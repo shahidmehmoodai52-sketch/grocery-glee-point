@@ -1,0 +1,156 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useSettings } from "@/hooks/use-settings";
+import { fmtMoney, fmtQty } from "@/lib/format";
+
+export const Route = createFileRoute("/_authenticated/products")({
+  component: ProductsPage,
+});
+
+type ProductForm = {
+  id?: string; name: string; sku: string; barcode: string; category: string; unit: string;
+  cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean;
+};
+const empty: ProductForm = { name: "", sku: "", barcode: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true };
+
+function ProductsPage() {
+  const qc = useQueryClient();
+  const { data: settings } = useSettings();
+  const sym = settings?.currency_symbol ?? "$";
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<ProductForm>(empty);
+
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("products").select("*").order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const filtered = products.filter((p) => {
+    const q = search.toLowerCase();
+    return !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q) || (p.barcode ?? "").toLowerCase().includes(q);
+  });
+
+  const save = async () => {
+    if (!form.name) return toast.error("Name is required");
+    const payload = { ...form, sku: form.sku || null, barcode: form.barcode || null, category: form.category || null };
+    const { error } = form.id
+      ? await supabase.from("products").update(payload).eq("id", form.id)
+      : await supabase.from("products").insert(payload);
+    if (error) return toast.error(error.message);
+    toast.success(form.id ? "Product updated" : "Product added");
+    setOpen(false);
+    setForm(empty);
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm("Delete this product?")) return;
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Deleted");
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  const edit = (p: any) => {
+    setForm({
+      id: p.id, name: p.name, sku: p.sku ?? "", barcode: p.barcode ?? "", category: p.category ?? "",
+      unit: p.unit ?? "pcs", cost_price: Number(p.cost_price), sell_price: Number(p.sell_price),
+      stock: Number(p.stock), tax_rate: Number(p.tax_rate), is_active: p.is_active,
+    });
+    setOpen(true);
+  };
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Products</h1>
+          <p className="text-sm text-muted-foreground">{products.length} items in catalog</p>
+        </div>
+        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
+          <DialogTrigger asChild>
+            <Button><Plus className="h-4 w-4 mr-2" />New product</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>{form.id ? "Edit" : "New"} product</DialogTitle></DialogHeader>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
+              <div><Label>Barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
+              <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
+              <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
+              <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
+              <div><Label>Price</Label><Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} /></div>
+              <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
+              <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button onClick={save}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card className="p-3">
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by name, SKU, barcode…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>SKU</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead className="text-right">Cost</TableHead>
+              <TableHead className="text-right">Price</TableHead>
+              <TableHead className="text-right">Stock</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
+            {!isLoading && filtered.length === 0 && (
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No products yet</TableCell></TableRow>
+            )}
+            {filtered.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">{p.name}</TableCell>
+                <TableCell className="text-muted-foreground">{p.sku ?? "—"}</TableCell>
+                <TableCell>{p.category ?? "—"}</TableCell>
+                <TableCell className="text-right">{fmtMoney(p.cost_price, sym)}</TableCell>
+                <TableCell className="text-right font-medium">{fmtMoney(p.sell_price, sym)}</TableCell>
+                <TableCell className="text-right">
+                  <Badge variant={Number(p.stock) > 0 ? "outline" : "destructive"}>
+                    {fmtQty(p.stock)} {p.unit}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" onClick={() => edit(p)}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
+  );
+}
