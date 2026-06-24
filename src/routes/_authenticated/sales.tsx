@@ -9,7 +9,9 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
-import { fmtMoney, fmtQty } from "@/lib/format";
+import { fmtMoney } from "@/lib/format";
+import { Receipt } from "@/components/receipt";
+
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: Page });
 
@@ -83,33 +85,21 @@ function Page() {
       </Card>
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Invoice {viewing?.invoice_no}</DialogTitle></DialogHeader>
           {viewing && (
-            <div id="printable-invoice" className="space-y-2 text-sm">
-              <div className="text-center border-b pb-2">
-                <div className="font-bold">{settings?.store_name}</div>
-                <div className="text-xs text-muted-foreground">{new Date(viewing.created_at).toLocaleString()}</div>
-              </div>
-              {viewing.sale_items?.map((it: any) => (
-                <div key={it.id} className="flex justify-between text-xs">
-                  <span>{it.name} × {fmtQty(it.qty)}</span>
-                  <span>{fmtMoney(it.line_total, sym)}</span>
-                </div>
-              ))}
-              <div className="border-t pt-2 space-y-1 text-xs">
-                <div className="flex justify-between"><span>Subtotal</span><span>{fmtMoney(viewing.subtotal, sym)}</span></div>
-                <div className="flex justify-between"><span>Tax</span><span>{fmtMoney(viewing.tax, sym)}</span></div>
-                <div className="flex justify-between"><span>Discount</span><span>-{fmtMoney(viewing.discount, sym)}</span></div>
-                <div className="flex justify-between font-bold border-t pt-1"><span>Total</span><span>{fmtMoney(viewing.total, sym)}</span></div>
+            <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
+              <div className="print-area">
+                <Receipt invoice={viewing} settings={settings} />
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="no-print">
             <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

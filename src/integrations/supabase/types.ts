@@ -354,8 +354,19 @@ export type Database = {
           currency: string
           currency_symbol: string
           id: number
+          logo_url: string | null
+          paper_width: string
           phone: string | null
+          receipt_footer: string | null
+          receipt_header: string | null
+          show_address: boolean
+          show_cashier: boolean
+          show_logo: boolean
+          show_phone: boolean
+          show_tax_id: boolean
+          show_tax_lines: boolean
           store_name: string
+          tax_id: string | null
           tax_rate: number
           updated_at: string
         }
@@ -364,8 +375,19 @@ export type Database = {
           currency?: string
           currency_symbol?: string
           id?: number
+          logo_url?: string | null
+          paper_width?: string
           phone?: string | null
+          receipt_footer?: string | null
+          receipt_header?: string | null
+          show_address?: boolean
+          show_cashier?: boolean
+          show_logo?: boolean
+          show_phone?: boolean
+          show_tax_id?: boolean
+          show_tax_lines?: boolean
           store_name?: string
+          tax_id?: string | null
           tax_rate?: number
           updated_at?: string
         }
@@ -374,8 +396,19 @@ export type Database = {
           currency?: string
           currency_symbol?: string
           id?: number
+          logo_url?: string | null
+          paper_width?: string
           phone?: string | null
+          receipt_footer?: string | null
+          receipt_header?: string | null
+          show_address?: boolean
+          show_cashier?: boolean
+          show_logo?: boolean
+          show_phone?: boolean
+          show_tax_id?: boolean
+          show_tax_lines?: boolean
           store_name?: string
+          tax_id?: string | null
           tax_rate?: number
           updated_at?: string
         }

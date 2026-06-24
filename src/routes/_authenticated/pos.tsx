@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
+import { Receipt } from "@/components/receipt";
+
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
@@ -407,46 +409,20 @@ function POSPage() {
   );
 }
 
-function InvoiceDialog({ invoice, sym, settings, onClose }: any) {
+function InvoiceDialog({ invoice, settings, onClose }: any) {
   if (!invoice) return null;
   return (
     <Dialog open={!!invoice} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Invoice {invoice.invoice_no}</DialogTitle>
         </DialogHeader>
-        <div id="printable-invoice" className="space-y-2 text-sm">
-          <div className="text-center border-b pb-2">
-            <div className="font-bold text-base">{settings?.store_name}</div>
-            {settings?.address && <div className="text-xs text-muted-foreground">{settings.address}</div>}
-            {settings?.phone && <div className="text-xs text-muted-foreground">{settings.phone}</div>}
+        <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
+          <div className="print-area">
+            <Receipt invoice={invoice} settings={settings} />
           </div>
-          <div className="flex justify-between text-xs">
-            <span>{new Date(invoice.created_at).toLocaleString()}</span>
-            <span>#{invoice.invoice_no}</span>
-          </div>
-          {invoice.customers?.name && <div className="text-xs">Customer: {invoice.customers.name}</div>}
-          <div className="border-t pt-2 space-y-1">
-            {invoice.sale_items?.map((it: any) => (
-              <div key={it.id} className="flex justify-between text-xs">
-                <span className="flex-1">{it.name} × {fmtQty(it.qty)}</span>
-                <span>{fmtMoney(it.line_total, sym)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="border-t pt-2 space-y-1 text-xs">
-            <div className="flex justify-between"><span>Subtotal</span><span>{fmtMoney(invoice.subtotal, sym)}</span></div>
-            <div className="flex justify-between"><span>Tax</span><span>{fmtMoney(invoice.tax, sym)}</span></div>
-            <div className="flex justify-between"><span>Discount</span><span>-{fmtMoney(invoice.discount, sym)}</span></div>
-            <div className="flex justify-between font-bold text-sm border-t pt-1">
-              <span>Total</span><span>{fmtMoney(invoice.total, sym)}</span>
-            </div>
-            <div className="flex justify-between"><span>Paid</span><span>{fmtMoney(invoice.paid, sym)}</span></div>
-            <div className="flex justify-between"><span>Change</span><span>{fmtMoney(invoice.change_due, sym)}</span></div>
-          </div>
-          <div className="text-center text-xs text-muted-foreground pt-2">Thank you!</div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="no-print">
           <Button variant="outline" onClick={onClose}>Close</Button>
           <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
         </DialogFooter>
@@ -454,3 +430,4 @@ function InvoiceDialog({ invoice, sym, settings, onClose }: any) {
     </Dialog>
   );
 }
+
