@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
+import { Receipt } from "@/components/receipt";
+
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
