@@ -310,38 +310,55 @@ function POSPage() {
                   Add items by clicking products or scanning barcodes.
                 </div>
               )}
-              {tab.items.map((it, idx) => (
-                <Card key={idx} className="p-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">{it.name}</div>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={it.qty}
-                          onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
-                          className="h-8 w-20 text-sm"
-                        />
-                        <span className="text-xs text-muted-foreground">×</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={it.price}
-                          onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
-                          className="h-8 w-24 text-sm"
-                        />
+              {tab.items.map((it, idx) => {
+                const lineRev = Number(it.qty) * Number(it.price);
+                const lineCost = Number(it.qty) * Number(it.cost);
+                const lineProfit = lineRev - lineCost;
+                const mpct = Number(it.price) > 0 ? ((Number(it.price) - Number(it.cost)) / Number(it.price)) * 100 : 0;
+                return (
+                  <Card key={idx} className="p-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{it.name}</div>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input
+                            type="number"
+                            step="0.001"
+                            value={it.qty}
+                            onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
+                            className="h-8 w-20 text-sm"
+                          />
+                          <span className="text-xs text-muted-foreground">×</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={it.price}
+                            onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
+                            className="h-8 w-24 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-sm">{fmtMoney(lineRev, sym)}</div>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 mt-1" onClick={() => removeLine(idx)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-sm">{fmtMoney(it.qty * it.price, sym)}</div>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 mt-1" onClick={() => removeLine(idx)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
+                    {/* Internal cost / margin — screen only, never printed */}
+                    <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-muted-foreground border-t pt-1">
+                      <span title="Purchase rate (cost)">
+                        Cost <span className="font-mono text-foreground/70">{fmtMoney(it.cost, sym)}</span>
+                        <span className="mx-1 opacity-50">·</span>
+                        Sale <span className="font-mono text-foreground/70">{fmtMoney(it.price, sym)}</span>
+                      </span>
+                      <span className={lineProfit >= 0 ? "text-success" : "text-destructive"} title="Line profit">
+                        +{fmtMoney(lineProfit, sym)} ({mpct.toFixed(0)}%)
+                      </span>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           </ScrollArea>
 
