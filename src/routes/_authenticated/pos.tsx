@@ -178,7 +178,8 @@ function POSPage() {
         customer_id: tab.customer_id,
         payment_method: tab.payment_method,
         tax,
-        discount,
+        // Combine per-line discounts with cart-level discount so they reach the ledger.
+        discount: +(lineDiscountTotal + discount).toFixed(2),
         paid: paidNum,
         note: tab.note,
         items: tab.items.map((i) => ({
@@ -189,6 +190,7 @@ function POSPage() {
           cost: i.cost,
         })),
       };
+
       const { data, error } = await supabase.rpc("complete_sale", { payload });
       if (error) throw error;
       const { data: sale } = await supabase
