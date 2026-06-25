@@ -538,6 +538,15 @@ function POSPage() {
   );
 }
 
+function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div className={`flex justify-between text-sm ${muted ? "text-muted-foreground" : ""}`}>
+      <span>{label}</span>
+      <span className={muted ? "" : "font-medium"}>{value}</span>
+    </div>
+  );
+}
+
 function InvoiceDialog({ invoice, settings, onClose }: any) {
   if (!invoice) return null;
   return (
