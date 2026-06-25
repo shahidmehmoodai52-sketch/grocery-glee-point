@@ -248,22 +248,32 @@ function POSPage() {
           </div>
           <ScrollArea className="flex-1">
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 p-3">
-              {filtered.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => addProduct(p)}
-                  className="text-left p-3 rounded-lg border bg-card hover:border-primary hover:shadow-sm transition"
-                >
-                  <div className="font-medium text-sm line-clamp-2">{p.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{p.sku ?? "—"}</div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="font-semibold text-primary">{fmtMoney(p.sell_price, sym)}</span>
-                    <Badge variant={p.stock > 0 ? "outline" : "destructive"} className="text-[10px]">
-                      {fmtQty(p.stock)} {p.unit}
-                    </Badge>
-                  </div>
-                </button>
-              ))}
+              {filtered.map((p) => {
+                const margin = Number(p.sell_price) - Number(p.cost_price);
+                const mpct = Number(p.sell_price) > 0 ? (margin / Number(p.sell_price)) * 100 : 0;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => addProduct(p)}
+                    className="text-left p-3 rounded-lg border bg-card hover:border-primary hover:shadow-sm transition"
+                  >
+                    <div className="font-medium text-sm line-clamp-2">{p.name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{p.sku ?? "—"}</div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="font-semibold text-primary">{fmtMoney(p.sell_price, sym)}</span>
+                      <Badge variant={p.stock > 0 ? "outline" : "destructive"} className="text-[10px]">
+                        {fmtQty(p.stock)} {p.unit}
+                      </Badge>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground border-t pt-1.5">
+                      <span>Cost <span className="font-mono text-foreground/70">{fmtMoney(p.cost_price, sym)}</span></span>
+                      <span className={margin >= 0 ? "text-success" : "text-destructive"}>
+                        +{fmtMoney(margin, sym)} ({mpct.toFixed(0)}%)
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
               {filtered.length === 0 && (
                 <div className="col-span-full text-center text-sm text-muted-foreground py-12">
                   No products match. Add products from the Products page.
@@ -300,38 +310,55 @@ function POSPage() {
                   Add items by clicking products or scanning barcodes.
                 </div>
               )}
-              {tab.items.map((it, idx) => (
-                <Card key={idx} className="p-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">{it.name}</div>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={it.qty}
-                          onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
-                          className="h-8 w-20 text-sm"
-                        />
-                        <span className="text-xs text-muted-foreground">×</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={it.price}
-                          onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
-                          className="h-8 w-24 text-sm"
-                        />
+              {tab.items.map((it, idx) => {
+                const lineRev = Number(it.qty) * Number(it.price);
+                const lineCost = Number(it.qty) * Number(it.cost);
+                const lineProfit = lineRev - lineCost;
+                const mpct = Number(it.price) > 0 ? ((Number(it.price) - Number(it.cost)) / Number(it.price)) * 100 : 0;
+                return (
+                  <Card key={idx} className="p-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{it.name}</div>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input
+                            type="number"
+                            step="0.001"
+                            value={it.qty}
+                            onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
+                            className="h-8 w-20 text-sm"
+                          />
+                          <span className="text-xs text-muted-foreground">×</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={it.price}
+                            onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
+                            className="h-8 w-24 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-sm">{fmtMoney(lineRev, sym)}</div>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 mt-1" onClick={() => removeLine(idx)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-sm">{fmtMoney(it.qty * it.price, sym)}</div>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 mt-1" onClick={() => removeLine(idx)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
+                    {/* Internal cost / margin — screen only, never printed */}
+                    <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-muted-foreground border-t pt-1">
+                      <span title="Purchase rate (cost)">
+                        Cost <span className="font-mono text-foreground/70">{fmtMoney(it.cost, sym)}</span>
+                        <span className="mx-1 opacity-50">·</span>
+                        Sale <span className="font-mono text-foreground/70">{fmtMoney(it.price, sym)}</span>
+                      </span>
+                      <span className={lineProfit >= 0 ? "text-success" : "text-destructive"} title="Line profit">
+                        +{fmtMoney(lineProfit, sym)} ({mpct.toFixed(0)}%)
+                      </span>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           </ScrollArea>
 
@@ -358,6 +385,22 @@ function POSPage() {
               <span>Total</span>
               <span className="text-primary">{fmtMoney(total, sym)}</span>
             </div>
+            {/* Internal profit summary — screen only, never printed */}
+            {tab.items.length > 0 && (() => {
+              const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
+              const cartProfit = subtotal - discount - cartCost;
+              const pct = subtotal > 0 ? (cartProfit / (subtotal - discount || 1)) * 100 : 0;
+              return (
+                <div className="no-print rounded-md border border-dashed bg-muted/40 px-2 py-1.5 text-[11px] flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    Cost <span className="font-mono text-foreground/80">{fmtMoney(cartCost, sym)}</span>
+                  </span>
+                  <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
+                    Profit {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
+                  </span>
+                </div>
+              );
+            })()}
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <div>
