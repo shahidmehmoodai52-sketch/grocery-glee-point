@@ -48,9 +48,7 @@ export type ReceiptInvoice = {
 type Props = {
   invoice: ReceiptInvoice;
   settings?: ReceiptSettings | null;
-  /** Render at the configured paper width (for print/preview). */
   paper?: boolean;
-  /** Document kind for header/stamps. */
   kind?: "sale" | "sale-return" | "purchase-return";
 };
 
@@ -73,23 +71,19 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
   return (
     <div
-      className={`receipt-paper bg-white text-black mx-auto relative ${
-        paper ? "shadow-[0_1px_0_rgba(0,0,0,0.04)]" : ""
-      }`}
+      className="receipt-paper bg-white text-black mx-auto relative"
       style={
         paper
           ? {
               width,
               padding: "5mm 4mm 6mm",
-              fontFamily:
-                "'SF Mono','Menlo','Consolas','Liberation Mono',monospace",
+              fontFamily: "'SF Mono','Menlo','Consolas','Liberation Mono',monospace",
               fontSize: "11px",
               lineHeight: 1.35,
             }
           : undefined
       }
     >
-      {/* Decorative top border */}
       <div className="flex flex-col items-center">
         <div className="w-full flex items-center gap-1 mb-1">
           <span className="flex-1 border-t-2 border-double border-black" />
@@ -98,25 +92,17 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         </div>
 
         {settings?.show_logo !== false && settings?.logo_url && (
-          <img
-            src={settings.logo_url}
-            alt="logo"
-            className="max-h-12 object-contain my-1"
-          />
+          <img src={settings.logo_url} alt="logo" className="max-h-12 object-contain my-1" />
         )}
 
         <div className="font-extrabold text-[15px] uppercase tracking-[0.08em] text-center">
           {settings?.store_name ?? "Store"}
         </div>
         {settings?.show_address !== false && settings?.address && (
-          <div className="text-[9.5px] text-center leading-tight">
-            {settings.address}
-          </div>
+          <div className="text-[9.5px] text-center leading-tight">{settings.address}</div>
         )}
         <div className="text-[9.5px] text-center flex flex-wrap justify-center gap-x-2">
-          {settings?.show_phone !== false && settings?.phone && (
-            <span>☎ {settings.phone}</span>
-          )}
+          {settings?.show_phone !== false && settings?.phone && <span>☎ {settings.phone}</span>}
           {settings?.show_tax_id !== false && settings?.tax_id && (
             <span>NTN/Tax: {settings.tax_id}</span>
           )}
@@ -130,9 +116,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       <div className="my-2 border-t border-dashed border-black" />
 
-      <div className="text-center text-[11px] font-bold tracking-widest">
-        {docTitle}
-      </div>
+      <div className="text-center text-[11px] font-bold tracking-widest">{docTitle}</div>
 
       <div className="mt-1 grid grid-cols-2 gap-x-2 text-[10px]">
         <div>
@@ -161,7 +145,6 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       <div className="my-2 border-t border-dashed border-black" />
 
-      {/* Items table */}
       <div className="text-[9.5px] grid grid-cols-12 font-bold uppercase tracking-wider pb-1 border-b border-black">
         <div className="col-span-6">Item</div>
         <div className="col-span-2 text-right">Qty</div>
@@ -190,7 +173,6 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       <div className="my-2 border-t border-dashed border-black" />
 
-      {/* Totals box */}
       <div className="space-y-0.5">
         <Row label="Subtotal" value={fmtMoney(invoice.subtotal, sym)} />
         {settings?.show_tax_lines !== false && (
@@ -199,9 +181,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
             value={fmtMoney(invoice.tax, sym)}
           />
         )}
-        {savings > 0 && (
-          <Row label="Discount" value={`-${fmtMoney(savings, sym)}`} />
-        )}
+        {savings > 0 && <Row label="Discount" value={`-${fmtMoney(savings, sym)}`} />}
       </div>
 
       <div className="mt-1 bg-black text-white px-2 py-1 flex justify-between text-[13px] font-extrabold tracking-wide">
@@ -218,7 +198,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
             />
             {Number(invoice.total) - Number(invoice.refund_amount ?? 0) > 0 && (
               <Row
-                label="Store credit"
+                label={kind === "purchase-return" ? "Credit from supplier" : "Store credit"}
                 value={fmtMoney(
                   Number(invoice.total) - Number(invoice.refund_amount ?? 0),
                   sym,
@@ -230,10 +210,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
           <>
             <Row label="Paid" value={fmtMoney(invoice.paid ?? 0, sym)} />
             {Number(invoice.change_due ?? 0) > 0 && (
-              <Row
-                label="Change"
-                value={fmtMoney(invoice.change_due ?? 0, sym)}
-              />
+              <Row label="Change" value={fmtMoney(invoice.change_due ?? 0, sym)} />
             )}
           </>
         )}
@@ -254,7 +231,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       )}
 
       {isReturn && (
-        <div className="my-2 mx-auto w-fit border-2 border-black px-3 py-0.5 text-[11px] font-extrabold rotate-[-4deg] tracking-widest">
+        <div className="my-2 mx-auto w-fit border-2 border-black px-3 py-0.5 text-[11px] font-extrabold tracking-widest" style={{ transform: "rotate(-4deg)" }}>
           ✦ RETURN ✦
         </div>
       )}
@@ -268,7 +245,6 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         </>
       )}
 
-      {/* Faux barcode of doc number */}
       <div className="mt-2 flex flex-col items-center">
         <div className="flex h-8 items-end gap-[1px]">
           {String(docNo)
@@ -279,10 +255,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
                 <span
                   key={`${i}-${k}`}
                   className="bg-black"
-                  style={{
-                    width: ((code + k) % 3) + 1 + "px",
-                    height: "100%",
-                  }}
+                  style={{ width: ((code + k) % 3) + 1 + "px", height: "100%" }}
                 />
               ));
             })}
@@ -308,7 +281,6 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Sample invoice used in the settings preview. */
 export const sampleInvoice: ReceiptInvoice = {
   invoice_no: "S-1042",
   created_at: new Date().toISOString(),
