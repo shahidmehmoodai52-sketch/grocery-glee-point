@@ -25,10 +25,12 @@ export const Route = createFileRoute("/_authenticated/pos")({
 
 type CartItem = {
   product_id: string | null;
+  code: string;
   name: string;
   qty: number;
   price: number;
   cost: number;
+  disc: number;
 };
 type Tab = {
   id: string;
@@ -37,6 +39,7 @@ type Tab = {
   customer_id: string | null;
   payment_method: string;
   discount: number;
+  discount_pct: string;
   paid: string;
   note: string;
 };
@@ -48,9 +51,11 @@ const newTab = (n: number): Tab => ({
   customer_id: null,
   payment_method: "cash",
   discount: 0,
+  discount_pct: "",
   paid: "",
   note: "",
 });
+
 
 function POSPage() {
   const qc = useQueryClient();
