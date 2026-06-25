@@ -256,15 +256,15 @@ function POSPage() {
         </ScrollArea>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_440px] min-h-0">
-        {/* Products */}
-        <div className="flex flex-col min-h-0 border-r">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[340px_1fr] min-h-0">
+        {/* Products sidebar */}
+        <div className="flex flex-col min-h-0 border-r bg-card/20">
           <div className="p-3 border-b">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 autoFocus
-                placeholder="Scan barcode or search products…"
+                placeholder="Scan barcode or search…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -278,7 +278,7 @@ function POSPage() {
             </div>
           </div>
           <ScrollArea className="flex-1">
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 p-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
               {filtered.map((p) => {
                 const margin = Number(p.sell_price) - Number(p.cost_price);
                 const mpct = Number(p.sell_price) > 0 ? (margin / Number(p.sell_price)) * 100 : 0;
@@ -286,20 +286,20 @@ function POSPage() {
                   <button
                     key={p.id}
                     onClick={() => addProduct(p)}
-                    className="text-left p-3 rounded-lg border bg-card hover:border-primary hover:shadow-sm transition"
+                    className="text-left p-2.5 rounded-lg border bg-card hover:border-primary hover:shadow-sm transition"
                   >
                     <div className="font-medium text-sm line-clamp-2">{p.name}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{p.sku ?? "—"}</div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="font-semibold text-primary">{fmtMoney(p.sell_price, sym)}</span>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">{p.sku ?? "—"}</div>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <span className="font-semibold text-primary text-sm">{fmtMoney(p.sell_price, sym)}</span>
                       <Badge variant={p.stock > 0 ? "outline" : "destructive"} className="text-[10px]">
                         {fmtQty(p.stock)} {p.unit}
                       </Badge>
                     </div>
-                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground border-t pt-1.5">
+                    <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground border-t pt-1">
                       <span>Cost <span className="font-mono text-foreground/70">{fmtMoney(p.cost_price, sym)}</span></span>
                       <span className={margin >= 0 ? "text-success" : "text-destructive"}>
-                        +{fmtMoney(margin, sym)} ({mpct.toFixed(0)}%)
+                        {mpct.toFixed(0)}%
                       </span>
                     </div>
                   </button>
@@ -307,176 +307,231 @@ function POSPage() {
               })}
               {filtered.length === 0 && (
                 <div className="col-span-full text-center text-sm text-muted-foreground py-12">
-                  No products match. Add products from the Products page.
+                  No products match.
                 </div>
               )}
             </div>
           </ScrollArea>
         </div>
 
-        {/* Cart panel */}
-        <div className="flex flex-col min-h-0 bg-card/30">
-          <div className="p-3 border-b">
-            <Label className="text-xs">Customer</Label>
-            <Select
-              value={tab.customer_id ?? "walkin"}
-              onValueChange={(v) => setTab({ customer_id: v === "walkin" ? null : v })}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="walkin">Walk-in customer</SelectItem>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Billing window */}
+        <div className="flex flex-col min-h-0 bg-background">
+          {/* Customer + meta strip */}
+          <div className="p-3 border-b grid grid-cols-1 md:grid-cols-[1fr_180px_180px] gap-2 items-end">
+            <div>
+              <Label className="text-xs">Customer</Label>
+              <Select
+                value={tab.customer_id ?? "walkin"}
+                onValueChange={(v) => setTab({ customer_id: v === "walkin" ? null : v })}
+              >
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="walkin">Walk-in customer</SelectItem>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Payment</Label>
+              <Select value={tab.payment_method} onValueChange={(v) => setTab({ payment_method: v })}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="bank">Bank transfer</SelectItem>
+                  <SelectItem value="credit">Credit (later)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-right text-xs text-muted-foreground self-end pb-1">
+              {tab.items.length} item{tab.items.length === 1 ? "" : "s"} · {tab.name}
+            </div>
           </div>
 
-          <ScrollArea className="flex-1">
-            <div className="p-3 space-y-2">
-              {tab.items.length === 0 && (
-                <div className="text-center text-sm text-muted-foreground py-12">
-                  Add items by clicking products or scanning barcodes.
-                </div>
-              )}
-              {tab.items.map((it, idx) => {
-                const lineRev = Number(it.qty) * Number(it.price);
-                const lineCost = Number(it.qty) * Number(it.cost);
-                const lineProfit = lineRev - lineCost;
-                const mpct = Number(it.price) > 0 ? ((Number(it.price) - Number(it.cost)) / Number(it.price)) * 100 : 0;
-                return (
-                  <Card key={idx} className="p-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate">{it.name}</div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Input
-                            type="number"
-                            step="0.001"
-                            value={it.qty}
-                            onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
-                            className="h-8 w-20 text-sm"
-                          />
-                          <span className="text-xs text-muted-foreground">×</span>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={it.price}
-                            onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
-                            className="h-8 w-24 text-sm"
-                          />
+          {/* Item-wise detailed table */}
+          <div className="flex-1 min-h-0 overflow-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead className="sticky top-0 z-10 bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2 text-left w-10">#</th>
+                  <th className="px-2 py-2 text-left w-28">Item Code</th>
+                  <th className="px-2 py-2 text-left">Item Name</th>
+                  <th className="px-2 py-2 text-right w-24" title="Purchase rate (cost)">Purch. Rate</th>
+                  <th className="px-2 py-2 text-right w-24">Sale Rate</th>
+                  <th className="px-2 py-2 text-right w-24">Qty</th>
+                  <th className="px-2 py-2 text-right w-24">Disc.</th>
+                  <th className="px-2 py-2 text-right w-28">Amount</th>
+                  <th className="px-2 py-2 w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tab.items.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="text-center text-muted-foreground py-16">
+                      Add items by clicking products or scanning barcodes.
+                    </td>
+                  </tr>
+                )}
+                {tab.items.map((it, idx) => {
+                  const gross = Number(it.qty) * Number(it.price);
+                  const amount = Math.max(gross - Number(it.disc || 0), 0);
+                  const profit = amount - Number(it.qty) * Number(it.cost);
+                  return (
+                    <tr key={idx} className="border-b hover:bg-muted/40">
+                      <td className="px-2 py-1.5 text-muted-foreground text-xs">{idx + 1}</td>
+                      <td className="px-2 py-1.5 font-mono text-xs">{it.code || "—"}</td>
+                      <td className="px-2 py-1.5">
+                        <div className="font-medium">{it.name}</div>
+                        <div className={`text-[10px] ${profit >= 0 ? "text-success" : "text-destructive"}`}>
+                          margin {fmtMoney(profit, sym)}
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-sm">{fmtMoney(lineRev, sym)}</div>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 mt-1" onClick={() => removeLine(idx)}>
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono text-muted-foreground">
+                        {fmtMoney(it.cost, sym)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={it.price}
+                          onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
+                          className="h-8 w-24 text-right text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={it.qty}
+                          onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
+                          className="h-8 w-20 text-right text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          value={it.disc}
+                          onChange={(e) => updateLine(idx, { disc: Math.max(0, Number(e.target.value)) })}
+                          className="h-8 w-20 text-right text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-semibold">{fmtMoney(amount, sym)}</td>
+                      <td className="px-2 py-1.5 text-right">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeLine(idx)}>
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
-                      </div>
-                    </div>
-                    {/* Internal cost / margin — screen only, never printed */}
-                    <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-muted-foreground border-t pt-1">
-                      <span title="Purchase rate (cost)">
-                        Cost <span className="font-mono text-foreground/70">{fmtMoney(it.cost, sym)}</span>
-                        <span className="mx-1 opacity-50">·</span>
-                        Sale <span className="font-mono text-foreground/70">{fmtMoney(it.price, sym)}</span>
-                      </span>
-                      <span className={lineProfit >= 0 ? "text-success" : "text-destructive"} title="Line profit">
-                        +{fmtMoney(lineProfit, sym)} ({mpct.toFixed(0)}%)
-                      </span>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          </ScrollArea>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-          <div className="border-t p-3 space-y-2 bg-card">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">{fmtMoney(subtotal, sym)}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Discount</span>
-              <Input
-                type="number"
-                step="0.01"
-                value={tab.discount}
-                onChange={(e) => setTab({ discount: Number(e.target.value) })}
-                className="h-7 w-24 text-right text-sm"
-              />
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Tax ({taxRate}%)</span>
-              <span>{fmtMoney(tax, sym)}</span>
-            </div>
-            <div className="flex justify-between text-lg font-semibold border-t pt-2">
-              <span>Total</span>
-              <span className="text-primary">{fmtMoney(total, sym)}</span>
-            </div>
-            {/* Internal profit summary — screen only, never printed */}
-            {tab.items.length > 0 && (() => {
-              const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
-              const cartProfit = subtotal - discount - cartCost;
-              const pct = subtotal > 0 ? (cartProfit / (subtotal - discount || 1)) * 100 : 0;
-              return (
-                <div className="no-print rounded-md border border-dashed bg-muted/40 px-2 py-1.5 text-[11px] flex items-center justify-between">
-                  <span className="text-muted-foreground">
-                    Cost <span className="font-mono text-foreground/80">{fmtMoney(cartCost, sym)}</span>
-                  </span>
-                  <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
-                    Profit {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
-                  </span>
+          {/* Totals strip */}
+          <div className="border-t bg-card grid grid-cols-1 md:grid-cols-[1fr_360px]">
+            {/* Internal cost/profit + paid controls */}
+            <div className="p-3 space-y-2 border-r">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Paid</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={tab.paid}
+                    onChange={(e) => setTab({ paid: e.target.value })}
+                    placeholder={total.toFixed(2)}
+                    className="h-9"
+                  />
                 </div>
-              );
-            })()}
+                <div className="flex flex-col justify-end">
+                  <button
+                    onClick={() => setTab({ paid: total.toFixed(2) })}
+                    className="text-xs text-primary hover:underline self-start"
+                  >
+                    Exact amount
+                  </button>
+                  <div className="text-xs mt-1">
+                    {due > 0
+                      ? <span className="text-destructive font-medium">Due: {fmtMoney(due, sym)}</span>
+                      : <span className="text-success font-medium">Change: {fmtMoney(change, sym)}</span>}
+                  </div>
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <div>
-                <Label className="text-xs">Method</Label>
-                <Select value={tab.payment_method} onValueChange={(v) => setTab({ payment_method: v })}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                    <SelectItem value="bank">Bank transfer</SelectItem>
-                    <SelectItem value="credit">Credit (later)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Paid</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={tab.paid}
-                  onChange={(e) => setTab({ paid: e.target.value })}
-                  placeholder={total.toFixed(2)}
-                  className="h-9"
-                />
-              </div>
-            </div>
-            <div className="flex justify-between text-xs pt-1">
-              <span className="text-muted-foreground">
-                {due > 0 ? `Due: ${fmtMoney(due, sym)}` : `Change: ${fmtMoney(change, sym)}`}
-              </span>
-              <button
-                onClick={() => setTab({ paid: total.toFixed(2) })}
-                className="text-primary hover:underline"
-              >
-                Exact
-              </button>
+              {/* Internal profit summary — screen only */}
+              {tab.items.length > 0 && (() => {
+                const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
+                const cartProfit = subtotal - discount - cartCost;
+                const net = subtotal - discount;
+                const pct = net > 0 ? (cartProfit / net) * 100 : 0;
+                return (
+                  <div className="no-print rounded-md border border-dashed bg-muted/40 px-2 py-1.5 text-[11px] flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      Cost <span className="font-mono text-foreground/80">{fmtMoney(cartCost, sym)}</span>
+                    </span>
+                    <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
+                      Profit {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
-            <Button className="w-full h-11 mt-2" onClick={handleSale} disabled={submitting}>
-              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Complete sale (F4)
-            </Button>
+            {/* Money column */}
+            <div className="p-3 space-y-1.5 bg-muted/30">
+              <Row label="Gross" value={fmtMoney(subtotal + lineDiscountTotal, sym)} muted />
+              {lineDiscountTotal > 0 && (
+                <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
+              )}
+              <Row label="Subtotal" value={fmtMoney(subtotal, sym)} />
+
+              <div className="flex items-center justify-between text-sm gap-2">
+                <span className="text-muted-foreground">Discount</span>
+                <div className="flex items-center gap-1">
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={tab.discount_pct}
+                      onChange={(e) => applyDiscountPct(e.target.value)}
+                      placeholder="0"
+                      className="h-8 w-16 text-right text-sm pr-5"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                  </div>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={tab.discount}
+                    onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
+                    className="h-8 w-24 text-right text-sm"
+                  />
+                </div>
+              </div>
+
+              <Row label={`Tax (${taxRate}%)`} value={fmtMoney(tax, sym)} />
+
+              <div className="flex justify-between items-center border-t-2 border-foreground/20 pt-2 mt-1">
+                <span className="text-base font-semibold">Grand Total</span>
+                <span className="text-xl font-bold text-primary">{fmtMoney(total, sym)}</span>
+              </div>
+
+              <Button className="w-full h-11 mt-2" onClick={handleSale} disabled={submitting}>
+                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Complete sale (F4)
+              </Button>
+            </div>
           </div>
         </div>
       </div>
+
 
       <InvoiceDialog invoice={lastInvoice} sym={sym} settings={settings} onClose={() => setLastInvoice(null)} />
     </div>
