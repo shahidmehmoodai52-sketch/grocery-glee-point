@@ -1,6 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
-  ShoppingCart, Package, Users, Truck, ClipboardList, Receipt, BarChart3, Settings, LogOut, Store,
+  LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
+  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -9,15 +10,38 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 
-const items = [
-  { title: "POS", url: "/pos", icon: ShoppingCart },
-  { title: "Sales", url: "/sales", icon: Receipt },
-  { title: "Purchases", url: "/purchases", icon: ClipboardList },
-  { title: "Products", url: "/products", icon: Package },
-  { title: "Customers", url: "/customers", icon: Users },
-  { title: "Suppliers", url: "/suppliers", icon: Truck },
-  { title: "Reports", url: "/reports", icon: BarChart3 },
-  { title: "Settings", url: "/settings", icon: Settings },
+const groups: { label: string; items: { title: string; url: string; icon: any }[] }[] = [
+  {
+    label: "Overview",
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      { title: "POS", url: "/pos", icon: ShoppingCart },
+    ],
+  },
+  {
+    label: "Transactions",
+    items: [
+      { title: "Sales", url: "/sales", icon: Receipt },
+      { title: "Sale returns", url: "/sale-returns", icon: Undo2 },
+      { title: "Purchases", url: "/purchases", icon: ClipboardList },
+      { title: "Purchase returns", url: "/purchase-returns", icon: RotateCcw },
+    ],
+  },
+  {
+    label: "Catalog",
+    items: [
+      { title: "Products", url: "/products", icon: Package },
+      { title: "Customers", url: "/customers", icon: Users },
+      { title: "Suppliers", url: "/suppliers", icon: Truck },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { title: "Reports", url: "/reports", icon: BarChart3 },
+      { title: "Settings", url: "/settings", icon: Settings },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -50,23 +74,25 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                    <Link to={item.url} className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {groups.map((g) => (
+          <SidebarGroup key={g.label}>
+            <SidebarGroupLabel>{g.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {g.items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                      <Link to={item.url} className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
