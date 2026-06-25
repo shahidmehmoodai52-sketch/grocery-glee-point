@@ -385,6 +385,22 @@ function POSPage() {
               <span>Total</span>
               <span className="text-primary">{fmtMoney(total, sym)}</span>
             </div>
+            {/* Internal profit summary — screen only, never printed */}
+            {tab.items.length > 0 && (() => {
+              const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
+              const cartProfit = subtotal - discount - cartCost;
+              const pct = subtotal > 0 ? (cartProfit / (subtotal - discount || 1)) * 100 : 0;
+              return (
+                <div className="no-print rounded-md border border-dashed bg-muted/40 px-2 py-1.5 text-[11px] flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    Cost <span className="font-mono text-foreground/80">{fmtMoney(cartCost, sym)}</span>
+                  </span>
+                  <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
+                    Profit {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
+                  </span>
+                </div>
+              );
+            })()}
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <div>
