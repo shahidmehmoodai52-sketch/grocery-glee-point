@@ -112,7 +112,15 @@ function POSPage() {
     const items = [...tab.items];
     const ex = items.find((i) => i.product_id === p.id);
     if (ex) ex.qty = Number(ex.qty) + 1;
-    else items.push({ product_id: p.id, name: p.name, qty: 1, price: Number(p.sell_price), cost: Number(p.cost_price) });
+    else items.push({
+      product_id: p.id,
+      code: p.sku ?? p.barcode ?? "",
+      name: p.name,
+      qty: 1,
+      price: Number(p.sell_price),
+      cost: Number(p.cost_price),
+      disc: 0,
+    });
     setTab({ items });
   };
 
@@ -123,13 +131,29 @@ function POSPage() {
 
   const removeLine = (idx: number) => setTab({ items: tab.items.filter((_, i) => i !== idx) });
 
-  const subtotal = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0);
+  const subtotal = tab.items.reduce(
+    (s, i) => s + Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
+    0,
+  );
+  const lineDiscountTotal = tab.items.reduce((s, i) => s + Number(i.disc || 0), 0);
   const tax = +(subtotal * (taxRate / 100)).toFixed(2);
   const discount = Number(tab.discount || 0);
   const total = +(subtotal + tax - discount).toFixed(2);
   const paidNum = Number(tab.paid || 0);
   const change = Math.max(paidNum - total, 0);
   const due = Math.max(total - paidNum, 0);
+
+  // Keep cart discount in sync when percentage is typed
+  const applyDiscountPct = (pct: string) => {
+    const n = Number(pct);
+    if (!isFinite(n) || pct === "") {
+      setTab({ discount_pct: pct });
+      return;
+    }
+    const newDisc = +Math.max(0, (subtotal * n) / 100).toFixed(2);
+    setTab({ discount_pct: pct, discount: newDisc });
+  };
+
 
   const addTab = () => {
     const t = newTab(tabs.length + 1);
