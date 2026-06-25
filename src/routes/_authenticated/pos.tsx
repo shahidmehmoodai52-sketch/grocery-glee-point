@@ -248,22 +248,32 @@ function POSPage() {
           </div>
           <ScrollArea className="flex-1">
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 p-3">
-              {filtered.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => addProduct(p)}
-                  className="text-left p-3 rounded-lg border bg-card hover:border-primary hover:shadow-sm transition"
-                >
-                  <div className="font-medium text-sm line-clamp-2">{p.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{p.sku ?? "—"}</div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="font-semibold text-primary">{fmtMoney(p.sell_price, sym)}</span>
-                    <Badge variant={p.stock > 0 ? "outline" : "destructive"} className="text-[10px]">
-                      {fmtQty(p.stock)} {p.unit}
-                    </Badge>
-                  </div>
-                </button>
-              ))}
+              {filtered.map((p) => {
+                const margin = Number(p.sell_price) - Number(p.cost_price);
+                const mpct = Number(p.sell_price) > 0 ? (margin / Number(p.sell_price)) * 100 : 0;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => addProduct(p)}
+                    className="text-left p-3 rounded-lg border bg-card hover:border-primary hover:shadow-sm transition"
+                  >
+                    <div className="font-medium text-sm line-clamp-2">{p.name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{p.sku ?? "—"}</div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="font-semibold text-primary">{fmtMoney(p.sell_price, sym)}</span>
+                      <Badge variant={p.stock > 0 ? "outline" : "destructive"} className="text-[10px]">
+                        {fmtQty(p.stock)} {p.unit}
+                      </Badge>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground border-t pt-1.5">
+                      <span>Cost <span className="font-mono text-foreground/70">{fmtMoney(p.cost_price, sym)}</span></span>
+                      <span className={margin >= 0 ? "text-success" : "text-destructive"}>
+                        +{fmtMoney(margin, sym)} ({mpct.toFixed(0)}%)
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
               {filtered.length === 0 && (
                 <div className="col-span-full text-center text-sm text-muted-foreground py-12">
                   No products match. Add products from the Products page.
