@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, Printer } from "lucide-react";
+import { Eye, Printer, Undo2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +76,10 @@ function Page() {
                     {s.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right whitespace-nowrap">
+                  <Button asChild variant="ghost" size="sm" title="Create return">
+                    <Link to="/sale-returns"><Undo2 className="h-4 w-4" /></Link>
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => setViewing(s)}><Eye className="h-4 w-4" /></Button>
                 </TableCell>
               </TableRow>
