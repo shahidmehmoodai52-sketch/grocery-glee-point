@@ -21,8 +21,10 @@ export type ReceiptSettings = {
 
 export type ReceiptInvoice = {
   invoice_no?: string | number;
+  return_no?: string | number;
   created_at?: string | Date;
-  customers?: { name?: string } | null;
+  customers?: { name?: string; phone?: string } | null;
+  suppliers?: { name?: string; phone?: string } | null;
   cashier_name?: string | null;
   sale_items?: Array<{
     id?: string;
@@ -33,12 +35,14 @@ export type ReceiptInvoice = {
   }>;
   subtotal: number;
   tax: number;
-  discount: number;
+  discount?: number;
   total: number;
-  paid: number;
+  paid?: number;
+  refund_amount?: number;
   change_due?: number;
   note?: string | null;
   payment_method?: string;
+  refund_method?: string;
 };
 
 type Props = {
@@ -46,73 +50,147 @@ type Props = {
   settings?: ReceiptSettings | null;
   /** Render at the configured paper width (for print/preview). */
   paper?: boolean;
+  /** Document kind for header/stamps. */
+  kind?: "sale" | "sale-return" | "purchase-return";
 };
 
-export function Receipt({ invoice, settings, paper = true }: Props) {
+export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Props) {
   const sym = settings?.currency_symbol ?? "$";
   const width = settings?.paper_width === "58mm" ? "58mm" : "80mm";
   const date = invoice.created_at ? new Date(invoice.created_at) : new Date();
+  const isReturn = kind !== "sale";
+  const docNo = invoice.return_no ?? invoice.invoice_no ?? "—";
+  const docTitle =
+    kind === "sale-return"
+      ? "SALES RETURN"
+      : kind === "purchase-return"
+      ? "PURCHASE RETURN"
+      : "SALES INVOICE";
+
+  const party = invoice.customers?.name ?? invoice.suppliers?.name;
+  const partyLabel = kind === "purchase-return" ? "Supplier" : "Customer";
+  const savings = Number(invoice.discount ?? 0);
 
   return (
     <div
-      className="receipt-paper bg-white text-black font-mono text-[11px] leading-snug mx-auto"
-      style={paper ? { width, padding: "6mm 4mm" } : undefined}
+      className={`receipt-paper bg-white text-black mx-auto relative ${
+        paper ? "shadow-[0_1px_0_rgba(0,0,0,0.04)]" : ""
+      }`}
+      style={
+        paper
+          ? {
+              width,
+              padding: "5mm 4mm 6mm",
+              fontFamily:
+                "'SF Mono','Menlo','Consolas','Liberation Mono',monospace",
+              fontSize: "11px",
+              lineHeight: 1.35,
+            }
+          : undefined
+      }
     >
-      {settings?.show_logo !== false && settings?.logo_url && (
-        <div className="flex justify-center mb-1">
-          <img src={settings.logo_url} alt="logo" className="max-h-14 object-contain" />
+      {/* Decorative top border */}
+      <div className="flex flex-col items-center">
+        <div className="w-full flex items-center gap-1 mb-1">
+          <span className="flex-1 border-t-2 border-double border-black" />
+          <span className="text-[8px] tracking-[0.3em] uppercase">★ Receipt ★</span>
+          <span className="flex-1 border-t-2 border-double border-black" />
         </div>
-      )}
-      <div className="text-center">
-        <div className="font-bold text-[13px] uppercase tracking-wide">
+
+        {settings?.show_logo !== false && settings?.logo_url && (
+          <img
+            src={settings.logo_url}
+            alt="logo"
+            className="max-h-12 object-contain my-1"
+          />
+        )}
+
+        <div className="font-extrabold text-[15px] uppercase tracking-[0.08em] text-center">
           {settings?.store_name ?? "Store"}
         </div>
         {settings?.show_address !== false && settings?.address && (
-          <div className="text-[10px]">{settings.address}</div>
+          <div className="text-[9.5px] text-center leading-tight">
+            {settings.address}
+          </div>
         )}
-        {settings?.show_phone !== false && settings?.phone && (
-          <div className="text-[10px]">Tel: {settings.phone}</div>
-        )}
-        {settings?.show_tax_id !== false && settings?.tax_id && (
-          <div className="text-[10px]">Tax ID: {settings.tax_id}</div>
-        )}
+        <div className="text-[9.5px] text-center flex flex-wrap justify-center gap-x-2">
+          {settings?.show_phone !== false && settings?.phone && (
+            <span>☎ {settings.phone}</span>
+          )}
+          {settings?.show_tax_id !== false && settings?.tax_id && (
+            <span>NTN/Tax: {settings.tax_id}</span>
+          )}
+        </div>
         {settings?.receipt_header && (
-          <div className="text-[10px] mt-1 whitespace-pre-line">{settings.receipt_header}</div>
+          <div className="text-[10px] mt-1 whitespace-pre-line text-center italic">
+            {settings.receipt_header}
+          </div>
         )}
       </div>
 
-      <div className="border-t border-dashed border-black my-2" />
+      <div className="my-2 border-t border-dashed border-black" />
 
-      <div className="flex justify-between text-[10px]">
-        <span>#{invoice.invoice_no ?? "—"}</span>
-        <span>{date.toLocaleString()}</span>
+      <div className="text-center text-[11px] font-bold tracking-widest">
+        {docTitle}
       </div>
-      {invoice.customers?.name && (
-        <div className="text-[10px]">Customer: {invoice.customers.name}</div>
-      )}
-      {settings?.show_cashier !== false && invoice.cashier_name && (
-        <div className="text-[10px]">Cashier: {invoice.cashier_name}</div>
-      )}
 
-      <div className="border-t border-dashed border-black my-2" />
+      <div className="mt-1 grid grid-cols-2 gap-x-2 text-[10px]">
+        <div>
+          <span className="font-semibold">No:</span>{" "}
+          <span className="font-mono">{docNo}</span>
+        </div>
+        <div className="text-right">{date.toLocaleDateString()}</div>
+        <div>
+          {party ? (
+            <>
+              <span className="font-semibold">{partyLabel}:</span> {party}
+            </>
+          ) : (
+            <span className="text-black/60">Walk-in</span>
+          )}
+        </div>
+        <div className="text-right">
+          {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </div>
+        {settings?.show_cashier !== false && invoice.cashier_name && (
+          <div className="col-span-2">
+            <span className="font-semibold">Cashier:</span> {invoice.cashier_name}
+          </div>
+        )}
+      </div>
 
-      <div className="space-y-1">
+      <div className="my-2 border-t border-dashed border-black" />
+
+      {/* Items table */}
+      <div className="text-[9.5px] grid grid-cols-12 font-bold uppercase tracking-wider pb-1 border-b border-black">
+        <div className="col-span-6">Item</div>
+        <div className="col-span-2 text-right">Qty</div>
+        <div className="col-span-2 text-right">Rate</div>
+        <div className="col-span-2 text-right">Amt</div>
+      </div>
+      <div className="divide-y divide-dotted divide-black/30">
         {invoice.sale_items?.map((it, i) => (
-          <div key={it.id ?? i}>
-            <div className="truncate">{it.name}</div>
-            <div className="flex justify-between text-[10px]">
-              <span>
-                {fmtQty(it.qty)}
-                {it.price != null ? ` × ${fmtMoney(it.price, sym)}` : ""}
-              </span>
-              <span>{fmtMoney(it.line_total, sym)}</span>
+          <div key={it.id ?? i} className="py-1">
+            <div className="text-[10.5px] font-medium leading-tight">
+              {String(i + 1).padStart(2, "0")}. {it.name}
+            </div>
+            <div className="grid grid-cols-12 text-[10px]">
+              <div className="col-span-6" />
+              <div className="col-span-2 text-right">{fmtQty(it.qty)}</div>
+              <div className="col-span-2 text-right">
+                {it.price != null ? fmtMoney(it.price, sym) : ""}
+              </div>
+              <div className="col-span-2 text-right font-semibold">
+                {fmtMoney(it.line_total, sym)}
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="border-t border-dashed border-black my-2" />
+      <div className="my-2 border-t border-dashed border-black" />
 
+      {/* Totals box */}
       <div className="space-y-0.5">
         <Row label="Subtotal" value={fmtMoney(invoice.subtotal, sym)} />
         {settings?.show_tax_lines !== false && (
@@ -121,47 +199,118 @@ export function Receipt({ invoice, settings, paper = true }: Props) {
             value={fmtMoney(invoice.tax, sym)}
           />
         )}
-        {Number(invoice.discount) > 0 && (
-          <Row label="Discount" value={`-${fmtMoney(invoice.discount, sym)}`} />
-        )}
-        <div className="border-t border-black my-1" />
-        <Row label="TOTAL" value={fmtMoney(invoice.total, sym)} bold />
-        <Row label="Paid" value={fmtMoney(invoice.paid, sym)} />
-        {Number(invoice.change_due ?? 0) > 0 && (
-          <Row label="Change" value={fmtMoney(invoice.change_due, sym)} />
+        {savings > 0 && (
+          <Row label="Discount" value={`-${fmtMoney(savings, sym)}`} />
         )}
       </div>
 
-      {invoice.payment_method && (
-        <div className="text-[10px] mt-2 text-center uppercase">
-          Paid by {invoice.payment_method}
+      <div className="mt-1 bg-black text-white px-2 py-1 flex justify-between text-[13px] font-extrabold tracking-wide">
+        <span>{isReturn ? "REFUND DUE" : "TOTAL"}</span>
+        <span>{fmtMoney(invoice.total, sym)}</span>
+      </div>
+
+      <div className="mt-1 space-y-0.5">
+        {isReturn ? (
+          <>
+            <Row
+              label={`Refund (${invoice.refund_method ?? "cash"})`}
+              value={fmtMoney(invoice.refund_amount ?? 0, sym)}
+            />
+            {Number(invoice.total) - Number(invoice.refund_amount ?? 0) > 0 && (
+              <Row
+                label="Store credit"
+                value={fmtMoney(
+                  Number(invoice.total) - Number(invoice.refund_amount ?? 0),
+                  sym,
+                )}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            <Row label="Paid" value={fmtMoney(invoice.paid ?? 0, sym)} />
+            {Number(invoice.change_due ?? 0) > 0 && (
+              <Row
+                label="Change"
+                value={fmtMoney(invoice.change_due ?? 0, sym)}
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      {savings > 0 && !isReturn && (
+        <div className="mt-2 text-center text-[10px] border border-dashed border-black py-1 font-semibold">
+          ★ You saved {fmtMoney(savings, sym)} today! ★
+        </div>
+      )}
+
+      {(invoice.payment_method || invoice.refund_method) && (
+        <div className="text-[10px] mt-2 text-center uppercase tracking-widest">
+          {isReturn
+            ? `Refunded via ${invoice.refund_method ?? "cash"}`
+            : `Paid by ${invoice.payment_method}`}
+        </div>
+      )}
+
+      {isReturn && (
+        <div className="my-2 mx-auto w-fit border-2 border-black px-3 py-0.5 text-[11px] font-extrabold rotate-[-4deg] tracking-widest">
+          ✦ RETURN ✦
         </div>
       )}
 
       {settings?.receipt_footer && (
         <>
-          <div className="border-t border-dashed border-black my-2" />
-          <div className="text-center text-[10px] whitespace-pre-line">
+          <div className="my-2 border-t border-dashed border-black" />
+          <div className="text-center text-[10px] whitespace-pre-line italic">
             {settings.receipt_footer}
           </div>
         </>
       )}
+
+      {/* Faux barcode of doc number */}
+      <div className="mt-2 flex flex-col items-center">
+        <div className="flex h-8 items-end gap-[1px]">
+          {String(docNo)
+            .split("")
+            .flatMap((ch, i) => {
+              const code = ch.charCodeAt(0);
+              return [0, 1, 2].map((k) => (
+                <span
+                  key={`${i}-${k}`}
+                  className="bg-black"
+                  style={{
+                    width: ((code + k) % 3) + 1 + "px",
+                    height: "100%",
+                  }}
+                />
+              ));
+            })}
+        </div>
+        <div className="text-[9px] mt-0.5 tracking-[0.2em]">*{docNo}*</div>
+      </div>
+
+      <div className="mt-1 flex items-center gap-1">
+        <span className="flex-1 border-t-2 border-double border-black" />
+        <span className="text-[8px] tracking-[0.3em] uppercase">end</span>
+        <span className="flex-1 border-t-2 border-double border-black" />
+      </div>
     </div>
   );
 }
 
-function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`flex justify-between ${bold ? "font-bold text-[12px]" : ""}`}>
+    <div className="flex justify-between text-[10.5px]">
       <span>{label}</span>
-      <span>{value}</span>
+      <span className="font-mono">{value}</span>
     </div>
   );
 }
 
 /** Sample invoice used in the settings preview. */
 export const sampleInvoice: ReceiptInvoice = {
-  invoice_no: "PREVIEW-001",
+  invoice_no: "S-1042",
   created_at: new Date().toISOString(),
   customers: { name: "Walk-in customer" },
   cashier_name: "Demo Cashier",
@@ -169,7 +318,7 @@ export const sampleInvoice: ReceiptInvoice = {
   sale_items: [
     { name: "Whole Wheat Bread 500g", qty: 2, price: 2.5, line_total: 5.0 },
     { name: "Organic Milk 1L", qty: 1, price: 3.2, line_total: 3.2 },
-    { name: "Bananas", qty: 1.25, price: 1.6, line_total: 2.0 },
+    { name: "Bananas (per kg)", qty: 1.25, price: 1.6, line_total: 2.0 },
   ],
   subtotal: 10.2,
   tax: 0.82,
