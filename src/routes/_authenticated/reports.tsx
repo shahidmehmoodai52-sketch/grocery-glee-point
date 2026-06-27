@@ -38,6 +38,14 @@ function Page() {
       (await supabase.from("purchases").select("subtotal,tax,total,paid,created_at")
         .gte("created_at", range.from).lte("created_at", range.to)).data ?? [],
   });
+  const { data: expenses = [] } = useQuery({
+    queryKey: ["report-expenses", from, to],
+    queryFn: async () =>
+      (await supabase.from("expenses")
+        .select("amount,category,description,expense_date,method,expense_persons(name)")
+        .gte("expense_date", from).lte("expense_date", to)
+        .order("expense_date", { ascending: false })).data ?? [],
+  });
 
   const revenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
   const cogs = sales.reduce((s, x: any) => s + Number(x.cost_total), 0);
