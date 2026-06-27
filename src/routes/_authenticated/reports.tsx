@@ -38,6 +38,14 @@ function Page() {
       (await supabase.from("purchases").select("subtotal,tax,total,paid,created_at")
         .gte("created_at", range.from).lte("created_at", range.to)).data ?? [],
   });
+  const { data: expenses = [] } = useQuery({
+    queryKey: ["report-expenses", from, to],
+    queryFn: async () =>
+      (await supabase.from("expenses")
+        .select("amount,category,description,expense_date,method,expense_persons(name)")
+        .gte("expense_date", from).lte("expense_date", to)
+        .order("expense_date", { ascending: false })).data ?? [],
+  });
 
   const revenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
   const cogs = sales.reduce((s, x: any) => s + Number(x.cost_total), 0);
@@ -48,6 +56,14 @@ function Page() {
   const cashIn = sales.reduce((s, x: any) => s + Number(x.paid), 0);
   const cashOut = purchases.reduce((s, x: any) => s + Number(x.paid), 0);
   const creditOut = sales.filter((x: any) => x.status === "credit").reduce((s, x: any) => s + (Number(x.total) - Number(x.paid)), 0);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const expensesPeriod = expenses.reduce((s, x: any) => s + Number(x.amount), 0);
+  const expensesToday = expenses.filter((x: any) => x.expense_date === todayStr).reduce((s, x: any) => s + Number(x.amount), 0);
+  const netProfit = grossProfit - expensesPeriod;
+  const expByCategory = Array.from(
+    expenses.reduce((m: Map<string, number>, x: any) => m.set(x.category, (m.get(x.category) ?? 0) + Number(x.amount)), new Map()),
+    ([name, value]) => ({ name, value: value as number }),
+  ).sort((a, b) => b.value - a.value);
 
   return (
     <div className="p-6 space-y-4">
@@ -67,7 +83,7 @@ function Page() {
         <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Cost of goods" value={fmtMoney(cogs, sym)} tone="destructive" />
         <Stat icon={Wallet} label="Gross profit" value={fmtMoney(grossProfit, sym)} tone="success" />
-        <Stat icon={Users} label="Credit outstanding" value={fmtMoney(creditOut, sym)} tone="warning" />
+        <Stat icon={TrendingDown} label={`Expenses today / period`} value={`${fmtMoney(expensesToday, sym)} / ${fmtMoney(expensesPeriod, sym)}`} tone="warning" />
       </div>
 
       <div id="printable-invoice" className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -78,12 +94,13 @@ function Page() {
               <Row label="Sales (net of discount)" value={fmtMoney(revenue, sym)} />
               <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} />
               <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold />
+              <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
               <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted />
-              <Row label="Net profit" value={fmtMoney(grossProfit, sym)} bold accent />
+              <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent />
             </TableBody>
           </Table>
           <div className="text-xs text-muted-foreground mt-3">
-            {from} → {to} · {sales.length} sales, {purchases.length} purchases
+            {from} → {to} · {sales.length} sales, {purchases.length} purchases, {expenses.length} expenses
           </div>
         </Card>
 
@@ -93,9 +110,25 @@ function Page() {
             <TableBody>
               <Row label="Cash received from sales" value={fmtMoney(cashIn, sym)} />
               <Row label="Cash paid for purchases" value={`(${fmtMoney(cashOut, sym)})`} />
-              <Row label="Net cash flow" value={fmtMoney(cashIn - cashOut, sym)} bold />
-              <Row label="Total sales (incl. credit)" value={fmtMoney(totalSales, sym)} muted />
+              <Row label="Cash paid for expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
+              <Row label="Net cash flow" value={fmtMoney(cashIn - cashOut - expensesPeriod, sym)} bold />
+              <Row label="Credit outstanding" value={fmtMoney(creditOut, sym)} muted />
               <Row label="Total purchases" value={fmtMoney(totalPurchases, sym)} muted />
+            </TableBody>
+          </Table>
+        </Card>
+
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-3">Expenses breakdown by category</h2>
+          <Table>
+            <TableBody>
+              {expByCategory.length === 0 && (
+                <TableRow><TableCell className="text-center text-muted-foreground py-4">No expenses in this period</TableCell></TableRow>
+              )}
+              {expByCategory.map((c) => (
+                <Row key={c.name} label={<span className="capitalize">{c.name}</span> as any} value={fmtMoney(c.value, sym)} />
+              ))}
+              <Row label="Total expenses" value={fmtMoney(expensesPeriod, sym)} bold />
             </TableBody>
           </Table>
         </Card>

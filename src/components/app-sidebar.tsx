@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw,
+  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -25,6 +25,7 @@ const groups: { label: string; items: { title: string; url: string; icon: any }[
       { title: "Sale returns", url: "/sale-returns", icon: Undo2 },
       { title: "Purchases", url: "/purchases", icon: ClipboardList },
       { title: "Purchase returns", url: "/purchase-returns", icon: RotateCcw },
+      { title: "Expenses", url: "/expenses", icon: Wallet },
     ],
   },
   {
