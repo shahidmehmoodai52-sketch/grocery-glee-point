@@ -94,12 +94,13 @@ function Page() {
               <Row label="Sales (net of discount)" value={fmtMoney(revenue, sym)} />
               <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} />
               <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold />
+              <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
               <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted />
-              <Row label="Net profit" value={fmtMoney(grossProfit, sym)} bold accent />
+              <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent />
             </TableBody>
           </Table>
           <div className="text-xs text-muted-foreground mt-3">
-            {from} → {to} · {sales.length} sales, {purchases.length} purchases
+            {from} → {to} · {sales.length} sales, {purchases.length} purchases, {expenses.length} expenses
           </div>
         </Card>
 
@@ -109,9 +110,25 @@ function Page() {
             <TableBody>
               <Row label="Cash received from sales" value={fmtMoney(cashIn, sym)} />
               <Row label="Cash paid for purchases" value={`(${fmtMoney(cashOut, sym)})`} />
-              <Row label="Net cash flow" value={fmtMoney(cashIn - cashOut, sym)} bold />
-              <Row label="Total sales (incl. credit)" value={fmtMoney(totalSales, sym)} muted />
+              <Row label="Cash paid for expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
+              <Row label="Net cash flow" value={fmtMoney(cashIn - cashOut - expensesPeriod, sym)} bold />
+              <Row label="Credit outstanding" value={fmtMoney(creditOut, sym)} muted />
               <Row label="Total purchases" value={fmtMoney(totalPurchases, sym)} muted />
+            </TableBody>
+          </Table>
+        </Card>
+
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-3">Expenses breakdown by category</h2>
+          <Table>
+            <TableBody>
+              {expByCategory.length === 0 && (
+                <TableRow><TableCell className="text-center text-muted-foreground py-4">No expenses in this period</TableCell></TableRow>
+              )}
+              {expByCategory.map((c) => (
+                <Row key={c.name} label={<span className="capitalize">{c.name}</span> as any} value={fmtMoney(c.value, sym)} />
+              ))}
+              <Row label="Total expenses" value={fmtMoney(expensesPeriod, sym)} bold />
             </TableBody>
           </Table>
         </Card>
