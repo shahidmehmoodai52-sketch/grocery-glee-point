@@ -25,6 +25,7 @@ const groups: { label: string; items: { title: string; url: string; icon: any }[
       { title: "Sale returns", url: "/sale-returns", icon: Undo2 },
       { title: "Purchases", url: "/purchases", icon: ClipboardList },
       { title: "Purchase returns", url: "/purchase-returns", icon: RotateCcw },
+      { title: "Expenses", url: "/expenses", icon: Wallet },
     ],
   },
   {
