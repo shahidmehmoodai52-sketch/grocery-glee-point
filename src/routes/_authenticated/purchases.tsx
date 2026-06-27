@@ -36,7 +36,7 @@ function Page() {
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => (await supabase.from("products").select("id,name,cost_price").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("products").select("id,name,cost_price,stock").order("name")).data ?? [],
   });
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases"],
