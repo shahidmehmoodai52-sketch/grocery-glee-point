@@ -83,7 +83,7 @@ function Page() {
         <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Cost of goods" value={fmtMoney(cogs, sym)} tone="destructive" />
         <Stat icon={Wallet} label="Gross profit" value={fmtMoney(grossProfit, sym)} tone="success" />
-        <Stat icon={Users} label="Credit outstanding" value={fmtMoney(creditOut, sym)} tone="warning" />
+        <Stat icon={TrendingDown} label={`Expenses today / period`} value={`${fmtMoney(expensesToday, sym)} / ${fmtMoney(expensesPeriod, sym)}`} tone="warning" />
       </div>
 
       <div id="printable-invoice" className="grid grid-cols-1 md:grid-cols-2 gap-4">
