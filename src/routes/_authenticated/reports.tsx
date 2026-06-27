@@ -56,6 +56,14 @@ function Page() {
   const cashIn = sales.reduce((s, x: any) => s + Number(x.paid), 0);
   const cashOut = purchases.reduce((s, x: any) => s + Number(x.paid), 0);
   const creditOut = sales.filter((x: any) => x.status === "credit").reduce((s, x: any) => s + (Number(x.total) - Number(x.paid)), 0);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const expensesPeriod = expenses.reduce((s, x: any) => s + Number(x.amount), 0);
+  const expensesToday = expenses.filter((x: any) => x.expense_date === todayStr).reduce((s, x: any) => s + Number(x.amount), 0);
+  const netProfit = grossProfit - expensesPeriod;
+  const expByCategory = Array.from(
+    expenses.reduce((m: Map<string, number>, x: any) => m.set(x.category, (m.get(x.category) ?? 0) + Number(x.amount)), new Map()),
+    ([name, value]) => ({ name, value: value as number }),
+  ).sort((a, b) => b.value - a.value);
 
   return (
     <div className="p-6 space-y-4">
