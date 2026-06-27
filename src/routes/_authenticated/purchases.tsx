@@ -99,18 +99,32 @@ function Page() {
                   <TableHeader><TableRow>
                     <TableHead>Product</TableHead><TableHead>Name</TableHead>
                     <TableHead className="w-24">Qty</TableHead><TableHead className="w-28">Cost</TableHead>
+                    <TableHead className="w-28 text-right">Old Avg</TableHead>
+                    <TableHead className="w-28 text-right">New Avg</TableHead>
+                    <TableHead className="w-20 text-right">Δ%</TableHead>
                     <TableHead className="text-right w-28">Total</TableHead><TableHead className="w-10"></TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {lines.map((l, i) => (
+                    {lines.map((l, i) => {
+                      const oldStock = Number(l.old_stock ?? 0);
+                      const oldCost = Number(l.old_cost ?? 0);
+                      const qty = Number(l.qty || 0);
+                      const cost = Number(l.cost || 0);
+                      const hasProduct = !!l.product_id;
+                      const newAvg = hasProduct
+                        ? (oldStock > 0 ? (oldStock * oldCost + qty * cost) / (oldStock + qty) : cost)
+                        : cost;
+                      const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
+                      const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
+                      return (
                       <TableRow key={i}>
                         <TableCell>
                           <Select
                             value={l.product_id ?? "new"}
                             onValueChange={(v) => {
-                              if (v === "new") { setLine(i, { product_id: null }); return; }
+                              if (v === "new") { setLine(i, { product_id: null, old_stock: 0, old_cost: 0 }); return; }
                               const p = products.find((p) => p.id === v);
-                              setLine(i, { product_id: v, name: p?.name ?? "", cost: Number(p?.cost_price ?? 0) });
+                              setLine(i, { product_id: v, name: p?.name ?? "", cost: Number(p?.cost_price ?? 0), old_stock: Number(p?.stock ?? 0), old_cost: Number(p?.cost_price ?? 0) });
                             }}
                           >
                             <SelectTrigger className="h-8"><SelectValue placeholder="Pick…" /></SelectTrigger>
@@ -123,10 +137,20 @@ function Page() {
                         <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8" /></TableCell>
                         <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} className="h-8" /></TableCell>
                         <TableCell><Input type="number" step="0.01" value={l.cost} onChange={(e) => setLine(i, { cost: Number(e.target.value) })} className="h-8" /></TableCell>
-                        <TableCell className="text-right font-medium">{fmtMoney(l.qty * l.cost, sym)}</TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-xs font-medium">
+                          {hasProduct ? fmtMoney(newAvg, sym) : "—"}
+                        </TableCell>
+                        <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
+                          {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}%` : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{fmtMoney(qty * cost, sym)}</TableCell>
                         <TableCell><Button variant="ghost" size="icon" onClick={() => setLines(lines.filter((_, x) => x !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
                 <div className="p-2"><Button variant="outline" size="sm" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" />Add row</Button></div>
