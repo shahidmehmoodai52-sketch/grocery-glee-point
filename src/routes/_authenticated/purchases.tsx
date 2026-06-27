@@ -16,7 +16,7 @@ import { fmtMoney } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; old_stock?: number; old_cost?: number };
 
 function Page() {
   const qc = useQueryClient();
