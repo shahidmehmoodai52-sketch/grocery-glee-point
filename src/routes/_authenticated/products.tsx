@@ -46,17 +46,39 @@ function ProductsPage() {
     return !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q) || (p.barcode ?? "").toLowerCase().includes(q);
   });
 
+  const parseBarcodes = (text: string) =>
+    Array.from(new Set(text.split(/[\s,;\n]+/).map((s) => s.trim()).filter(Boolean)));
+
   const save = async () => {
     if (!form.name) return toast.error("Name is required");
-    const payload = { ...form, sku: form.sku || null, barcode: form.barcode || null, category: form.category || null };
-    const { error } = form.id
-      ? await supabase.from("products").update(payload).eq("id", form.id)
-      : await supabase.from("products").insert(payload);
-    if (error) return toast.error(error.message);
+    const allBarcodes = parseBarcodes(form.barcodes_text);
+    const primary = form.barcode?.trim() || allBarcodes[0] || null;
+    const { barcodes_text: _bt, ...rest } = form;
+    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null };
+    let productId = form.id;
+    if (form.id) {
+      const { error } = await supabase.from("products").update(payload).eq("id", form.id);
+      if (error) return toast.error(error.message);
+    } else {
+      const { data, error } = await supabase.from("products").insert(payload).select("id").single();
+      if (error) return toast.error(error.message);
+      productId = data.id;
+    }
+    if (productId) {
+      // Sync extra barcodes (all entries except the primary go into product_barcodes; primary also stored there for scan lookup)
+      await supabase.from("product_barcodes").delete().eq("product_id", productId);
+      const set = Array.from(new Set([...(primary ? [primary] : []), ...allBarcodes]));
+      if (set.length > 0) {
+        const rows = set.map((bc) => ({ product_id: productId!, barcode: bc }));
+        const { error: bcErr } = await supabase.from("product_barcodes").insert(rows);
+        if (bcErr) return toast.error(bcErr.message);
+      }
+    }
     toast.success(form.id ? "Product updated" : "Product added");
     setOpen(false);
     setForm(empty);
     qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["product_barcodes"] });
   };
 
   const remove = async (id: string) => {
@@ -67,14 +89,19 @@ function ProductsPage() {
     qc.invalidateQueries({ queryKey: ["products"] });
   };
 
-  const edit = (p: any) => {
+  const edit = async (p: any) => {
+    const { data: bcs } = await supabase.from("product_barcodes").select("barcode").eq("product_id", p.id);
+    const list = (bcs ?? []).map((b: any) => b.barcode).filter((b: string) => b && b !== p.barcode);
     setForm({
-      id: p.id, name: p.name, sku: p.sku ?? "", barcode: p.barcode ?? "", category: p.category ?? "",
+      id: p.id, name: p.name, sku: p.sku ?? "", barcode: p.barcode ?? "",
+      barcodes_text: list.join("\n"),
+      category: p.category ?? "",
       unit: p.unit ?? "pcs", cost_price: Number(p.cost_price), sell_price: Number(p.sell_price),
       stock: Number(p.stock), tax_rate: Number(p.tax_rate), is_active: p.is_active,
     });
     setOpen(true);
   };
+
 
   return (
     <div className="p-6 space-y-4">
