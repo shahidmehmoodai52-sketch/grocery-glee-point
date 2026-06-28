@@ -301,10 +301,11 @@ function POSPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && filtered.length === 1) {
-                    addProduct(filtered[0]);
-                    setSearch("");
-                  }
+                  if (e.key !== "Enter") return;
+                  const raw = search.trim();
+                  const exact = productByBarcode[raw];
+                  if (exact) { addProduct(exact); setSearch(""); return; }
+                  if (filtered.length === 1) { addProduct(filtered[0]); setSearch(""); }
                 }}
                 className="pl-9"
               />
