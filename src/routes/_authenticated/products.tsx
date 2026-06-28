@@ -19,10 +19,10 @@ export const Route = createFileRoute("/_authenticated/products")({
 });
 
 type ProductForm = {
-  id?: string; name: string; sku: string; barcode: string; category: string; unit: string;
+  id?: string; name: string; sku: string; barcode: string; barcodes_text: string; category: string; unit: string;
   cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true };
+const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true };
 
 function ProductsPage() {
   const qc = useQueryClient();
@@ -46,17 +46,39 @@ function ProductsPage() {
     return !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q) || (p.barcode ?? "").toLowerCase().includes(q);
   });
 
+  const parseBarcodes = (text: string) =>
+    Array.from(new Set(text.split(/[\s,;\n]+/).map((s) => s.trim()).filter(Boolean)));
+
   const save = async () => {
     if (!form.name) return toast.error("Name is required");
-    const payload = { ...form, sku: form.sku || null, barcode: form.barcode || null, category: form.category || null };
-    const { error } = form.id
-      ? await supabase.from("products").update(payload).eq("id", form.id)
-      : await supabase.from("products").insert(payload);
-    if (error) return toast.error(error.message);
+    const allBarcodes = parseBarcodes(form.barcodes_text);
+    const primary = form.barcode?.trim() || allBarcodes[0] || null;
+    const { barcodes_text: _bt, ...rest } = form;
+    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null };
+    let productId = form.id;
+    if (form.id) {
+      const { error } = await supabase.from("products").update(payload).eq("id", form.id);
+      if (error) return toast.error(error.message);
+    } else {
+      const { data, error } = await supabase.from("products").insert(payload).select("id").single();
+      if (error) return toast.error(error.message);
+      productId = data.id;
+    }
+    if (productId) {
+      // Sync extra barcodes (all entries except the primary go into product_barcodes; primary also stored there for scan lookup)
+      await supabase.from("product_barcodes").delete().eq("product_id", productId);
+      const set = Array.from(new Set([...(primary ? [primary] : []), ...allBarcodes]));
+      if (set.length > 0) {
+        const rows = set.map((bc) => ({ product_id: productId!, barcode: bc }));
+        const { error: bcErr } = await supabase.from("product_barcodes").insert(rows);
+        if (bcErr) return toast.error(bcErr.message);
+      }
+    }
     toast.success(form.id ? "Product updated" : "Product added");
     setOpen(false);
     setForm(empty);
     qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["product_barcodes"] });
   };
 
   const remove = async (id: string) => {
@@ -67,14 +89,19 @@ function ProductsPage() {
     qc.invalidateQueries({ queryKey: ["products"] });
   };
 
-  const edit = (p: any) => {
+  const edit = async (p: any) => {
+    const { data: bcs } = await supabase.from("product_barcodes").select("barcode").eq("product_id", p.id);
+    const list = (bcs ?? []).map((b: any) => b.barcode).filter((b: string) => b && b !== p.barcode);
     setForm({
-      id: p.id, name: p.name, sku: p.sku ?? "", barcode: p.barcode ?? "", category: p.category ?? "",
+      id: p.id, name: p.name, sku: p.sku ?? "", barcode: p.barcode ?? "",
+      barcodes_text: list.join("\n"),
+      category: p.category ?? "",
       unit: p.unit ?? "pcs", cost_price: Number(p.cost_price), sell_price: Number(p.sell_price),
       stock: Number(p.stock), tax_rate: Number(p.tax_rate), is_active: p.is_active,
     });
     setOpen(true);
   };
+
 
   return (
     <div className="p-6 space-y-4">
@@ -92,7 +119,16 @@ function ProductsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
-              <div><Label>Barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
+              <div><Label>Primary barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
+              <div className="col-span-2">
+                <Label>Additional barcodes (one per line — for different versions/packs of the same item)</Label>
+                <textarea
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.barcodes_text}
+                  onChange={(e) => setForm({ ...form, barcodes_text: e.target.value })}
+                  placeholder={"8964000000001\n8964000000002"}
+                />
+              </div>
               <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
               <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
               <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>

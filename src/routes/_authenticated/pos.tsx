@@ -84,6 +84,37 @@ function POSPage() {
     },
   });
 
+  const { data: extraBarcodes = [] } = useQuery({
+    queryKey: ["product_barcodes"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("product_barcodes").select("product_id,barcode");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // product_id -> array of all barcodes (primary + extras)
+  const barcodesByProduct = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    products.forEach((p) => {
+      m[p.id] = p.barcode ? [String(p.barcode)] : [];
+    });
+    extraBarcodes.forEach((b: any) => {
+      if (!m[b.product_id]) m[b.product_id] = [];
+      if (!m[b.product_id].includes(b.barcode)) m[b.product_id].push(b.barcode);
+    });
+    return m;
+  }, [products, extraBarcodes]);
+
+  // Exact-barcode lookup for scan
+  const productByBarcode = useMemo(() => {
+    const m: Record<string, any> = {};
+    products.forEach((p) => {
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => { m[bc] = p; });
+    });
+    return m;
+  }, [products, barcodesByProduct]);
+
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
     queryFn: async () => {
@@ -97,13 +128,15 @@ function POSPage() {
     const q = search.trim().toLowerCase();
     if (!q) return products.slice(0, 24);
     return products
-      .filter((p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.sku ?? "").toLowerCase().includes(q) ||
-        (p.barcode ?? "").toLowerCase().includes(q),
-      )
+      .filter((p) => {
+        if (p.name.toLowerCase().includes(q)) return true;
+        if ((p.sku ?? "").toLowerCase().includes(q)) return true;
+        const bcs = barcodesByProduct[p.id] ?? [];
+        return bcs.some((bc) => bc.toLowerCase().includes(q));
+      })
       .slice(0, 60);
-  }, [products, search]);
+  }, [products, search, barcodesByProduct]);
+
 
   const setTab = (patch: Partial<Tab>) =>
     setTabs((ts) => ts.map((t) => (t.id === active ? { ...t, ...patch } : t)));
@@ -268,10 +301,11 @@ function POSPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && filtered.length === 1) {
-                    addProduct(filtered[0]);
-                    setSearch("");
-                  }
+                  if (e.key !== "Enter") return;
+                  const raw = search.trim();
+                  const exact = productByBarcode[raw];
+                  if (exact) { addProduct(exact); setSearch(""); return; }
+                  if (filtered.length === 1) { addProduct(filtered[0]); setSearch(""); }
                 }}
                 className="pl-9"
               />
