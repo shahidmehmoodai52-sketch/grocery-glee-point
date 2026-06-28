@@ -307,76 +307,66 @@ function POSPage() {
         </ScrollArea>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[340px_1fr] min-h-0">
-        {/* Products sidebar */}
-        <div className="flex flex-col min-h-0 border-r bg-card/20">
-          <div className="p-3 border-b">
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Billing window */}
+        <div className="flex flex-col min-h-0 flex-1 bg-background">
+          {/* Scan / search bar + customer + payment */}
+          <div className="p-3 border-b grid grid-cols-1 md:grid-cols-[1fr_220px_160px_160px] gap-2 items-end">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                autoFocus
-                placeholder="Scan barcode or search…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  const raw = search.trim();
-                  const exact = productByBarcode[raw];
-                  if (exact) { addProduct(exact); setSearch(""); return; }
-                  if (filtered.length === 1) { addProduct(filtered[0]); setSearch(""); }
-                }}
-                className="pl-9"
-              />
-            </div>
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
-              {filtered.map((p) => {
-                const margin = Number(p.sell_price) - Number(p.cost_price);
-                const mpct = Number(p.sell_price) > 0 ? (margin / Number(p.sell_price)) * 100 : 0;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => addProduct(p)}
-                    className="text-left p-2.5 rounded-lg border bg-card hover:border-primary hover:shadow-sm transition"
-                  >
-                    <div className="font-medium text-sm line-clamp-2">{p.name}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">{p.sku ?? "—"}</div>
-                    <div className="flex items-center justify-between mt-1.5">
-                      <span className="font-semibold text-primary text-sm">{fmtMoney(p.sell_price, sym)}</span>
-                      <Badge variant={p.stock > 0 ? "outline" : "destructive"} className="text-[10px]">
-                        {fmtQty(p.stock)} {p.unit}
-                      </Badge>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground border-t pt-1">
-                      <span>Cost <span className="font-mono text-foreground/70">{fmtMoney(p.cost_price, sym)}</span></span>
-                      <span className={margin >= 0 ? "text-success" : "text-destructive"}>
-                        {mpct.toFixed(0)}%
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-              {filtered.length === 0 && (
-                <div className="col-span-full text-center text-sm text-muted-foreground py-12">
-                  No products match.
+              <Label className="text-xs">Scan barcode / search item</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  placeholder="Scan barcode or type name / SKU…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") { setSearch(""); return; }
+                    if (e.key !== "Enter") return;
+                    const raw = search.trim();
+                    const exact = productByBarcode[raw];
+                    if (exact) { addProduct(exact); setSearch(""); return; }
+                    if (filtered.length >= 1) { addProduct(filtered[0]); setSearch(""); }
+                  }}
+                  className="pl-9 h-10"
+                />
+              </div>
+              {search.trim() && filtered.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg max-h-80 overflow-auto">
+                  {filtered.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => { addProduct(p); setSearch(""); }}
+                      className="w-full text-left px-3 py-2 hover:bg-accent flex items-center justify-between gap-3 border-b last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate">{p.name}</div>
+                        <div className="text-[11px] text-muted-foreground font-mono">
+                          {p.sku ?? "—"} · stock {fmtQty(p.stock)} {p.unit}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-semibold text-sm text-primary">{fmtMoney(p.sell_price, sym)}</div>
+                        <div className="text-[10px] text-muted-foreground">cost {fmtMoney(p.cost_price, sym)}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {search.trim() && filtered.length === 0 && (
+                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm text-muted-foreground">
+                  No products match "{search}".
                 </div>
               )}
             </div>
-          </ScrollArea>
-        </div>
-
-        {/* Billing window */}
-        <div className="flex flex-col min-h-0 bg-background">
-          {/* Customer + meta strip */}
-          <div className="p-3 border-b grid grid-cols-1 md:grid-cols-[1fr_180px_180px] gap-2 items-end">
             <div>
               <Label className="text-xs">Customer</Label>
               <Select
                 value={tab.customer_id ?? "walkin"}
                 onValueChange={(v) => setTab({ customer_id: v === "walkin" ? null : v })}
               >
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="walkin">Walk-in customer</SelectItem>
                   {customers.map((c) => (
@@ -390,7 +380,7 @@ function POSPage() {
             <div>
               <Label className="text-xs">Payment</Label>
               <Select value={tab.payment_method} onValueChange={(v) => setTab({ payment_method: v })}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Card</SelectItem>
@@ -399,10 +389,11 @@ function POSPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-right text-xs text-muted-foreground self-end pb-1">
+            <div className="text-right text-xs text-muted-foreground self-end pb-2">
               {tab.items.length} item{tab.items.length === 1 ? "" : "s"} · {tab.name}
             </div>
           </div>
+
 
           {/* Item-wise detailed table — FAST SALES style spreadsheet */}
           <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-background">
