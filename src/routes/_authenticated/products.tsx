@@ -19,10 +19,10 @@ export const Route = createFileRoute("/_authenticated/products")({
 });
 
 type ProductForm = {
-  id?: string; name: string; sku: string; barcode: string; category: string; unit: string;
+  id?: string; name: string; sku: string; barcode: string; barcodes_text: string; category: string; unit: string;
   cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true };
+const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true };
 
 function ProductsPage() {
   const qc = useQueryClient();
