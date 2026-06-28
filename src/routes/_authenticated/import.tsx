@@ -151,8 +151,8 @@ function Importer({ entity }: { entity: EntityKey }) {
         const withKey = chunk.filter((r) => r.sku);
         const withoutKey = chunk.filter((r) => !r.sku);
         const ops: Promise<any>[] = [];
-        if (withKey.length) ops.push(supabase.from("products").upsert(withKey as any, { onConflict: "sku" }));
-        if (withoutKey.length) ops.push(supabase.from("products").insert(withoutKey as any));
+        if (withKey.length) ops.push(Promise.resolve(supabase.from("products").upsert(withKey as any, { onConflict: "sku" })));
+        if (withoutKey.length) ops.push(Promise.resolve(supabase.from("products").insert(withoutKey as any)));
         const results = await Promise.all(ops);
         results.forEach((r, idx) => {
           if (r.error) { failed += idx === 0 ? withKey.length : withoutKey.length; errors.push(r.error.message); }
