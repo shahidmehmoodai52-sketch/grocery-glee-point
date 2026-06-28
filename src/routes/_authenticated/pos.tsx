@@ -154,14 +154,24 @@ function POSPage() {
       name: p.name,
       qty: 1,
       price: Number(p.sell_price),
+      mrp: Number(p.sell_price),
       cost: Number(p.cost_price),
+      disc_pct: 0,
+      tax_pct: taxRate,
       disc: 0,
     });
     setTab({ items });
   };
 
   const updateLine = (idx: number, patch: Partial<CartItem>) => {
-    const items = tab.items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
+    const items = tab.items.map((it, i) => {
+      if (i !== idx) return it;
+      const next = { ...it, ...patch };
+      // keep `disc` (flat) in sync with disc_pct + qty*price
+      const gross = Number(next.qty) * Number(next.price);
+      next.disc = +Math.max(0, (gross * Number(next.disc_pct || 0)) / 100).toFixed(2);
+      return next;
+    });
     setTab({ items });
   };
 
@@ -172,7 +182,11 @@ function POSPage() {
     0,
   );
   const lineDiscountTotal = tab.items.reduce((s, i) => s + Number(i.disc || 0), 0);
-  const tax = +(subtotal * (taxRate / 100)).toFixed(2);
+  // per-line tax sum (overrides global tax)
+  const tax = +tab.items.reduce((s, i) => {
+    const net = Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0);
+    return s + (net * Number(i.tax_pct || 0)) / 100;
+  }, 0).toFixed(2);
   const discount = Number(tab.discount || 0);
   const total = +(subtotal + tax - discount).toFixed(2);
   const paidNum = Number(tab.paid || 0);
