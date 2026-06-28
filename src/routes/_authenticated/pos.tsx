@@ -73,6 +73,7 @@ function POSPage() {
   const [search, setSearch] = useState("");
   const [lastInvoice, setLastInvoice] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showCost, setShowCost] = useState(false);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", "active"],
