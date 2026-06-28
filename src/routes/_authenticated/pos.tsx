@@ -572,7 +572,7 @@ function POSPage() {
                 </div>
               </div>
 
-              <Row label={`Tax (${taxRate}%)`} value={fmtMoney(tax, sym)} />
+              
 
               <div className="flex justify-between items-center border-t-2 border-foreground/20 pt-2 mt-1">
                 <span className="text-base font-semibold">Grand Total</span>
