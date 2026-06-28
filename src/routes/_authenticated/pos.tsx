@@ -28,9 +28,12 @@ type CartItem = {
   code: string;
   name: string;
   qty: number;
-  price: number;
-  cost: number;
-  disc: number;
+  price: number;     // Unit rate (editable)
+  mrp: number;       // Original MRP / sell price
+  cost: number;      // Purchase rate (internal only)
+  disc_pct: number;  // line discount %
+  tax_pct: number;   // line tax %
+  disc: number;      // derived flat discount
 };
 type Tab = {
   id: string;
@@ -151,14 +154,24 @@ function POSPage() {
       name: p.name,
       qty: 1,
       price: Number(p.sell_price),
+      mrp: Number(p.sell_price),
       cost: Number(p.cost_price),
+      disc_pct: 0,
+      tax_pct: taxRate,
       disc: 0,
     });
     setTab({ items });
   };
 
   const updateLine = (idx: number, patch: Partial<CartItem>) => {
-    const items = tab.items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
+    const items = tab.items.map((it, i) => {
+      if (i !== idx) return it;
+      const next = { ...it, ...patch };
+      // keep `disc` (flat) in sync with disc_pct + qty*price
+      const gross = Number(next.qty) * Number(next.price);
+      next.disc = +Math.max(0, (gross * Number(next.disc_pct || 0)) / 100).toFixed(2);
+      return next;
+    });
     setTab({ items });
   };
 
@@ -169,7 +182,11 @@ function POSPage() {
     0,
   );
   const lineDiscountTotal = tab.items.reduce((s, i) => s + Number(i.disc || 0), 0);
-  const tax = +(subtotal * (taxRate / 100)).toFixed(2);
+  // per-line tax sum (overrides global tax)
+  const tax = +tab.items.reduce((s, i) => {
+    const net = Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0);
+    return s + (net * Number(i.tax_pct || 0)) / 100;
+  }, 0).toFixed(2);
   const discount = Number(tab.discount || 0);
   const total = +(subtotal + tax - discount).toFixed(2);
   const paidNum = Number(tab.paid || 0);
@@ -386,78 +403,77 @@ function POSPage() {
             </div>
           </div>
 
-          {/* Item-wise detailed table */}
-          <div className="flex-1 min-h-0 overflow-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead className="sticky top-0 z-10 bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+          {/* Item-wise detailed table — FAST SALES style spreadsheet */}
+          <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-background">
+            <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
+              <thead className="sticky top-0 z-10 bg-[hsl(var(--muted))] text-[11px] uppercase tracking-wide">
                 <tr>
-                  <th className="px-2 py-2 text-left w-10">#</th>
-                  <th className="px-2 py-2 text-left w-28">Item Code</th>
+                  <th className="px-2 py-2 text-left w-14">Item No</th>
                   <th className="px-2 py-2 text-left">Item Name</th>
-                  <th className="px-2 py-2 text-right w-24" title="Purchase rate (cost)">Purch. Rate</th>
-                  <th className="px-2 py-2 text-right w-24">Sale Rate</th>
-                  <th className="px-2 py-2 text-right w-24">Qty</th>
-                  <th className="px-2 py-2 text-right w-24">Disc.</th>
+                  <th className="px-2 py-2 text-right w-20 no-print" title="Purchase rate (internal)">P.Rate</th>
+                  <th className="px-2 py-2 text-right w-20">MRP</th>
+                  <th className="px-2 py-2 text-right w-24">Unit Rate</th>
+                  <th className="px-2 py-2 text-right w-20">QTY</th>
+                  <th className="px-2 py-2 text-right w-20">Disc (%)</th>
+                  <th className="px-2 py-2 text-right w-20">Tax (%)</th>
                   <th className="px-2 py-2 text-right w-28">Amount</th>
-                  <th className="px-2 py-2 w-10"></th>
+                  <th className="px-2 py-2 w-8 no-print"></th>
                 </tr>
               </thead>
               <tbody>
                 {tab.items.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center text-muted-foreground py-16">
-                      Add items by clicking products or scanning barcodes.
+                    <td colSpan={10} className="text-center text-muted-foreground py-16 border-0">
+                      Scan barcode ya product click karen — same item dobara scan hone par usi row me Qty +1 ho jaye gi.
                     </td>
                   </tr>
                 )}
                 {tab.items.map((it, idx) => {
                   const gross = Number(it.qty) * Number(it.price);
-                  const amount = Math.max(gross - Number(it.disc || 0), 0);
-                  const profit = amount - Number(it.qty) * Number(it.cost);
+                  const lineDisc = Number(it.disc || 0);
+                  const net = Math.max(gross - lineDisc, 0);
+                  const lineTax = (net * Number(it.tax_pct || 0)) / 100;
+                  const amount = net + lineTax;
+                  const profit = net - Number(it.qty) * Number(it.cost);
+                  const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
                   return (
-                    <tr key={idx} className="border-b hover:bg-muted/40">
-                      <td className="px-2 py-1.5 text-muted-foreground text-xs">{idx + 1}</td>
-                      <td className="px-2 py-1.5 font-mono text-xs">{it.code || "—"}</td>
-                      <td className="px-2 py-1.5">
-                        <div className="font-medium">{it.name}</div>
-                        <div className={`text-[10px] ${profit >= 0 ? "text-success" : "text-destructive"}`}>
+                    <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
+                      <td className="px-2 py-1 font-mono text-xs">{it.code || String(idx + 1).padStart(3, "0")}</td>
+                      <td className="px-2 py-1">
+                        <div className="font-medium leading-tight">{it.name}</div>
+                        <div className={`text-[10px] no-print ${profit >= 0 ? "text-success" : "text-destructive"}`}>
                           margin {fmtMoney(profit, sym)}
                         </div>
                       </td>
-                      <td className="px-2 py-1.5 text-right font-mono text-muted-foreground">
+                      <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
                         {fmtMoney(it.cost, sym)}
                       </td>
-                      <td className="px-2 py-1.5 text-right">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={it.price}
+                      <td className="px-2 py-1 text-right font-mono text-xs text-muted-foreground">
+                        {fmtMoney(it.mrp, sym)}
+                      </td>
+                      <td className="p-0">
+                        <Input type="number" step="0.01" value={it.price}
                           onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
-                          className="h-8 w-24 text-right text-sm ml-auto"
-                        />
+                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
                       </td>
-                      <td className="px-2 py-1.5 text-right">
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={it.qty}
+                      <td className="p-0">
+                        <Input type="number" step="0.001" value={it.qty}
                           onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
-                          className="h-8 w-20 text-right text-sm ml-auto"
-                        />
+                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
                       </td>
-                      <td className="px-2 py-1.5 text-right">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          value={it.disc}
-                          onChange={(e) => updateLine(idx, { disc: Math.max(0, Number(e.target.value)) })}
-                          className="h-8 w-20 text-right text-sm ml-auto"
-                        />
+                      <td className="p-0">
+                        <Input type="number" step="0.01" min={0} value={it.disc_pct}
+                          onChange={(e) => updateLine(idx, { disc_pct: Math.max(0, Number(e.target.value)) })}
+                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
                       </td>
-                      <td className="px-2 py-1.5 text-right font-semibold">{fmtMoney(amount, sym)}</td>
-                      <td className="px-2 py-1.5 text-right">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeLine(idx)}>
+                      <td className="p-0">
+                        <Input type="number" step="0.01" min={0} value={it.tax_pct}
+                          onChange={(e) => updateLine(idx, { tax_pct: Math.max(0, Number(e.target.value)) })}
+                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
+                      </td>
+                      <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(amount, sym)}</td>
+                      <td className="px-1 py-1 text-center no-print border-0">
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeLine(idx)}>
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       </td>
@@ -467,6 +483,7 @@ function POSPage() {
               </tbody>
             </table>
           </div>
+
 
           {/* Totals strip */}
           <div className="border-t bg-card grid grid-cols-1 md:grid-cols-[1fr_360px]">
