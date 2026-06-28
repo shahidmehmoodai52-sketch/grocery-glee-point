@@ -448,13 +448,11 @@ function POSPage() {
                     <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
                       <td className="px-2 py-1 font-mono text-xs">{it.code || String(idx + 1).padStart(3, "0")}</td>
                       <td className="px-2 py-1">
-                        <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-                          <span className="font-medium truncate">{it.name}</span>
-                          <span className={`text-[10px] no-print shrink-0 ${profit >= 0 ? "text-success" : "text-destructive"}`}>
-                            · margin {fmtMoney(profit, sym)}
-                          </span>
+                        <div className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                          {it.name}
                         </div>
                       </td>
+
                       {showCost && (
                         <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
                           {fmtMoney(it.cost, sym)}
