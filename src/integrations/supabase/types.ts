@@ -160,6 +160,38 @@ export type Database = {
         }
         Relationships: []
       }
+      product_barcodes: {
+        Row: {
+          barcode: string
+          created_at: string
+          id: string
+          label: string | null
+          product_id: string
+        }
+        Insert: {
+          barcode: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          product_id: string
+        }
+        Update: {
+          barcode?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_barcodes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           barcode: string | null
