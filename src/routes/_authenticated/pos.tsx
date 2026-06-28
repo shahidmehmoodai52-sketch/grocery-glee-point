@@ -403,17 +403,28 @@ function POSPage() {
 
           {/* Item-wise detailed table — FAST SALES style spreadsheet */}
           <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-background">
+            <div className="flex items-center justify-end gap-2 px-3 py-1.5 border-b bg-muted/30 no-print">
+              <Button
+                size="sm"
+                variant={showCost ? "secondary" : "ghost"}
+                className="h-7 text-xs"
+                onClick={() => setShowCost((v) => !v)}
+              >
+                {showCost ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+                {showCost ? "Hide" : "Show"} Purchase Rate
+              </Button>
+            </div>
             <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
               <thead className="sticky top-0 z-10 bg-[hsl(var(--muted))] text-[11px] uppercase tracking-wide">
                 <tr>
                   <th className="px-2 py-2 text-left w-14">Item No</th>
                   <th className="px-2 py-2 text-left">Item Name</th>
-                  <th className="px-2 py-2 text-right w-20 no-print" title="Purchase rate (internal)">P.Rate</th>
-                  <th className="px-2 py-2 text-right w-20">MRP</th>
+                  {showCost && (
+                    <th className="px-2 py-2 text-right w-20 no-print" title="Purchase rate (internal)">P.Rate</th>
+                  )}
                   <th className="px-2 py-2 text-right w-24">Unit Rate</th>
                   <th className="px-2 py-2 text-right w-20">QTY</th>
-                  <th className="px-2 py-2 text-right w-20">Disc (%)</th>
-                  <th className="px-2 py-2 text-right w-20">Tax (%)</th>
+                  <th className="px-2 py-2 text-right w-24">Discount</th>
                   <th className="px-2 py-2 text-right w-28">Amount</th>
                   <th className="px-2 py-2 w-8 no-print"></th>
                 </tr>
@@ -421,8 +432,8 @@ function POSPage() {
               <tbody>
                 {tab.items.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center text-muted-foreground py-16 border-0">
-                      Scan barcode ya product click karen — same item dobara scan hone par usi row me Qty +1 ho jaye gi.
+                    <td colSpan={showCost ? 8 : 7} className="text-center text-muted-foreground py-16 border-0">
+                      Scan barcode ya product search karen — same item dobara scan hone par usi row me Qty +1 ho jaye gi.
                     </td>
                   </tr>
                 )}
@@ -430,25 +441,25 @@ function POSPage() {
                   const gross = Number(it.qty) * Number(it.price);
                   const lineDisc = Number(it.disc || 0);
                   const net = Math.max(gross - lineDisc, 0);
-                  const lineTax = (net * Number(it.tax_pct || 0)) / 100;
-                  const amount = net + lineTax;
+                  const amount = net;
                   const profit = net - Number(it.qty) * Number(it.cost);
                   const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
                   return (
                     <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
                       <td className="px-2 py-1 font-mono text-xs">{it.code || String(idx + 1).padStart(3, "0")}</td>
                       <td className="px-2 py-1">
-                        <div className="font-medium leading-tight">{it.name}</div>
-                        <div className={`text-[10px] no-print ${profit >= 0 ? "text-success" : "text-destructive"}`}>
-                          margin {fmtMoney(profit, sym)}
+                        <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
+                          <span className="font-medium truncate">{it.name}</span>
+                          <span className={`text-[10px] no-print shrink-0 ${profit >= 0 ? "text-success" : "text-destructive"}`}>
+                            · margin {fmtMoney(profit, sym)}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
-                        {fmtMoney(it.cost, sym)}
-                      </td>
-                      <td className="px-2 py-1 text-right font-mono text-xs text-muted-foreground">
-                        {fmtMoney(it.mrp, sym)}
-                      </td>
+                      {showCost && (
+                        <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
+                          {fmtMoney(it.cost, sym)}
+                        </td>
+                      )}
                       <td className="p-0">
                         <Input type="number" step="0.01" value={it.price}
                           onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
@@ -460,13 +471,8 @@ function POSPage() {
                           className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
                       </td>
                       <td className="p-0">
-                        <Input type="number" step="0.01" min={0} value={it.disc_pct}
-                          onChange={(e) => updateLine(idx, { disc_pct: Math.max(0, Number(e.target.value)) })}
-                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
-                      </td>
-                      <td className="p-0">
-                        <Input type="number" step="0.01" min={0} value={it.tax_pct}
-                          onChange={(e) => updateLine(idx, { tax_pct: Math.max(0, Number(e.target.value)) })}
+                        <Input type="number" step="0.01" min={0} value={it.disc}
+                          onChange={(e) => updateLine(idx, { disc: Math.max(0, Number(e.target.value)) })}
                           className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
                       </td>
                       <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(amount, sym)}</td>
@@ -481,6 +487,7 @@ function POSPage() {
               </tbody>
             </table>
           </div>
+
 
 
           {/* Totals strip */}
