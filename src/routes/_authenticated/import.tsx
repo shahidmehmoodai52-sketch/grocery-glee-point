@@ -145,7 +145,6 @@ function Importer({ entity }: { entity: EntityKey }) {
     const chunkSize = 200;
     for (let i = 0; i < mapped.length; i += chunkSize) {
       const chunk = mapped.slice(i, i + chunkSize);
-      let q = supabase.from(entity).insert(chunk as any);
       if (entity === "products" && schema.onConflict) {
         // Upsert on SKU when present, else just insert. Split rows.
         const withKey = chunk.filter((r) => r.sku);
