@@ -159,7 +159,7 @@ function POSPage() {
       mrp: Number(p.sell_price),
       cost: Number(p.cost_price),
       disc_pct: 0,
-      tax_pct: taxRate,
+      tax_pct: 0,
       disc: 0,
     });
     setTab({ items });
@@ -169,9 +169,14 @@ function POSPage() {
     const items = tab.items.map((it, i) => {
       if (i !== idx) return it;
       const next = { ...it, ...patch };
-      // keep `disc` (flat) in sync with disc_pct + qty*price
       const gross = Number(next.qty) * Number(next.price);
-      next.disc = +Math.max(0, (gross * Number(next.disc_pct || 0)) / 100).toFixed(2);
+      if ("disc" in patch) {
+        // flat discount typed directly — derive %
+        next.disc = +Math.max(0, Number(patch.disc || 0)).toFixed(2);
+        next.disc_pct = gross > 0 ? +((next.disc / gross) * 100).toFixed(2) : 0;
+      } else {
+        next.disc = +Math.max(0, (gross * Number(next.disc_pct || 0)) / 100).toFixed(2);
+      }
       return next;
     });
     setTab({ items });
