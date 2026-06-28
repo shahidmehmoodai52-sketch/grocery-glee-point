@@ -28,9 +28,12 @@ type CartItem = {
   code: string;
   name: string;
   qty: number;
-  price: number;
-  cost: number;
-  disc: number;
+  price: number;     // Unit rate (editable)
+  mrp: number;       // Original MRP / sell price
+  cost: number;      // Purchase rate (internal only)
+  disc_pct: number;  // line discount %
+  tax_pct: number;   // line tax %
+  disc: number;      // derived flat discount
 };
 type Tab = {
   id: string;
