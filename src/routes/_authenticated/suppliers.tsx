@@ -87,13 +87,22 @@ function Page() {
             {rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No suppliers yet</TableCell></TableRow>}
             {rows.map((c) => (
               <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link to="/suppliers/$id" params={{ id: c.id }} className="hover:underline text-primary">
+                    {c.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{c.phone ?? "—"}</TableCell>
                 <TableCell>{c.email ?? "—"}</TableCell>
                 <TableCell className={`text-right font-medium ${Number(c.balance) > 0 ? "text-destructive" : ""}`}>
                   {fmtMoney(c.balance, sym)}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-2">
+                  <Button size="sm" variant="ghost" asChild>
+                    <Link to="/suppliers/$id" params={{ id: c.id }}>
+                      <BookOpen className="h-3.5 w-3.5 mr-1" />Ledger
+                    </Link>
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Number(c.balance), method: "cash", note: "" }); }}>
                     <DollarSign className="h-3.5 w-3.5 mr-1" />Pay supplier
                   </Button>
