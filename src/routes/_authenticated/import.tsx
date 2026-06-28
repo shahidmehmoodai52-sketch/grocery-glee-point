@@ -158,7 +158,7 @@ function Importer({ entity }: { entity: EntityKey }) {
           else ok += idx === 0 ? withKey.length : withoutKey.length;
         });
       } else {
-        const { error } = await q;
+        const { error } = await supabase.from(entity).insert(chunk as any);
         if (error) { failed += chunk.length; errors.push(error.message); }
         else ok += chunk.length;
       }
