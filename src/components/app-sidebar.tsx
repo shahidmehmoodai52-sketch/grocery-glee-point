@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet,
+  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -34,6 +34,7 @@ const groups: { label: string; items: { title: string; url: string; icon: any }[
       { title: "Products", url: "/products", icon: Package },
       { title: "Customers", url: "/customers", icon: Users },
       { title: "Suppliers", url: "/suppliers", icon: Truck },
+      { title: "Bulk import", url: "/import", icon: Upload },
     ],
   },
   {
