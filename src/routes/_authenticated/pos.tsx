@@ -329,28 +329,52 @@ function POSPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  ref={searchRef}
                   autoFocus
-                  placeholder="Scan barcode or type name / SKU…"
+                  placeholder="Scan barcode or type name / SKU…  (↑/↓ to choose, Enter to add)"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Escape") { setSearch(""); return; }
+                    if (e.key === "ArrowDown" && filtered.length) {
+                      e.preventDefault();
+                      setHighlight((h) => (h + 1) % filtered.length);
+                      return;
+                    }
+                    if (e.key === "ArrowUp" && filtered.length) {
+                      e.preventDefault();
+                      setHighlight((h) => (h - 1 + filtered.length) % filtered.length);
+                      return;
+                    }
                     if (e.key !== "Enter") return;
+                    e.preventDefault();
                     const raw = search.trim();
+                    // Empty search + items in cart → jump to Paid input
+                    if (!raw) {
+                      if (tab.items.length > 0) paidRef.current?.focus();
+                      return;
+                    }
                     const exact = productByBarcode[raw];
                     if (exact) { addProduct(exact); setSearch(""); return; }
-                    if (filtered.length >= 1) { addProduct(filtered[0]); setSearch(""); }
+                    if (filtered.length >= 1) {
+                      const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
+                      addProduct(pick);
+                      setSearch("");
+                    }
                   }}
                   className="pl-9 h-10"
                 />
               </div>
               {search.trim() && filtered.length > 0 && (
                 <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg max-h-80 overflow-auto">
-                  {filtered.map((p) => (
+                  {filtered.map((p, i) => (
                     <button
                       key={p.id}
-                      onClick={() => { addProduct(p); setSearch(""); }}
-                      className="w-full text-left px-3 py-2 hover:bg-accent flex items-center justify-between gap-3 border-b last:border-0"
+                      onMouseEnter={() => setHighlight(i)}
+                      onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
+                      className={`w-full text-left px-3 py-2 flex items-center justify-between gap-3 border-b last:border-0 ${
+                        i === highlight ? "bg-accent" : "hover:bg-accent/60"
+                      }`}
                     >
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate">{p.name}</div>
