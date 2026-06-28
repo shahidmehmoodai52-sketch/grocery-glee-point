@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
-import { Upload, FileDown, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import * as XLSX from "xlsx";
+import { Upload, FileDown, CheckCircle2, AlertCircle, Loader2, Database, FileSpreadsheet, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -16,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/import")({ component: Page
 
 type EntityKey = "products" | "customers" | "suppliers";
 
-const SCHEMAS: Record<EntityKey, { fields: { key: string; label: string; required?: boolean; type?: "number" | "bool" }[]; sample: string; onConflict?: string }> = {
+const SCHEMAS: Record<EntityKey, { fields: { key: string; label: string; required?: boolean; type?: "number" | "bool" }[]; sample: any[][]; onConflict?: string }> = {
   products: {
     fields: [
       { key: "name", label: "Name", required: true },
@@ -30,7 +32,11 @@ const SCHEMAS: Record<EntityKey, { fields: { key: string; label: string; require
       { key: "tax_rate", label: "Tax %", type: "number" },
       { key: "is_active", label: "Active", type: "bool" },
     ],
-    sample: "name,sku,barcode,category,unit,cost_price,sell_price,stock,tax_rate\nSugar 1kg,SUG001,8964000111111,Grocery,pcs,120,140,50,0\nRice 5kg,RIC005,8964000222222,Grocery,pcs,1100,1250,20,0\n",
+    sample: [
+      ["name","sku","barcode","category","unit","cost_price","sell_price","stock","tax_rate"],
+      ["Sugar 1kg","SUG001","8964000111111","Grocery","pcs",120,140,50,0],
+      ["Rice 5kg","RIC005","8964000222222","Grocery","pcs",1100,1250,20,0],
+    ],
     onConflict: "sku",
   },
   customers: {
@@ -41,7 +47,10 @@ const SCHEMAS: Record<EntityKey, { fields: { key: string; label: string; require
       { key: "address", label: "Address" },
       { key: "balance", label: "Opening Balance (they owe)", type: "number" },
     ],
-    sample: "name,phone,email,address,balance\nAhmed Khan,03001234567,ahmed@example.com,Lahore,0\nWalk-in Regular,,,,0\n",
+    sample: [
+      ["name","phone","email","address","balance"],
+      ["Ahmed Khan","03001234567","ahmed@example.com","Lahore",0],
+    ],
   },
   suppliers: {
     fields: [
@@ -51,24 +60,53 @@ const SCHEMAS: Record<EntityKey, { fields: { key: string; label: string; require
       { key: "address", label: "Address" },
       { key: "balance", label: "Opening Balance (we owe)", type: "number" },
     ],
-    sample: "name,phone,email,address,balance\nMetro Wholesale,0429876543,info@metro.pk,Lahore,0\n",
+    sample: [
+      ["name","phone","email","address","balance"],
+      ["Metro Wholesale","0429876543","info@metro.pk","Lahore",0],
+    ],
   },
 };
+
+// Parse any spreadsheet file (xlsx, xls, csv) into rows of objects keyed by header
+async function parseSpreadsheet(file: File): Promise<{ headers: string[]; rows: Record<string, any>[] }> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".csv")) {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (res) => resolve({ headers: res.meta.fields ?? [], rows: res.data as any[] }),
+        error: reject,
+      });
+    });
+  }
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "", raw: true });
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  return { headers, rows };
+}
 
 function Page() {
   return (
     <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Bulk import</h1>
-        <p className="text-sm text-muted-foreground">Migrate from your old POS. Upload CSV files for products, customers, and suppliers — no single-by-single entry needed.</p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Bulk import &amp; export</h1>
+          <p className="text-sm text-muted-foreground">Excel (.xlsx / .xls) ya CSV files upload karen — ya pora system data Excel me export karen.</p>
+        </div>
+        <ExportAllButton />
       </div>
 
-      <Tabs defaultValue="products">
+      <Tabs defaultValue="smart">
         <TabsList>
-          <TabsTrigger value="products">Products & Stock</TabsTrigger>
+          <TabsTrigger value="smart"><Wand2 className="h-4 w-4 mr-1" />Smart merge (Stock + Barcode)</TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
         </TabsList>
+        <TabsContent value="smart" className="mt-4"><SmartMerge /></TabsContent>
         {(["products", "customers", "suppliers"] as EntityKey[]).map((k) => (
           <TabsContent key={k} value={k} className="mt-4">
             <Importer entity={k} />
@@ -79,6 +117,263 @@ function Page() {
   );
 }
 
+// ---------------- Smart merge: stockmaster + barcode by item code ----------------
+
+const FIELD_HINTS: Record<string, string[]> = {
+  name: ["name","item name","itemname","description","product","product name","particulars","title"],
+  sku: ["sku","item code","itemcode","code","item no","item#","item number","itemno","prod code","product code","barcode"],
+  barcode: ["barcode","bar code","ean","upc","scan","scancode","scan code"],
+  category: ["category","cat","group","department"],
+  unit: ["unit","uom","measure"],
+  cost_price: ["cost","cost price","purchase","purchase rate","p rate","prate","p.rate","purchase price","buy","buying"],
+  sell_price: ["sale","sale rate","sell","sell price","sale price","s rate","srate","s.rate","mrp","retail","price"],
+  stock: ["stock","qty","quantity","on hand","onhand","balance","stock qty","stockqty","closing","opening"],
+  tax_rate: ["tax","tax %","tax rate","gst","vat"],
+};
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+function autoMap(headers: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, hints] of Object.entries(FIELD_HINTS)) {
+    const normHeaders = headers.map((h) => ({ raw: h, n: norm(h) }));
+    let hit = normHeaders.find((h) => hints.some((x) => h.n === norm(x)));
+    if (!hit) hit = normHeaders.find((h) => hints.some((x) => h.n.includes(norm(x))));
+    if (hit) out[key] = hit.raw;
+  }
+  return out;
+}
+
+function SmartMerge() {
+  const fileA = useRef<HTMLInputElement>(null);
+  const fileB = useRef<HTMLInputElement>(null);
+  const [stockFile, setStockFile] = useState<{ headers: string[]; rows: Record<string, any>[]; name: string } | null>(null);
+  const [barcodeFile, setBarcodeFile] = useState<{ headers: string[]; rows: Record<string, any>[]; name: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ products: number; barcodes: number; failed: number; errors: string[] } | null>(null);
+
+  // Detect which file is "stock" (has name + price/stock) vs "barcode" (mostly barcode + code)
+  const handleFile = async (file: File, slot: "auto" | "stock" | "barcode") => {
+    const parsed = await parseSpreadsheet(file);
+    const map = autoMap(parsed.headers);
+    let isBarcode = false;
+    if (slot === "auto") {
+      const hasBarcode = !!map.barcode;
+      const hasName = !!map.name;
+      const hasPriceOrStock = !!(map.sell_price || map.cost_price || map.stock);
+      // If it has barcode column and (no name OR no price/stock), it's the barcode file
+      isBarcode = hasBarcode && (!hasName || !hasPriceOrStock);
+    } else {
+      isBarcode = slot === "barcode";
+    }
+    const payload = { headers: parsed.headers, rows: parsed.rows, name: file.name };
+    if (isBarcode) setBarcodeFile(payload); else setStockFile(payload);
+    toast.success(`${file.name} → ${isBarcode ? "Barcode file" : "Stock master"} (${parsed.rows.length} rows)`);
+  };
+
+  const stockMap = useMemo(() => stockFile ? autoMap(stockFile.headers) : {}, [stockFile]);
+  const barcodeMap = useMemo(() => barcodeFile ? autoMap(barcodeFile.headers) : {}, [barcodeFile]);
+
+  const merged = useMemo(() => {
+    if (!stockFile) return [];
+    const m = stockMap;
+    const num = (v: any) => Number(String(v ?? "").replace(/[^0-9.\-]/g, "")) || 0;
+    const products = stockFile.rows.map((r) => ({
+      name: String(r[m.name ?? ""] ?? "").trim(),
+      sku: m.sku ? String(r[m.sku] ?? "").trim() : "",
+      barcode: m.barcode ? String(r[m.barcode] ?? "").trim() : "",
+      category: m.category ? String(r[m.category] ?? "").trim() : null,
+      unit: m.unit ? String(r[m.unit] ?? "").trim() : null,
+      cost_price: m.cost_price ? num(r[m.cost_price]) : 0,
+      sell_price: m.sell_price ? num(r[m.sell_price]) : 0,
+      stock: m.stock ? num(r[m.stock]) : 0,
+      tax_rate: m.tax_rate ? num(r[m.tax_rate]) : 0,
+    })).filter((p) => p.name);
+    return products;
+  }, [stockFile, stockMap]);
+
+  const extraBarcodes = useMemo(() => {
+    if (!barcodeFile || !barcodeMap.sku || !barcodeMap.barcode) return [] as { sku: string; barcode: string }[];
+    return barcodeFile.rows
+      .map((r) => ({ sku: String(r[barcodeMap.sku] ?? "").trim(), barcode: String(r[barcodeMap.barcode] ?? "").trim() }))
+      .filter((x) => x.sku && x.barcode);
+  }, [barcodeFile, barcodeMap]);
+
+  const runImport = async () => {
+    if (merged.length === 0) return toast.error("Stock master file me koi valid rows nahi");
+    setBusy(true); setResult({ products: 0, barcodes: 0, failed: 0, errors: [] });
+    const errors: string[] = [];
+    let ok = 0, failed = 0;
+
+    // 1) Upsert products by SKU (when present)
+    const chunkSize = 200;
+    const withSku = merged.filter((p) => p.sku);
+    const noSku = merged.filter((p) => !p.sku);
+    for (let i = 0; i < withSku.length; i += chunkSize) {
+      const chunk = withSku.slice(i, i + chunkSize);
+      const { error } = await supabase.from("products").upsert(chunk as any, { onConflict: "sku" });
+      if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
+    }
+    for (let i = 0; i < noSku.length; i += chunkSize) {
+      const chunk = noSku.slice(i, i + chunkSize);
+      const { error } = await supabase.from("products").insert(chunk as any);
+      if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
+    }
+
+    // 2) Handle extra barcodes — need product IDs via SKU lookup
+    let bcOk = 0;
+    if (extraBarcodes.length > 0) {
+      const uniqueSkus = [...new Set(extraBarcodes.map((x) => x.sku))];
+      const skuToId: Record<string, string> = {};
+      for (let i = 0; i < uniqueSkus.length; i += 500) {
+        const slice = uniqueSkus.slice(i, i + 500);
+        const { data } = await supabase.from("products").select("id, sku").in("sku", slice);
+        (data ?? []).forEach((p: any) => { if (p.sku) skuToId[p.sku] = p.id; });
+      }
+      const rows = extraBarcodes
+        .map((x) => ({ product_id: skuToId[x.sku], barcode: x.barcode }))
+        .filter((x) => x.product_id);
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const { error } = await supabase.from("product_barcodes").upsert(chunk as any, { onConflict: "barcode" });
+        if (error) errors.push(error.message); else bcOk += chunk.length;
+      }
+    }
+
+    setBusy(false);
+    setResult({ products: ok, barcodes: bcOk, failed, errors: [...new Set(errors)].slice(0, 5) });
+    if (failed === 0) toast.success(`Imported ${ok} products, ${bcOk} extra barcodes`);
+    else toast.error(`${ok} imported, ${failed} failed`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <Alert>
+        <Wand2 className="h-4 w-4" />
+        <AlertDescription className="text-xs">
+          Apni <b>do Excel files</b> upload karen: ek stock/item master (name, rate, stock) aur dosri barcode list (item code + barcode).
+          System dono ko khud detect karega, item code par jodega, aur products + multiple barcodes set kar dega.
+          <b> Existing SKU update ho jata hai</b>, naya add ho jata hai.
+        </AlertDescription>
+      </Alert>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <FileSlot
+          label="File 1 (Stock master)"
+          file={stockFile}
+          map={stockMap}
+          required={["name"]}
+          inputRef={fileA}
+          onPick={(f) => handleFile(f, "auto")}
+          onClear={() => setStockFile(null)}
+        />
+        <FileSlot
+          label="File 2 (Barcodes)"
+          file={barcodeFile}
+          map={barcodeMap}
+          required={["sku","barcode"]}
+          inputRef={fileB}
+          onPick={(f) => handleFile(f, "auto")}
+          onClear={() => setBarcodeFile(null)}
+        />
+      </div>
+
+      {merged.length > 0 && (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="font-medium">Preview</h3>
+              <p className="text-xs text-muted-foreground">
+                {merged.length} products · {extraBarcodes.length} extra barcodes (linked by item code)
+              </p>
+            </div>
+            <Button onClick={runImport} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Import everything
+            </Button>
+          </div>
+          <div className="max-h-72 overflow-auto border rounded">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>SKU</TableHead><TableHead>Name</TableHead><TableHead>Barcode</TableHead>
+                <TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Sale</TableHead><TableHead className="text-right">Stock</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {merged.slice(0, 50).map((p, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-xs">{p.sku}</TableCell>
+                    <TableCell className="text-xs">{p.name}</TableCell>
+                    <TableCell className="text-xs">{p.barcode}</TableCell>
+                    <TableCell className="text-xs text-right">{p.cost_price}</TableCell>
+                    <TableCell className="text-xs text-right">{p.sell_price}</TableCell>
+                    <TableCell className="text-xs text-right">{p.stock}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {merged.length > 50 && <p className="text-xs text-muted-foreground">Showing first 50 of {merged.length}.</p>}
+        </Card>
+      )}
+
+      {result && (
+        <Alert variant={result.failed > 0 ? "destructive" : "default"}>
+          {result.failed === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+          <AlertDescription>
+            <div><b>{result.products}</b> products imported · <b>{result.barcodes}</b> extra barcodes · <b>{result.failed}</b> failed.</div>
+            {result.errors.length > 0 && <ul className="mt-2 text-xs list-disc pl-4">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}
+
+function FileSlot({ label, file, map, required, inputRef, onPick, onClear }: {
+  label: string;
+  file: { headers: string[]; rows: any[]; name: string } | null;
+  map: Record<string, string>;
+  required: string[];
+  inputRef: React.RefObject<HTMLInputElement>;
+  onPick: (f: File) => void;
+  onClear: () => void;
+}) {
+  const missing = required.filter((k) => !map[k]);
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-sm">{label}</h3>
+        {file ? (
+          <Button size="sm" variant="ghost" onClick={onClear}>Clear</Button>
+        ) : (
+          <>
+            <input ref={inputRef} type="file" hidden accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && onPick(e.target.files[0])} />
+            <Button size="sm" variant="outline" onClick={() => inputRef.current?.click()}>
+              <FileSpreadsheet className="h-4 w-4 mr-1" />Choose file
+            </Button>
+          </>
+        )}
+      </div>
+      {file && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground truncate">📄 {file.name} · {file.rows.length} rows</p>
+          <div className="flex flex-wrap gap-1">
+            {Object.entries(map).map(([k, v]) => (
+              <Badge key={k} variant="secondary" className="text-[10px]">{k} ← {v}</Badge>
+            ))}
+          </div>
+          {missing.length > 0 && (
+            <Alert variant="destructive" className="py-2">
+              <AlertCircle className="h-3 w-3" />
+              <AlertDescription className="text-xs">Required column not detected: {missing.join(", ")}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ---------------- Single-entity importer (now supports xlsx) ----------------
+
 function Importer({ entity }: { entity: EntityKey }) {
   const schema = SCHEMAS[entity];
   const fileRef = useRef<HTMLInputElement>(null);
@@ -88,28 +383,21 @@ function Importer({ entity }: { entity: EntityKey }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: number; failed: number; errors: string[] } | null>(null);
 
-  const parseFile = (file: File) => {
+  const parseFile = async (file: File) => {
     setResult(null);
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (res) => {
-        const data = res.data as Record<string, any>[];
-        const hdrs = res.meta.fields ?? [];
-        setHeaders(hdrs);
-        setRows(data);
-        // Auto-map by name similarity
-        const auto: Record<string, string> = {};
-        schema.fields.forEach((f) => {
-          const hit = hdrs.find((h) => h.toLowerCase().replace(/[^a-z]/g, "") === f.key.replace(/[^a-z]/g, ""))
-            || hdrs.find((h) => h.toLowerCase().includes(f.key.split("_")[0]));
-          if (hit) auto[f.key] = hit;
-        });
-        setMapping(auto);
-        toast.success(`Parsed ${data.length} rows`);
-      },
-      error: (e) => toast.error(e.message),
-    });
+    try {
+      const { headers: hdrs, rows: data } = await parseSpreadsheet(file);
+      setHeaders(hdrs); setRows(data);
+      const auto: Record<string, string> = {};
+      schema.fields.forEach((f) => {
+        const hints = FIELD_HINTS[f.key] ?? [f.key];
+        const hit = hdrs.find((h) => hints.some((x) => norm(h) === norm(x)))
+          || hdrs.find((h) => hints.some((x) => norm(h).includes(norm(x))));
+        if (hit) auto[f.key] = hit;
+      });
+      setMapping(auto);
+      toast.success(`Parsed ${data.length} rows`);
+    } catch (e: any) { toast.error(e.message); }
   };
 
   const mapped = useMemo(() => {
@@ -130,43 +418,38 @@ function Importer({ entity }: { entity: EntityKey }) {
   }, [rows, mapping, schema]);
 
   const downloadSample = () => {
-    const blob = new Blob([schema.sample], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${entity}-sample.csv`; a.click();
-    URL.revokeObjectURL(url);
+    const ws = XLSX.utils.aoa_to_sheet(schema.sample);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, entity);
+    XLSX.writeFile(wb, `${entity}-sample.xlsx`);
   };
 
   const runImport = async () => {
     if (mapped.length === 0) return toast.error("No rows to import");
     setBusy(true); setResult({ ok: 0, failed: 0, errors: [] });
-    const errors: string[] = [];
-    let ok = 0, failed = 0;
+    const errors: string[] = []; let ok = 0, failed = 0;
     const chunkSize = 200;
     for (let i = 0; i < mapped.length; i += chunkSize) {
       const chunk = mapped.slice(i, i + chunkSize);
       if (entity === "products" && schema.onConflict) {
-        // Upsert on SKU when present, else just insert. Split rows.
         const withKey = chunk.filter((r) => r.sku);
         const withoutKey = chunk.filter((r) => !r.sku);
-        const ops: Promise<any>[] = [];
-        if (withKey.length) ops.push(Promise.resolve(supabase.from("products").upsert(withKey as any, { onConflict: "sku" })));
-        if (withoutKey.length) ops.push(Promise.resolve(supabase.from("products").insert(withoutKey as any)));
-        const results = await Promise.all(ops);
-        results.forEach((r, idx) => {
-          if (r.error) { failed += idx === 0 ? withKey.length : withoutKey.length; errors.push(r.error.message); }
-          else ok += idx === 0 ? withKey.length : withoutKey.length;
-        });
+        if (withKey.length) {
+          const { error } = await supabase.from("products").upsert(withKey as any, { onConflict: "sku" });
+          if (error) { failed += withKey.length; errors.push(error.message); } else ok += withKey.length;
+        }
+        if (withoutKey.length) {
+          const { error } = await supabase.from("products").insert(withoutKey as any);
+          if (error) { failed += withoutKey.length; errors.push(error.message); } else ok += withoutKey.length;
+        }
       } else {
         const { error } = await supabase.from(entity).insert(chunk as any);
-        if (error) { failed += chunk.length; errors.push(error.message); }
-        else ok += chunk.length;
+        if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
       }
       setResult({ ok, failed, errors: [...new Set(errors)].slice(0, 5) });
     }
     setBusy(false);
-    if (failed === 0) toast.success(`Imported ${ok} rows`);
-    else toast.error(`${ok} imported, ${failed} failed`);
+    if (failed === 0) toast.success(`Imported ${ok} rows`); else toast.error(`${ok} imported, ${failed} failed`);
   };
 
   return (
@@ -174,12 +457,12 @@ function Importer({ entity }: { entity: EntityKey }) {
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="font-medium">Step 1 — Upload CSV</h3>
-            <p className="text-xs text-muted-foreground">Export from your old POS as CSV (UTF-8). Headers in first row.</p>
+            <h3 className="font-medium">Step 1 — Upload file</h3>
+            <p className="text-xs text-muted-foreground">Excel (.xlsx, .xls) ya CSV. First row me headers honi chahiye.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={downloadSample}><FileDown className="h-4 w-4 mr-2" />Sample CSV</Button>
-            <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => e.target.files?.[0] && parseFile(e.target.files[0])} />
+            <Button variant="outline" onClick={downloadSample}><FileDown className="h-4 w-4 mr-2" />Sample Excel</Button>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files?.[0] && parseFile(e.target.files[0])} />
             <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />Choose file</Button>
           </div>
         </div>
@@ -191,9 +474,7 @@ function Importer({ entity }: { entity: EntityKey }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {schema.fields.map((f) => (
               <div key={f.key} className="space-y-1">
-                <Label className="text-xs">
-                  {f.label} {f.required && <span className="text-destructive">*</span>}
-                </Label>
+                <Label className="text-xs">{f.label} {f.required && <span className="text-destructive">*</span>}</Label>
                 <Select value={mapping[f.key] ?? "__none__"} onValueChange={(v) => setMapping({ ...mapping, [f.key]: v === "__none__" ? "" : v })}>
                   <SelectTrigger><SelectValue placeholder="— skip —" /></SelectTrigger>
                   <SelectContent>
@@ -218,7 +499,7 @@ function Importer({ entity }: { entity: EntityKey }) {
           </div>
           {entity === "products" && (
             <Alert><AlertDescription className="text-xs">
-              Rows with matching <b>SKU</b> will be updated (stock & prices overwritten). Rows without SKU are added as new.
+              Matching <b>SKU</b> rows update ho jain gi (stock &amp; prices overwrite). Bina SKU ke rows nayi add hongi.
             </AlertDescription></Alert>
           )}
           <div className="max-h-72 overflow-auto border rounded">
@@ -237,7 +518,6 @@ function Importer({ entity }: { entity: EntityKey }) {
               </TableBody>
             </Table>
           </div>
-          {mapped.length > 50 && <p className="text-xs text-muted-foreground">Showing first 50 of {mapped.length}.</p>}
         </Card>
       )}
 
@@ -246,14 +526,50 @@ function Importer({ entity }: { entity: EntityKey }) {
           {result.failed === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
           <AlertDescription>
             <div><b>{result.ok}</b> imported, <b>{result.failed}</b> failed.</div>
-            {result.errors.length > 0 && (
-              <ul className="mt-2 text-xs list-disc pl-4">
-                {result.errors.map((e, i) => <li key={i}>{e}</li>)}
-              </ul>
-            )}
+            {result.errors.length > 0 && <ul className="mt-2 text-xs list-disc pl-4">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
           </AlertDescription>
         </Alert>
       )}
     </div>
+  );
+}
+
+// ---------------- Full system export to Excel ----------------
+
+function ExportAllButton() {
+  const [busy, setBusy] = useState(false);
+
+  const exportAll = async () => {
+    setBusy(true);
+    try {
+      const tables = [
+        "products","product_barcodes","customers","suppliers",
+        "sales","sale_items","sale_returns","sale_return_items",
+        "purchases","purchase_items","purchase_returns","purchase_return_items",
+        "expenses","expense_persons","party_payments",
+      ] as const;
+
+      const wb = XLSX.utils.book_new();
+      let total = 0;
+      for (const t of tables) {
+        const { data, error } = await supabase.from(t).select("*").limit(50000);
+        if (error) { toast.error(`${t}: ${error.message}`); continue; }
+        const ws = XLSX.utils.json_to_sheet(data ?? []);
+        XLSX.utils.book_append_sheet(wb, ws, t.slice(0, 31));
+        total += (data ?? []).length;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `pos-backup-${stamp}.xlsx`);
+      toast.success(`Exported ${total} rows across ${tables.length} sheets`);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Button onClick={exportAll} disabled={busy} variant="default">
+      {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Database className="h-4 w-4 mr-2" />}
+      Export full system (Excel)
+    </Button>
   );
 }
