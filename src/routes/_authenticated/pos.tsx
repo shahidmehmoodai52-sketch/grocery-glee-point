@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
