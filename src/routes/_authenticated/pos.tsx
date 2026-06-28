@@ -526,10 +526,17 @@ function POSPage() {
                 <div>
                   <Label className="text-xs">Paid</Label>
                   <Input
+                    ref={paidRef}
                     type="number"
                     step="0.01"
                     value={tab.paid}
                     onChange={(e) => setTab({ paid: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleSale();
+                      }
+                    }}
                     placeholder={total.toFixed(2)}
                     className="h-9"
                   />
