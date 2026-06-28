@@ -146,10 +146,10 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       <div className="my-2 border-t border-dashed border-black" />
 
       <div className="text-[9.5px] grid grid-cols-12 font-bold uppercase tracking-wider pb-1 border-b border-black">
-        <div className="col-span-6">Item</div>
-        <div className="col-span-2 text-right">Qty</div>
+        <div className="col-span-5">Item</div>
         <div className="col-span-2 text-right">Rate</div>
-        <div className="col-span-2 text-right">Amt</div>
+        <div className="col-span-2 text-right">Qty</div>
+        <div className="col-span-3 text-right">Amt</div>
       </div>
       <div className="divide-y divide-dotted divide-black/30">
         {invoice.sale_items?.map((it, i) => (
@@ -158,12 +158,12 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
               {String(i + 1).padStart(2, "0")}. {it.name}
             </div>
             <div className="grid grid-cols-12 text-[10px]">
-              <div className="col-span-6" />
-              <div className="col-span-2 text-right">{fmtQty(it.qty)}</div>
+              <div className="col-span-5" />
               <div className="col-span-2 text-right">
                 {it.price != null ? fmtMoney(it.price, sym) : ""}
               </div>
-              <div className="col-span-2 text-right font-semibold">
+              <div className="col-span-2 text-right">{fmtQty(it.qty)}</div>
+              <div className="col-span-3 text-right font-semibold">
                 {fmtMoney(it.line_total, sym)}
               </div>
             </div>
