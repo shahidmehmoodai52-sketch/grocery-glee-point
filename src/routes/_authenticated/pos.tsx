@@ -129,7 +129,7 @@ function POSPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return products.slice(0, 24);
+    if (!q) return [];
     return products
       .filter((p) => {
         if (p.name.toLowerCase().includes(q)) return true;
@@ -137,8 +137,9 @@ function POSPage() {
         const bcs = barcodesByProduct[p.id] ?? [];
         return bcs.some((bc) => bc.toLowerCase().includes(q));
       })
-      .slice(0, 60);
+      .slice(0, 8);
   }, [products, search, barcodesByProduct]);
+
 
 
   const setTab = (patch: Partial<Tab>) =>
