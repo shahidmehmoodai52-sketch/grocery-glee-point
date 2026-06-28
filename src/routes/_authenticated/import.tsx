@@ -332,7 +332,7 @@ function FileSlot({ label, file, map, required, inputRef, onPick, onClear }: {
   file: { headers: string[]; rows: any[]; name: string } | null;
   map: Record<string, string>;
   required: string[];
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
   onPick: (f: File) => void;
   onClear: () => void;
 }) {
