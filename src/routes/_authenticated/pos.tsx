@@ -144,6 +144,9 @@ function POSPage() {
       .slice(0, 8);
   }, [products, search, barcodesByProduct]);
 
+  // reset highlight whenever the filtered list changes
+  useEffect(() => { setHighlight(0); }, [search]);
+
 
 
   const setTab = (patch: Partial<Tab>) =>
