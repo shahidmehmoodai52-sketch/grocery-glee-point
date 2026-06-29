@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen } from "lucide-react";
+import { BookOpen, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, DollarSign } from "lucide-react";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { openWhatsApp } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/_authenticated/suppliers")({ component: Page });
 
