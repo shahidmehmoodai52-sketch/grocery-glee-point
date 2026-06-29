@@ -1,18 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, MessageCircle, FileDown } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, MessageCircle, FileDown, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { openWhatsApp, shareOrDownloadPdf } from "@/lib/whatsapp";
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
+import { Receipt } from "@/components/receipt";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
@@ -22,8 +24,9 @@ type Entry = {
   type: "sale" | "payment" | "return";
   ref: string;
   note: string;
-  debit: number;   // they owe more
-  credit: number;  // they paid / refunded
+  debit: number;
+  credit: number;
+  sale?: any;       // attached for sale rows so we can re-open / re-print the invoice
 };
 
 function Page() {
@@ -32,6 +35,7 @@ function Page() {
   const sym = settings?.currency_symbol ?? "$";
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [openInvoice, setOpenInvoice] = useState<any>(null);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
@@ -41,7 +45,7 @@ function Page() {
     queryKey: ["customer-sales", id],
     queryFn: async () =>
       (await supabase.from("sales")
-        .select("id,invoice_no,total,paid,created_at,note,sale_items(name,qty,price,line_total)")
+        .select("id,invoice_no,subtotal,tax,discount,total,paid,change_due,payment_method,created_at,note,sale_items(id,name,qty,price,line_total)")
         .eq("customer_id", id).order("created_at", { ascending: true })).data ?? [],
   });
   const { data: payments = [] } = useQuery({
@@ -60,7 +64,7 @@ function Page() {
   const entries: Entry[] = useMemo(() => {
     const e: Entry[] = [];
     for (const s of sales as any[]) {
-      e.push({ date: s.created_at, type: "sale", ref: s.invoice_no, note: s.note ?? "", debit: Number(s.total), credit: 0 });
+      e.push({ date: s.created_at, type: "sale", ref: s.invoice_no, note: s.note ?? "", debit: Number(s.total), credit: 0, sale: s });
       if (Number(s.paid) > 0) {
         e.push({ date: s.created_at, type: "payment", ref: `${s.invoice_no} · on-invoice`, note: "Paid at sale", debit: 0, credit: Number(s.paid) });
       }
@@ -172,7 +176,7 @@ function Page() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat icon={Receipt} label="Total sales" value={fmtMoney(totalDebit, sym)} tone="primary" />
+        <Stat icon={ReceiptIcon} label="Total sales" value={fmtMoney(totalDebit, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Received / returned" value={fmtMoney(totalCredit, sym)} tone="success" />
         <Stat icon={TrendingUp} label="Period net" value={fmtMoney(totalDebit - totalCredit, sym)} tone="warning" />
         <Stat icon={Wallet} label="Outstanding (they owe)" value={fmtMoney(outstanding, sym)} tone={outstanding > 0 ? "destructive" : "success"} />
@@ -190,9 +194,10 @@ function Page() {
             <TableHead className="text-right">Debit</TableHead>
             <TableHead className="text-right">Credit</TableHead>
             <TableHead className="text-right">Balance</TableHead>
+            <TableHead className="text-right no-print w-20">Invoice</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
+            {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
             {rows.map((x, i) => (
               <TableRow key={i}>
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
@@ -208,6 +213,13 @@ function Page() {
                 <TableCell className={`text-right font-medium ${x.balance > 0 ? "text-destructive" : x.balance < 0 ? "text-success" : ""}`}>
                   {fmtMoney(x.balance, sym)}
                 </TableCell>
+                <TableCell className="text-right no-print">
+                  {x.type === "sale" && x.sale && (
+                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
+                      <Eye className="h-3.5 w-3.5 mr-1" />Open
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
             {rows.length > 0 && (
@@ -216,11 +228,31 @@ function Page() {
                 <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
                 <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(running, sym)}</TableCell>
+                <TableCell className="no-print"></TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </Card>
+
+      {/* Invoice viewer — open from any sale row */}
+      <Dialog open={!!openInvoice} onOpenChange={(o) => !o && setOpenInvoice(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Invoice {openInvoice?.invoice_no}</DialogTitle>
+          </DialogHeader>
+          <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
+            <div className="print-area">
+              {openInvoice && <Receipt invoice={openInvoice} settings={settings as any} />}
+            </div>
+          </div>
+          <DialogFooter className="no-print">
+            <Button variant="outline" onClick={() => setOpenInvoice(null)}>Close</Button>
+            <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Card className="p-3 print-area">
         <div className="mb-2 font-semibold">Item-wise details</div>
