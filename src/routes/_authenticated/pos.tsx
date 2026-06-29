@@ -707,3 +707,107 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
   );
 }
 
+function ReprintDialog({
+  open,
+  onOpenChange,
+  settings,
+  sym,
+  onView,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  settings: any;
+  sym: string;
+  onView: (s: any) => void;
+}) {
+  const [q, setQ] = useState("");
+
+  const { data: sales = [], isFetching } = useQuery({
+    queryKey: ["sales", "reprint"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sales")
+        .select("*, customers(name), sale_items(*)")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return sales.slice(0, 50);
+    const asNum = Number(term);
+    const isNum = isFinite(asNum) && term !== "";
+    return sales.filter((s: any) => {
+      if (String(s.invoice_no ?? "").toLowerCase().includes(term)) return true;
+      if ((s.customers?.name ?? "").toLowerCase().includes(term)) return true;
+      if ((s.payment_method ?? "").toLowerCase().includes(term)) return true;
+      if (isNum) {
+        // amount match — tolerate within 1 unit so user can type 250 to find 250.00
+        if (Math.abs(Number(s.total) - asNum) < 1) return true;
+        if (Math.abs(Number(s.paid) - asNum) < 1) return true;
+      }
+      return false;
+    });
+  }, [q, sales]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Reprint / past invoices</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              autoFocus
+              placeholder="Search by invoice no, customer, or amount (e.g. 250)…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="pl-9 h-10"
+            />
+          </div>
+          <div className="rounded-md border max-h-[55vh] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-xs uppercase tracking-wide sticky top-0">
+                <tr>
+                  <th className="text-left px-3 py-2">Invoice</th>
+                  <th className="text-left px-3 py-2">Date</th>
+                  <th className="text-left px-3 py-2">Customer</th>
+                  <th className="text-right px-3 py-2">Total</th>
+                  <th className="px-2 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {isFetching && (
+                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
+                )}
+                {!isFetching && filtered.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No invoices match.</td></tr>
+                )}
+                {filtered.map((s: any) => (
+                  <tr key={s.id} className="border-t hover:bg-accent/40">
+                    <td className="px-3 py-1.5 font-mono text-xs">{s.invoice_no}</td>
+                    <td className="px-3 py-1.5 text-xs">{new Date(s.created_at).toLocaleString()}</td>
+                    <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
+                    <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(s.total, sym)}</td>
+                    <td className="px-2 py-1 text-right">
+                      <Button size="sm" variant="ghost" onClick={() => { onView(s); onOpenChange(false); }}>
+                        <Printer className="h-3.5 w-3.5 mr-1" /> Open
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
