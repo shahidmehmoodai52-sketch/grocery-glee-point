@@ -24,6 +24,9 @@ type Entry = {
   note: string;
   debit: number;   // we owe more
   credit: number;  // we paid / refunded
+  purchase_id?: string;
+  paid?: number;
+  total?: number;
 };
 
 function Page() {
