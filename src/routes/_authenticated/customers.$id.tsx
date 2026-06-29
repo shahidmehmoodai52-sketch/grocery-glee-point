@@ -149,11 +149,18 @@ function Page() {
         <div className="flex items-end gap-2 no-print flex-wrap">
           <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
           <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Button variant="outline" onClick={() => { setFrom(""); setTo(""); }}>All</Button>
           <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
           <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
         </div>
       </div>
+
+      <div className="flex flex-wrap gap-1.5 no-print">
+        {PRESETS.map((p) => (
+          <Button key={p.key} size="sm" variant="secondary" className="h-7 text-xs"
+            onClick={() => { const r = rangeFor(p.key as DatePreset); setFrom(r.from); setTo(r.to); }}>
+            {p.label}
+          </Button>
+        ))}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={ReceiptIcon} label="Total sales" value={fmtMoney(totalDebit, sym)} tone="primary" />
