@@ -104,7 +104,12 @@ function Page() {
     return true;
   });
 
-  let running = 0;
+  // Opening balance = sum of all entries BEFORE the filter window so the running balance is continuous
+  const opening = entries
+    .filter((x) => from && x.date < from)
+    .reduce((s, x) => s + x.debit - x.credit, 0);
+
+  let running = opening;
   const rows = filtered.map((x) => {
     running += x.debit - x.credit;
     return { ...x, balance: running };
