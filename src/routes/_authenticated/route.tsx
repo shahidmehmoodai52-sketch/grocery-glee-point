@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { maybeRunDaily } from "@/lib/backup";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 function Layout() {
   useEffect(() => { maybeRunDaily(); }, []);
+  useRealtimeSync();
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
