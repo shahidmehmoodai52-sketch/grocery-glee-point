@@ -174,23 +174,73 @@ function Page() {
             {rows.length === 0 && (
               <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
             )}
-            {rows.map((x, i) => (
-              <TableRow key={i}>
-                <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleDateString()}</TableCell>
-                <TableCell>
-                  <Badge variant={x.type === "purchase" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
-                    {x.type}
-                  </Badge>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{x.ref}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{x.note || "—"}</TableCell>
-                <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
-                <TableCell className="text-right text-success">{x.credit > 0 ? fmtMoney(x.credit, sym) : "—"}</TableCell>
-                <TableCell className={`text-right font-medium ${x.balance > 0 ? "text-destructive" : x.balance < 0 ? "text-success" : ""}`}>
-                  {fmtMoney(x.balance, sym)}
-                </TableCell>
-              </TableRow>
-            ))}
+            {rows.map((x, i) => {
+              const isPurchase = x.type === "purchase" && x.purchase_id;
+              const open = isPurchase && expanded.has(x.purchase_id!);
+              const items = isPurchase ? itemsByPurchase.get(x.purchase_id!) ?? [] : [];
+              const due = isPurchase ? Number(x.total || 0) - Number(x.paid || 0) : 0;
+              return (
+                <>
+                  <TableRow key={i}>
+                    <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <Badge variant={x.type === "purchase" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
+                        {x.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {isPurchase ? (
+                        <button onClick={() => toggle(x.purchase_id!)} className="inline-flex items-center gap-1 hover:underline no-print">
+                          {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                          {x.ref}
+                        </button>
+                      ) : x.ref}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {x.note || "—"}
+                      {isPurchase && due > 0 && <Badge variant="destructive" className="ml-2 text-[10px]">Unpaid {fmtMoney(due, sym)}</Badge>}
+                      {isPurchase && due <= 0 && Number(x.paid || 0) > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">Paid</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
+                    <TableCell className="text-right text-success">{x.credit > 0 ? fmtMoney(x.credit, sym) : "—"}</TableCell>
+                    <TableCell className={`text-right font-medium ${x.balance > 0 ? "text-destructive" : x.balance < 0 ? "text-success" : ""}`}>
+                      {fmtMoney(x.balance, sym)}
+                    </TableCell>
+                  </TableRow>
+                  {open && (
+                    <TableRow key={`${i}-d`} className="bg-muted/30">
+                      <TableCell colSpan={7} className="p-0">
+                        <div className="p-3">
+                          <div className="text-xs font-medium mb-2 text-muted-foreground">Items in {x.ref} · Total {fmtMoney(Number(x.total||0), sym)} · Paid {fmtMoney(Number(x.paid||0), sym)} · Due {fmtMoney(due, sym)}</div>
+                          {items.length === 0 ? (
+                            <div className="text-xs text-muted-foreground">No item details</div>
+                          ) : (
+                            <Table>
+                              <TableHeader><TableRow>
+                                <TableHead>Item</TableHead>
+                                <TableHead className="text-right w-20">Qty</TableHead>
+                                <TableHead className="text-right w-28">Cost</TableHead>
+                                <TableHead className="text-right w-28">Amount</TableHead>
+                              </TableRow></TableHeader>
+                              <TableBody>
+                                {items.map((it, j) => (
+                                  <TableRow key={j}>
+                                    <TableCell>{it.name}</TableCell>
+                                    <TableCell className="text-right">{Number(it.qty)}</TableCell>
+                                    <TableCell className="text-right">{fmtMoney(Number(it.cost), sym)}</TableCell>
+                                    <TableCell className="text-right font-medium">{fmtMoney(Number(it.line_total), sym)}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
             {rows.length > 0 && (
               <TableRow className="bg-muted/40 font-semibold">
                 <TableCell colSpan={4}>Totals</TableCell>
