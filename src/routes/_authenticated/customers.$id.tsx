@@ -197,7 +197,8 @@ function Page() {
           <TableBody>
             {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
             {rows.map((x, i) => (
-              <TableRow key={i}>
+              <TableRow key={i} className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
+
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
                 <TableCell>
                   <Badge variant={x.type === "sale" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
