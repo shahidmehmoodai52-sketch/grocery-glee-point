@@ -655,7 +655,23 @@ function POSPage() {
       </div>
 
 
-      <InvoiceDialog invoice={lastInvoice} sym={sym} settings={settings} onClose={() => setLastInvoice(null)} />
+      {/* Reprint browser */}
+      <ReprintDialog
+        open={reprintOpen}
+        onOpenChange={setReprintOpen}
+        settings={settings}
+        sym={sym}
+        onView={(s) => setReprintView(s)}
+      />
+
+      {/* Single invoice viewer (used by both reprint and the post-sale toast action) */}
+      <InvoiceDialog
+        invoice={reprintView}
+        settings={settings}
+        onClose={() => setReprintView(null)}
+      />
+      {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
+      {false && lastInvoice}
     </div>
   );
 }
