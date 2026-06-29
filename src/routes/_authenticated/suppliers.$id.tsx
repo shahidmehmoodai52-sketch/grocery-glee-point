@@ -146,10 +146,9 @@ function Page() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <Stat icon={Receipt} label="Total purchases" value={fmtMoney(totalDebit, sym)} tone="primary" />
-        <Stat icon={TrendingDown} label="Paid / returned" value={fmtMoney(totalCredit, sym)} tone="success" />
-        <Stat icon={TrendingUp} label="Period net" value={fmtMoney(totalDebit - totalCredit, sym)} tone="warning" />
+        <Stat icon={TrendingDown} label="Paid" value={fmtMoney(totalCredit, sym)} tone="success" />
         <Stat icon={Wallet} label="Outstanding (we owe)" value={fmtMoney(outstanding, sym)} tone={outstanding > 0 ? "destructive" : "success"} />
       </div>
 
