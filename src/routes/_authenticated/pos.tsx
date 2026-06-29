@@ -305,8 +305,8 @@ function POSPage() {
   return (
     <div className="h-[calc(100vh-3rem)] flex flex-col">
       {/* Tabs strip */}
-      <div className="flex items-center gap-1 px-3 pt-2 border-b bg-card/40">
-        <ScrollArea className="max-w-full">
+      <div className="flex items-center gap-2 px-3 pt-2 border-b bg-card/40">
+        <ScrollArea className="flex-1 max-w-full">
           <div className="flex items-center gap-1 pb-2">
             {tabs.map((t) => (
               <button
@@ -335,6 +335,19 @@ function POSPage() {
             </Button>
           </div>
         </ScrollArea>
+
+        {/* Live clock + Reprint button */}
+        <div className="flex items-center gap-2 pb-2 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-mono tabular-nums">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>{now.toLocaleDateString()}</span>
+            <span className="text-muted-foreground">·</span>
+            <span>{now.toLocaleTimeString()}</span>
+          </div>
+          <Button size="sm" variant="outline" className="h-7" onClick={() => setReprintOpen(true)}>
+            <History className="h-3.5 w-3.5 mr-1" /> Reprint / Past invoices
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col min-h-0">
