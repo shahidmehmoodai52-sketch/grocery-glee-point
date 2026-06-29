@@ -91,13 +91,24 @@ function Page() {
             {rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No customers yet</TableCell></TableRow>}
             {rows.map((c) => (
               <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link to="/customers/$id" params={{ id: c.id }} className="hover:underline text-primary">{c.name}</Link>
+                </TableCell>
                 <TableCell>{c.phone ?? "—"}</TableCell>
                 <TableCell>{c.email ?? "—"}</TableCell>
                 <TableCell className={`text-right font-medium ${Number(c.balance) > 0 ? "text-destructive" : ""}`}>
                   {fmtMoney(c.balance, sym)}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-2">
+                  <Button size="sm" variant="ghost" asChild>
+                    <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
+                  </Button>
+                  {c.phone && (
+                    <Button size="sm" variant="ghost" className="text-success"
+                      onClick={() => openWhatsApp(c.phone, `*${settings?.store_name ?? "Store"}*\nDear ${c.name}, your current outstanding balance is ${sym}${Number(c.balance).toFixed(2)}.`)}>
+                      <MessageCircle className="h-3.5 w-3.5 mr-1" />WhatsApp
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Number(c.balance), method: "cash", note: "" }); }}>
                     <DollarSign className="h-3.5 w-3.5 mr-1" />Receive payment
                   </Button>
