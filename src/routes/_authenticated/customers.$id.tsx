@@ -147,12 +147,6 @@ function Page() {
           <Button variant="outline" onClick={() => { setFrom(""); setTo(""); }}>All</Button>
           <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
           <Button variant="outline" onClick={downloadPdf}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
-          <Button variant="outline" onClick={sendQuickWa} className="text-success border-success/40">
-            <MessageCircle className="h-4 w-4 mr-2" />WhatsApp summary
-          </Button>
-          <Button onClick={sendPdfWa} className="bg-success hover:bg-success/90 text-success-foreground">
-            <MessageCircle className="h-4 w-4 mr-2" />Send full PDF
-          </Button>
         </div>
       </div>
 
