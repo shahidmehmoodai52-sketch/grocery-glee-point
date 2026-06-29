@@ -118,26 +118,6 @@ function Page() {
     totalDebit, totalCredit, outstanding,
   });
 
-  const summaryMsg = () =>
-    `*${settings?.store_name ?? "Store"}* — Account statement for ${customer?.name}\n` +
-    (from || to ? `Period: ${from || "—"} to ${to || "—"}\n` : "") +
-    `Total purchases: ${sym}${totalDebit.toFixed(2)}\n` +
-    `Paid / returns: ${sym}${totalCredit.toFixed(2)}\n` +
-    `*Outstanding balance: ${sym}${outstanding.toFixed(2)}*\n` +
-    `Thank you for your business.`;
-
-  const sendQuickWa = () => {
-    if (!customer?.phone) return toast.error("No phone number on file");
-    openWhatsApp(customer.phone, summaryMsg());
-  };
-  const sendPdfWa = async () => {
-    const blob = buildPdf();
-    const res = await shareOrDownloadPdf({
-      phone: customer?.phone, message: summaryMsg(),
-      filename: `Ledger-${customer?.name?.replace(/\s+/g, "_")}.pdf`, blob,
-    });
-    if (res === "downloaded") toast.info("PDF downloaded — attach it in WhatsApp");
-  };
   const downloadPdf = () => {
     const blob = buildPdf();
     const url = URL.createObjectURL(blob);
@@ -145,6 +125,7 @@ function Page() {
     a.href = url; a.download = `Ledger-${customer?.name?.replace(/\s+/g, "_")}.pdf`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
+
 
   return (
     <div className="p-6 space-y-4">
