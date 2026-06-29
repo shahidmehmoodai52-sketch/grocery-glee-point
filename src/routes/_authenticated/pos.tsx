@@ -78,6 +78,7 @@ function POSPage() {
   const [showCost, setShowCost] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [now, setNow] = useState(() => new Date());
+  const [phonePrompt, setPhonePrompt] = useState<{ open: boolean; phone: string }>({ open: false, phone: "" });
   const searchRef = useRef<HTMLInputElement>(null);
   const paidRef = useRef<HTMLInputElement>(null);
 
