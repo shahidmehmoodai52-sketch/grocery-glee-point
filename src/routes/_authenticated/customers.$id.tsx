@@ -233,7 +233,29 @@ function Page() {
       </Dialog>
 
 
+
+      <Dialog open={pdfPrompt} onOpenChange={setPdfPrompt}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generate PDF</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground">
+            Choose how you want the ledger PDF: a clean summary with only bills & payments, or a full version that also includes item-wise details for every invoice.
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setPdfPrompt(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => downloadPdf(false)}>
+              <FileDown className="h-4 w-4 mr-2" />Summary (bills only)
+            </Button>
+            <Button onClick={() => downloadPdf(true)}>
+              <FileDown className="h-4 w-4 mr-2" />Full + item-wise
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card className="p-3 print-area">
+
         <div className="mb-2 font-semibold">Item-wise details</div>
         <Table>
           <TableHeader><TableRow>
