@@ -31,8 +31,9 @@ function ProductsPage() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "$";
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<ProductForm>(empty);
+  const [open, setOpen, clearOpen] = usePersistentState<boolean>("product-entry-open", false);
+  const [form, setForm, clearForm] = usePersistentState<ProductForm>("product-entry-form", empty);
+
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products"],
