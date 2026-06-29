@@ -1,8 +1,10 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { maybeRunDaily } from "@/lib/backup";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -15,6 +17,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function Layout() {
+  useEffect(() => { maybeRunDaily(); }, []);
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">

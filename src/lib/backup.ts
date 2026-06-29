@@ -1,0 +1,149 @@
+import { get, set, del } from "idb-keyval";
+import * as XLSX from "xlsx";
+import { supabase } from "@/integrations/supabase/client";
+
+const DIR_KEY = "backup_dir_handle";
+const LAST_KEY = "backup_last_run";
+const ENABLED_KEY = "backup_auto_enabled";
+
+const TABLES = [
+  "store_settings", "products", "product_barcodes", "customers", "suppliers",
+  "sales", "sale_items", "sale_returns", "sale_return_items",
+  "purchases", "purchase_items", "purchase_returns", "purchase_return_items",
+  "expenses", "expense_persons", "party_payments", "user_roles", "profiles",
+] as const;
+
+export type BackupStatus = {
+  hasHandle: boolean;
+  dirName: string | null;
+  lastRun: string | null;
+  autoEnabled: boolean;
+};
+
+export async function getStatus(): Promise<BackupStatus> {
+  const handle = await get<FileSystemDirectoryHandle>(DIR_KEY);
+  const lastRun = (await get<string>(LAST_KEY)) ?? null;
+  const autoEnabled = (await get<boolean>(ENABLED_KEY)) ?? false;
+  return {
+    hasHandle: !!handle,
+    dirName: handle?.name ?? null,
+    lastRun,
+    autoEnabled,
+  };
+}
+
+export function isSupported() {
+  return typeof window !== "undefined" && "showDirectoryPicker" in window;
+}
+
+export async function pickBackupFolder(): Promise<FileSystemDirectoryHandle> {
+  // @ts-ignore - File System Access API
+  const handle: FileSystemDirectoryHandle = await window.showDirectoryPicker({
+    id: "pos-backup",
+    mode: "readwrite",
+    startIn: "documents",
+  });
+  await set(DIR_KEY, handle);
+  await set(ENABLED_KEY, true);
+  return handle;
+}
+
+export async function clearBackupFolder() {
+  await del(DIR_KEY);
+  await set(ENABLED_KEY, false);
+}
+
+export async function setAutoEnabled(v: boolean) {
+  await set(ENABLED_KEY, v);
+}
+
+async function verifyPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  // @ts-ignore
+  const opts = { mode: "readwrite" };
+  // @ts-ignore
+  if ((await handle.queryPermission(opts)) === "granted") return true;
+  // @ts-ignore
+  if ((await handle.requestPermission(opts)) === "granted") return true;
+  return false;
+}
+
+async function fetchAll(table: string): Promise<any[]> {
+  const out: any[] = [];
+  const PAGE = 1000;
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from(table as any)
+      .select("*")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    out.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
+export async function buildWorkbookBlob(): Promise<{ blob: Blob; counts: Record<string, number> }> {
+  const wb = XLSX.utils.book_new();
+  const counts: Record<string, number> = {};
+  for (const t of TABLES) {
+    try {
+      const rows = await fetchAll(t);
+      counts[t] = rows.length;
+      const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
+      XLSX.utils.book_append_sheet(wb, ws, t.slice(0, 31));
+    } catch (e) {
+      counts[t] = -1;
+    }
+  }
+  const arr = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  return { blob: new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), counts };
+}
+
+function fileName() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `pos-backup-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.xlsx`;
+}
+
+export async function runBackup(opts: { silent?: boolean } = {}): Promise<{ ok: boolean; file?: string; error?: string; counts?: Record<string, number> }> {
+  const handle = await get<FileSystemDirectoryHandle>(DIR_KEY);
+  if (!handle) return { ok: false, error: "No backup folder selected" };
+  const granted = await verifyPermission(handle);
+  if (!granted) return { ok: false, error: "Permission to write backup folder denied" };
+
+  const { blob, counts } = await buildWorkbookBlob();
+  const name = fileName();
+  // @ts-ignore
+  const fileHandle = await handle.getFileHandle(name, { create: true });
+  // @ts-ignore
+  const writable = await fileHandle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+
+  await set(LAST_KEY, new Date().toISOString());
+  return { ok: true, file: name, counts };
+}
+
+export async function maybeRunDaily(): Promise<void> {
+  try {
+    if (!isSupported()) return;
+    const enabled = (await get<boolean>(ENABLED_KEY)) ?? false;
+    if (!enabled) return;
+    const handle = await get<FileSystemDirectoryHandle>(DIR_KEY);
+    if (!handle) return;
+    const last = await get<string>(LAST_KEY);
+    if (last) {
+      const diff = Date.now() - new Date(last).getTime();
+      if (diff < 24 * 60 * 60 * 1000) return;
+    }
+    // @ts-ignore
+    const perm = await handle.queryPermission({ mode: "readwrite" });
+    if (perm !== "granted") return; // don't prompt silently; user must visit page
+    await runBackup({ silent: true });
+  } catch {
+    // swallow
+  }
+}
