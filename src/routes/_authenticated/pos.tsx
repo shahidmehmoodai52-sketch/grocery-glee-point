@@ -264,8 +264,14 @@ function POSPage() {
 
   const doSale = async () => {
     setSubmitting(true);
+    const isCredit = due > 0;
+    // Pre-open the WhatsApp tab SYNCHRONOUSLY (inside the click gesture) so
+    // browsers don't block it after the awaited RPC. We redirect it once we
+    // have the invoice details. If sale fails, we close it again.
+    const waWindow: Window | null = isCredit && tab.customer_id
+      ? window.open("about:blank", "_blank")
+      : null;
     try {
-      const isCredit = due > 0;
       const payload = {
         customer_id: tab.customer_id,
         payment_method: tab.payment_method,
@@ -293,12 +299,15 @@ function POSPage() {
       setLastInvoice(sale);
 
       const custPhone = sale?.customers?.phone ?? null;
-      const { openWhatsApp } = await import("@/lib/whatsapp");
+      const { openWhatsApp, buildWhatsAppUrl } = await import("@/lib/whatsapp");
       const waMsg = `*${settings?.store_name ?? "Store"}* — Invoice ${sale?.invoice_no}\nDate: ${new Date(sale?.created_at ?? Date.now()).toLocaleString()}\nItems: ${sale?.sale_items?.length ?? 0}\nTotal: ${sym}${Number(sale?.total ?? 0).toFixed(2)}\nPaid: ${sym}${Number(sale?.paid ?? 0).toFixed(2)}\nBalance: ${sym}${(Number(sale?.total ?? 0) - Number(sale?.paid ?? 0)).toFixed(2)}\nThank you for shopping with us!`;
 
       // Auto WhatsApp only for CREDIT sales (where there is a balance to track).
-      if (isCredit && custPhone) {
-        openWhatsApp(custPhone, waMsg);
+      if (isCredit && custPhone && waWindow && !waWindow.closed) {
+        try { waWindow.location.href = buildWhatsAppUrl(custPhone, waMsg); }
+        catch { openWhatsApp(custPhone, waMsg); }
+      } else if (waWindow && !waWindow.closed) {
+        waWindow.close();
       }
       toast.success(`Sale ${sale?.invoice_no} saved`, {
         action: custPhone
@@ -312,6 +321,7 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
     } catch (err: any) {
+      if (waWindow && !waWindow.closed) waWindow.close();
       toast.error(err.message ?? "Failed to complete sale");
     } finally {
       setSubmitting(false);
