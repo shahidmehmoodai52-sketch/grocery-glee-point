@@ -270,8 +270,18 @@ function POSPage() {
         .eq("id", data as string)
         .maybeSingle();
       setLastInvoice(sale);
-      toast.success(`Sale ${sale?.invoice_no} recorded`);
+      toast.success(`Sale ${sale?.invoice_no} saved`, {
+        action: {
+          label: "Print",
+          onClick: () => {
+            setReprintView(sale);
+          },
+        },
+        duration: 5000,
+      });
       closeTab(active);
+      // Ready for next bill — focus the scan box
+      setTimeout(() => searchRef.current?.focus(), 50);
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
