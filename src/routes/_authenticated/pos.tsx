@@ -292,14 +292,20 @@ function POSPage() {
     }
   };
 
-  // F2 add tab, F4 complete
+  // F2 add tab, F4 complete (capture phase so inputs can't swallow it)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F2") { e.preventDefault(); addTab(); }
+      if (e.key === "F2") {
+        e.preventDefault();
+        e.stopPropagation();
+        addTab();
+        setSearch("");
+        setTimeout(() => searchRef.current?.focus(), 0);
+      }
       if (e.key === "F4") { e.preventDefault(); handleSale(); }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   });
 
   return (
