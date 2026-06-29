@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+
 
 export const Route = createFileRoute("/_authenticated/products")({
   component: ProductsPage,
@@ -29,8 +31,9 @@ function ProductsPage() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "$";
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<ProductForm>(empty);
+  const [open, setOpen, clearOpen] = usePersistentState<boolean>("product-entry-open", false);
+  const [form, setForm, clearForm] = usePersistentState<ProductForm>("product-entry-form", empty);
+
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products"],
@@ -75,8 +78,9 @@ function ProductsPage() {
       }
     }
     toast.success(form.id ? "Product updated" : "Product added");
-    setOpen(false);
-    setForm(empty);
+    clearOpen();
+    clearForm();
+
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["product_barcodes"] });
   };
@@ -110,7 +114,7 @@ function ProductsPage() {
           <h1 className="text-2xl font-semibold">Products</h1>
           <p className="text-sm text-muted-foreground">{products.length} items in catalog</p>
         </div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
+        <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />New product</Button>
           </DialogTrigger>
@@ -137,9 +141,11 @@ function ProductsPage() {
               <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+              <Button variant="outline" onClick={() => { clearOpen(); clearForm(); }}>Discard</Button>
               <Button onClick={save}>Save</Button>
             </DialogFooter>
+
           </DialogContent>
         </Dialog>
       </div>
