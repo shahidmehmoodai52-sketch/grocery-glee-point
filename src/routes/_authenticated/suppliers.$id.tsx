@@ -35,6 +35,25 @@ function Page() {
   const sym = settings?.currency_symbol ?? "$";
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (pid: string) => setExpanded((s) => { const n = new Set(s); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
+
+  const { data: purchaseItems = [] } = useQuery({
+    queryKey: ["supplier-purchase-items", id],
+    queryFn: async () => {
+      const { data: ps } = await supabase.from("purchases").select("id").eq("supplier_id", id);
+      const ids = (ps ?? []).map((p) => p.id);
+      if (!ids.length) return [];
+      return (await supabase.from("purchase_items").select("purchase_id,name,qty,cost,line_total").in("purchase_id", ids)).data ?? [];
+    },
+  });
+  const itemsByPurchase = useMemo(() => {
+    const m = new Map<string, any[]>();
+    (purchaseItems as any[]).forEach((it) => {
+      const arr = m.get(it.purchase_id) ?? []; arr.push(it); m.set(it.purchase_id, arr);
+    });
+    return m;
+  }, [purchaseItems]);
 
   const { data: supplier } = useQuery({
     queryKey: ["supplier", id],
