@@ -34,6 +34,7 @@ function Page() {
   const sym = settings?.currency_symbol ?? "$";
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [openInvoice, setOpenInvoice] = useState<any>(null);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
