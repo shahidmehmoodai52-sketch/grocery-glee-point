@@ -72,11 +72,19 @@ function POSPage() {
 
   const [search, setSearch] = useState("");
   const [lastInvoice, setLastInvoice] = useState<any>(null);
+  const [reprintOpen, setReprintOpen] = useState(false);
+  const [reprintView, setReprintView] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showCost, setShowCost] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [now, setNow] = useState(() => new Date());
   const searchRef = useRef<HTMLInputElement>(null);
   const paidRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", "active"],
