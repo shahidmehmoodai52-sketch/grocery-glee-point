@@ -238,7 +238,7 @@ function Page() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               );
             })}
             {rows.length > 0 && (
