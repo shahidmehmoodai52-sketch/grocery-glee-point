@@ -141,9 +141,11 @@ function ProductsPage() {
               <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+              <Button variant="outline" onClick={() => { clearOpen(); clearForm(); }}>Discard</Button>
               <Button onClick={save}>Save</Button>
             </DialogFooter>
+
           </DialogContent>
         </Dialog>
       </div>
