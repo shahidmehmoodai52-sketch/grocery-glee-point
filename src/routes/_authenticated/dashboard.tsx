@@ -158,6 +158,12 @@ function Page() {
           sub={`${products.length} active SKUs`} tone="info"
         />
         <Kpi
+          icon={TrendingDown} label="Purchases (30d)" value={fmtMoney(purch30, sym)}
+          sub={`${fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} today`} tone="warning"
+        />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Kpi
           icon={Undo2} label="Returns (30d)" value={fmtMoney(returns30, sym)}
           sub={`${fmtMoney(refunds30, sym)} refunded`} tone="warning"
         />
