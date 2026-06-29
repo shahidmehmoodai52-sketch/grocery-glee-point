@@ -77,11 +77,12 @@ function Page() {
     });
     if (error) return toast.error(error.message);
     toast.success("Purchase recorded, stock updated");
-    setOpen(false); setLines([]); setSupplier("none"); setTax(0); setPaid(0); setNote("");
+    clearDraft();
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
   };
+
 
   return (
     <div className="p-6 space-y-4">
