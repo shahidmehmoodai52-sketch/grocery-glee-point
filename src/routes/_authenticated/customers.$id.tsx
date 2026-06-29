@@ -36,6 +36,7 @@ function Page() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [openInvoice, setOpenInvoice] = useState<any>(null);
+  const [pdfPrompt, setPdfPrompt] = useState(false);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
@@ -106,7 +107,7 @@ function Page() {
     return out;
   }, [sales, from, to]);
 
-  const buildPdf = () => buildLedgerPdf({
+  const buildPdf = (includeItems: boolean) => buildLedgerPdf({
     storeName: settings?.store_name ?? "Store",
     storeAddress: settings?.address ?? "",
     storePhone: settings?.phone ?? "",
@@ -114,16 +115,19 @@ function Page() {
     partyPhone: customer?.phone ?? "",
     heading: "Customer Ledger",
     from, to, currency: sym,
-    rows, items,
+    rows, items: includeItems ? items : undefined,
     totalDebit, totalCredit, outstanding,
   });
 
-  const downloadPdf = () => {
-    const blob = buildPdf();
+  const downloadPdf = (includeItems: boolean) => {
+    const blob = buildPdf(includeItems);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `Ledger-${customer?.name?.replace(/\s+/g, "_")}.pdf`; a.click();
+    a.href = url;
+    a.download = `Ledger-${customer?.name?.replace(/\s+/g, "_")}${includeItems ? "-detailed" : "-summary"}.pdf`;
+    a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setPdfPrompt(false);
   };
 
 
@@ -146,7 +150,7 @@ function Page() {
           <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
           <Button variant="outline" onClick={() => { setFrom(""); setTo(""); }}>All</Button>
           <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
-          <Button variant="outline" onClick={downloadPdf}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
+          <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
         </div>
       </div>
 
@@ -229,7 +233,29 @@ function Page() {
       </Dialog>
 
 
+
+      <Dialog open={pdfPrompt} onOpenChange={setPdfPrompt}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generate PDF</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground">
+            Choose how you want the ledger PDF: a clean summary with only bills & payments, or a full version that also includes item-wise details for every invoice.
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setPdfPrompt(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => downloadPdf(false)}>
+              <FileDown className="h-4 w-4 mr-2" />Summary (bills only)
+            </Button>
+            <Button onClick={() => downloadPdf(true)}>
+              <FileDown className="h-4 w-4 mr-2" />Full + item-wise
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card className="p-3 print-area">
+
         <div className="mb-2 font-semibold">Item-wise details</div>
         <Table>
           <TableHeader><TableRow>
