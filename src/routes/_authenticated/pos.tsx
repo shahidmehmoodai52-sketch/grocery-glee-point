@@ -243,9 +243,29 @@ function POSPage() {
 
   const handleSale = async () => {
     if (!tab.items.length) return toast.error("Cart is empty");
-    if (due > 0 && !tab.customer_id) return toast.error("Select a customer for credit sale");
+    const isCredit = due > 0;
+    if (isCredit && !tab.customer_id) return toast.error("Select a customer for credit sale");
+
+    // For credit sales, ensure the customer has a phone for WhatsApp updates.
+    if (isCredit && tab.customer_id) {
+      const { data: cust } = await supabase
+        .from("customers")
+        .select("phone")
+        .eq("id", tab.customer_id)
+        .maybeSingle();
+      if (!cust?.phone) {
+        // Open inline phone-add dialog and stop here — user can save or skip.
+        setPhonePrompt({ open: true, phone: "" });
+        return;
+      }
+    }
+    await doSale();
+  };
+
+  const doSale = async () => {
     setSubmitting(true);
     try {
+      const isCredit = due > 0;
       const payload = {
         customer_id: tab.customer_id,
         payment_method: tab.payment_method,
@@ -267,27 +287,26 @@ function POSPage() {
       if (error) throw error;
       const { data: sale } = await supabase
         .from("sales")
-        .select("*, sale_items(*), customers(name)")
+        .select("*, sale_items(*), customers(name,phone)")
         .eq("id", data as string)
         .maybeSingle();
       setLastInvoice(sale);
-      const custPhone = tab.customer_id
-        ? (await supabase.from("customers").select("phone").eq("id", tab.customer_id).maybeSingle()).data?.phone ?? null
-        : null;
+
+      const custPhone = sale?.customers?.phone ?? null;
       const { openWhatsApp } = await import("@/lib/whatsapp");
       const waMsg = `*${settings?.store_name ?? "Store"}* — Invoice ${sale?.invoice_no}\nDate: ${new Date(sale?.created_at ?? Date.now()).toLocaleString()}\nItems: ${sale?.sale_items?.length ?? 0}\nTotal: ${sym}${Number(sale?.total ?? 0).toFixed(2)}\nPaid: ${sym}${Number(sale?.paid ?? 0).toFixed(2)}\nBalance: ${sym}${(Number(sale?.total ?? 0) - Number(sale?.paid ?? 0)).toFixed(2)}\nThank you for shopping with us!`;
-      if (custPhone) {
-        // Auto open WhatsApp tab with pre-filled invoice message
+
+      // Auto WhatsApp only for CREDIT sales (where there is a balance to track).
+      if (isCredit && custPhone) {
         openWhatsApp(custPhone, waMsg);
       }
       toast.success(`Sale ${sale?.invoice_no} saved`, {
         action: custPhone
-          ? { label: "Resend WhatsApp", onClick: () => openWhatsApp(custPhone, waMsg) }
+          ? { label: "Send WhatsApp", onClick: () => openWhatsApp(custPhone, waMsg) }
           : { label: "Print", onClick: () => setReprintView(sale) },
         duration: 6000,
       });
       closeTab(active);
-      // Ready for next bill — focus the scan box
       setTimeout(() => searchRef.current?.focus(), 50);
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
@@ -298,6 +317,19 @@ function POSPage() {
       setSubmitting(false);
     }
   };
+
+  const savePhoneAndSale = async () => {
+    if (!tab.customer_id) return;
+    const phone = phonePrompt.phone.trim();
+    if (phone) {
+      const { error } = await supabase.from("customers").update({ phone }).eq("id", tab.customer_id);
+      if (error) return toast.error(error.message);
+      qc.invalidateQueries({ queryKey: ["customers"] });
+    }
+    setPhonePrompt({ open: false, phone: "" });
+    await doSale();
+  };
+
 
   // F2 add tab, F4 complete (capture phase so inputs can't swallow it)
   useEffect(() => {
