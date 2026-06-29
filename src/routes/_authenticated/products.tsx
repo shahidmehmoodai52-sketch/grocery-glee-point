@@ -114,7 +114,7 @@ function ProductsPage() {
           <h1 className="text-2xl font-semibold">Products</h1>
           <p className="text-sm text-muted-foreground">{products.length} items in catalog</p>
         </div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
+        <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />New product</Button>
           </DialogTrigger>
