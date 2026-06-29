@@ -270,14 +270,14 @@ function POSPage() {
         .eq("id", data as string)
         .maybeSingle();
       setLastInvoice(sale);
+      const cust: any = sale?.customers;
+      const custPhone = tab.customer_id ? (await supabase.from("customers").select("phone").eq("id", tab.customer_id).maybeSingle()).data?.phone : null;
+      const waMsg = `*${settings?.store_name ?? "Store"}* — Invoice ${sale?.invoice_no}\nDate: ${new Date(sale?.created_at).toLocaleString()}\nItems: ${sale?.sale_items?.length ?? 0}\nTotal: ${sym}${Number(sale?.total).toFixed(2)}\nPaid: ${sym}${Number(sale?.paid).toFixed(2)}\nBalance: ${sym}${(Number(sale?.total) - Number(sale?.paid)).toFixed(2)}\nThank you for shopping with us!`;
       toast.success(`Sale ${sale?.invoice_no} saved`, {
-        action: {
-          label: "Print",
-          onClick: () => {
-            setReprintView(sale);
-          },
-        },
-        duration: 5000,
+        action: custPhone
+          ? { label: "WhatsApp", onClick: () => (await import("@/lib/whatsapp")).openWhatsApp(custPhone, waMsg) }
+          : { label: "Print", onClick: () => setReprintView(sale) },
+        duration: 6000,
       });
       closeTab(active);
       // Ready for next bill — focus the scan box
