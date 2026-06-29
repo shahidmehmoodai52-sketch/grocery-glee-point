@@ -180,8 +180,8 @@ function Page() {
               const items = isPurchase ? itemsByPurchase.get(x.purchase_id!) ?? [] : [];
               const due = isPurchase ? Number(x.total || 0) - Number(x.paid || 0) : 0;
               return (
-                <>
-                  <TableRow key={i}>
+                <Fragment key={i}>
+                  <TableRow>
                     <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Badge variant={x.type === "purchase" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
