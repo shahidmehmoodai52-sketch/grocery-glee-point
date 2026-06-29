@@ -104,7 +104,12 @@ function Page() {
     return true;
   });
 
-  let running = 0;
+  // Opening balance = sum of all entries BEFORE the filter window so the running balance is continuous
+  const opening = entries
+    .filter((x) => from && x.date < from)
+    .reduce((s, x) => s + x.debit - x.credit, 0);
+
+  let running = opening;
   const rows = filtered.map((x) => {
     running += x.debit - x.credit;
     return { ...x, balance: running };
@@ -188,6 +193,14 @@ function Page() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {opening !== 0 && (
+              <TableRow className="bg-muted/30 font-medium">
+                <TableCell colSpan={4} className="text-muted-foreground">Opening balance (before {from})</TableCell>
+                <TableCell className="text-right">—</TableCell>
+                <TableCell className="text-right">—</TableCell>
+                <TableCell className={`text-right ${opening > 0 ? "text-destructive" : "text-success"}`}>{fmtMoney(opening, sym)}</TableCell>
+              </TableRow>
+            )}
             {rows.length === 0 && (
               <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
             )}
