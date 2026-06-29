@@ -293,9 +293,10 @@ function Page() {
       </div>
 
       {/* Period summary footer */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Mini label="Revenue 30d" value={fmtMoney(rev30, sym)} icon={TrendingUp} />
         <Mini label="Profit 30d" value={fmtMoney(profit30, sym)} icon={Wallet} accent />
+        <Mini label="Purchases today" value={fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} icon={TrendingDown} accent />
         <Mini label="Purchases 30d" value={fmtMoney(purch30, sym)} icon={TrendingDown} />
         <Mini label="Invoices 30d" value={String(sales.length)} icon={Users} />
       </div>
