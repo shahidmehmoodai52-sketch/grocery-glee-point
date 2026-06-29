@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
-import { openWhatsApp } from "@/lib/whatsapp";
+
 
 export const Route = createFileRoute("/_authenticated/suppliers/")({ component: Page });
 
