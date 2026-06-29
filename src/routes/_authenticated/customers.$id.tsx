@@ -44,7 +44,7 @@ function Page() {
     queryKey: ["customer-sales", id],
     queryFn: async () =>
       (await supabase.from("sales")
-        .select("id,invoice_no,total,paid,created_at,note,sale_items(name,qty,price,line_total)")
+        .select("id,invoice_no,subtotal,tax,discount,total,paid,change_due,payment_method,created_at,note,sale_items(id,name,qty,price,line_total)")
         .eq("customer_id", id).order("created_at", { ascending: true })).data ?? [],
   });
   const { data: payments = [] } = useQuery({
