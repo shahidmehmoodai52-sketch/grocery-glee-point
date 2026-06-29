@@ -209,18 +209,35 @@ function Page() {
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
               </TableRow>
             ))}
+            {purchases.length > 0 && (() => {
+              const allTotal = (purchases as any[]).reduce((s, p) => s + Number(p.total), 0);
+              const allPaid = (purchases as any[]).reduce((s, p) => s + Number(p.paid), 0);
+              const due = allTotal - allPaid;
+              return (
+                <>
+                  <TableRow className="bg-muted/40 font-semibold border-t-2">
+                    <TableCell colSpan={3} className="text-right">Column totals</TableCell>
+                    <TableCell className="text-right text-primary">{fmtMoney(allTotal, sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(allPaid, sym)}</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                  <TableRow className="bg-primary/5 font-bold">
+                    <TableCell colSpan={5} className="text-right text-base">Grand Total (Outstanding due)</TableCell>
+                    <TableCell className={`text-right text-base ${due > 0 ? "text-destructive" : "text-success"}`}>{fmtMoney(due, sym)}</TableCell>
+                  </TableRow>
+                </>
+              );
+            })()}
           </TableBody>
         </Table>
         {(() => {
           const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
           const todayTotal = (purchases as any[]).filter((p) => new Date(p.created_at) >= startOfToday).reduce((s, p) => s + Number(p.total), 0);
           const todayPaid = (purchases as any[]).filter((p) => new Date(p.created_at) >= startOfToday).reduce((s, p) => s + Number(p.paid), 0);
-          const allTotal = (purchases as any[]).reduce((s, p) => s + Number(p.total), 0);
           return (
             <div className="flex flex-wrap gap-6 justify-end border-t mt-2 pt-3 px-2 text-sm">
               <div><span className="text-muted-foreground">Today's purchases: </span><span className="font-semibold text-primary">{fmtMoney(todayTotal, sym)}</span></div>
               <div><span className="text-muted-foreground">Today's paid: </span><span className="font-semibold">{fmtMoney(todayPaid, sym)}</span></div>
-              <div><span className="text-muted-foreground">Shown total: </span><span className="font-semibold">{fmtMoney(allTotal, sym)}</span></div>
             </div>
           );
         })()}
