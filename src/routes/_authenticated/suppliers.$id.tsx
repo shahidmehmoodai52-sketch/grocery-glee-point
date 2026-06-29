@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, MessageCircle, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,9 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { openWhatsApp, shareOrDownloadPdf } from "@/lib/whatsapp";
+import { buildLedgerPdf } from "@/lib/pdf-ledger";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
 
@@ -102,11 +105,36 @@ function Page() {
             </p>
           </div>
         </div>
-        <div className="flex items-end gap-2 no-print">
+        <div className="flex items-end gap-2 no-print flex-wrap">
           <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
           <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
           <Button variant="outline" onClick={() => { setFrom(""); setTo(""); }}>All</Button>
           <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          <Button variant="outline" onClick={() => {
+            const blob = buildLedgerPdf({
+              storeName: settings?.store_name ?? "Store", storeAddress: settings?.address ?? "", storePhone: settings?.phone ?? "",
+              partyName: supplier?.name ?? "Supplier", partyPhone: supplier?.phone ?? "",
+              heading: "Supplier Ledger", from, to, currency: sym,
+              rows, totalDebit, totalCredit, outstanding,
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a"); a.href = url; a.download = `Ledger-${supplier?.name?.replace(/\s+/g,"_")}.pdf`; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+          }}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
+          <Button onClick={async () => {
+            if (!supplier?.phone) return toast.error("No phone on file");
+            const blob = buildLedgerPdf({
+              storeName: settings?.store_name ?? "Store", storeAddress: settings?.address ?? "", storePhone: settings?.phone ?? "",
+              partyName: supplier?.name ?? "Supplier", partyPhone: supplier?.phone ?? "",
+              heading: "Supplier Ledger", from, to, currency: sym,
+              rows, totalDebit, totalCredit, outstanding,
+            });
+            const msg = `*${settings?.store_name ?? "Store"}* — Statement for ${supplier?.name}\nTotal purchases: ${sym}${totalDebit.toFixed(2)}\nPaid: ${sym}${totalCredit.toFixed(2)}\n*Outstanding: ${sym}${outstanding.toFixed(2)}*`;
+            const res = await shareOrDownloadPdf({ phone: supplier.phone, message: msg, filename: `Ledger-${supplier.name}.pdf`, blob });
+            if (res === "downloaded") toast.info("PDF downloaded — attach in WhatsApp");
+          }} className="bg-success hover:bg-success/90 text-success-foreground">
+            <MessageCircle className="h-4 w-4 mr-2" />Send via WhatsApp
+          </Button>
         </div>
       </div>
 

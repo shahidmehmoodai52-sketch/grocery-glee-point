@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen } from "lucide-react";
+import { BookOpen, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, DollarSign } from "lucide-react";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { openWhatsApp } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/_authenticated/suppliers")({ component: Page });
 
@@ -46,7 +47,11 @@ function Page() {
       p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
     });
     if (error) return toast.error(error.message);
-    toast.success("Payment sent");
+    const newBal = Number(payOpen.balance) - pay.amount;
+    const msg = `*${settings?.store_name ?? "Store"}*\nPayment of ${sym}${pay.amount.toFixed(2)} (${pay.method}) sent to ${payOpen.name}.\nRemaining payable: ${sym}${newBal.toFixed(2)}.`;
+    toast.success("Payment sent", {
+      action: payOpen.phone ? { label: "WhatsApp", onClick: () => openWhatsApp(payOpen.phone, msg) } : undefined,
+    });
     setPayOpen(null);
     setPay({ amount: 0, method: "cash", note: "" });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
