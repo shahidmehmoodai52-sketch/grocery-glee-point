@@ -321,6 +321,7 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
     } catch (err: any) {
+      if (waWindow && !waWindow.closed) waWindow.close();
       toast.error(err.message ?? "Failed to complete sale");
     } finally {
       setSubmitting(false);
