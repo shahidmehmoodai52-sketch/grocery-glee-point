@@ -211,6 +211,19 @@ function Page() {
             ))}
           </TableBody>
         </Table>
+        {(() => {
+          const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+          const todayTotal = (purchases as any[]).filter((p) => new Date(p.created_at) >= startOfToday).reduce((s, p) => s + Number(p.total), 0);
+          const todayPaid = (purchases as any[]).filter((p) => new Date(p.created_at) >= startOfToday).reduce((s, p) => s + Number(p.paid), 0);
+          const allTotal = (purchases as any[]).reduce((s, p) => s + Number(p.total), 0);
+          return (
+            <div className="flex flex-wrap gap-6 justify-end border-t mt-2 pt-3 px-2 text-sm">
+              <div><span className="text-muted-foreground">Today's purchases: </span><span className="font-semibold text-primary">{fmtMoney(todayTotal, sym)}</span></div>
+              <div><span className="text-muted-foreground">Today's paid: </span><span className="font-semibold">{fmtMoney(todayPaid, sym)}</span></div>
+              <div><span className="text-muted-foreground">Shown total: </span><span className="font-semibold">{fmtMoney(allTotal, sym)}</span></div>
+            </div>
+          );
+        })()}
       </Card>
     </div>
   );
