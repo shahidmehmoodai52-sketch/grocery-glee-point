@@ -46,11 +46,8 @@ function Page() {
       p_party_type: "customer", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
     });
     if (error) return toast.error(error.message);
-    const newBal = Number(payOpen.balance) - pay.amount;
-    const msg = `*${settings?.store_name ?? "Store"}*\nDear ${payOpen.name}, we have received your payment of ${sym}${pay.amount.toFixed(2)} (${pay.method}).\nRemaining balance: ${sym}${newBal.toFixed(2)}.\nThank you!`;
-    toast.success("Payment recorded", {
-      action: payOpen.phone ? { label: "WhatsApp", onClick: () => openWhatsApp(payOpen.phone, msg) } : undefined,
-    });
+    toast.success("Payment recorded");
+
     setPayOpen(null);
     setPay({ amount: 0, method: "cash", note: "" });
     qc.invalidateQueries({ queryKey: ["customers"] });
