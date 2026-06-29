@@ -36,6 +36,7 @@ function Page() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [openInvoice, setOpenInvoice] = useState<any>(null);
+  const [pdfPrompt, setPdfPrompt] = useState(false);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
