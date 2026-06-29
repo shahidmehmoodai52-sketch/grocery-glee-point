@@ -1,18 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, MessageCircle, FileDown } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, MessageCircle, FileDown, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { openWhatsApp, shareOrDownloadPdf } from "@/lib/whatsapp";
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
+import { Receipt } from "@/components/receipt";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
