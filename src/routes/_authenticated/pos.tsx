@@ -661,7 +661,7 @@ function POSPage() {
         onOpenChange={setReprintOpen}
         settings={settings}
         sym={sym}
-        onView={(s) => setReprintView(s)}
+        onView={(s: any) => setReprintView(s)}
       />
 
       {/* Single invoice viewer (used by both reprint and the post-sale toast action) */}
