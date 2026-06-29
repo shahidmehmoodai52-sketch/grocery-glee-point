@@ -182,9 +182,11 @@ function Page() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+              <Button variant="outline" onClick={clearDraft}>Discard</Button>
               <Button onClick={submit}>Record purchase</Button>
             </DialogFooter>
+
           </DialogContent>
         </Dialog>
       </div>
