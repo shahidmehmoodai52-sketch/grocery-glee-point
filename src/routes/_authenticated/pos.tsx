@@ -717,6 +717,34 @@ function POSPage() {
       />
       {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
       {false && lastInvoice}
+
+      {/* Missing-phone prompt for credit sales */}
+      <Dialog open={phonePrompt.open} onOpenChange={(o) => !o && setPhonePrompt({ open: false, phone: "" })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add customer phone</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Ye credit sale hai. Customer ko WhatsApp pe balance ka update bhejne ke liye phone number add kar dein.
+            Aap chahein to skip bhi kar sakte hain.
+          </p>
+          <Input
+            autoFocus
+            placeholder="03xx-xxxxxxx"
+            value={phonePrompt.phone}
+            onChange={(e) => setPhonePrompt((s) => ({ ...s, phone: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === "Enter") savePhoneAndSale(); }}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={async () => { setPhonePrompt({ open: false, phone: "" }); await doSale(); }}>
+              Skip & save
+            </Button>
+            <Button onClick={savePhoneAndSale} disabled={submitting}>
+              Save phone & complete sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
