@@ -14,11 +14,31 @@ export function normalizePhone(raw: string | null | undefined, defaultCountry = 
   return digits;
 }
 
-export function openWhatsApp(phone: string | null | undefined, message: string) {
+export function buildWhatsAppUrl(phone: string | null | undefined, message: string): string {
   const num = normalizePhone(phone);
   const text = encodeURIComponent(message);
-  const url = num ? `https://wa.me/${num}?text=${text}` : `https://wa.me/?text=${text}`;
-  window.open(url, "_blank", "noopener,noreferrer");
+  return num ? `https://wa.me/${num}?text=${text}` : `https://wa.me/?text=${text}`;
+}
+
+// Opens WhatsApp. If `prewin` (a window handle opened synchronously inside a
+// user gesture) is supplied, we redirect that window — this avoids popup
+// blockers that fire when window.open() runs after an `await`. If no prewin
+// is given and window.open is blocked, we fall back to navigating the
+// current tab so the message still reaches the user.
+export function openWhatsApp(
+  phone: string | null | undefined,
+  message: string,
+  prewin?: Window | null,
+) {
+  const url = buildWhatsAppUrl(phone, message);
+  if (prewin && !prewin.closed) {
+    try { prewin.location.href = url; return; } catch { /* fall through */ }
+  }
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win || win.closed || typeof win.closed === "undefined") {
+    // Popup blocked — navigate current tab as a last resort.
+    window.location.href = url;
+  }
 }
 
 // Try to share a PDF via the native Web Share API (mobile + some desktops).
