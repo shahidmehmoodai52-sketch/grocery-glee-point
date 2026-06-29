@@ -144,7 +144,7 @@ function Page() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Kpi
           icon={TrendingUp} label="Today's revenue" value={fmtMoney(revToday, sym)}
           delta={dayDelta} sub={`${todaySales.length} invoices`} tone="primary"
@@ -154,15 +154,13 @@ function Page() {
           sub="After cost & tax" tone="success"
         />
         <Kpi
-          icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
-          sub={`${products.length} active SKUs`} tone="info"
-        />
-        <Kpi
           icon={TrendingDown} label="Purchases (30d)" value={fmtMoney(purch30, sym)}
           sub={`${fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} today`} tone="warning"
         />
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Kpi
+          icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
+          sub={`${products.length} active SKUs`} tone="info"
+        />
         <Kpi
           icon={Undo2} label="Returns (30d)" value={fmtMoney(returns30, sym)}
           sub={`${fmtMoney(refunds30, sym)} refunded`} tone="warning"
