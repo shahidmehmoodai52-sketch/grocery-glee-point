@@ -245,32 +245,11 @@ function POSPage() {
     if (!tab.items.length) return toast.error("Cart is empty");
     const isCredit = due > 0;
     if (isCredit && !tab.customer_id) return toast.error("Select a customer for credit sale");
-
-    // For credit sales, ensure the customer has a phone for WhatsApp updates.
-    if (isCredit && tab.customer_id) {
-      const { data: cust } = await supabase
-        .from("customers")
-        .select("phone")
-        .eq("id", tab.customer_id)
-        .maybeSingle();
-      if (!cust?.phone) {
-        // Open inline phone-add dialog and stop here — user can save or skip.
-        setPhonePrompt({ open: true, phone: "" });
-        return;
-      }
-    }
     await doSale();
   };
 
   const doSale = async () => {
     setSubmitting(true);
-    const isCredit = due > 0;
-    // Pre-open the WhatsApp tab SYNCHRONOUSLY (inside the click gesture) so
-    // browsers don't block it after the awaited RPC. We redirect it once we
-    // have the invoice details. If sale fails, we close it again.
-    const waWindow: Window | null = isCredit && tab.customer_id
-      ? window.open("about:blank", "_blank")
-      : null;
     try {
       const payload = {
         customer_id: tab.customer_id,
@@ -298,22 +277,9 @@ function POSPage() {
         .maybeSingle();
       setLastInvoice(sale);
 
-      const custPhone = sale?.customers?.phone ?? null;
-      const { openWhatsApp, buildWhatsAppUrl } = await import("@/lib/whatsapp");
-      const waMsg = `*${settings?.store_name ?? "Store"}* — Invoice ${sale?.invoice_no}\nDate: ${new Date(sale?.created_at ?? Date.now()).toLocaleString()}\nItems: ${sale?.sale_items?.length ?? 0}\nTotal: ${sym}${Number(sale?.total ?? 0).toFixed(2)}\nPaid: ${sym}${Number(sale?.paid ?? 0).toFixed(2)}\nBalance: ${sym}${(Number(sale?.total ?? 0) - Number(sale?.paid ?? 0)).toFixed(2)}\nThank you for shopping with us!`;
-
-      // Auto WhatsApp only for CREDIT sales (where there is a balance to track).
-      if (isCredit && custPhone && waWindow && !waWindow.closed) {
-        try { waWindow.location.href = buildWhatsAppUrl(custPhone, waMsg); }
-        catch { openWhatsApp(custPhone, waMsg); }
-      } else if (waWindow && !waWindow.closed) {
-        waWindow.close();
-      }
       toast.success(`Sale ${sale?.invoice_no} saved`, {
-        action: custPhone
-          ? { label: "Send WhatsApp", onClick: () => openWhatsApp(custPhone, waMsg) }
-          : { label: "Print", onClick: () => setReprintView(sale) },
-        duration: 6000,
+        action: { label: "Print", onClick: () => setReprintView(sale) },
+        duration: 5000,
       });
       closeTab(active);
       setTimeout(() => searchRef.current?.focus(), 50);
@@ -321,24 +287,13 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
     } catch (err: any) {
-      if (waWindow && !waWindow.closed) waWindow.close();
       toast.error(err.message ?? "Failed to complete sale");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const savePhoneAndSale = async () => {
-    if (!tab.customer_id) return;
-    const phone = phonePrompt.phone.trim();
-    if (phone) {
-      const { error } = await supabase.from("customers").update({ phone }).eq("id", tab.customer_id);
-      if (error) return toast.error(error.message);
-      qc.invalidateQueries({ queryKey: ["customers"] });
-    }
-    setPhonePrompt({ open: false, phone: "" });
-    await doSale();
-  };
+
 
 
   // F2 add tab, F4 complete (capture phase so inputs can't swallow it)
