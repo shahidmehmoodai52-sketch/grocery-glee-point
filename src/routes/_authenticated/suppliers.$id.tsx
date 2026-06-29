@@ -198,7 +198,8 @@ function Page() {
               const due = isPurchase ? Number(x.total || 0) - Number(x.paid || 0) : 0;
               return (
                 <Fragment key={i}>
-                  <TableRow>
+                  <TableRow className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
+
                     <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Badge variant={x.type === "purchase" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
