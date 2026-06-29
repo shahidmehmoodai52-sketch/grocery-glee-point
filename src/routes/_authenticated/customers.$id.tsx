@@ -24,8 +24,9 @@ type Entry = {
   type: "sale" | "payment" | "return";
   ref: string;
   note: string;
-  debit: number;   // they owe more
-  credit: number;  // they paid / refunded
+  debit: number;
+  credit: number;
+  sale?: any;       // attached for sale rows so we can re-open / re-print the invoice
 };
 
 function Page() {
