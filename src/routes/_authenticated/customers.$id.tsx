@@ -154,13 +154,22 @@ function Page() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 no-print">
-        {PRESETS.map((p) => (
-          <Button key={p.key} size="sm" variant="secondary" className="h-7 text-xs"
-            onClick={() => { const r = rangeFor(p.key as DatePreset); setFrom(r.from); setTo(r.to); }}>
-            {p.label}
-          </Button>
-        ))}
+      <div className="no-print">
+        <select
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+          value={(() => {
+            for (const p of PRESETS) { const r = rangeFor(p.key); if (r.from === from && r.to === to) return p.key; }
+            return "";
+          })()}
+          onChange={(e) => {
+            if (!e.target.value) return;
+            const r = rangeFor(e.target.value as DatePreset);
+            setFrom(r.from); setTo(r.to);
+          }}
+        >
+          <option value="">Quick range…</option>
+          {PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+        </select>
       </div>
 
 
@@ -188,7 +197,8 @@ function Page() {
           <TableBody>
             {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
             {rows.map((x, i) => (
-              <TableRow key={i}>
+              <TableRow key={i} className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
+
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
                 <TableCell>
                   <Badge variant={x.type === "sale" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
