@@ -107,7 +107,7 @@ function Page() {
     return out;
   }, [sales, from, to]);
 
-  const buildPdf = () => buildLedgerPdf({
+  const buildPdf = (includeItems: boolean) => buildLedgerPdf({
     storeName: settings?.store_name ?? "Store",
     storeAddress: settings?.address ?? "",
     storePhone: settings?.phone ?? "",
@@ -115,16 +115,19 @@ function Page() {
     partyPhone: customer?.phone ?? "",
     heading: "Customer Ledger",
     from, to, currency: sym,
-    rows, items,
+    rows, items: includeItems ? items : undefined,
     totalDebit, totalCredit, outstanding,
   });
 
-  const downloadPdf = () => {
-    const blob = buildPdf();
+  const downloadPdf = (includeItems: boolean) => {
+    const blob = buildPdf(includeItems);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `Ledger-${customer?.name?.replace(/\s+/g, "_")}.pdf`; a.click();
+    a.href = url;
+    a.download = `Ledger-${customer?.name?.replace(/\s+/g, "_")}${includeItems ? "-detailed" : "-summary"}.pdf`;
+    a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setPdfPrompt(false);
   };
 
 
