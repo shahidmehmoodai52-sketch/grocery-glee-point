@@ -11,7 +11,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
-import { openWhatsApp, shareOrDownloadPdf } from "@/lib/whatsapp";
+
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { toast } from "sonner";
 
