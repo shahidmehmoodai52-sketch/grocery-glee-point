@@ -104,8 +104,8 @@ function Page() {
 
   const buildPdf = () => buildLedgerPdf({
     storeName: settings?.store_name ?? "Store",
-    storeAddress: settings?.store_address ?? "",
-    storePhone: settings?.store_phone ?? "",
+    storeAddress: settings?.address ?? "",
+    storePhone: settings?.phone ?? "",
     partyName: customer?.name ?? "Customer",
     partyPhone: customer?.phone ?? "",
     heading: "Customer Ledger",
