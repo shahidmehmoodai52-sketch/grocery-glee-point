@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
-import { openWhatsApp, shareOrDownloadPdf } from "@/lib/whatsapp";
+
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { Receipt } from "@/components/receipt";
 import { toast } from "sonner";
