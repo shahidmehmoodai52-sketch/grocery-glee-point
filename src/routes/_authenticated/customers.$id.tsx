@@ -161,6 +161,8 @@ function Page() {
             {p.label}
           </Button>
         ))}
+      </div>
+
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={ReceiptIcon} label="Total sales" value={fmtMoney(totalDebit, sym)} tone="primary" />
