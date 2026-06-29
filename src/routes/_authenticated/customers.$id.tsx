@@ -154,13 +154,22 @@ function Page() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 no-print">
-        {PRESETS.map((p) => (
-          <Button key={p.key} size="sm" variant="secondary" className="h-7 text-xs"
-            onClick={() => { const r = rangeFor(p.key as DatePreset); setFrom(r.from); setTo(r.to); }}>
-            {p.label}
-          </Button>
-        ))}
+      <div className="no-print">
+        <select
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+          value={(() => {
+            for (const p of PRESETS) { const r = rangeFor(p.key); if (r.from === from && r.to === to) return p.key; }
+            return "";
+          })()}
+          onChange={(e) => {
+            if (!e.target.value) return;
+            const r = rangeFor(e.target.value as DatePreset);
+            setFrom(r.from); setTo(r.to);
+          }}
+        >
+          <option value="">Quick range…</option>
+          {PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+        </select>
       </div>
 
 
