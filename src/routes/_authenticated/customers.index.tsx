@@ -100,12 +100,6 @@ function Page() {
                   <Button size="sm" variant="ghost" asChild>
                     <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
                   </Button>
-                  {c.phone && (
-                    <Button size="sm" variant="ghost" className="text-success"
-                      onClick={() => openWhatsApp(c.phone, `*${settings?.store_name ?? "Store"}*\nDear ${c.name}, your current outstanding balance is ${sym}${Number(c.balance).toFixed(2)}.`)}>
-                      <MessageCircle className="h-3.5 w-3.5 mr-1" />WhatsApp
-                    </Button>
-                  )}
                   <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Number(c.balance), method: "cash", note: "" }); }}>
                     <DollarSign className="h-3.5 w-3.5 mr-1" />Receive payment
                   </Button>
