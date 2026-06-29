@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff } from "lucide-react";
+import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -72,11 +72,19 @@ function POSPage() {
 
   const [search, setSearch] = useState("");
   const [lastInvoice, setLastInvoice] = useState<any>(null);
+  const [reprintOpen, setReprintOpen] = useState(false);
+  const [reprintView, setReprintView] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showCost, setShowCost] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [now, setNow] = useState(() => new Date());
   const searchRef = useRef<HTMLInputElement>(null);
   const paidRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", "active"],
@@ -262,8 +270,18 @@ function POSPage() {
         .eq("id", data as string)
         .maybeSingle();
       setLastInvoice(sale);
-      toast.success(`Sale ${sale?.invoice_no} recorded`);
+      toast.success(`Sale ${sale?.invoice_no} saved`, {
+        action: {
+          label: "Print",
+          onClick: () => {
+            setReprintView(sale);
+          },
+        },
+        duration: 5000,
+      });
       closeTab(active);
+      // Ready for next bill — focus the scan box
+      setTimeout(() => searchRef.current?.focus(), 50);
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
@@ -287,8 +305,8 @@ function POSPage() {
   return (
     <div className="h-[calc(100vh-3rem)] flex flex-col">
       {/* Tabs strip */}
-      <div className="flex items-center gap-1 px-3 pt-2 border-b bg-card/40">
-        <ScrollArea className="max-w-full">
+      <div className="flex items-center gap-2 px-3 pt-2 border-b bg-card/40">
+        <ScrollArea className="flex-1 max-w-full">
           <div className="flex items-center gap-1 pb-2">
             {tabs.map((t) => (
               <button
@@ -317,6 +335,19 @@ function POSPage() {
             </Button>
           </div>
         </ScrollArea>
+
+        {/* Live clock + Reprint button */}
+        <div className="flex items-center gap-2 pb-2 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-mono tabular-nums">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>{now.toLocaleDateString()}</span>
+            <span className="text-muted-foreground">·</span>
+            <span>{now.toLocaleTimeString()}</span>
+          </div>
+          <Button size="sm" variant="outline" className="h-7" onClick={() => setReprintOpen(true)}>
+            <History className="h-3.5 w-3.5 mr-1" /> Reprint / Past invoices
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col min-h-0">
@@ -624,7 +655,23 @@ function POSPage() {
       </div>
 
 
-      <InvoiceDialog invoice={lastInvoice} sym={sym} settings={settings} onClose={() => setLastInvoice(null)} />
+      {/* Reprint browser */}
+      <ReprintDialog
+        open={reprintOpen}
+        onOpenChange={setReprintOpen}
+        settings={settings}
+        sym={sym}
+        onView={(s: any) => setReprintView(s)}
+      />
+
+      {/* Single invoice viewer (used by both reprint and the post-sale toast action) */}
+      <InvoiceDialog
+        invoice={reprintView}
+        settings={settings}
+        onClose={() => setReprintView(null)}
+      />
+      {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
+      {false && lastInvoice}
     </div>
   );
 }
@@ -655,6 +702,110 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
           <Button variant="outline" onClick={onClose}>Close</Button>
           <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReprintDialog({
+  open,
+  onOpenChange,
+  settings,
+  sym,
+  onView,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  settings: any;
+  sym: string;
+  onView: (s: any) => void;
+}) {
+  const [q, setQ] = useState("");
+
+  const { data: sales = [], isFetching } = useQuery({
+    queryKey: ["sales", "reprint"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sales")
+        .select("*, customers(name), sale_items(*)")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return sales.slice(0, 50);
+    const asNum = Number(term);
+    const isNum = isFinite(asNum) && term !== "";
+    return sales.filter((s: any) => {
+      if (String(s.invoice_no ?? "").toLowerCase().includes(term)) return true;
+      if ((s.customers?.name ?? "").toLowerCase().includes(term)) return true;
+      if ((s.payment_method ?? "").toLowerCase().includes(term)) return true;
+      if (isNum) {
+        // amount match — tolerate within 1 unit so user can type 250 to find 250.00
+        if (Math.abs(Number(s.total) - asNum) < 1) return true;
+        if (Math.abs(Number(s.paid) - asNum) < 1) return true;
+      }
+      return false;
+    });
+  }, [q, sales]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Reprint / past invoices</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              autoFocus
+              placeholder="Search by invoice no, customer, or amount (e.g. 250)…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="pl-9 h-10"
+            />
+          </div>
+          <div className="rounded-md border max-h-[55vh] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-xs uppercase tracking-wide sticky top-0">
+                <tr>
+                  <th className="text-left px-3 py-2">Invoice</th>
+                  <th className="text-left px-3 py-2">Date</th>
+                  <th className="text-left px-3 py-2">Customer</th>
+                  <th className="text-right px-3 py-2">Total</th>
+                  <th className="px-2 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {isFetching && (
+                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
+                )}
+                {!isFetching && filtered.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No invoices match.</td></tr>
+                )}
+                {filtered.map((s: any) => (
+                  <tr key={s.id} className="border-t hover:bg-accent/40">
+                    <td className="px-3 py-1.5 font-mono text-xs">{s.invoice_no}</td>
+                    <td className="px-3 py-1.5 text-xs">{new Date(s.created_at).toLocaleString()}</td>
+                    <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
+                    <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(s.total, sym)}</td>
+                    <td className="px-2 py-1 text-right">
+                      <Button size="sm" variant="ghost" onClick={() => { onView(s); onOpenChange(false); }}>
+                        <Printer className="h-3.5 w-3.5 mr-1" /> Open
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
