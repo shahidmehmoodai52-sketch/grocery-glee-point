@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, DollarSign, BookOpen, MessageCircle } from "lucide-react";
+import { Plus, DollarSign, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
-import { openWhatsApp } from "@/lib/whatsapp";
+
 
 export const Route = createFileRoute("/_authenticated/customers/")({ component: Page });
 
@@ -46,11 +46,8 @@ function Page() {
       p_party_type: "customer", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
     });
     if (error) return toast.error(error.message);
-    const newBal = Number(payOpen.balance) - pay.amount;
-    const msg = `*${settings?.store_name ?? "Store"}*\nDear ${payOpen.name}, we have received your payment of ${sym}${pay.amount.toFixed(2)} (${pay.method}).\nRemaining balance: ${sym}${newBal.toFixed(2)}.\nThank you!`;
-    toast.success("Payment recorded", {
-      action: payOpen.phone ? { label: "WhatsApp", onClick: () => openWhatsApp(payOpen.phone, msg) } : undefined,
-    });
+    toast.success("Payment recorded");
+
     setPayOpen(null);
     setPay({ amount: 0, method: "cash", note: "" });
     qc.invalidateQueries({ queryKey: ["customers"] });
@@ -103,12 +100,6 @@ function Page() {
                   <Button size="sm" variant="ghost" asChild>
                     <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
                   </Button>
-                  {c.phone && (
-                    <Button size="sm" variant="ghost" className="text-success"
-                      onClick={() => openWhatsApp(c.phone, `*${settings?.store_name ?? "Store"}*\nDear ${c.name}, your current outstanding balance is ${sym}${Number(c.balance).toFixed(2)}.`)}>
-                      <MessageCircle className="h-3.5 w-3.5 mr-1" />WhatsApp
-                    </Button>
-                  )}
                   <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Number(c.balance), method: "cash", note: "" }); }}>
                     <DollarSign className="h-3.5 w-3.5 mr-1" />Receive payment
                   </Button>

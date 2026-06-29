@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, MessageCircle, FileDown, Eye } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, FileDown, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
-import { openWhatsApp, shareOrDownloadPdf } from "@/lib/whatsapp";
+
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { Receipt } from "@/components/receipt";
 import { toast } from "sonner";
@@ -118,26 +118,6 @@ function Page() {
     totalDebit, totalCredit, outstanding,
   });
 
-  const summaryMsg = () =>
-    `*${settings?.store_name ?? "Store"}* — Account statement for ${customer?.name}\n` +
-    (from || to ? `Period: ${from || "—"} to ${to || "—"}\n` : "") +
-    `Total purchases: ${sym}${totalDebit.toFixed(2)}\n` +
-    `Paid / returns: ${sym}${totalCredit.toFixed(2)}\n` +
-    `*Outstanding balance: ${sym}${outstanding.toFixed(2)}*\n` +
-    `Thank you for your business.`;
-
-  const sendQuickWa = () => {
-    if (!customer?.phone) return toast.error("No phone number on file");
-    openWhatsApp(customer.phone, summaryMsg());
-  };
-  const sendPdfWa = async () => {
-    const blob = buildPdf();
-    const res = await shareOrDownloadPdf({
-      phone: customer?.phone, message: summaryMsg(),
-      filename: `Ledger-${customer?.name?.replace(/\s+/g, "_")}.pdf`, blob,
-    });
-    if (res === "downloaded") toast.info("PDF downloaded — attach it in WhatsApp");
-  };
   const downloadPdf = () => {
     const blob = buildPdf();
     const url = URL.createObjectURL(blob);
@@ -145,6 +125,7 @@ function Page() {
     a.href = url; a.download = `Ledger-${customer?.name?.replace(/\s+/g, "_")}.pdf`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
+
 
   return (
     <div className="p-6 space-y-4">
@@ -166,12 +147,6 @@ function Page() {
           <Button variant="outline" onClick={() => { setFrom(""); setTo(""); }}>All</Button>
           <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
           <Button variant="outline" onClick={downloadPdf}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
-          <Button variant="outline" onClick={sendQuickWa} className="text-success border-success/40">
-            <MessageCircle className="h-4 w-4 mr-2" />WhatsApp summary
-          </Button>
-          <Button onClick={sendPdfWa} className="bg-success hover:bg-success/90 text-success-foreground">
-            <MessageCircle className="h-4 w-4 mr-2" />Send full PDF
-          </Button>
         </div>
       </div>
 
