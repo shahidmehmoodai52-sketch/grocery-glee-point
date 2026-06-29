@@ -194,9 +194,10 @@ function Page() {
             <TableHead className="text-right">Debit</TableHead>
             <TableHead className="text-right">Credit</TableHead>
             <TableHead className="text-right">Balance</TableHead>
+            <TableHead className="text-right no-print w-20">Invoice</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
+            {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
             {rows.map((x, i) => (
               <TableRow key={i}>
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
@@ -212,6 +213,13 @@ function Page() {
                 <TableCell className={`text-right font-medium ${x.balance > 0 ? "text-destructive" : x.balance < 0 ? "text-success" : ""}`}>
                   {fmtMoney(x.balance, sym)}
                 </TableCell>
+                <TableCell className="text-right no-print">
+                  {x.type === "sale" && x.sale && (
+                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
+                      <Eye className="h-3.5 w-3.5 mr-1" />Open
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
             {rows.length > 0 && (
@@ -220,11 +228,31 @@ function Page() {
                 <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
                 <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(running, sym)}</TableCell>
+                <TableCell className="no-print"></TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </Card>
+
+      {/* Invoice viewer — open from any sale row */}
+      <Dialog open={!!openInvoice} onOpenChange={(o) => !o && setOpenInvoice(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Invoice {openInvoice?.invoice_no}</DialogTitle>
+          </DialogHeader>
+          <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
+            <div className="print-area">
+              {openInvoice && <Receipt invoice={openInvoice} settings={settings as any} />}
+            </div>
+          </div>
+          <DialogFooter className="no-print">
+            <Button variant="outline" onClick={() => setOpenInvoice(null)}>Close</Button>
+            <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Card className="p-3 print-area">
         <div className="mb-2 font-semibold">Item-wise details</div>
