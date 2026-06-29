@@ -78,8 +78,9 @@ function ProductsPage() {
       }
     }
     toast.success(form.id ? "Product updated" : "Product added");
-    setOpen(false);
-    setForm(empty);
+    clearOpen();
+    clearForm();
+
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["product_barcodes"] });
   };
