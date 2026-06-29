@@ -682,6 +682,10 @@ function POSPage() {
       />
       {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
       {false && lastInvoice}
+    </div>
+  );
+}
+
 
 
 function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
