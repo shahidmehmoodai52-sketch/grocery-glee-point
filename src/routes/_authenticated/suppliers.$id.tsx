@@ -81,7 +81,7 @@ function Page() {
   const entries: Entry[] = useMemo(() => {
     const e: Entry[] = [];
     for (const p of purchases as any[]) {
-      e.push({ date: p.created_at, type: "purchase", ref: p.invoice_no, note: p.note ?? "", debit: Number(p.total), credit: 0 });
+      e.push({ date: p.created_at, type: "purchase", ref: p.invoice_no, note: p.note ?? "", debit: Number(p.total), credit: 0, purchase_id: p.id, paid: Number(p.paid), total: Number(p.total) });
       if (Number(p.paid) > 0) {
         e.push({ date: p.created_at, type: "payment", ref: `${p.invoice_no} · on-invoice`, note: "Paid at purchase time", debit: 0, credit: Number(p.paid) });
       }
