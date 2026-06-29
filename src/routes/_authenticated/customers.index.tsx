@@ -14,7 +14,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { openWhatsApp } from "@/lib/whatsapp";
 
-export const Route = createFileRoute("/_authenticated/customers")({ component: Page });
+export const Route = createFileRoute("/_authenticated/customers/")({ component: Page });
 
 function Page() {
   const qc = useQueryClient();

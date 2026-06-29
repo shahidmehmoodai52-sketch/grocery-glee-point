@@ -275,9 +275,13 @@ function POSPage() {
         : null;
       const { openWhatsApp } = await import("@/lib/whatsapp");
       const waMsg = `*${settings?.store_name ?? "Store"}* — Invoice ${sale?.invoice_no}\nDate: ${new Date(sale?.created_at ?? Date.now()).toLocaleString()}\nItems: ${sale?.sale_items?.length ?? 0}\nTotal: ${sym}${Number(sale?.total ?? 0).toFixed(2)}\nPaid: ${sym}${Number(sale?.paid ?? 0).toFixed(2)}\nBalance: ${sym}${(Number(sale?.total ?? 0) - Number(sale?.paid ?? 0)).toFixed(2)}\nThank you for shopping with us!`;
+      if (custPhone) {
+        // Auto open WhatsApp tab with pre-filled invoice message
+        openWhatsApp(custPhone, waMsg);
+      }
       toast.success(`Sale ${sale?.invoice_no} saved`, {
         action: custPhone
-          ? { label: "WhatsApp", onClick: () => openWhatsApp(custPhone, waMsg) }
+          ? { label: "Resend WhatsApp", onClick: () => openWhatsApp(custPhone, waMsg) }
           : { label: "Print", onClick: () => setReprintView(sale) },
         duration: 6000,
       });
