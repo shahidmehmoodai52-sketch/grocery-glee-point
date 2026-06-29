@@ -13,22 +13,37 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
 type Line = { product_id: string | null; name: string; qty: number; cost: number; old_stock?: number; old_cost?: number };
+
+type Draft = {
+  open: boolean;
+  supplier: string;
+  lines: Line[];
+  tax: number;
+  paid: number;
+  note: string;
+};
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, paid: 0, note: "" };
 
 function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "$";
 
-  const [open, setOpen] = useState(false);
-  const [supplier, setSupplier] = useState<string>("none");
-  const [lines, setLines] = useState<Line[]>([]);
-  const [tax, setTax] = useState(0);
-  const [paid, setPaid] = useState(0);
-  const [note, setNote] = useState("");
+  const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
+  const { open, supplier, lines, tax, paid, note } = draft;
+  const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
+  const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
+  const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
+    setDraft((d) => ({ ...d, lines: typeof updater === "function" ? (updater as any)(d.lines) : updater }));
+  const setTax = (v: number) => setDraft((d) => ({ ...d, tax: v }));
+  const setPaid = (v: number) => setDraft((d) => ({ ...d, paid: v }));
+  const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
+
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
