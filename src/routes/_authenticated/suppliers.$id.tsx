@@ -194,14 +194,12 @@ function Page() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {opening !== 0 && (
-              <TableRow className="bg-muted/30 font-medium">
-                <TableCell colSpan={4} className="text-muted-foreground">Opening balance (before {from})</TableCell>
-                <TableCell className="text-right">—</TableCell>
-                <TableCell className="text-right">—</TableCell>
-                <TableCell className={`text-right ${opening > 0 ? "text-destructive" : "text-success"}`}>{fmtMoney(opening, sym)}</TableCell>
-              </TableRow>
-            )}
+            <TableRow className="bg-muted/30 font-medium">
+              <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
+              <TableCell className="text-right">—</TableCell>
+              <TableCell className="text-right">—</TableCell>
+              <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
+            </TableRow>
             {rows.length === 0 && (
               <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
             )}
