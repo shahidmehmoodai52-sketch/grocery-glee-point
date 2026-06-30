@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { maybeRunDaily } from "@/lib/backup";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import { RouteGuard } from "@/components/route-guard";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -29,7 +30,7 @@ function Layout() {
             <SidebarTrigger />
           </header>
           <main className="flex-1 min-w-0 overflow-auto">
-            <Outlet />
+            <RouteGuard><Outlet /></RouteGuard>
           </main>
         </div>
         <Toaster richColors position="top-right" />
