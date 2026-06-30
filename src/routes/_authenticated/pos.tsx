@@ -511,8 +511,27 @@ function POSPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-right text-xs text-muted-foreground self-end pb-2">
-              {tab.items.length} item{tab.items.length === 1 ? "" : "s"} · {tab.name}
+            <div className="flex flex-col items-end gap-1 self-end pb-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={showStaff || tab.expense_person_id ? "secondary" : "outline"}
+                className="h-8 text-xs whitespace-nowrap"
+                onClick={() => {
+                  if (tab.expense_person_id) {
+                    // Hiding while a person is selected clears the assignment
+                    setTab({ expense_person_id: null });
+                  }
+                  setShowStaff((v) => !v);
+                }}
+                title="Charge this bill to a staff/owner expense ledger"
+              >
+                <UserCog className="h-3.5 w-3.5 mr-1" />
+                {showStaff || tab.expense_person_id ? "Hide staff" : "Staff / Owner"}
+              </Button>
+              <div className="text-right text-[11px] text-muted-foreground">
+                {tab.items.length} item{tab.items.length === 1 ? "" : "s"} · {tab.name}
+              </div>
             </div>
           </div>
 
