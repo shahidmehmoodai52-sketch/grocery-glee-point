@@ -87,7 +87,10 @@ function Page() {
     return true;
   });
 
-  let running = 0;
+  const opening = entries
+    .filter((x) => from && x.date < from)
+    .reduce((s, x) => s + x.debit - x.credit, 0);
+  let running = opening;
   const rows = filtered.map((x) => { running += x.debit - x.credit; return { ...x, balance: running }; });
   const totalDebit = filtered.reduce((s, x) => s + x.debit, 0);
   const totalCredit = filtered.reduce((s, x) => s + x.credit, 0);
