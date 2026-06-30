@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock } from "lucide-react";
+import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -78,6 +78,7 @@ function POSPage() {
   const [reprintView, setReprintView] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showCost, setShowCost] = useState(false);
+  const [showStaff, setShowStaff] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [now, setNow] = useState(() => new Date());
   
@@ -379,7 +380,11 @@ function POSPage() {
         {/* Billing window */}
         <div className="flex flex-col min-h-0 flex-1 bg-background">
           {/* Scan / search bar + customer + payment */}
-          <div className="p-3 border-b grid grid-cols-1 md:grid-cols-[1fr_200px_200px_140px_140px] gap-2 items-end">
+          <div className={`p-3 border-b grid grid-cols-1 gap-2 items-end ${
+            (showStaff || tab.expense_person_id)
+              ? "md:grid-cols-[1fr_200px_200px_140px_auto]"
+              : "md:grid-cols-[1fr_200px_140px_auto]"
+          }`}>
             <div className="relative">
               <Label className="text-xs">Scan barcode / search item</Label>
               <div className="relative">
@@ -469,29 +474,31 @@ function POSPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">Staff / Owner purchase</Label>
-              <Select
-                value={tab.expense_person_id ?? "none"}
-                onValueChange={(v) => setTab({
-                  expense_person_id: v === "none" ? null : v,
-                  // When charged to staff/owner, clear customer (bill goes to their expense ledger).
-                  customer_id: v === "none" ? tab.customer_id : null,
-                })}
-              >
-                <SelectTrigger className={`h-10 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— Not staff purchase —</SelectItem>
-                  {persons.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} {p.role ? `· ${p.role}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {(showStaff || tab.expense_person_id) && (
+              <div>
+                <Label className="text-xs">Staff / Owner purchase</Label>
+                <Select
+                  value={tab.expense_person_id ?? "none"}
+                  onValueChange={(v) => setTab({
+                    expense_person_id: v === "none" ? null : v,
+                    // When charged to staff/owner, clear customer (bill goes to their expense ledger).
+                    customer_id: v === "none" ? tab.customer_id : null,
+                  })}
+                >
+                  <SelectTrigger className={`h-10 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Not staff purchase —</SelectItem>
+                    {persons.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} {p.role ? `· ${p.role}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label className="text-xs">Payment</Label>
               <Select value={tab.payment_method} onValueChange={(v) => setTab({ payment_method: v })}>
@@ -504,8 +511,27 @@ function POSPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-right text-xs text-muted-foreground self-end pb-2">
-              {tab.items.length} item{tab.items.length === 1 ? "" : "s"} · {tab.name}
+            <div className="flex flex-col items-end gap-1 self-end pb-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={showStaff || tab.expense_person_id ? "secondary" : "outline"}
+                className="h-8 text-xs whitespace-nowrap"
+                onClick={() => {
+                  if (tab.expense_person_id) {
+                    // Hiding while a person is selected clears the assignment
+                    setTab({ expense_person_id: null });
+                  }
+                  setShowStaff((v) => !v);
+                }}
+                title="Charge this bill to a staff/owner expense ledger"
+              >
+                <UserCog className="h-3.5 w-3.5 mr-1" />
+                {showStaff || tab.expense_person_id ? "Hide staff" : "Staff / Owner"}
+              </Button>
+              <div className="text-right text-[11px] text-muted-foreground">
+                {tab.items.length} item{tab.items.length === 1 ? "" : "s"} · {tab.name}
+              </div>
             </div>
           </div>
 
