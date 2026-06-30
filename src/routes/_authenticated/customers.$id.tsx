@@ -92,9 +92,11 @@ function Page() {
     .reduce((s, x) => s + x.debit - x.credit, 0);
   let running = opening;
   const rows = filtered.map((x) => { running += x.debit - x.credit; return { ...x, balance: running }; });
-  const totalDebit = filtered.reduce((s, x) => s + x.debit, 0);
-  const totalCredit = filtered.reduce((s, x) => s + x.credit, 0);
-  const outstanding = Number(customer?.balance ?? 0);
+  const totalIn = filtered.reduce((s, x) => s + x.debit, 0);
+  const totalOut = filtered.reduce((s, x) => s + x.credit, 0);
+  const closing = opening + totalIn - totalOut;
+  const closingLabel = closing > 0 ? "Outstanding (they owe)" : closing < 0 ? "Advance (credit)" : "Settled";
+  const closingTone = closing > 0 ? "destructive" : closing < 0 ? "success" : "primary";
 
   const items: LedgerItem[] = useMemo(() => {
     const out: LedgerItem[] = [];
@@ -120,7 +122,8 @@ function Page() {
     heading: "Customer Ledger",
     from, to, currency: sym,
     rows, items: includeItems ? items : undefined,
-    totalDebit, totalCredit, outstanding,
+    opening, totalDebit: totalIn, totalCredit: totalOut,
+    owedLabel: "Outstanding (they owe)", advanceLabel: "Advance (credit)",
   });
 
   const downloadPdf = (includeItems: boolean) => {
@@ -178,9 +181,9 @@ function Page() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
-        <Stat icon={ReceiptIcon} label="Total sales" value={fmtMoney(totalDebit, sym)} tone="primary" />
-        <Stat icon={TrendingDown} label="Received / returned" value={fmtMoney(totalCredit, sym)} tone="success" />
-        <Stat icon={Wallet} label="Outstanding (they owe)" value={fmtMoney(outstanding, sym)} tone={outstanding > 0 ? "destructive" : "success"} />
+        <Stat icon={ReceiptIcon} label="Total In (+)" value={fmtMoney(totalIn, sym)} tone="primary" />
+        <Stat icon={TrendingDown} label="Total Out (−)" value={fmtMoney(totalOut, sym)} tone="success" />
+        <Stat icon={Wallet} label={closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
       </div>
 
       <Card className="p-3 print-area">
@@ -192,13 +195,13 @@ function Page() {
           <TableHeader><TableRow>
             <TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Ref</TableHead>
             <TableHead>Note</TableHead>
-            <TableHead className="text-right">Debit</TableHead>
-            <TableHead className="text-right">Credit</TableHead>
+            <TableHead className="text-right">In (+)</TableHead>
+            <TableHead className="text-right">Out (−)</TableHead>
             <TableHead className="text-right">Balance</TableHead>
             <TableHead className="text-right no-print w-20">Invoice</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            <TableRow className="bg-muted/30 font-medium">
+            <TableRow className="bg-muted/40 font-medium">
               <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
               <TableCell className="text-right">—</TableCell>
               <TableCell className="text-right">—</TableCell>
@@ -233,26 +236,21 @@ function Page() {
             ))}
             {rows.length > 0 && (
               <>
-                <TableRow className="bg-muted/30 font-medium">
-                  <TableCell colSpan={6} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
-                  <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
-                  <TableCell className="no-print"></TableCell>
-                </TableRow>
                 <TableRow className="bg-muted/40 font-semibold">
-                  <TableCell colSpan={4}>Period totals (Debits − Credits = Net)</TableCell>
-                  <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
-                  <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
-                  <TableCell className={`text-right ${totalDebit - totalCredit > 0 ? "text-destructive" : totalDebit - totalCredit < 0 ? "text-success" : ""}`}>{fmtMoney(totalDebit - totalCredit, sym)}</TableCell>
+                  <TableCell colSpan={4}>Period totals</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalIn, sym)}</TableCell>
+                  <TableCell className="text-right text-success">{fmtMoney(totalOut, sym)}</TableCell>
+                  <TableCell></TableCell>
                   <TableCell className="no-print"></TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/5 text-xs">
                   <TableCell colSpan={8} className="text-muted-foreground text-right">
-                    {fmtMoney(opening, sym)} (Opening) + {fmtMoney(totalDebit, sym)} (Debits) − {fmtMoney(totalCredit, sym)} (Credits) = <span className="font-semibold text-foreground">{fmtMoney(running, sym)}</span>
+                    {fmtMoney(opening, sym)} (Opening) + {fmtMoney(totalIn, sym)} (In) − {fmtMoney(totalOut, sym)} (Out) = <span className="font-semibold text-foreground">{fmtMoney(closing, sym)}</span>
                   </TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/10 font-bold">
-                  <TableCell colSpan={6}>Closing balance {running > 0 ? "(they owe)" : running < 0 ? "(advance / credit)" : ""}</TableCell>
-                  <TableCell className={`text-right ${running > 0 ? "text-destructive" : running < 0 ? "text-success" : ""}`}>{fmtMoney(running, sym)}</TableCell>
+                  <TableCell colSpan={6}>Closing balance · {closingLabel}</TableCell>
+                  <TableCell className={`text-right ${closing > 0 ? "text-destructive" : closing < 0 ? "text-success" : ""}`}>{fmtMoney(closing, sym)}</TableCell>
                   <TableCell className="no-print"></TableCell>
                 </TableRow>
               </>
