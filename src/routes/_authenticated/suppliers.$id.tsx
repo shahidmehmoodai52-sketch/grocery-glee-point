@@ -272,12 +272,22 @@ function Page() {
               );
             })}
             {rows.length > 0 && (
-              <TableRow className="bg-muted/40 font-semibold">
-                <TableCell colSpan={4}>Totals</TableCell>
-                <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
-                <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
-                <TableCell className="text-right">{fmtMoney(running, sym)}</TableCell>
-              </TableRow>
+              <>
+                <TableRow className="bg-muted/30 font-medium">
+                  <TableCell colSpan={6} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
+                  <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-muted/40 font-semibold">
+                  <TableCell colSpan={4}>Period totals</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
+                  <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalDebit - totalCredit, sym)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-primary/10 font-bold">
+                  <TableCell colSpan={6}>Closing balance (Opening + Period net)</TableCell>
+                  <TableCell className={`text-right ${running > 0 ? "text-destructive" : running < 0 ? "text-success" : ""}`}>{fmtMoney(running, sym)}</TableCell>
+                </TableRow>
+              </>
             )}
           </TableBody>
         </Table>
