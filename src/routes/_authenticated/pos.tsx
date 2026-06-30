@@ -40,6 +40,7 @@ type Tab = {
   name: string;
   items: CartItem[];
   customer_id: string | null;
+  expense_person_id: string | null;
   payment_method: string;
   discount: number;
   discount_pct: string;
@@ -52,6 +53,7 @@ const newTab = (n: number): Tab => ({
   name: `Invoice ${n}`,
   items: [],
   customer_id: null,
+  expense_person_id: null,
   payment_method: "cash",
   discount: 0,
   discount_pct: "",
@@ -135,6 +137,16 @@ function POSPage() {
     queryKey: ["customers"],
     queryFn: async () => {
       const { data, error } = await supabase.from("customers").select("id,name,balance").order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: persons = [] } = useQuery({
+    queryKey: ["expense_persons", "active"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("expense_persons")
+        .select("id,name,role").eq("is_active", true).order("name");
       if (error) throw error;
       return data ?? [];
     },
@@ -244,7 +256,7 @@ function POSPage() {
   const handleSale = async () => {
     if (!tab.items.length) return toast.error("Cart is empty");
     const isCredit = due > 0;
-    if (isCredit && !tab.customer_id) return toast.error("Select a customer for credit sale");
+    if (isCredit && !tab.customer_id && !tab.expense_person_id) return toast.error("Select a customer or a staff/owner for credit sale");
     await doSale();
   };
 
@@ -253,6 +265,7 @@ function POSPage() {
     try {
       const payload = {
         customer_id: tab.customer_id,
+        expense_person_id: tab.expense_person_id,
         payment_method: tab.payment_method,
         tax,
         // Combine per-line discounts with cart-level discount so they reach the ledger.
@@ -286,6 +299,8 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      qc.invalidateQueries({ queryKey: ["expense_persons"] });
     } catch (err: any) {
       toast.error(err.message ?? "Failed to complete sale");
     } finally {
@@ -364,7 +379,7 @@ function POSPage() {
         {/* Billing window */}
         <div className="flex flex-col min-h-0 flex-1 bg-background">
           {/* Scan / search bar + customer + payment */}
-          <div className="p-3 border-b grid grid-cols-1 md:grid-cols-[1fr_220px_160px_160px] gap-2 items-end">
+          <div className="p-3 border-b grid grid-cols-1 md:grid-cols-[1fr_200px_200px_140px_140px] gap-2 items-end">
             <div className="relative">
               <Label className="text-xs">Scan barcode / search item</Label>
               <div className="relative">
@@ -449,6 +464,29 @@ function POSPage() {
                   {customers.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Staff / Owner purchase</Label>
+              <Select
+                value={tab.expense_person_id ?? "none"}
+                onValueChange={(v) => setTab({
+                  expense_person_id: v === "none" ? null : v,
+                  // When charged to staff/owner, clear customer (bill goes to their expense ledger).
+                  customer_id: v === "none" ? tab.customer_id : null,
+                })}
+              >
+                <SelectTrigger className={`h-10 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Not staff purchase —</SelectItem>
+                  {persons.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.role ? `· ${p.role}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

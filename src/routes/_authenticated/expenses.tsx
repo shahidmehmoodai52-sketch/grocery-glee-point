@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Wallet, Users as UsersIcon } from "lucide-react";
@@ -257,9 +257,17 @@ function Page() {
               <TableHeader><TableRow><TableHead>Person</TableHead><TableHead className="text-right">Total spent</TableHead></TableRow></TableHeader>
               <TableBody>
                 {totals.byPerson.length === 0 && <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
-                {totals.byPerson.map((p) => (
-                  <TableRow key={p.name}><TableCell className="font-medium">{p.name}</TableCell><TableCell className="text-right font-semibold">{fmtMoney(p.value, sym)}</TableCell></TableRow>
-                ))}
+                {totals.byPerson.map((p) => {
+                  const pp = persons.find((x: any) => x.name === p.name);
+                  return (
+                    <TableRow key={p.name}>
+                      <TableCell className="font-medium">
+                        {pp ? <Link to="/expense-persons/$id" params={{ id: pp.id }} className="hover:underline">{p.name}</Link> : p.name}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">{fmtMoney(p.value, sym)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </Card>
@@ -282,15 +290,18 @@ function Page() {
         <TabsContent value="persons">
           <Card className="p-3">
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead>Phone</TableHead><TableHead>Notes</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead>Phone</TableHead><TableHead>Notes</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
-                {persons.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No people added yet</TableCell></TableRow>}
+                {persons.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No people added yet</TableCell></TableRow>}
                 {persons.map((p: any) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{p.role ?? "—"}</Badge></TableCell>
                     <TableCell>{p.phone ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.notes ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild size="sm" variant="ghost"><Link to="/expense-persons/$id" params={{ id: p.id }}>Open ledger</Link></Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

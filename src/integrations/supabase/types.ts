@@ -90,6 +90,7 @@ export type Database = {
           id: string
           method: string
           person_id: string | null
+          sale_id: string | null
           updated_at: string
           user_id: string
         }
@@ -102,6 +103,7 @@ export type Database = {
           id?: string
           method?: string
           person_id?: string | null
+          sale_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -114,6 +116,7 @@ export type Database = {
           id?: string
           method?: string
           person_id?: string | null
+          sale_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -123,6 +126,13 @@ export type Database = {
             columns: ["person_id"]
             isOneToOne: false
             referencedRelation: "expense_persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]
@@ -622,6 +632,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           discount: number
+          expense_person_id: string | null
           id: string
           invoice_no: string
           note: string | null
@@ -639,6 +650,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           discount?: number
+          expense_person_id?: string | null
           id?: string
           invoice_no?: string
           note?: string | null
@@ -656,6 +668,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           discount?: number
+          expense_person_id?: string | null
           id?: string
           invoice_no?: string
           note?: string | null
@@ -672,6 +685,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_expense_person_id_fkey"
+            columns: ["expense_person_id"]
+            isOneToOne: false
+            referencedRelation: "expense_persons"
             referencedColumns: ["id"]
           },
         ]
