@@ -40,6 +40,7 @@ type Tab = {
   name: string;
   items: CartItem[];
   customer_id: string | null;
+  expense_person_id: string | null;
   payment_method: string;
   discount: number;
   discount_pct: string;
@@ -52,6 +53,7 @@ const newTab = (n: number): Tab => ({
   name: `Invoice ${n}`,
   items: [],
   customer_id: null,
+  expense_person_id: null,
   payment_method: "cash",
   discount: 0,
   discount_pct: "",
