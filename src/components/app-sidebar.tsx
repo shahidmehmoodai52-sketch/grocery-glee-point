@@ -60,6 +60,7 @@ export function AppSidebar() {
   const visibleGroups = groups
     .map((g) => ({ ...g, items: g.items.filter((it) => (it.adminOnly ? isAdmin : can(it.perm))) }))
     .filter((g) => g.items.length > 0);
+  const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
