@@ -24,6 +24,7 @@ function Page() {
   const [from, setFrom] = useState(startOfMonth());
   const [to, setTo] = useState(today());
   const [tab, setTab] = useState("pnl");
+  const [search, setSearch] = useState("");
 
   const range = { from: new Date(from + "T00:00:00").toISOString(), to: new Date(to + "T23:59:59").toISOString() };
 
@@ -91,6 +92,23 @@ function Page() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [sales]);
 
+  const q = search.trim().toLowerCase();
+  const filteredInvoices = useMemo(() => {
+    if (!q) return sales as any[];
+    return (sales as any[]).filter((s) =>
+      String(s.invoice_no ?? "").toLowerCase().includes(q) ||
+      String(s.customers?.name ?? "walk-in").toLowerCase().includes(q) ||
+      String(s.payment_method ?? "").toLowerCase().includes(q) ||
+      String(Number(s.total).toFixed(2)).includes(q) ||
+      (s.sale_items ?? []).some((i: any) => String(i.name).toLowerCase().includes(q))
+    );
+  }, [sales, q]);
+  const filteredProducts = useMemo(() => {
+    if (!q) return productSales;
+    return productSales.filter((p) => p.name.toLowerCase().includes(q));
+  }, [productSales, q]);
+
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-end justify-between flex-wrap gap-3">
@@ -113,13 +131,23 @@ function Page() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="no-print">
-          <TabsTrigger value="pnl">P&amp;L</TabsTrigger>
-          <TabsTrigger value="sales">Sale report</TabsTrigger>
-          <TabsTrigger value="profit">Sale &amp; profit</TabsTrigger>
-          <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
-          <TabsTrigger value="product">Product-wise</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-2 flex-wrap no-print">
+          <TabsList>
+            <TabsTrigger value="pnl">P&amp;L</TabsTrigger>
+            <TabsTrigger value="sales">Sale report</TabsTrigger>
+            <TabsTrigger value="profit">Sale &amp; profit</TabsTrigger>
+            <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
+            <TabsTrigger value="product">Product-wise</TabsTrigger>
+          </TabsList>
+          {(tab === "invoice" || tab === "product") && (
+            <Input
+              placeholder={tab === "product" ? "Search product name…" : "Search invoice, customer, amount…"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 max-w-xs"
+            />
+          )}
+        </div>
 
         <TabsContent value="pnl">
           <Card className="p-5">
@@ -224,8 +252,8 @@ function Page() {
                 <TableHead>Status</TableHead><TableHead></TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {sales.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
-                {sales.map((s: any) => {
+                {filteredInvoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {filteredInvoices.map((s: any) => {
                   const profit = (Number(s.subtotal) - Number(s.discount)) - Number(s.cost_total);
                   const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
                   return (
@@ -242,11 +270,11 @@ function Page() {
                     </TableRow>
                   );
                 })}
-                {sales.length > 0 && (
+                {filteredInvoices.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={5}>Total ({sales.length} invoices)</TableCell>
-                    <TableCell className="text-right">{fmtMoney(totalSales, sym)}</TableCell>
-                    <TableCell className="text-right text-success">{fmtMoney(grossProfit, sym)}</TableCell>
+                    <TableCell colSpan={5}>Total ({filteredInvoices.length} invoices{q && ` of ${sales.length}`})</TableCell>
+                    <TableCell className="text-right">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + Number(b.total), 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + ((Number(b.subtotal) - Number(b.discount)) - Number(b.cost_total)), 0), sym)}</TableCell>
                     <TableCell colSpan={2} />
                   </TableRow>
                 )}
@@ -267,8 +295,8 @@ function Page() {
                 <TableHead className="text-right">Margin %</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {productSales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
-                {productSales.map((p, i) => {
+                {filteredProducts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
+                {filteredProducts.map((p, i) => {
                   const margin = p.revenue ? (p.profit / p.revenue) * 100 : 0;
                   return (
                     <TableRow key={i}>
@@ -281,13 +309,13 @@ function Page() {
                     </TableRow>
                   );
                 })}
-                {productSales.length > 0 && (
+                {filteredProducts.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total ({productSales.length} items)</TableCell>
-                    <TableCell className="text-right">{productSales.reduce((a, b) => a + b.qty, 0)}</TableCell>
-                    <TableCell className="text-right">{fmtMoney(productSales.reduce((a, b) => a + b.revenue, 0), sym)}</TableCell>
-                    <TableCell className="text-right">{fmtMoney(productSales.reduce((a, b) => a + b.cost, 0), sym)}</TableCell>
-                    <TableCell className="text-right text-success">{fmtMoney(productSales.reduce((a, b) => a + b.profit, 0), sym)}</TableCell>
+                    <TableCell>Total ({filteredProducts.length} items{q && ` of ${productSales.length}`})</TableCell>
+                    <TableCell className="text-right">{filteredProducts.reduce((a, b) => a + b.qty, 0)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(filteredProducts.reduce((a, b) => a + b.revenue, 0), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(filteredProducts.reduce((a, b) => a + b.cost, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(filteredProducts.reduce((a, b) => a + b.profit, 0), sym)}</TableCell>
                     <TableCell />
                   </TableRow>
                 )}
