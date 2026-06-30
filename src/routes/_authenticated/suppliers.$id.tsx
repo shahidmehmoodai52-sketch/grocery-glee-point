@@ -169,7 +169,8 @@ function Page() {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
         <Stat icon={Receipt} label="Total purchases" value={fmtMoney(totalDebit, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Paid" value={fmtMoney(totalCredit, sym)} tone="success" />
         <Stat icon={Wallet} label="Outstanding (we owe)" value={fmtMoney(outstanding, sym)} tone={outstanding > 0 ? "destructive" : "success"} />
