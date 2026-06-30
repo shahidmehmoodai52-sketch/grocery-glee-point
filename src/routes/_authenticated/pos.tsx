@@ -256,7 +256,7 @@ function POSPage() {
   const handleSale = async () => {
     if (!tab.items.length) return toast.error("Cart is empty");
     const isCredit = due > 0;
-    if (isCredit && !tab.customer_id) return toast.error("Select a customer for credit sale");
+    if (isCredit && !tab.customer_id && !tab.expense_person_id) return toast.error("Select a customer or a staff/owner for credit sale");
     await doSale();
   };
 
