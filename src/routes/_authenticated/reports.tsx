@@ -295,8 +295,8 @@ function Page() {
                 <TableHead className="text-right">Margin %</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {productSales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
-                {productSales.map((p, i) => {
+                {filteredProducts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
+                {filteredProducts.map((p, i) => {
                   const margin = p.revenue ? (p.profit / p.revenue) * 100 : 0;
                   return (
                     <TableRow key={i}>
@@ -309,13 +309,13 @@ function Page() {
                     </TableRow>
                   );
                 })}
-                {productSales.length > 0 && (
+                {filteredProducts.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total ({productSales.length} items)</TableCell>
-                    <TableCell className="text-right">{productSales.reduce((a, b) => a + b.qty, 0)}</TableCell>
-                    <TableCell className="text-right">{fmtMoney(productSales.reduce((a, b) => a + b.revenue, 0), sym)}</TableCell>
-                    <TableCell className="text-right">{fmtMoney(productSales.reduce((a, b) => a + b.cost, 0), sym)}</TableCell>
-                    <TableCell className="text-right text-success">{fmtMoney(productSales.reduce((a, b) => a + b.profit, 0), sym)}</TableCell>
+                    <TableCell>Total ({filteredProducts.length} items{q && ` of ${productSales.length}`})</TableCell>
+                    <TableCell className="text-right">{filteredProducts.reduce((a, b) => a + b.qty, 0)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(filteredProducts.reduce((a, b) => a + b.revenue, 0), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(filteredProducts.reduce((a, b) => a + b.cost, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(filteredProducts.reduce((a, b) => a + b.profit, 0), sym)}</TableCell>
                     <TableCell />
                   </TableRow>
                 )}
