@@ -114,13 +114,23 @@ function Page() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="no-print">
-          <TabsTrigger value="pnl">P&amp;L</TabsTrigger>
-          <TabsTrigger value="sales">Sale report</TabsTrigger>
-          <TabsTrigger value="profit">Sale &amp; profit</TabsTrigger>
-          <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
-          <TabsTrigger value="product">Product-wise</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-2 flex-wrap no-print">
+          <TabsList>
+            <TabsTrigger value="pnl">P&amp;L</TabsTrigger>
+            <TabsTrigger value="sales">Sale report</TabsTrigger>
+            <TabsTrigger value="profit">Sale &amp; profit</TabsTrigger>
+            <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
+            <TabsTrigger value="product">Product-wise</TabsTrigger>
+          </TabsList>
+          {(tab === "invoice" || tab === "product") && (
+            <Input
+              placeholder={tab === "product" ? "Search product name…" : "Search invoice, customer, amount…"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 max-w-xs"
+            />
+          )}
+        </div>
 
         <TabsContent value="pnl">
           <Card className="p-5">
