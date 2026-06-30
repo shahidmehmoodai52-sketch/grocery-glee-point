@@ -474,29 +474,31 @@ function POSPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">Staff / Owner purchase</Label>
-              <Select
-                value={tab.expense_person_id ?? "none"}
-                onValueChange={(v) => setTab({
-                  expense_person_id: v === "none" ? null : v,
-                  // When charged to staff/owner, clear customer (bill goes to their expense ledger).
-                  customer_id: v === "none" ? tab.customer_id : null,
-                })}
-              >
-                <SelectTrigger className={`h-10 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— Not staff purchase —</SelectItem>
-                  {persons.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} {p.role ? `· ${p.role}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {(showStaff || tab.expense_person_id) && (
+              <div>
+                <Label className="text-xs">Staff / Owner purchase</Label>
+                <Select
+                  value={tab.expense_person_id ?? "none"}
+                  onValueChange={(v) => setTab({
+                    expense_person_id: v === "none" ? null : v,
+                    // When charged to staff/owner, clear customer (bill goes to their expense ledger).
+                    customer_id: v === "none" ? tab.customer_id : null,
+                  })}
+                >
+                  <SelectTrigger className={`h-10 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Not staff purchase —</SelectItem>
+                    {persons.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} {p.role ? `· ${p.role}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label className="text-xs">Payment</Label>
               <Select value={tab.payment_method} onValueChange={(v) => setTab({ payment_method: v })}>
