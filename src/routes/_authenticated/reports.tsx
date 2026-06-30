@@ -252,8 +252,8 @@ function Page() {
                 <TableHead>Status</TableHead><TableHead></TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {sales.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
-                {sales.map((s: any) => {
+                {filteredInvoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {filteredInvoices.map((s: any) => {
                   const profit = (Number(s.subtotal) - Number(s.discount)) - Number(s.cost_total);
                   const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
                   return (
@@ -270,11 +270,11 @@ function Page() {
                     </TableRow>
                   );
                 })}
-                {sales.length > 0 && (
+                {filteredInvoices.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={5}>Total ({sales.length} invoices)</TableCell>
-                    <TableCell className="text-right">{fmtMoney(totalSales, sym)}</TableCell>
-                    <TableCell className="text-right text-success">{fmtMoney(grossProfit, sym)}</TableCell>
+                    <TableCell colSpan={5}>Total ({filteredInvoices.length} invoices{q && ` of ${sales.length}`})</TableCell>
+                    <TableCell className="text-right">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + Number(b.total), 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + ((Number(b.subtotal) - Number(b.discount)) - Number(b.cost_total)), 0), sym)}</TableCell>
                     <TableCell colSpan={2} />
                   </TableRow>
                 )}
