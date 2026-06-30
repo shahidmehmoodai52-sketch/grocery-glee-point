@@ -169,7 +169,8 @@ function Page() {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
         <Stat icon={Receipt} label="Total purchases" value={fmtMoney(totalDebit, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Paid" value={fmtMoney(totalCredit, sym)} tone="success" />
         <Stat icon={Wallet} label="Outstanding (we owe)" value={fmtMoney(outstanding, sym)} tone={outstanding > 0 ? "destructive" : "success"} />
@@ -193,14 +194,12 @@ function Page() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {opening !== 0 && (
-              <TableRow className="bg-muted/30 font-medium">
-                <TableCell colSpan={4} className="text-muted-foreground">Opening balance (before {from})</TableCell>
-                <TableCell className="text-right">—</TableCell>
-                <TableCell className="text-right">—</TableCell>
-                <TableCell className={`text-right ${opening > 0 ? "text-destructive" : "text-success"}`}>{fmtMoney(opening, sym)}</TableCell>
-              </TableRow>
-            )}
+            <TableRow className="bg-muted/30 font-medium">
+              <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
+              <TableCell className="text-right">—</TableCell>
+              <TableCell className="text-right">—</TableCell>
+              <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
+            </TableRow>
             {rows.length === 0 && (
               <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
             )}
@@ -273,12 +272,22 @@ function Page() {
               );
             })}
             {rows.length > 0 && (
-              <TableRow className="bg-muted/40 font-semibold">
-                <TableCell colSpan={4}>Totals</TableCell>
-                <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
-                <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
-                <TableCell className="text-right">{fmtMoney(running, sym)}</TableCell>
-              </TableRow>
+              <>
+                <TableRow className="bg-muted/30 font-medium">
+                  <TableCell colSpan={6} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
+                  <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-muted/40 font-semibold">
+                  <TableCell colSpan={4}>Period totals</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
+                  <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalDebit - totalCredit, sym)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-primary/10 font-bold">
+                  <TableCell colSpan={6}>Closing balance (Opening + Period net)</TableCell>
+                  <TableCell className={`text-right ${running > 0 ? "text-destructive" : running < 0 ? "text-success" : ""}`}>{fmtMoney(running, sym)}</TableCell>
+                </TableRow>
+              </>
             )}
           </TableBody>
         </Table>

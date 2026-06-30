@@ -87,7 +87,10 @@ function Page() {
     return true;
   });
 
-  let running = 0;
+  const opening = entries
+    .filter((x) => from && x.date < from)
+    .reduce((s, x) => s + x.debit - x.credit, 0);
+  let running = opening;
   const rows = filtered.map((x) => { running += x.debit - x.credit; return { ...x, balance: running }; });
   const totalDebit = filtered.reduce((s, x) => s + x.debit, 0);
   const totalCredit = filtered.reduce((s, x) => s + x.credit, 0);
@@ -174,9 +177,9 @@ function Page() {
 
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
         <Stat icon={ReceiptIcon} label="Total sales" value={fmtMoney(totalDebit, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Received / returned" value={fmtMoney(totalCredit, sym)} tone="success" />
-        <Stat icon={TrendingUp} label="Period net" value={fmtMoney(totalDebit - totalCredit, sym)} tone="warning" />
         <Stat icon={Wallet} label="Outstanding (they owe)" value={fmtMoney(outstanding, sym)} tone={outstanding > 0 ? "destructive" : "success"} />
       </div>
 
@@ -195,6 +198,13 @@ function Page() {
             <TableHead className="text-right no-print w-20">Invoice</TableHead>
           </TableRow></TableHeader>
           <TableBody>
+            <TableRow className="bg-muted/30 font-medium">
+              <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
+              <TableCell className="text-right">—</TableCell>
+              <TableCell className="text-right">—</TableCell>
+              <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
+              <TableCell className="no-print"></TableCell>
+            </TableRow>
             {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
             {rows.map((x, i) => (
               <TableRow key={i} className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
@@ -222,13 +232,25 @@ function Page() {
               </TableRow>
             ))}
             {rows.length > 0 && (
-              <TableRow className="bg-muted/40 font-semibold">
-                <TableCell colSpan={4}>Totals</TableCell>
-                <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
-                <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
-                <TableCell className="text-right">{fmtMoney(running, sym)}</TableCell>
-                <TableCell className="no-print"></TableCell>
-              </TableRow>
+              <>
+                <TableRow className="bg-muted/30 font-medium">
+                  <TableCell colSpan={6} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
+                  <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
+                  <TableCell className="no-print"></TableCell>
+                </TableRow>
+                <TableRow className="bg-muted/40 font-semibold">
+                  <TableCell colSpan={4}>Period totals</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
+                  <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalDebit - totalCredit, sym)}</TableCell>
+                  <TableCell className="no-print"></TableCell>
+                </TableRow>
+                <TableRow className="bg-primary/10 font-bold">
+                  <TableCell colSpan={6}>Closing balance (Opening + Period net)</TableCell>
+                  <TableCell className={`text-right ${running > 0 ? "text-destructive" : running < 0 ? "text-success" : ""}`}>{fmtMoney(running, sym)}</TableCell>
+                  <TableCell className="no-print"></TableCell>
+                </TableRow>
+              </>
             )}
           </TableBody>
         </Table>
