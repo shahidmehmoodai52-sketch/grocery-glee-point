@@ -56,8 +56,10 @@ export function AppSidebar() {
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { data: settings } = useSettings();
-
-  const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
+  const { isAdmin, can } = usePermissions();
+  const visibleGroups = groups
+    .map((g) => ({ ...g, items: g.items.filter((it) => (it.adminOnly ? isAdmin : can(it.perm))) }))
+    .filter((g) => g.items.length > 0);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
