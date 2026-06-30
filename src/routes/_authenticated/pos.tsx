@@ -265,6 +265,7 @@ function POSPage() {
     try {
       const payload = {
         customer_id: tab.customer_id,
+        expense_person_id: tab.expense_person_id,
         payment_method: tab.payment_method,
         tax,
         // Combine per-line discounts with cart-level discount so they reach the ledger.
