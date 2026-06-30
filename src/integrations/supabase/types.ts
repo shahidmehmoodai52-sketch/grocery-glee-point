@@ -772,6 +772,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          perm: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          perm: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          perm?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -799,6 +820,10 @@ export type Database = {
       complete_purchase_return: { Args: { payload: Json }; Returns: string }
       complete_sale: { Args: { payload: Json }; Returns: string }
       complete_sale_return: { Args: { payload: Json }; Returns: string }
+      has_permission: {
+        Args: { _perm: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
