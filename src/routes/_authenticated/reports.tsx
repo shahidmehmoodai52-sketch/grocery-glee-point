@@ -24,6 +24,7 @@ function Page() {
   const [from, setFrom] = useState(startOfMonth());
   const [to, setTo] = useState(today());
   const [tab, setTab] = useState("pnl");
+  const [search, setSearch] = useState("");
 
   const range = { from: new Date(from + "T00:00:00").toISOString(), to: new Date(to + "T23:59:59").toISOString() };
 
