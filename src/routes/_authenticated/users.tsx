@@ -22,26 +22,22 @@ function Page() {
   const list = useServerFn(listStaff);
   const create = useServerFn(createStaff);
   const reset = useServerFn(resetStaffPassword);
-  const setPerms = useServerFn(setStaffPermissions);
   const del = useServerFn(deleteStaff);
 
-  const { data: users = [], isLoading } = useQuery({ queryKey: ["staff"], queryFn: () => list() });
+  const { data: users = [], isLoading } = useQuery({ queryKey: ["staff"], queryFn: () => (list as any)() });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["staff"] });
 
-  // Create form
   const [newOpen, setNewOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [role, setRole] = useState<"admin" | "cashier">("cashier");
-  const [perms, setPerms] = useState<string[]>([]);
-
-  const togglePerm = (k: string, list: string[], set: (v: string[]) => void) =>
-    set(list.includes(k) ? list.filter((p) => p !== k) : [...list, k]);
+  const [perms, setPermsState] = useState<string[]>([]);
+  const togglePerm = (k: string) => setPermsState((p) => p.includes(k) ? p.filter((x) => x !== k) : [...p, k]);
 
   const createMut = useMutation({
     mutationFn: () => create({ data: { email, password: pwd, role, perms } }),
-    onSuccess: () => { toast.success("Staff created"); setNewOpen(false); setEmail(""); setPwd(""); setPerms([]); setRole("cashier"); refresh(); },
+    onSuccess: () => { toast.success("Staff created"); setNewOpen(false); setEmail(""); setPwd(""); setPermsState([]); setRole("cashier"); refresh(); },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
 
@@ -72,7 +68,7 @@ function Page() {
                   <div className="grid grid-cols-2 gap-2 mt-2 p-3 rounded border max-h-64 overflow-auto">
                     {ALL_PERMS.filter((p) => p.key !== "sales").map((p) => (
                       <label key={p.key} className="flex items-center gap-2 text-sm">
-                        <Checkbox checked={perms.includes(p.key)} onCheckedChange={() => togglePerm(p.key, perms, setPerms)} />
+                        <Checkbox checked={perms.includes(p.key)} onCheckedChange={() => togglePerm(p.key)} />
                         {p.label}
                       </label>
                     ))}
@@ -95,7 +91,7 @@ function Page() {
           </TableRow></TableHeader>
           <TableBody>
             {isLoading && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
-            {users.map((u: any) => <UserRow key={u.id} u={u} reset={reset} setPerms={setPerms2 => setPerms2} setPermsFn={setPerms} del={del} refresh={refresh} />)}
+            {users.map((u: any) => <UserRow key={u.id} u={u} reset={reset} del={del} refresh={refresh} />)}
           </TableBody>
         </Table>
       </Card>
