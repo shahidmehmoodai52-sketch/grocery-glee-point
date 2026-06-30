@@ -142,6 +142,16 @@ function POSPage() {
     },
   });
 
+  const { data: persons = [] } = useQuery({
+    queryKey: ["expense_persons", "active"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("expense_persons")
+        .select("id,name,role").eq("is_active", true).order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
