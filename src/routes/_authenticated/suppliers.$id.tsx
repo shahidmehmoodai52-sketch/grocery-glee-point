@@ -14,7 +14,6 @@ import { fmtMoney } from "@/lib/format";
 
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
 
@@ -23,8 +22,8 @@ type Entry = {
   type: "purchase" | "payment" | "return";
   ref: string;
   note: string;
-  debit: number;   // we owe more
-  credit: number;  // we paid / refunded
+  debit: number;   // In  (+) — we owe more
+  credit: number;  // Out (−) — we paid / refunded
   purchase_id?: string;
   paid?: number;
   total?: number;
@@ -88,7 +87,6 @@ function Page() {
       }
     }
     for (const r of returns as any[]) {
-      // Return reduces what we owe (credit) by (total - refund). Refund itself is cash received — also credit.
       e.push({ date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
     }
     for (const pay of payments as any[]) {
@@ -104,7 +102,7 @@ function Page() {
     return true;
   });
 
-  // Opening balance = sum of all entries BEFORE the filter window so the running balance is continuous
+  // Single source of truth: ledger drives every number.
   const opening = entries
     .filter((x) => from && x.date < from)
     .reduce((s, x) => s + x.debit - x.credit, 0);
@@ -115,9 +113,11 @@ function Page() {
     return { ...x, balance: running };
   });
 
-  const totalDebit = filtered.reduce((s, x) => s + x.debit, 0);
-  const totalCredit = filtered.reduce((s, x) => s + x.credit, 0);
-  const outstanding = Number(supplier?.balance ?? 0);
+  const totalIn = filtered.reduce((s, x) => s + x.debit, 0);
+  const totalOut = filtered.reduce((s, x) => s + x.credit, 0);
+  const closing = opening + totalIn - totalOut;
+  const closingLabel = closing > 0 ? "Outstanding (we owe)" : closing < 0 ? "Advance (we paid extra)" : "Settled";
+  const closingTone = closing > 0 ? "destructive" : closing < 0 ? "success" : "primary";
 
   return (
     <div className="p-6 space-y-4">
@@ -142,7 +142,8 @@ function Page() {
               storeName: settings?.store_name ?? "Store", storeAddress: settings?.address ?? "", storePhone: settings?.phone ?? "",
               partyName: supplier?.name ?? "Supplier", partyPhone: supplier?.phone ?? "",
               heading: "Supplier Ledger", from, to, currency: sym,
-              rows, totalDebit, totalCredit, outstanding,
+              rows, opening, totalDebit: totalIn, totalCredit: totalOut,
+              owedLabel: "Outstanding (we owe)", advanceLabel: "Advance (we paid extra)",
             });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a"); a.href = url; a.download = `Ledger-${supplier?.name?.replace(/\s+/g,"_")}.pdf`; a.click();
@@ -171,9 +172,9 @@ function Page() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
-        <Stat icon={Receipt} label="Total purchases" value={fmtMoney(totalDebit, sym)} tone="primary" />
-        <Stat icon={TrendingDown} label="Paid" value={fmtMoney(totalCredit, sym)} tone="success" />
-        <Stat icon={Wallet} label="Outstanding (we owe)" value={fmtMoney(outstanding, sym)} tone={outstanding > 0 ? "destructive" : "success"} />
+        <Stat icon={Receipt} label="Total In (+)" value={fmtMoney(totalIn, sym)} tone="primary" />
+        <Stat icon={TrendingDown} label="Total Out (−)" value={fmtMoney(totalOut, sym)} tone="success" />
+        <Stat icon={Wallet} label={closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
       </div>
 
       <Card className="p-3 print-area">
@@ -188,13 +189,13 @@ function Page() {
               <TableHead>Type</TableHead>
               <TableHead>Ref</TableHead>
               <TableHead>Note</TableHead>
-              <TableHead className="text-right">Debit</TableHead>
-              <TableHead className="text-right">Credit</TableHead>
+              <TableHead className="text-right">In (+)</TableHead>
+              <TableHead className="text-right">Out (−)</TableHead>
               <TableHead className="text-right">Balance</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow className="bg-muted/30 font-medium">
+            <TableRow className="bg-muted/40 font-medium">
               <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
               <TableCell className="text-right">—</TableCell>
               <TableCell className="text-right">—</TableCell>
@@ -211,7 +212,6 @@ function Page() {
               return (
                 <Fragment key={i}>
                   <TableRow className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
-
                     <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Badge variant={x.type === "purchase" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
@@ -273,24 +273,20 @@ function Page() {
             })}
             {rows.length > 0 && (
               <>
-                <TableRow className="bg-muted/30 font-medium">
-                  <TableCell colSpan={6} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
-                  <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
-                </TableRow>
                 <TableRow className="bg-muted/40 font-semibold">
-                  <TableCell colSpan={4}>Period totals (Debits − Credits = Net)</TableCell>
-                  <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
-                  <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
-                  <TableCell className={`text-right ${totalDebit - totalCredit > 0 ? "text-destructive" : totalDebit - totalCredit < 0 ? "text-success" : ""}`}>{fmtMoney(totalDebit - totalCredit, sym)}</TableCell>
+                  <TableCell colSpan={4}>Period totals</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalIn, sym)}</TableCell>
+                  <TableCell className="text-right text-success">{fmtMoney(totalOut, sym)}</TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/5 text-xs">
                   <TableCell colSpan={7} className="text-muted-foreground text-right">
-                    {fmtMoney(opening, sym)} (Opening) + {fmtMoney(totalDebit, sym)} (Purchases) − {fmtMoney(totalCredit, sym)} (Paid) = <span className="font-semibold text-foreground">{fmtMoney(running, sym)}</span>
+                    {fmtMoney(opening, sym)} (Opening) + {fmtMoney(totalIn, sym)} (In) − {fmtMoney(totalOut, sym)} (Out) = <span className="font-semibold text-foreground">{fmtMoney(closing, sym)}</span>
                   </TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/10 font-bold">
-                  <TableCell colSpan={6}>Closing balance {running > 0 ? "(we owe)" : running < 0 ? "(advance)" : ""}</TableCell>
-                  <TableCell className={`text-right ${running > 0 ? "text-destructive" : running < 0 ? "text-success" : ""}`}>{fmtMoney(running, sym)}</TableCell>
+                  <TableCell colSpan={6}>Closing balance · {closingLabel}</TableCell>
+                  <TableCell className={`text-right ${closing > 0 ? "text-destructive" : closing < 0 ? "text-success" : ""}`}>{fmtMoney(closing, sym)}</TableCell>
                 </TableRow>
               </>
             )}
