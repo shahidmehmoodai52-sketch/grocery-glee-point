@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtDate } from "@/lib/format";
 import { Receipt } from "@/components/receipt";
-import { presetRange, type PresetKey } from "@/lib/date-presets";
+import { rangeFor, type DatePreset } from "@/lib/date-presets";
 
 export const Route = createFileRoute("/_authenticated/expense-persons/$id")({ component: Page });
 
