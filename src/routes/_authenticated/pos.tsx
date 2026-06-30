@@ -78,6 +78,7 @@ function POSPage() {
   const [reprintView, setReprintView] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showCost, setShowCost] = useState(false);
+  const [showStaff, setShowStaff] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [now, setNow] = useState(() => new Date());
   
