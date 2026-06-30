@@ -299,6 +299,8 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      qc.invalidateQueries({ queryKey: ["expense_persons"] });
     } catch (err: any) {
       toast.error(err.message ?? "Failed to complete sale");
     } finally {
