@@ -282,15 +282,18 @@ function Page() {
         <TabsContent value="persons">
           <Card className="p-3">
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead>Phone</TableHead><TableHead>Notes</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead>Phone</TableHead><TableHead>Notes</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
-                {persons.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No people added yet</TableCell></TableRow>}
+                {persons.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No people added yet</TableCell></TableRow>}
                 {persons.map((p: any) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{p.role ?? "—"}</Badge></TableCell>
                     <TableCell>{p.phone ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.notes ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild size="sm" variant="ghost"><Link to="/expense-persons/$id" params={{ id: p.id }}>Open ledger</Link></Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
