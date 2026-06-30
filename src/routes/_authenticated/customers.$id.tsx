@@ -239,14 +239,19 @@ function Page() {
                   <TableCell className="no-print"></TableCell>
                 </TableRow>
                 <TableRow className="bg-muted/40 font-semibold">
-                  <TableCell colSpan={4}>Period totals</TableCell>
+                  <TableCell colSpan={4}>Period totals (Debits − Credits = Net)</TableCell>
                   <TableCell className="text-right">{fmtMoney(totalDebit, sym)}</TableCell>
                   <TableCell className="text-right text-success">{fmtMoney(totalCredit, sym)}</TableCell>
-                  <TableCell className="text-right">{fmtMoney(totalDebit - totalCredit, sym)}</TableCell>
+                  <TableCell className={`text-right ${totalDebit - totalCredit > 0 ? "text-destructive" : totalDebit - totalCredit < 0 ? "text-success" : ""}`}>{fmtMoney(totalDebit - totalCredit, sym)}</TableCell>
                   <TableCell className="no-print"></TableCell>
                 </TableRow>
+                <TableRow className="bg-primary/5 text-xs">
+                  <TableCell colSpan={8} className="text-muted-foreground text-right">
+                    {fmtMoney(opening, sym)} (Opening) + {fmtMoney(totalDebit, sym)} (Debits) − {fmtMoney(totalCredit, sym)} (Credits) = <span className="font-semibold text-foreground">{fmtMoney(running, sym)}</span>
+                  </TableCell>
+                </TableRow>
                 <TableRow className="bg-primary/10 font-bold">
-                  <TableCell colSpan={6}>Closing balance (Opening + Period net)</TableCell>
+                  <TableCell colSpan={6}>Closing balance {running > 0 ? "(they owe)" : running < 0 ? "(advance / credit)" : ""}</TableCell>
                   <TableCell className={`text-right ${running > 0 ? "text-destructive" : running < 0 ? "text-success" : ""}`}>{fmtMoney(running, sym)}</TableCell>
                   <TableCell className="no-print"></TableCell>
                 </TableRow>
