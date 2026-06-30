@@ -379,7 +379,7 @@ function POSPage() {
         {/* Billing window */}
         <div className="flex flex-col min-h-0 flex-1 bg-background">
           {/* Scan / search bar + customer + payment */}
-          <div className="p-3 border-b grid grid-cols-1 md:grid-cols-[1fr_220px_160px_160px] gap-2 items-end">
+          <div className="p-3 border-b grid grid-cols-1 md:grid-cols-[1fr_200px_200px_140px_140px] gap-2 items-end">
             <div className="relative">
               <Label className="text-xs">Scan barcode / search item</Label>
               <div className="relative">
