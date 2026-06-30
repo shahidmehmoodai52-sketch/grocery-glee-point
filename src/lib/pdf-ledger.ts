@@ -6,8 +6,8 @@ export type LedgerRow = {
   type: string;
   ref: string;
   note?: string;
-  debit: number;
-  credit: number;
+  debit: number;   // In  (+)
+  credit: number;  // Out (−)
   balance: number;
 };
 
@@ -32,13 +32,23 @@ export function buildLedgerPdf(opts: {
   currency: string;
   rows: LedgerRow[];
   items?: LedgerItem[];
-  totalDebit: number;
-  totalCredit: number;
-  outstanding: number;
+  opening: number;
+  totalDebit: number;   // total In
+  totalCredit: number;  // total Out
+  /** Direction label used for non-zero balances. e.g. customer: "they owe" / "advance" ; supplier: "we owe" / "advance" */
+  owedLabel?: string;
+  advanceLabel?: string;
 }): Blob {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const sym = opts.currency;
   const money = (n: number) => `${sym}${Number(n || 0).toFixed(2)}`;
+  const closing = opts.opening + opts.totalDebit - opts.totalCredit;
+  const owed = opts.owedLabel ?? "Outstanding";
+  const advance = opts.advanceLabel ?? "Advance";
+  const closingLabel =
+    closing > 0 ? `${owed}: ${money(closing)}`
+    : closing < 0 ? `${advance}: ${money(Math.abs(closing))}`
+    : `Settled: ${money(0)}`;
 
   doc.setFontSize(16);
   doc.text(opts.storeName, 40, 40);
@@ -54,10 +64,13 @@ export function buildLedgerPdf(opts: {
   const periodStr = opts.from || opts.to ? `Period: ${opts.from || "—"} → ${opts.to || "—"}` : `Generated: ${new Date().toLocaleString()}`;
   doc.text(periodStr, 40, 138);
 
-  autoTable(doc, {
-    startY: 155,
-    head: [["Date", "Type", "Ref", "Note", "Debit", "Credit", "Balance"]],
-    body: opts.rows.map((r) => [
+  const body: any[] = [
+    [
+      { content: `Opening balance${opts.from ? ` (before ${opts.from})` : ""}`, colSpan: 4, styles: { fontStyle: "bold", fillColor: [241, 245, 249] } },
+      "", "",
+      { content: money(opts.opening), styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249] } },
+    ],
+    ...opts.rows.map((r) => [
       new Date(r.date).toLocaleDateString(),
       r.type,
       r.ref,
@@ -66,20 +79,33 @@ export function buildLedgerPdf(opts: {
       r.credit ? money(r.credit) : "",
       money(r.balance),
     ]),
-    foot: [[
-      "Totals", "", "", "",
-      money(opts.totalDebit),
-      money(opts.totalCredit),
-      money(opts.outstanding),
-    ]],
+  ];
+
+  autoTable(doc, {
+    startY: 155,
+    head: [["Date", "Type", "Ref", "Note", "In (+)", "Out (−)", "Balance"]],
+    body,
+    foot: [
+      [
+        { content: "Period totals", colSpan: 4, styles: { fontStyle: "bold" } },
+        { content: money(opts.totalDebit), styles: { halign: "right", fontStyle: "bold" } },
+        { content: money(opts.totalCredit), styles: { halign: "right", fontStyle: "bold" } },
+        "",
+      ],
+      [
+        { content: `Closing = Opening + In − Out`, colSpan: 6, styles: { fontStyle: "bold" } },
+        { content: money(closing), styles: { halign: "right", fontStyle: "bold" } },
+      ],
+    ],
     styles: { fontSize: 9 },
     headStyles: { fillColor: [30, 41, 59] },
     footStyles: { fillColor: [241, 245, 249], textColor: 20, fontStyle: "bold" },
+    columnStyles: { 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" } },
   });
 
   let y = (doc as any).lastAutoTable.finalY + 18;
-  doc.setFontSize(11);
-  doc.text(`Outstanding balance: ${money(opts.outstanding)}`, 40, y);
+  doc.setFontSize(12);
+  doc.text(closingLabel, 40, y);
   y += 18;
 
   if (opts.items && opts.items.length) {
