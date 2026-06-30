@@ -25,14 +25,14 @@ function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "$";
 
-  const [preset, setPreset] = useState<PresetKey>("all");
+  const [preset, setPreset] = useState<DatePreset>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [view, setView] = useState<any>(null);
 
-  const applyPreset = (k: PresetKey) => {
+  const applyPreset = (k: DatePreset) => {
     setPreset(k);
-    const r = presetRange(k);
+    const r = rangeFor(k);
     setFrom(r.from);
     setTo(r.to);
   };
@@ -90,16 +90,16 @@ function Page() {
         <div className="flex items-end gap-2 no-print">
           <div className="w-40">
             <Label className="text-xs">Quick range</Label>
-            <Select value={preset} onValueChange={(v) => applyPreset(v as PresetKey)}>
+            <Select value={preset} onValueChange={(v) => applyPreset(v as DatePreset)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="today">Today</SelectItem>
                 <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="thisWeek">This week</SelectItem>
-                <SelectItem value="lastWeek">Last week</SelectItem>
-                <SelectItem value="thisMonth">This month</SelectItem>
-                <SelectItem value="lastMonth">Last month</SelectItem>
+                <SelectItem value="this_week">This week</SelectItem>
+                <SelectItem value="last_week">Last week</SelectItem>
+                <SelectItem value="this_month">This month</SelectItem>
+                <SelectItem value="last_month">Last month</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -171,7 +171,7 @@ function Page() {
       <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Invoice {view?.invoice_no}</DialogTitle></DialogHeader>
-          {view && <Receipt sale={view} settings={settings} />}
+          {view && <Receipt invoice={view} settings={settings} />}
           <div className="flex justify-end gap-2 no-print">
             <Button variant="outline" onClick={() => setView(null)}>Close</Button>
             <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Print</Button>
