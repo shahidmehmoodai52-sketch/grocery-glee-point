@@ -92,6 +92,23 @@ function Page() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [sales]);
 
+  const q = search.trim().toLowerCase();
+  const filteredInvoices = useMemo(() => {
+    if (!q) return sales as any[];
+    return (sales as any[]).filter((s) =>
+      String(s.invoice_no ?? "").toLowerCase().includes(q) ||
+      String(s.customers?.name ?? "walk-in").toLowerCase().includes(q) ||
+      String(s.payment_method ?? "").toLowerCase().includes(q) ||
+      String(Number(s.total).toFixed(2)).includes(q) ||
+      (s.sale_items ?? []).some((i: any) => String(i.name).toLowerCase().includes(q))
+    );
+  }, [sales, q]);
+  const filteredProducts = useMemo(() => {
+    if (!q) return productSales;
+    return productSales.filter((p) => p.name.toLowerCase().includes(q));
+  }, [productSales, q]);
+
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-end justify-between flex-wrap gap-3">
