@@ -28,6 +28,7 @@ import { Route as AuthenticatedBackupRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedSuppliersIndexRouteImport } from './routes/_authenticated/suppliers.index'
 import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authenticated/customers.index'
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers.$id'
+import { Route as AuthenticatedExpensePersonsIdRouteImport } from './routes/_authenticated/expense-persons.$id'
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
 
 const AuthRoute = AuthRouteImport.update({
@@ -129,6 +130,12 @@ const AuthenticatedSuppliersIdRoute =
     path: '/suppliers/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedExpensePersonsIdRoute =
+  AuthenticatedExpensePersonsIdRouteImport.update({
+    id: '/expense-persons/$id',
+    path: '/expense-persons/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCustomersIdRoute =
   AuthenticatedCustomersIdRouteImport.update({
     id: '/customers/$id',
@@ -153,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
+  '/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/suppliers/': typeof AuthenticatedSuppliersIndexRoute
@@ -174,6 +182,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
+  '/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/suppliers': typeof AuthenticatedSuppliersIndexRoute
@@ -197,6 +206,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
+  '/_authenticated/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/_authenticated/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/suppliers/': typeof AuthenticatedSuppliersIndexRoute
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/users'
     | '/customers/$id'
+    | '/expense-persons/$id'
     | '/suppliers/$id'
     | '/customers/'
     | '/suppliers/'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/users'
     | '/customers/$id'
+    | '/expense-persons/$id'
     | '/suppliers/$id'
     | '/customers'
     | '/suppliers'
@@ -263,6 +275,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/users'
     | '/_authenticated/customers/$id'
+    | '/_authenticated/expense-persons/$id'
     | '/_authenticated/suppliers/$id'
     | '/_authenticated/customers/'
     | '/_authenticated/suppliers/'
@@ -409,6 +422,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSuppliersIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/expense-persons/$id': {
+      id: '/_authenticated/expense-persons/$id'
+      path: '/expense-persons/$id'
+      fullPath: '/expense-persons/$id'
+      preLoaderRoute: typeof AuthenticatedExpensePersonsIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/customers/$id': {
       id: '/_authenticated/customers/$id'
       path: '/customers/$id'
@@ -434,6 +454,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedCustomersIdRoute: typeof AuthenticatedCustomersIdRoute
+  AuthenticatedExpensePersonsIdRoute: typeof AuthenticatedExpensePersonsIdRoute
   AuthenticatedSuppliersIdRoute: typeof AuthenticatedSuppliersIdRoute
   AuthenticatedCustomersIndexRoute: typeof AuthenticatedCustomersIndexRoute
   AuthenticatedSuppliersIndexRoute: typeof AuthenticatedSuppliersIndexRoute
@@ -454,6 +475,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedCustomersIdRoute: AuthenticatedCustomersIdRoute,
+  AuthenticatedExpensePersonsIdRoute: AuthenticatedExpensePersonsIdRoute,
   AuthenticatedSuppliersIdRoute: AuthenticatedSuppliersIdRoute,
   AuthenticatedCustomersIndexRoute: AuthenticatedCustomersIndexRoute,
   AuthenticatedSuppliersIndexRoute: AuthenticatedSuppliersIndexRoute,
