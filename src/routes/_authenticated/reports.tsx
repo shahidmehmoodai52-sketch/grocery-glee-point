@@ -1,21 +1,21 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Printer, TrendingUp, TrendingDown, Wallet, Users } from "lucide-react";
+import { Printer, TrendingUp, TrendingDown, Wallet, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: Page });
 
-function startOfMonth() {
-  const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString().slice(0, 10);
-}
+function startOfMonth() { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString().slice(0, 10); }
 function today() { return new Date().toISOString().slice(0, 10); }
 
 function Page() {
@@ -23,14 +23,18 @@ function Page() {
   const sym = settings?.currency_symbol ?? "$";
   const [from, setFrom] = useState(startOfMonth());
   const [to, setTo] = useState(today());
+  const [tab, setTab] = useState("pnl");
 
   const range = { from: new Date(from + "T00:00:00").toISOString(), to: new Date(to + "T23:59:59").toISOString() };
 
   const { data: sales = [] } = useQuery({
-    queryKey: ["report-sales", from, to],
+    queryKey: ["report-sales-full", from, to],
     queryFn: async () =>
-      (await supabase.from("sales").select("subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method")
-        .gte("created_at", range.from).lte("created_at", range.to)).data ?? [],
+      (await supabase
+        .from("sales")
+        .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
+        .gte("created_at", range.from).lte("created_at", range.to)
+        .order("created_at", { ascending: false })).data ?? [],
   });
   const { data: purchases = [] } = useQuery({
     queryKey: ["report-purchases", from, to],
@@ -41,12 +45,10 @@ function Page() {
   const { data: expenses = [] } = useQuery({
     queryKey: ["report-expenses", from, to],
     queryFn: async () =>
-      (await supabase.from("expenses")
-        .select("amount,category,description,expense_date,method,expense_persons(name)")
-        .gte("expense_date", from).lte("expense_date", to)
-        .order("expense_date", { ascending: false })).data ?? [],
+      (await supabase.from("expenses").select("amount,category,expense_date").gte("expense_date", from).lte("expense_date", to)).data ?? [],
   });
 
+  // ---- aggregates
   const revenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
   const cogs = sales.reduce((s, x: any) => s + Number(x.cost_total), 0);
   const grossProfit = revenue - cogs;
@@ -54,23 +56,47 @@ function Page() {
   const totalSales = sales.reduce((s, x: any) => s + Number(x.total), 0);
   const totalPurchases = purchases.reduce((s, x: any) => s + Number(x.total), 0);
   const cashIn = sales.reduce((s, x: any) => s + Number(x.paid), 0);
-  const cashOut = purchases.reduce((s, x: any) => s + Number(x.paid), 0);
   const creditOut = sales.filter((x: any) => x.status === "credit").reduce((s, x: any) => s + (Number(x.total) - Number(x.paid)), 0);
-  const todayStr = new Date().toISOString().slice(0, 10);
   const expensesPeriod = expenses.reduce((s, x: any) => s + Number(x.amount), 0);
-  const expensesToday = expenses.filter((x: any) => x.expense_date === todayStr).reduce((s, x: any) => s + Number(x.amount), 0);
   const netProfit = grossProfit - expensesPeriod;
-  const expByCategory = Array.from(
-    expenses.reduce((m: Map<string, number>, x: any) => m.set(x.category, (m.get(x.category) ?? 0) + Number(x.amount)), new Map()),
-    ([name, value]) => ({ name, value: value as number }),
-  ).sort((a, b) => b.value - a.value);
+
+  // Daily sale report
+  const dailySales = useMemo(() => {
+    const map = new Map<string, { date: string; invoices: number; qty: number; revenue: number; tax: number; total: number; profit: number }>();
+    for (const s of sales as any[]) {
+      const d = new Date(s.created_at).toISOString().slice(0, 10);
+      const rev = Number(s.subtotal) - Number(s.discount);
+      const profit = rev - Number(s.cost_total);
+      const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
+      const cur = map.get(d) ?? { date: d, invoices: 0, qty: 0, revenue: 0, tax: 0, total: 0, profit: 0 };
+      cur.invoices += 1; cur.qty += qty; cur.revenue += rev; cur.tax += Number(s.tax); cur.total += Number(s.total); cur.profit += profit;
+      map.set(d, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+  }, [sales]);
+
+  // Product-wise
+  const productSales = useMemo(() => {
+    const map = new Map<string, { name: string; qty: number; revenue: number; cost: number; profit: number }>();
+    for (const s of sales as any[]) {
+      for (const it of s.sale_items ?? []) {
+        const key = it.product_id || it.name;
+        const cur = map.get(key) ?? { name: it.name, qty: 0, revenue: 0, cost: 0, profit: 0 };
+        const rev = Number(it.line_total);
+        const cost = Number(it.cost) * Number(it.qty);
+        cur.qty += Number(it.qty); cur.revenue += rev; cur.cost += cost; cur.profit += rev - cost;
+        map.set(key, cur);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  }, [sales]);
 
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Reports — Profit & Loss</h1>
-          <p className="text-sm text-muted-foreground">Period summary across sales and purchases</p>
+          <h1 className="text-2xl font-semibold">Reports</h1>
+          <p className="text-sm text-muted-foreground">Sales, profit, invoice &amp; product breakdowns</p>
         </div>
         <div className="flex items-end gap-2 no-print">
           <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
@@ -83,64 +109,199 @@ function Page() {
         <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Cost of goods" value={fmtMoney(cogs, sym)} tone="destructive" />
         <Stat icon={Wallet} label="Gross profit" value={fmtMoney(grossProfit, sym)} tone="success" />
-        <Stat icon={TrendingDown} label={`Expenses today / period`} value={`${fmtMoney(expensesToday, sym)} / ${fmtMoney(expensesPeriod, sym)}`} tone="warning" />
+        <Stat icon={TrendingDown} label="Expenses (period)" value={fmtMoney(expensesPeriod, sym)} tone="warning" />
       </div>
 
-      <div id="printable-invoice" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-5">
-          <h2 className="font-semibold mb-3">Profit & Loss Statement</h2>
-          <Table>
-            <TableBody>
-              <Row label="Sales (net of discount)" value={fmtMoney(revenue, sym)} />
-              <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} />
-              <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold />
-              <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
-              <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted />
-              <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent />
-            </TableBody>
-          </Table>
-          <div className="text-xs text-muted-foreground mt-3">
-            {from} → {to} · {sales.length} sales, {purchases.length} purchases, {expenses.length} expenses
-          </div>
-        </Card>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="no-print">
+          <TabsTrigger value="pnl">P&amp;L</TabsTrigger>
+          <TabsTrigger value="sales">Sale report</TabsTrigger>
+          <TabsTrigger value="profit">Sale &amp; profit</TabsTrigger>
+          <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
+          <TabsTrigger value="product">Product-wise</TabsTrigger>
+        </TabsList>
 
-        <Card className="p-5">
-          <h2 className="font-semibold mb-3">Cash Flow</h2>
-          <Table>
-            <TableBody>
-              <Row label="Cash received from sales" value={fmtMoney(cashIn, sym)} />
-              <Row label="Cash paid for purchases" value={`(${fmtMoney(cashOut, sym)})`} />
-              <Row label="Cash paid for expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
-              <Row label="Net cash flow" value={fmtMoney(cashIn - cashOut - expensesPeriod, sym)} bold />
-              <Row label="Credit outstanding" value={fmtMoney(creditOut, sym)} muted />
-              <Row label="Total purchases" value={fmtMoney(totalPurchases, sym)} muted />
-            </TableBody>
-          </Table>
-        </Card>
+        <TabsContent value="pnl">
+          <Card className="p-5">
+            <h2 className="font-semibold mb-3">Profit &amp; Loss Statement</h2>
+            <Table>
+              <TableBody>
+                <Row label="Sales (net of discount)" value={fmtMoney(revenue, sym)} />
+                <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} />
+                <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold />
+                <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
+                <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted />
+                <Row label="Credit outstanding" value={fmtMoney(creditOut, sym)} muted />
+                <Row label="Total purchases (period)" value={fmtMoney(totalPurchases, sym)} muted />
+                <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent />
+              </TableBody>
+            </Table>
+            <div className="text-xs text-muted-foreground mt-3">{from} → {to} · {sales.length} sales, {purchases.length} purchases, {expenses.length} expenses</div>
+          </Card>
+        </TabsContent>
 
-        <Card className="p-5 md:col-span-2">
-          <h2 className="font-semibold mb-3">Expenses breakdown by category</h2>
-          <Table>
-            <TableBody>
-              {expByCategory.length === 0 && (
-                <TableRow><TableCell className="text-center text-muted-foreground py-4">No expenses in this period</TableCell></TableRow>
-              )}
-              {expByCategory.map((c) => (
-                <Row key={c.name} label={<span className="capitalize">{c.name}</span> as any} value={fmtMoney(c.value, sym)} />
-              ))}
-              <Row label="Total expenses" value={fmtMoney(expensesPeriod, sym)} bold />
-            </TableBody>
-          </Table>
-        </Card>
-      </div>
+        <TabsContent value="sales">
+          <Card className="p-3">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Date</TableHead><TableHead className="text-right">Invoices</TableHead>
+                <TableHead className="text-right">Items qty</TableHead><TableHead className="text-right">Revenue</TableHead>
+                <TableHead className="text-right">Tax</TableHead><TableHead className="text-right">Total</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {dailySales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No sales</TableCell></TableRow>}
+                {dailySales.map((d) => (
+                  <TableRow key={d.date}>
+                    <TableCell>{d.date}</TableCell>
+                    <TableCell className="text-right">{d.invoices}</TableCell>
+                    <TableCell className="text-right">{d.qty}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(d.revenue, sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(d.tax, sym)}</TableCell>
+                    <TableCell className="text-right font-medium">{fmtMoney(d.total, sym)}</TableCell>
+                  </TableRow>
+                ))}
+                {dailySales.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right">{dailySales.reduce((a, b) => a + b.invoices, 0)}</TableCell>
+                    <TableCell className="text-right">{dailySales.reduce((a, b) => a + b.qty, 0)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(revenue, sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(taxCollected, sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(totalSales, sym)}</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="profit">
+          <Card className="p-3">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Date</TableHead><TableHead className="text-right">Invoices</TableHead>
+                <TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Cost</TableHead>
+                <TableHead className="text-right">Profit</TableHead><TableHead className="text-right">Margin %</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {dailySales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
+                {dailySales.map((d) => {
+                  const cost = d.revenue - d.profit;
+                  const margin = d.revenue ? (d.profit / d.revenue) * 100 : 0;
+                  return (
+                    <TableRow key={d.date}>
+                      <TableCell>{d.date}</TableCell>
+                      <TableCell className="text-right">{d.invoices}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(d.revenue, sym)}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(cost, sym)}</TableCell>
+                      <TableCell className="text-right text-success font-medium">{fmtMoney(d.profit, sym)}</TableCell>
+                      <TableCell className="text-right">{margin.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+                {dailySales.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right">{dailySales.reduce((a, b) => a + b.invoices, 0)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(revenue, sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(cogs, sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(grossProfit, sym)}</TableCell>
+                    <TableCell className="text-right">{revenue ? ((grossProfit / revenue) * 100).toFixed(1) : "0.0"}%</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="invoice">
+          <Card className="p-3">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
+                <TableHead>Method</TableHead><TableHead className="text-right">Items</TableHead>
+                <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Profit</TableHead>
+                <TableHead>Status</TableHead><TableHead></TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {sales.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {sales.map((s: any) => {
+                  const profit = (Number(s.subtotal) - Number(s.discount)) - Number(s.cost_total);
+                  const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
+                      <TableCell className="text-sm">{new Date(s.created_at).toLocaleString()}</TableCell>
+                      <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
+                      <TableCell className="capitalize">{s.payment_method}</TableCell>
+                      <TableCell className="text-right">{qty}</TableCell>
+                      <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
+                      <TableCell className="text-right text-success">{fmtMoney(profit, sym)}</TableCell>
+                      <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
+                      <TableCell className="text-right"><Button asChild variant="ghost" size="icon"><Link to="/sales"><Eye className="h-4 w-4" /></Link></Button></TableCell>
+                    </TableRow>
+                  );
+                })}
+                {sales.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell colSpan={5}>Total ({sales.length} invoices)</TableCell>
+                    <TableCell className="text-right">{fmtMoney(totalSales, sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(grossProfit, sym)}</TableCell>
+                    <TableCell colSpan={2} />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="product">
+          <Card className="p-3">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead className="text-right">Qty sold</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+                <TableHead className="text-right">Cost</TableHead>
+                <TableHead className="text-right">Profit</TableHead>
+                <TableHead className="text-right">Margin %</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {productSales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
+                {productSales.map((p, i) => {
+                  const margin = p.revenue ? (p.profit / p.revenue) * 100 : 0;
+                  return (
+                    <TableRow key={i}>
+                      <TableCell>{p.name}</TableCell>
+                      <TableCell className="text-right">{p.qty}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(p.revenue, sym)}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(p.cost, sym)}</TableCell>
+                      <TableCell className="text-right text-success font-medium">{fmtMoney(p.profit, sym)}</TableCell>
+                      <TableCell className="text-right">{margin.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+                {productSales.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total ({productSales.length} items)</TableCell>
+                    <TableCell className="text-right">{productSales.reduce((a, b) => a + b.qty, 0)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(productSales.reduce((a, b) => a + b.revenue, 0), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(productSales.reduce((a, b) => a + b.cost, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(productSales.reduce((a, b) => a + b.profit, 0), sym)}</TableCell>
+                    <TableCell />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
 function Stat({ icon: Icon, label, value, tone }: any) {
-  const colors: Record<string, string> = {
-    primary: "text-primary", success: "text-success", destructive: "text-destructive", warning: "text-warning",
-  };
+  const colors: Record<string, string> = { primary: "text-primary", success: "text-success", destructive: "text-destructive", warning: "text-warning" };
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5" />{label}</div>
@@ -152,7 +313,7 @@ function Stat({ icon: Icon, label, value, tone }: any) {
 function Row({ label, value, bold, muted, accent }: any) {
   return (
     <TableRow>
-      <TableCell className={`${muted ? "text-muted-foreground" : ""}`}>{label}</TableCell>
+      <TableCell className={muted ? "text-muted-foreground" : ""}>{label}</TableCell>
       <TableCell className={`text-right ${bold ? "font-semibold" : ""} ${accent ? "text-primary text-lg" : ""}`}>{value}</TableCell>
     </TableRow>
   );
