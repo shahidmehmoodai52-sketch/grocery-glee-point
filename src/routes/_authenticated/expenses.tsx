@@ -257,9 +257,17 @@ function Page() {
               <TableHeader><TableRow><TableHead>Person</TableHead><TableHead className="text-right">Total spent</TableHead></TableRow></TableHeader>
               <TableBody>
                 {totals.byPerson.length === 0 && <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
-                {totals.byPerson.map((p) => (
-                  <TableRow key={p.name}><TableCell className="font-medium">{p.name}</TableCell><TableCell className="text-right font-semibold">{fmtMoney(p.value, sym)}</TableCell></TableRow>
-                ))}
+                {totals.byPerson.map((p) => {
+                  const pp = persons.find((x: any) => x.name === p.name);
+                  return (
+                    <TableRow key={p.name}>
+                      <TableCell className="font-medium">
+                        {pp ? <Link to="/expense-persons/$id" params={{ id: pp.id }} className="hover:underline">{p.name}</Link> : p.name}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">{fmtMoney(p.value, sym)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </Card>
