@@ -6,10 +6,22 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+// Electron desktop build uses the Nitro `node-server` preset so we can spawn a
+// local Node server from main.cjs. Enable via NITRO_PRESET=node-server (see the
+// `electron:build` script). Default cloud build stays on cloudflare-module.
+const nitroPreset = process.env.NITRO_PRESET;
+
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  ...(nitroPreset
+    ? {
+        nitro: {
+          preset: nitroPreset,
+        },
+      }
+    : {}),
 });
