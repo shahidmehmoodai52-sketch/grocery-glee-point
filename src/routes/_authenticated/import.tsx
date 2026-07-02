@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { Upload, FileDown, CheckCircle2, AlertCircle, Loader2, Database, FileSpreadsheet, Wand2 } from "lucide-react";
@@ -584,6 +584,8 @@ function SingleMergedFile() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ products: number; barcodes: number; failed: number; errors: string[] } | null>(null);
+  const [autoSave, setAutoSave] = useState(true);
+  const autoRanFor = useRef<string | null>(null);
 
   const FIELDS = [
     { key: "name", label: "Item Name", required: true },
@@ -722,6 +724,19 @@ function SingleMergedFile() {
     else toast.error(`${prodOk} imported, ${prodFail} failed`);
   };
 
+  // Auto-save: as soon as file is parsed and required "name" column is mapped,
+  // run the import once automatically (unless user turned auto-save off).
+  useEffect(() => {
+    if (!autoSave || !file || busy) return;
+    if (!mapping.name) return;
+    if (!grouped.length) return;
+    const key = `${file.name}:${file.rows.length}`;
+    if (autoRanFor.current === key) return;
+    autoRanFor.current = key;
+    runImport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, mapping, grouped, autoSave]);
+
   return (
     <div className="space-y-4">
       <Alert>
@@ -738,10 +753,14 @@ function SingleMergedFile() {
           <h3 className="font-medium">Step 1 — Upload file</h3>
           <p className="text-xs text-muted-foreground">{file ? `${file.name} · ${file.rows.length} rows` : "Excel (.xlsx, .xls) ya CSV"}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
+            <input type="checkbox" checked={autoSave} onChange={(e) => setAutoSave(e.target.checked)} />
+            Auto-save on upload
+          </label>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files?.[0] && pickFile(e.target.files[0])} />
           <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />Choose file</Button>
-          {file && <Button variant="outline" onClick={() => { setFile(null); setMapping({}); setResult(null); }}>Clear</Button>}
+          {file && <Button variant="outline" onClick={() => { setFile(null); setMapping({}); setResult(null); autoRanFor.current = null; }}>Clear</Button>}
         </div>
       </Card>
 

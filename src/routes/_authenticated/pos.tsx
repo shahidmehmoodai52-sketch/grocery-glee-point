@@ -95,7 +95,7 @@ function POSPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id,name,sku,barcode,sell_price,cost_price,stock,unit")
+        .select("id,name,sku,barcode,sell_price,cost_price,stock,unit,category")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -160,10 +160,11 @@ function POSPage() {
       .filter((p) => {
         if (p.name.toLowerCase().includes(q)) return true;
         if ((p.sku ?? "").toLowerCase().includes(q)) return true;
+        if ((p.category ?? "").toLowerCase().includes(q)) return true;
         const bcs = barcodesByProduct[p.id] ?? [];
         return bcs.some((bc) => bc.toLowerCase().includes(q));
       })
-      .slice(0, 8);
+      .slice(0, 12);
   }, [products, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
@@ -440,7 +441,7 @@ function POSPage() {
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate">{p.name}</div>
                         <div className="text-[11px] text-muted-foreground font-mono">
-                          {p.sku ?? "—"} · stock {fmtQty(p.stock)} {p.unit}
+                          {p.sku ?? "—"}{p.category ? ` · ${p.category}` : ""} · stock {fmtQty(p.stock)} {p.unit}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
