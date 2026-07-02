@@ -441,7 +441,7 @@ function POSPage() {
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate">{p.name}</div>
                         <div className="text-[11px] text-muted-foreground font-mono">
-                          {p.sku ?? "—"} · stock {fmtQty(p.stock)} {p.unit}
+                          {p.sku ?? "—"}{p.category ? ` · ${p.category}` : ""} · stock {fmtQty(p.stock)} {p.unit}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
