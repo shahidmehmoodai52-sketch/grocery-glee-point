@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Store, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const goToApp = async () => {
+  const goToApp = useCallback(async () => {
     try {
       await navigate({ to: "/pos", replace: true });
     } finally {
@@ -30,13 +30,13 @@ function AuthPage() {
       // It also clears any stale auth-page render after Supabase stores the session.
       window.location.replace("/pos");
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) void goToApp();
     });
-  }, []);
+  }, [goToApp]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
