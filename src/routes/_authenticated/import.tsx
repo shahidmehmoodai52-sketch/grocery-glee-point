@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { Upload, FileDown, CheckCircle2, AlertCircle, Loader2, Database, FileSpreadsheet, Wand2 } from "lucide-react";
@@ -584,6 +584,8 @@ function SingleMergedFile() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ products: number; barcodes: number; failed: number; errors: string[] } | null>(null);
+  const [autoSave, setAutoSave] = useState(true);
+  const autoRanFor = useRef<string | null>(null);
 
   const FIELDS = [
     { key: "name", label: "Item Name", required: true },
