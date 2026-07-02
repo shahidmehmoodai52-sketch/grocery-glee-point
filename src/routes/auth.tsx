@@ -22,11 +22,21 @@ function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const goToApp = async () => {
+    try {
+      await navigate({ to: "/pos", replace: true });
+    } finally {
+      // Electron + browser preview both work reliably with a hard route handoff.
+      // It also clears any stale auth-page render after Supabase stores the session.
+      window.location.replace("/pos");
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/pos", replace: true });
+      if (data.session) void goToApp();
     });
-  }, [navigate]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +55,7 @@ function AuthPage() {
         // Auto-confirm is enabled → a session is returned immediately.
         if (data.session) {
           toast.success("Account created. Signing you in…");
-          navigate({ to: "/pos", replace: true });
+          await goToApp();
         } else {
           toast.success("Account created. You can sign in now.");
           setMode("signin");
@@ -53,7 +63,7 @@ function AuthPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: "/pos", replace: true });
+        await goToApp();
       }
     } catch (err: any) {
       toast.error(err.message ?? "Authentication failed");
@@ -71,7 +81,7 @@ function AuthPage() {
       return;
     }
     if (result.redirected) return;
-    navigate({ to: "/pos", replace: true });
+    await goToApp();
   };
 
   return (
