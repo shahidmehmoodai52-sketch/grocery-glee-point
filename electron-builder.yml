@@ -25,6 +25,6 @@ nsis:
   shortcutName: Grocery POS
 publish:
   - provider: github
-    owner: REPLACE_WITH_GITHUB_OWNER   # e.g. your github username or org
-    repo: REPLACE_WITH_RELEASES_REPO   # a repo you own; can be public
+    owner: shahidmehmoodai52-sketch
+    repo: grocery-glee-point
     releaseType: release
