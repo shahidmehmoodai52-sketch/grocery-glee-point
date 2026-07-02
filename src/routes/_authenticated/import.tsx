@@ -99,13 +99,15 @@ function Page() {
         <ExportAllButton />
       </div>
 
-      <Tabs defaultValue="smart">
+      <Tabs defaultValue="single">
         <TabsList>
-          <TabsTrigger value="smart"><Wand2 className="h-4 w-4 mr-1" />Smart merge (Stock + Barcode)</TabsTrigger>
+          <TabsTrigger value="single"><FileSpreadsheet className="h-4 w-4 mr-1" />Merged file (multi-barcode)</TabsTrigger>
+          <TabsTrigger value="smart"><Wand2 className="h-4 w-4 mr-1" />Smart merge (2 files)</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
         </TabsList>
+        <TabsContent value="single" className="mt-4"><SingleMergedFile /></TabsContent>
         <TabsContent value="smart" className="mt-4"><SmartMerge /></TabsContent>
         {(["products", "customers", "suppliers"] as EntityKey[]).map((k) => (
           <TabsContent key={k} value={k} className="mt-4">
