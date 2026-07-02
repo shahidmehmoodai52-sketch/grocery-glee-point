@@ -1,78 +1,71 @@
-# Windows Offline POS — Full Rewrite Plan
 
-Aap ne jo choose kiya (sab offline + LAN multi-PC + cloud mirror + PIN + big-bang) ye current web app ke saath ek **parallel desktop product** hai. Iska matlab poore backend layer ko dobara wire karna hoga. Neeche exact scope, phases, aur trade-offs hain.
+# Offline-First SaaS POS — Rebuild Plan
+
+Pichla Phase 1 (local Postgres + LAN Fastify) delete kar ke ek **true offline-first SaaS** banayenge. Cloud (Lovable) primary rahega, har PC apna local cache + write queue rakhega, net wapas aate hi auto-sync. GitHub Releases se auto-update.
 
 ## Architecture
 
 ```text
-┌──────────────────────────────────────────────────────┐
-│  Server PC (Mart counter / office)                   │
-│  ┌────────────────────────────────────────────────┐  │
-│  │ Electron app                                   │  │
-│  │  ├─ React UI (current app, repointed)          │  │
-│  │  ├─ Local Node API server (port 5544)          │  │
-│  │  │   └─ same RPCs: complete_sale, purchase...  │  │
-│  │  ├─ Bundled PostgreSQL 16 (data dir in %APPDATA%)│ │
-│  │  └─ Sync worker (local → Lovable Cloud, hourly)│  │
-│  └────────────────────────────────────────────────┘  │
-│               ▲ LAN (192.168.x.x:5544)               │
-└───────────────┼──────────────────────────────────────┘
-                │
-   ┌────────────┼────────────┐
-   ▼            ▼            ▼
-Cashier PC   Cashier PC   Owner PC   ← Electron in "client" mode,
-(POS only)   (POS only)  (all tabs)    hits server PC's API over LAN
+┌─ Windows .exe (Electron, auto-update on)  ─────────────┐
+│                                                        │
+│  Existing React app (kuch nahi todna)                  │
+│    │                                                   │
+│    ├─ Supabase client (unchanged)                      │
+│    │                                                   │
+│    └─ NEW: offline layer (src/lib/offline/)            │
+│        ├─ cache.ts     → Dexie/IndexedDB mirror of     │
+│        │                 products, barcodes, customers,│
+│        │                 suppliers, expense_persons,   │
+│        │                 store_settings, user_perms    │
+│        │                                               │
+│        ├─ outbox.ts    → queue of pending writes       │
+│        │                 (sales, purchases, returns,   │
+│        │                 expenses, payments, edits)    │
+│        │                                               │
+│        ├─ sync.ts      → net-status listener; drain    │
+│        │                 outbox to Supabase RPCs in    │
+│        │                 order; re-pull cache on push  │
+│        │                                               │
+│        └─ data-client  → thin wrapper: online = direct │
+│                          Supabase, offline = cache+queue│
+│                                                        │
+│  Electron shell (electron/main.cjs)                    │
+│    ├─ BrowserWindow loads local dist/ (works offline)  │
+│    ├─ electron-updater → GitHub Releases feed          │
+│    └─ Update UI: "Update ready, restart"               │
+└────────────────────────────────────────────────────────┘
 ```
 
-## What changes in the codebase
+## Delivery in stages (aap ke big-bang ke andar visible chunks)
 
-**Backend replacement**
-- New folder `electron/` — main process, local Postgres launcher, IPC bridge, LAN HTTP server.
-- New folder `server/` — Fastify API that mirrors every Supabase RPC (`complete_sale`, `complete_purchase`, `complete_sale_return`, `complete_purchase_return`, `record_payment`, `has_role`, `has_permission`) 1:1 in Postgres running locally. Same SQL bodies reused — Postgres bundled.
-- Data client swap: `src/integrations/supabase/client.ts` ko ek thin adapter se replace karenge jo build-time env pe decide kare:
-  - `VITE_MODE=desktop` → `http://<server-ip>:5544` pe fetch
-  - `VITE_MODE=web` → current Supabase (development ke liye chalta rahega)
-  This way saare 30+ route files ko haath nahi lagana padta.
+| # | Stage | End state |
+|---|-------|-----------|
+| A | **Cleanup + Electron shell + auto-updater** | Purana Phase 1 code deleted. `pnpm dev:electron` chalne se app khulti hai. `pnpm build:win` se .exe banti hai. GitHub release publish karo → installed app auto-download karke restart pe update ho jati hai. |
+| B | **Offline cache (read-side)** | Dexie schema, initial pull, background refresh. Net band ho to products/customers/suppliers/settings sab load hote hain — POS UI khulti hai, search chalta hai, purani sales dikhti hain. |
+| C | **Outbox queue (write-side)** | Sale complete, purchase, return, expense, payment — sab offline mode me local queue me jate hain, temporary local ID milta hai, stock local cache me adjust hota hai. UI me "Pending sync: 3" badge. |
+| D | **Sync worker + conflict rules** | Net wapas aate hi outbox drain (FIFO), server RPCs same use hote hain (`complete_sale` etc.), success pe local ID → real UUID map, cache refresh. Fail hone pe row `sync_error` state me jaati hai, user manually retry kar sakta hai. |
+| E | **Auto-update polish + installer signing hints** | `checkForUpdates` on app start + har 4 ghante, download progress toast, "Restart to install" button. `desktop-docs/RELEASE.md` — kaise GitHub token set karke `pnpm release` chalana hai. |
 
-**Auth rewrite**
-- Supabase Auth hata denge desktop build me. Naya `users` table (local Postgres) with `pin_hash` (bcrypt), `role`, `permissions`.
-- Login screen: staff name select → 4-digit PIN → local server verifies → JWT (short-lived) issue.
-- Same permissions system chalega (has_permission), sirf auth source badalta hai.
+Har stage ke baad aap test karke "next" bolen.
 
-**LAN discovery**
-- Server PC installer pe user IP set kare (ya auto-detect via mDNS/bonjour).
-- Cashier installer pehli baar launch pe server IP puchega, `%APPDATA%\pos\config.json` me save.
-- Last-write-wins: har row me `updated_at` timestamp, koi conflict resolution nahi (aap ne yehi choose kiya).
+## Trade-offs (senior-dev honesty)
 
-**Cloud mirror**
-- Hourly cron in main process: local Postgres → `pg_dump --data-only` → chunked upload to Lovable Cloud tables via existing RPCs.
-- Restore utility: agar server PC crash ho, naya install → "Restore from cloud" button → cloud se pull.
+- **Realtime multi-user offline pe kaam nahi karega** — ye by design hai. Do PCs jab dono offline hon aur same item sell karen, dono ka stock local -1 hoga; net aane pe dono queue push hongi, server pe stock -2 ho jayega. Agar stock neeche 0 chala jaye to warning toast dikhayenge, block nahi karenge (grocery mart me realistic hai — bhai actual stock physical hai, digital sirf tracking hai).
+- **Invoice numbers offline me temporary honge** (`OFFLINE-<timestamp>`), sync ke baad server ka real invoice number replace ho jayega. Print receipt me clearly marked "Pending sync" jab tak sync na ho.
+- **Returns offline me** original sale ka reference chahiye — agar wo bhi offline queue me hai to return bhi queue me chala jayega aur sync order maintain hoga (sale pehle, phir return).
+- **Purchases WAC (weighted average cost)** offline me local calc karenge; sync pe server dobara calc karega — chhota discrepancy ho sakta hai agar do PCs ne offline purchase kiya. Owner dashboard me "Cost drift" alert dikha denge agar variance >2%.
+- **Auto-update ke liye GitHub repo public ho ya private + token** — private repo me har user PC me update token embed karna padta hai. Public repo (compiled binary, code alag) recommend karta hun.
+- **Pehli baar cache populate hone ke liye net chahiye** — fresh install offline nahi ho sakta.
+- **Editor preview me offline test nahi hota** — Electron app chahiye. Har stage ke baad main aap ko `.exe` build karke dunga, aap PC pe test karo.
 
-**Distribution**
-- `electron-builder` NSIS installer, 2 targets:
-  - `POS-Server-Setup.exe` (~280MB — includes Postgres binaries)
-  - `POS-Cashier-Setup.exe` (~120MB — no Postgres, LAN client only)
+## Files touched summary
 
-## Phases (aap ne big-bang chuna, still deliver in visible chunks)
+**Delete:** `electron/api-server.cjs`, `api-tables.cjs`, `api-rpcs.cjs`, `schema.sql`, `.lovable/plan.md` (replaced by this).
 
-| # | Milestone | What runs at end | Duration signal |
-|---|-----------|------------------|-----------------|
-| 1 | Electron shell + bundled Postgres + schema migration runner | App khulta hai, local DB ready | 1 large turn |
-| 2 | Fastify API server + adapter swap in client | POS billing, purchases, ledgers sab local Postgres pe | 2 large turns |
-| 3 | PIN auth + users/roles porting | Login screen, RBAC same as before | 1 turn |
-| 4 | LAN client build + config UI | Cashier PC server PC se connect karta hai | 1 turn |
-| 5 | Cloud sync worker + restore | Hourly backup, disaster recovery | 1 turn |
-| 6 | electron-builder Windows installers | `.exe` files ready to ship | 1 turn |
+**New:** `electron/main.cjs` (rewrite, lighter), `electron/preload.cjs`, `electron/updater.cjs`, `src/lib/offline/{cache,outbox,sync,data-client,dexie-schema}.ts`, `src/hooks/use-online.ts`, `src/components/sync-badge.tsx`, `desktop-docs/RELEASE.md`.
 
-## Trade-offs aap ko pata hone chahiye
+**Modified:** `package.json` (scripts + electron-updater dep), `electron-builder.yml` (GitHub publish target), `src/routes/_authenticated/route.tsx` (sync badge + boot cache), key write sites in POS/purchases/returns/expenses (route through data-client).
 
-- **Realtime multi-user (current feature)** replaced with **polling every 3s** on cashier PCs — LAN pe socket.io theek chalega but simpler polling zyada reliable hai grocery mart me.
-- **Google/email login khtm** desktop me — sirf PIN. Web version alag rahega if aap chahen.
-- **Last-write-wins ka matlab**: agar do PCs offline ho aur dono same item bech dein, phir LAN wapas aaye → stock double-deduct nahi hoga (server authoritative) lekin agar dono ne same invoice number claim kiya to unique constraint pe ek fail hoga. Aap ne simple choose kiya, ye consequence bhi.
-- **Cloud mirror sirf backup ke liye hai** — cloud se live edit karke desktop nahi update hoga. Ek-tarfa flow.
-- **Ye web preview me test nahi ho sakta** — Electron Windows binary sirf `.exe` install karke test hoti hai. Main sandbox me build kar dunga, aap Windows PC pe run karke feedback dengay.
-- **Aapka current online data**: pehli baar install pe cloud → local pe ek-time import script chalayenge, sab products/customers/suppliers/ledger aa jayega.
+## Approve karo to Stage A shuru karun
 
-## Approval
-
-Ye plan approve karo to Phase 1 se shuru karta hun: Electron shell + bundled Postgres + schema. Har phase ke baad aap test karke agla bolen — big-bang scope tha lekin delivery visible steps me hogi warna ek turn me itna kaam ship karke bugs pakadna namumkin ho jayega.
+Stage A me sirf cleanup + Electron shell + auto-updater lagegi — aapke offline features abhi nahi aayenge lekin app installable + auto-updating ban jayegi. Phir Stage B se offline layer.

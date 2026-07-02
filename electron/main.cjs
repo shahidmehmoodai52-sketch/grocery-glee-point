@@ -1,79 +1,62 @@
-// Electron main process for POS Desktop (Windows)
-// Two modes decided by config.json: "server" (runs Postgres + API) or "client" (LAN client)
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+// Electron main process — offline-first SaaS POS shell.
+// Spawns the built TanStack Start Nitro node server locally so the React app
+// runs fully offline once cached. Cloud sync + auto-update handled separately.
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const os = require('os');
+const http = require('http');
+const { fork } = require('child_process');
+const { setupAutoUpdater, checkForUpdatesNow } = require('./updater.cjs');
 
-const USER_DIR = path.join(app.getPath('userData'));
-const CONFIG_PATH = path.join(USER_DIR, 'config.json');
-const PG_DATA_DIR = path.join(USER_DIR, 'pgdata');
+const IS_DEV = !!process.env.POS_DEV;
+const NITRO_ENTRY = path.join(__dirname, '..', '.output', 'server', 'index.mjs');
+const DEV_URL = process.env.POS_DEV_URL || 'http://localhost:8080';
 
-function loadConfig() {
-  try { return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')); }
-  catch { return { mode: 'server', serverHost: '127.0.0.1', serverPort: 5544, pgPort: 55432 }; }
-}
-function saveConfig(cfg) {
-  fs.mkdirSync(USER_DIR, { recursive: true });
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2));
-}
+let mainWindow = null;
+let nitroChild = null;
+let nitroPort = 0;
 
-let mainWindow;
-let pgProcess = null;
-let apiServer = null;
-
-async function startEmbeddedPostgres(cfg) {
-  // Uses `embedded-postgres` npm package. Downloads Postgres binary on first run,
-  // caches under app.getPath('userData')/postgres-<version>.
-  const EmbeddedPostgres = require('embedded-postgres').default || require('embedded-postgres');
-  const pg = new EmbeddedPostgres({
-    databaseDir: PG_DATA_DIR,
-    user: 'pos_admin',
-    password: 'pos_local_secret',
-    port: cfg.pgPort,
-    persistent: true,
-  });
-  const isFirstRun = !fs.existsSync(PG_DATA_DIR);
-  if (isFirstRun) await pg.initialise();
-  await pg.start();
-  if (isFirstRun) {
-    await pg.createDatabase('pos');
-    const client = pg.getPgClient('pos');
-    await client.connect();
-    const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
-    await client.query(schema);
-    await client.end();
-  }
-  pgProcess = pg;
-  return pg;
+function pickPort() {
+  // Random high port; node server binds to 127.0.0.1 so no LAN exposure.
+  return 20000 + Math.floor(Math.random() * 20000);
 }
 
-async function startApiServer(cfg) {
-  // Fastify HTTP server, listens on 0.0.0.0:5544 so cashier PCs on LAN can reach it.
-  const server = require(path.join(__dirname, 'api-server.cjs'));
-  apiServer = await server.start({
-    port: cfg.serverPort,
-    pgConnection: {
-      host: '127.0.0.1', port: cfg.pgPort,
-      user: 'pos_admin', password: 'pos_local_secret', database: 'pos',
-    },
+function waitForServer(url, timeoutMs = 15000) {
+  const started = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      const req = http.get(url, (res) => {
+        res.resume();
+        resolve();
+      });
+      req.on('error', () => {
+        if (Date.now() - started > timeoutMs) return reject(new Error('Local server did not start in time'));
+        setTimeout(tick, 200);
+      });
+    };
+    tick();
   });
 }
 
-async function bootBackendIfServer(cfg) {
-  if (cfg.mode !== 'server') return;
-  try {
-    await startEmbeddedPostgres(cfg);
-    await startApiServer(cfg);
-  } catch (err) {
-    dialog.showErrorBox('Backend failed to start', String(err?.message || err));
-    throw err;
-  }
+async function startNitroServer() {
+  nitroPort = pickPort();
+  nitroChild = fork(NITRO_ENTRY, [], {
+    env: { ...process.env, PORT: String(nitroPort), HOST: '127.0.0.1', NITRO_PORT: String(nitroPort), NITRO_HOST: '127.0.0.1' },
+    stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+  });
+  nitroChild.on('exit', (code) => {
+    console.error('[nitro] exited', code);
+    nitroChild = null;
+  });
+  await waitForServer(`http://127.0.0.1:${nitroPort}/`);
 }
 
-function createWindow(cfg) {
+function createWindow(startUrl) {
   mainWindow = new BrowserWindow({
-    width: 1440, height: 900, minWidth: 1100, minHeight: 700,
+    width: 1440,
+    height: 900,
+    minWidth: 1100,
+    minHeight: 700,
     title: 'Grocery POS',
     backgroundColor: '#0f172a',
     webPreferences: {
@@ -83,29 +66,47 @@ function createWindow(cfg) {
     },
   });
   mainWindow.setMenuBarVisibility(false);
-  // Vite build output loaded as file://; index.html expects relative asset paths -> vite.config base:'./'
-  mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
-  if (process.env.POS_DEV === '1') mainWindow.webContents.openDevTools({ mode: 'detach' });
+  mainWindow.loadURL(startUrl);
+  if (IS_DEV) mainWindow.webContents.openDevTools({ mode: 'detach' });
+
+  // Open external links in the OS browser, not a new Electron window.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
 }
 
 app.whenReady().then(async () => {
-  const cfg = loadConfig();
-  await bootBackendIfServer(cfg);
-  createWindow(cfg);
+  try {
+    let startUrl;
+    if (IS_DEV) {
+      startUrl = DEV_URL;
+    } else {
+      await startNitroServer();
+      startUrl = `http://127.0.0.1:${nitroPort}/`;
+    }
+    createWindow(startUrl);
+    if (!IS_DEV) setupAutoUpdater(mainWindow);
+  } catch (err) {
+    dialog.showErrorBox('Failed to start Grocery POS', String(err?.message || err));
+    app.quit();
+  }
 });
 
-app.on('window-all-closed', async () => {
-  if (apiServer?.close) await apiServer.close();
-  if (pgProcess?.stop) await pgProcess.stop();
+app.on('window-all-closed', () => {
+  if (nitroChild) { try { nitroChild.kill(); } catch {} nitroChild = null; }
   if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC — renderer uses window.pos.* to read config + set LAN server
-ipcMain.handle('pos:get-config', () => loadConfig());
-ipcMain.handle('pos:set-config', (_e, next) => { saveConfig(next); return true; });
+// IPC surface for renderer (window.pos.*)
 ipcMain.handle('pos:app-info', () => ({
   version: app.getVersion(),
   hostname: os.hostname(),
   platform: process.platform,
-  userDir: USER_DIR,
+  userDir: app.getPath('userData'),
 }));
+ipcMain.handle('pos:check-updates', () => checkForUpdatesNow());
+ipcMain.handle('pos:quit-and-install', () => {
+  const { autoUpdater } = require('electron-updater');
+  autoUpdater.quitAndInstall();
+});

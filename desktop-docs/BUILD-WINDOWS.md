@@ -2,57 +2,60 @@
 
 Ye Electron desktop build hai. Web preview (Lovable) me test nahi hoga — sirf Windows PC pe.
 
-## Ek-baar setup (developer machine)
+## Requirements
+
+- Node 20+ / Bun 1.x
+- Windows 10/11 (build machine)
+- Internet (pehli install pe cache populate karne ke liye)
+
+## Install deps (ek baar)
 
 ```powershell
-# Node 20+ chahiye
-npm install
-npm install --save electron@31 fastify @fastify/cors pg bcryptjs jsonwebtoken embedded-postgres
-npm install --save-dev electron-builder
+bun install
 ```
 
-## Build
+## Development
+
+Do terminals:
 
 ```powershell
-# 1. Web bundle (Vite) → dist/
-npm run build
+# Terminal 1 — TanStack Start dev server (Vite)
+bun run dev
 
-# 2. Server variant (bundled Postgres, ~280MB installer)
-$env:POS_ROLE="Server"; npx electron-builder --config electron-builder.yml --win nsis
-
-# 3. Cashier variant (LAN client only, ~120MB installer)
-#    (Postgres binaries excluded; cashier PCs connect to server PC's IP)
-$env:POS_ROLE="Cashier"; npx electron-builder --config electron-builder.yml --win nsis --config.extraResources= --config.asarUnpack=
+# Terminal 2 — Electron window pointing to dev server
+bun run electron:dev
 ```
 
-Output: `electron-release\POS-Server-Setup-<ver>.exe` aur `POS-Cashier-Setup-<ver>.exe`. Ye files USB/WhatsApp pe bhej sakte ho.
+## Local test build (installer only, no publish)
 
-## Install order at the mart
+```powershell
+bun run electron:pack
+```
 
-1. **Server PC** (jo kabhi bhi off na ho — office desk / counter):
-   - `POS-Server-Setup.exe` install → launch → pehli baar Postgres data dir bane ga `%APPDATA%\Grocery POS\pgdata\`
-   - Default admin PIN: **1234** — Users tab se change kar dena.
-   - Windows Firewall me port 5544 aur 55432 allow karo (installer prompt karega).
-   - Server PC ka LAN IP note karo: `ipconfig` → IPv4 Address (jaise `192.168.1.10`).
+Output: `electron-release\GroceryPOS-Setup-<version>.exe`. Ye file USB/WhatsApp pe bhej sakte ho.
 
-2. **Cashier PCs** (billing counters):
-   - `POS-Cashier-Setup.exe` install → launch → pehli screen pe Server IP daalo (`192.168.1.10`) aur port `5544`.
-   - PIN se login karo.
+## Publish with auto-update
 
-## Data migration from cloud (ek-baar)
+Full flow `desktop-docs/RELEASE.md` me hai:
 
-Server PC pe pehli baar setup ke baad:
-- Settings → Backup → **Import from Cloud** → sab products/customers/suppliers/ledger cloud se local Postgres me aa jayenge.
+```powershell
+bun run electron:release
+```
 
-## Cloud mirror
+## Architecture note
 
-Har ghante local Postgres se cloud pe backup push ho jata hai (jab internet available ho). Agar server PC crash ho:
-- Naya PC pe `POS-Server-Setup.exe` install karo → "Restore from Cloud" → last backup se restart.
+App **SaaS hai** — data Lovable Cloud (Supabase) pe live rehta hai. Electron shell sirf isliye hai ki:
+
+1. Users ko `.exe` install experience mile (browser open karne ki zaroorat nahi)
+2. Naye updates auto-install hon (GitHub Releases se)
+3. Offline mode (Stage B ke baad) — net na ho to POS local cache + queue me chalti rahegi
+
+Har PC independent hai — kisi ko "server PC" banane ki zaroorat nahi, LAN configure karne ki zaroorat nahi. Sab PCs seedhe cloud se sync hote hain.
 
 ## Troubleshooting
 
-| Issue | Fix |
-|---|---|
-| Cashier PC pe "Cannot connect to server" | Server PC ka IP + firewall check karo |
-| Postgres port already in use | Config file me `pgPort` change karo: `%APPDATA%\Grocery POS\config.json` |
-| PIN bhool gaye | Server PC pe `psql` se `UPDATE app_users SET pin_hash = crypt('1234', gen_salt('bf')) WHERE role='admin';` |
+**"Local server did not start in time"** — `.output/server/index.mjs` build hua nahi hai. `bun run electron:build` phir chalao.
+
+**Blank white window** — Nitro server bind fail hua. Task Manager me `node.exe` dhoondh ke kill karo, phir app restart.
+
+**Windows SmartScreen warning** — .exe signed nahi hai. "More info" → "Run anyway" click karo, ya code-signing certificate lagao (RELEASE.md dekho).
