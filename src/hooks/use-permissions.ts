@@ -19,15 +19,17 @@ export const ALL_PERMS = [
 ] as const;
 
 export function usePermissions() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const q = useQuery({
     queryKey: ["my-access", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const [{ data: roles }, { data: perms }] = await Promise.all([
+      const [{ data: roles, error: rolesError }, { data: perms, error: permsError }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", user!.id),
         supabase.from("user_permissions").select("perm").eq("user_id", user!.id),
       ]);
+      if (rolesError) throw rolesError;
+      if (permsError) throw permsError;
       const isAdmin = (roles ?? []).some((r) => r.role === "admin");
       const granted = new Set((perms ?? []).map((p) => p.perm));
       return { isAdmin, perms: granted };
@@ -40,5 +42,5 @@ export function usePermissions() {
     if (perm === "pos" || perm === "sales") return true;
     return q.data?.perms.has(perm) ?? false;
   };
-  return { isAdmin, can, loading: q.isLoading };
+  return { isAdmin, can, loading: authLoading || q.isLoading };
 }
