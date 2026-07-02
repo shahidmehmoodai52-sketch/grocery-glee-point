@@ -1,8 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('pos', {
-  getConfig: () => ipcRenderer.invoke('pos:get-config'),
-  setConfig: (cfg) => ipcRenderer.invoke('pos:set-config', cfg),
-  appInfo: () => ipcRenderer.invoke('pos:app-info'),
   isDesktop: true,
+  appInfo: () => ipcRenderer.invoke('pos:app-info'),
+  checkForUpdates: () => ipcRenderer.invoke('pos:check-updates'),
+  quitAndInstall: () => ipcRenderer.invoke('pos:quit-and-install'),
+  onUpdateStatus: (cb) => {
+    const listener = (_e, payload) => cb(payload);
+    ipcRenderer.on('pos:update-status', listener);
+    return () => ipcRenderer.removeListener('pos:update-status', listener);
+  },
 });

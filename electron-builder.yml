@@ -1,22 +1,21 @@
-# Windows NSIS installer config. Build on a Windows box:
-#   npm run build && npm run pack:win
-appId: com.mart.pos
+# electron-builder config — Windows NSIS + GitHub Releases auto-update feed.
+# Publish flow: set GH_TOKEN env, then `bun run electron:release`. See desktop-docs/RELEASE.md.
+appId: com.mart.grocerypos
 productName: Grocery POS
 directories:
   output: electron-release
   buildResources: electron/build-resources
 files:
-  - dist/**/*
+  - .output/**/*        # nitro node server bundle (spawned by main.cjs)
   - electron/**/*
   - "!electron/build-resources/**"
-extraResources:
-  - from: electron/schema.sql
-    to: schema.sql
+  - "!**/*.map"
+asar: true
 win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: "POS-${env.POS_ROLE}-Setup-${version}.exe"
+  artifactName: "GroceryPOS-Setup-${version}.exe"
 nsis:
   oneClick: false
   perMachine: false
@@ -24,7 +23,8 @@ nsis:
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: Grocery POS
-asar: true
-asarUnpack:
-  - node_modules/embedded-postgres/**
-  - node_modules/bcryptjs/**
+publish:
+  - provider: github
+    owner: REPLACE_WITH_GITHUB_OWNER   # e.g. your github username or org
+    repo: REPLACE_WITH_RELEASES_REPO   # a repo you own; can be public
+    releaseType: release
