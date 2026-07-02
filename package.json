@@ -1,5 +1,8 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "grocery-glee-point",
+  "version": "0.1.0",
+  "description": "Grocery POS — offline-first SaaS point of sale for grocery stores",
+  "author": "Shahid Mehmood <shahidmehmoodai52@gmail.com>",
   "private": true,
   "sideEffects": false,
   "type": "module",
