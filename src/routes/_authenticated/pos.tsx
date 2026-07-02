@@ -449,22 +449,14 @@ function POSPage() {
                       key={p.id}
                       onMouseEnter={() => setHighlight(i)}
                       onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
-                      className={`w-full text-left px-3 py-2 flex items-center justify-between gap-3 border-b last:border-0 ${
+                      className={`w-full text-left px-3 py-2 border-b last:border-0 ${
                         i === highlight ? "bg-accent" : "hover:bg-accent/60"
                       }`}
                     >
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm truncate">{p.name}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono">
-                          {p.sku ?? "—"}{p.category ? ` · ${p.category}` : ""} · stock {fmtQty(p.stock)} {p.unit}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-semibold text-sm text-primary">{fmtMoney(p.sell_price, sym)}</div>
-                        <div className="text-[10px] text-muted-foreground">cost {fmtMoney(p.cost_price, sym)}</div>
-                      </div>
+                      <div className="font-semibold text-base truncate">{p.name}</div>
                     </button>
                   ))}
+
                 </div>
               )}
               {search.trim() && filtered.length === 0 && (
