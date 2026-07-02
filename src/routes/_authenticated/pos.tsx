@@ -156,15 +156,30 @@ function POSPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
-    return products
-      .filter((p) => {
-        if (p.name.toLowerCase().includes(q)) return true;
-        if ((p.sku ?? "").toLowerCase().includes(q)) return true;
-        if ((p.category ?? "").toLowerCase().includes(q)) return true;
-        const bcs = barcodesByProduct[p.id] ?? [];
-        return bcs.some((bc) => bc.toLowerCase().includes(q));
-      })
-      .slice(0, 12);
+    // Score each product so best matches float to the top.
+    // 0 = exact sku/barcode, 1 = sku/barcode prefix, 2 = name prefix,
+    // 3 = word-start in name, 4 = name substring, 5 = sku/barcode substring,
+    // 6 = category match. Lower is better.
+    const scored: { p: any; s: number }[] = [];
+    for (const p of products) {
+      const name = (p.name ?? "").toLowerCase();
+      const sku = (p.sku ?? "").toLowerCase();
+      const cat = (p.category ?? "").toLowerCase();
+      const bcs = (barcodesByProduct[p.id] ?? []).map((b) => b.toLowerCase());
+
+      let s = -1;
+      if (sku === q || bcs.includes(q)) s = 0;
+      else if (sku.startsWith(q) || bcs.some((b) => b.startsWith(q))) s = 1;
+      else if (name.startsWith(q)) s = 2;
+      else if (name.includes(" " + q)) s = 3;
+      else if (name.includes(q)) s = 4;
+      else if (sku.includes(q) || bcs.some((b) => b.includes(q))) s = 5;
+      else if (cat.includes(q)) s = 6;
+
+      if (s >= 0) scored.push({ p, s });
+    }
+    scored.sort((a, b) => a.s - b.s || a.p.name.localeCompare(b.p.name));
+    return scored.slice(0, 12).map((x) => x.p);
   }, [products, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
