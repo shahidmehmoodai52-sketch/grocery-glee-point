@@ -575,3 +575,252 @@ function ExportAllButton() {
     </Button>
   );
 }
+
+// ---------------- Single merged file: name/sku + multiple barcodes ----------------
+
+function SingleMergedFile() {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<{ headers: string[]; rows: Record<string, any>[]; name: string } | null>(null);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ products: number; barcodes: number; failed: number; errors: string[] } | null>(null);
+
+  const FIELDS = [
+    { key: "name", label: "Item Name", required: true },
+    { key: "sku", label: "Item Code / SKU" },
+    { key: "barcode", label: "Barcode(s) — comma/space separated ok" },
+    { key: "category", label: "Category" },
+    { key: "unit", label: "Unit" },
+    { key: "cost_price", label: "Purchase Rate" },
+    { key: "sell_price", label: "Sale Rate" },
+    { key: "stock", label: "Stock" },
+    { key: "tax_rate", label: "Tax %" },
+  ];
+
+  const pickFile = async (f: File) => {
+    try {
+      const parsed = await parseSpreadsheet(f);
+      if (!parsed.rows.length) return toast.error("File empty ya headers nahi mile");
+      setFile({ ...parsed, name: f.name });
+      setMapping(autoMap(parsed.headers));
+      toast.success(`Parsed ${parsed.rows.length} rows from ${f.name}`);
+    } catch (e: any) { toast.error(`Read failed: ${e.message}`); }
+  };
+
+  // Group rows by key = sku (preferred) or normalized name+category
+  const grouped = useMemo(() => {
+    if (!file) return [] as any[];
+    const num = (v: any) => Number(String(v ?? "").replace(/[^0-9.\-]/g, "")) || 0;
+    const splitBC = (s: string) => s.split(/[\s,;|/]+/g).map((x) => x.trim()).filter(Boolean);
+    const groups = new Map<string, any>();
+    for (const r of file.rows) {
+      const name = String(r[mapping.name ?? ""] ?? "").trim();
+      if (!name) continue;
+      const sku = mapping.sku ? String(r[mapping.sku] ?? "").trim() : "";
+      const cat = mapping.category ? String(r[mapping.category] ?? "").trim() : "";
+      const key = sku ? `sku:${sku}` : `nm:${name.toLowerCase()}|${cat.toLowerCase()}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          name, sku: sku || null,
+          category: cat || null,
+          unit: mapping.unit ? String(r[mapping.unit] ?? "").trim() || null : null,
+          cost_price: mapping.cost_price ? num(r[mapping.cost_price]) : 0,
+          sell_price: mapping.sell_price ? num(r[mapping.sell_price]) : 0,
+          stock: mapping.stock ? num(r[mapping.stock]) : 0,
+          tax_rate: mapping.tax_rate ? num(r[mapping.tax_rate]) : 0,
+          barcodes: new Set<string>(),
+        };
+        groups.set(key, g);
+      } else {
+        // fill missing values from later rows
+        if (!g.category && mapping.category) g.category = String(r[mapping.category] ?? "").trim() || null;
+        if (!g.unit && mapping.unit) g.unit = String(r[mapping.unit] ?? "").trim() || null;
+        if (!g.cost_price && mapping.cost_price) g.cost_price = num(r[mapping.cost_price]);
+        if (!g.sell_price && mapping.sell_price) g.sell_price = num(r[mapping.sell_price]);
+        if (!g.stock && mapping.stock) g.stock = num(r[mapping.stock]);
+      }
+      if (mapping.barcode) {
+        for (const b of splitBC(String(r[mapping.barcode] ?? ""))) g.barcodes.add(b);
+      }
+    }
+    return [...groups.values()].map((g) => ({ ...g, barcodes: [...g.barcodes] }));
+  }, [file, mapping]);
+
+  const totalBarcodes = useMemo(() => grouped.reduce((s, g) => s + g.barcodes.length, 0), [grouped]);
+
+  const runImport = async () => {
+    if (!grouped.length) return toast.error("Koi valid rows nahi mili");
+    setBusy(true); setResult({ products: 0, barcodes: 0, failed: 0, errors: [] });
+    const errors: string[] = [];
+    let prodOk = 0, prodFail = 0, bcOk = 0;
+    const chunkSize = 200;
+
+    // Split by whether SKU present
+    const withSku = grouped.filter((g) => g.sku);
+    const noSku = grouped.filter((g) => !g.sku);
+
+    // Prepare product rows (drop barcodes array; set primary barcode = first)
+    const toProduct = (g: any) => ({
+      name: g.name, sku: g.sku, category: g.category, unit: g.unit || "pcs",
+      cost_price: g.cost_price, sell_price: g.sell_price, stock: g.stock, tax_rate: g.tax_rate,
+      barcode: g.barcodes[0] ?? null,
+    });
+
+    // 1) Upsert products with SKU (grouped so no dupes in one batch)
+    for (let i = 0; i < withSku.length; i += chunkSize) {
+      const chunk = withSku.slice(i, i + chunkSize).map(toProduct);
+      const { error } = await supabase.from("products").upsert(chunk as any, { onConflict: "sku" });
+      if (error) { prodFail += chunk.length; errors.push(error.message); } else prodOk += chunk.length;
+      setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
+    }
+    // 2) Insert products without SKU
+    for (let i = 0; i < noSku.length; i += chunkSize) {
+      const chunk = noSku.slice(i, i + chunkSize).map(toProduct);
+      const { error } = await supabase.from("products").insert(chunk as any);
+      if (error) { prodFail += chunk.length; errors.push(error.message); } else prodOk += chunk.length;
+      setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
+    }
+
+    // 3) Resolve product IDs — lookup by SKU (bulk) and by name (bulk) for no-SKU items
+    const skuList = withSku.map((g) => g.sku!).filter(Boolean);
+    const skuToId: Record<string, string> = {};
+    for (let i = 0; i < skuList.length; i += 500) {
+      const slice = skuList.slice(i, i + 500);
+      const { data } = await supabase.from("products").select("id, sku").in("sku", slice);
+      (data ?? []).forEach((p: any) => { if (p.sku) skuToId[p.sku] = p.id; });
+    }
+    const nameToId: Record<string, string> = {};
+    if (noSku.length) {
+      const names = [...new Set(noSku.map((g) => g.name))];
+      for (let i = 0; i < names.length; i += 500) {
+        const slice = names.slice(i, i + 500);
+        const { data } = await supabase.from("products").select("id, name").in("name", slice);
+        (data ?? []).forEach((p: any) => { nameToId[p.name] = p.id; });
+      }
+    }
+
+    // 4) Upsert all barcodes
+    const bcRows: { product_id: string; barcode: string }[] = [];
+    for (const g of grouped) {
+      const pid = g.sku ? skuToId[g.sku] : nameToId[g.name];
+      if (!pid) continue;
+      for (const b of g.barcodes) bcRows.push({ product_id: pid, barcode: b });
+    }
+    // De-dupe by barcode
+    const seen = new Set<string>();
+    const uniqueBC = bcRows.filter((r) => (seen.has(r.barcode) ? false : (seen.add(r.barcode), true)));
+    for (let i = 0; i < uniqueBC.length; i += chunkSize) {
+      const chunk = uniqueBC.slice(i, i + chunkSize);
+      const { error } = await supabase.from("product_barcodes").upsert(chunk as any, { onConflict: "barcode", ignoreDuplicates: false });
+      if (error) errors.push(`barcodes: ${error.message}`); else bcOk += chunk.length;
+      setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
+    }
+
+    setBusy(false);
+    if (prodFail === 0) toast.success(`Imported ${prodOk} items · ${bcOk} barcodes linked`);
+    else toast.error(`${prodOk} imported, ${prodFail} failed`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <Alert>
+        <FileSpreadsheet className="h-4 w-4" />
+        <AlertDescription className="text-xs">
+          <b>Aik hi file</b> upload karen jis me item name, item code aur barcodes hon. Same item ke multiple barcodes ho sakty hain —
+          ya to alag alag rows me (same SKU/Name), ya aik hi cell me comma/space se separated. System khud group kar dega.
+          <b> Existing SKU update hoga, naye add ho jain ge.</b>
+        </AlertDescription>
+      </Alert>
+
+      <Card className="p-4 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 className="font-medium">Step 1 — Upload file</h3>
+          <p className="text-xs text-muted-foreground">{file ? `${file.name} · ${file.rows.length} rows` : "Excel (.xlsx, .xls) ya CSV"}</p>
+        </div>
+        <div className="flex gap-2">
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files?.[0] && pickFile(e.target.files[0])} />
+          <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />Choose file</Button>
+          {file && <Button variant="outline" onClick={() => { setFile(null); setMapping({}); setResult(null); }}>Clear</Button>}
+        </div>
+      </Card>
+
+      {file && (
+        <Card className="p-4 space-y-3">
+          <h3 className="font-medium">Step 2 — Map columns</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {FIELDS.map((f) => (
+              <div key={f.key} className="space-y-1">
+                <Label className="text-xs">
+                  {f.label} {f.required && <span className="text-destructive">*</span>}
+                  {mapping[f.key] && <Badge variant="secondary" className="ml-2">auto</Badge>}
+                </Label>
+                <Select value={mapping[f.key] ?? "__none__"} onValueChange={(v) => setMapping({ ...mapping, [f.key]: v === "__none__" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="— skip —" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— skip —</SelectItem>
+                    {file.headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {grouped.length > 0 && (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="font-medium">Step 3 — Preview</h3>
+              <p className="text-xs text-muted-foreground">
+                {grouped.length} unique items · {totalBarcodes} barcodes total
+                {file && ` (from ${file.rows.length} rows — grouped by ${mapping.sku ? "SKU" : "Name"})`}
+              </p>
+            </div>
+            <Button onClick={runImport} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Import {grouped.length} items
+            </Button>
+          </div>
+          <div className="max-h-80 overflow-auto border rounded">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>SKU</TableHead><TableHead>Name</TableHead><TableHead>Barcodes</TableHead>
+                <TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Sale</TableHead><TableHead className="text-right">Stock</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {grouped.slice(0, 100).map((g, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-xs">{g.sku ?? "—"}</TableCell>
+                    <TableCell className="text-xs">{g.name}</TableCell>
+                    <TableCell className="text-xs">
+                      <div className="flex flex-wrap gap-1">
+                        {g.barcodes.slice(0, 4).map((b: string) => <Badge key={b} variant="outline" className="font-mono text-[10px]">{b}</Badge>)}
+                        {g.barcodes.length > 4 && <span className="text-muted-foreground">+{g.barcodes.length - 4}</span>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-right">{g.cost_price}</TableCell>
+                    <TableCell className="text-xs text-right">{g.sell_price}</TableCell>
+                    <TableCell className="text-xs text-right">{g.stock}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {grouped.length > 100 && <p className="text-xs text-muted-foreground">Showing first 100 of {grouped.length}.</p>}
+        </Card>
+      )}
+
+      {result && (
+        <Alert variant={result.failed > 0 ? "destructive" : "default"}>
+          {result.failed === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+          <AlertDescription>
+            <div><b>{result.products}</b> items imported · <b>{result.barcodes}</b> barcodes linked · <b>{result.failed}</b> failed.</div>
+            {result.errors.length > 0 && <ul className="mt-2 text-xs list-disc pl-4">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}
