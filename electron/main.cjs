@@ -16,9 +16,14 @@ let mainWindow = null;
 let nitroChild = null;
 let nitroPort = 0;
 
+// Fixed local port so the app origin (and therefore localStorage / Supabase
+// session persistence) stays stable across restarts. Bound to 127.0.0.1 only,
+// so there is no LAN exposure. If a user genuinely has 34817 taken, they can
+// override via POS_PORT.
 function pickPort() {
-  // Random high port; node server binds to 127.0.0.1 so no LAN exposure.
-  return 20000 + Math.floor(Math.random() * 20000);
+  const override = Number(process.env.POS_PORT);
+  if (Number.isFinite(override) && override > 0) return override;
+  return 34817;
 }
 
 function waitForServer(url, timeoutMs = 15000) {
