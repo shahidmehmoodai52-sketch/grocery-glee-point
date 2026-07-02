@@ -1,0 +1,30 @@
+# Windows NSIS installer config. Build on a Windows box:
+#   npm run build && npm run pack:win
+appId: com.mart.pos
+productName: Grocery POS
+directories:
+  output: electron-release
+  buildResources: electron/build-resources
+files:
+  - dist/**/*
+  - electron/**/*
+  - "!electron/build-resources/**"
+extraResources:
+  - from: electron/schema.sql
+    to: schema.sql
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: "POS-${env.POS_ROLE}-Setup-${version}.exe"
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Grocery POS
+asar: true
+asarUnpack:
+  - node_modules/embedded-postgres/**
+  - node_modules/bcryptjs/**
