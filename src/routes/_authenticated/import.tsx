@@ -724,6 +724,19 @@ function SingleMergedFile() {
     else toast.error(`${prodOk} imported, ${prodFail} failed`);
   };
 
+  // Auto-save: as soon as file is parsed and required "name" column is mapped,
+  // run the import once automatically (unless user turned auto-save off).
+  useEffect(() => {
+    if (!autoSave || !file || busy) return;
+    if (!mapping.name) return;
+    if (!grouped.length) return;
+    const key = `${file.name}:${file.rows.length}`;
+    if (autoRanFor.current === key) return;
+    autoRanFor.current = key;
+    runImport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, mapping, grouped, autoSave]);
+
   return (
     <div className="space-y-4">
       <Alert>
