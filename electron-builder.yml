@@ -10,7 +10,15 @@ files:
   - electron/**/*
   - "!electron/build-resources/**"
   - "!**/*.map"
+# The Nitro node server (an ESM module tree) must live on the real filesystem
+# so child_process.fork can load it — Node cannot fork files that live inside
+# the asar archive. Same for our .cjs main scripts that require electron-updater.
 asar: true
+asarUnpack:
+  - ".output/**/*"
+  - "electron/**/*"
+extraMetadata:
+  main: electron/main.cjs
 win:
   target:
     - target: nsis
