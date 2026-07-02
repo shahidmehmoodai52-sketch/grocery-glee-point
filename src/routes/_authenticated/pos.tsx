@@ -95,7 +95,7 @@ function POSPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id,name,sku,barcode,sell_price,cost_price,stock,unit")
+        .select("id,name,sku,barcode,sell_price,cost_price,stock,unit,category")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
