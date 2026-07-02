@@ -12,8 +12,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "electron:dev": "POS_DEV=1 electron electron/main.cjs",
-    "electron:pack:server": "cross-env POS_ROLE=Server electron-builder --config electron-builder.yml --win nsis",
-    "electron:pack:cashier": "cross-env POS_ROLE=Cashier electron-builder --config electron-builder.yml --win nsis"
+    "electron:build": "vite build && NITRO_PRESET=node-server vite build",
+    "electron:pack": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish never",
+    "electron:release": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish always"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
