@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "electron:dev": "POS_DEV=1 electron electron/main.cjs",
-    "electron:build": "vite build && NITRO_PRESET=node-server vite build",
+    "electron:build": "NITRO_PRESET=node-server vite build",
     "electron:pack": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish never",
     "electron:release": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish always"
   },
