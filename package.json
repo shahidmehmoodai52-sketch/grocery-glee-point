@@ -14,8 +14,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "electron:dev": "POS_DEV=1 electron electron/main.cjs",
-    "electron:build": "NITRO_PRESET=node-server vite build",
+    "electron:dev": "cross-env POS_DEV=1 electron electron/main.cjs",
+    "electron:build": "cross-env NITRO_PRESET=node-server vite build",
     "electron:pack": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish never",
     "electron:release": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish always"
   },
@@ -88,6 +88,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "cross-env": "^10.1.0",
     "electron": "^43.0.0",
     "electron-builder": "^26.15.3",
     "electron-updater": "^6.8.9",
