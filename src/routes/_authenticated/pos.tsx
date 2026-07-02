@@ -160,10 +160,11 @@ function POSPage() {
       .filter((p) => {
         if (p.name.toLowerCase().includes(q)) return true;
         if ((p.sku ?? "").toLowerCase().includes(q)) return true;
+        if ((p.category ?? "").toLowerCase().includes(q)) return true;
         const bcs = barcodesByProduct[p.id] ?? [];
         return bcs.some((bc) => bc.toLowerCase().includes(q));
       })
-      .slice(0, 8);
+      .slice(0, 12);
   }, [products, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
