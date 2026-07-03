@@ -759,7 +759,8 @@ function SingleMergedFile() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ products: number; barcodes: number; failed: number; errors: string[] } | null>(null);
-  const [autoSave, setAutoSave] = useState(true);
+  const [autoSave, setAutoSave] = useState(false);
+  const [wiping, setWiping] = useState(false);
   const autoRanFor = useRef<string | null>(null);
 
   const FIELDS = [
