@@ -305,18 +305,25 @@ function smartAutoMap(headers: string[], rows: Record<string, any>[]): Record<st
     if (p) assign("sell_price", p.h);
   }
 
-  // 7) Stock = numeric (int), can be negative, not barcode length
+  // 7) Stock = numeric (int), can be negative, not barcode length, has variance
+  //    (skip columns where every row is the same value — those are usually zero placeholders).
   const stockHint = hintMatch("stock");
-  if (stockHint && stats[stockHint].numericCount / Math.max(stats[stockHint].nonEmpty, 1) > 0.7) {
+  const isValidStock = (s: ColStats) =>
+    s.longDigitCount / Math.max(s.nonEmpty, 1) <= 0.5 &&
+    s.uniqueCount > 1 &&
+    s.numericCount / Math.max(s.nonEmpty, 1) > 0.7;
+  if (stockHint && isValidStock(stats[stockHint])) {
     assign("stock", stockHint);
   } else {
     assign("stock", pickBy("stock", (s) => {
-      if (s.longDigitCount / Math.max(s.nonEmpty, 1) > 0.5) return 0;
+      if (!isValidStock(s)) return 0;
       const intRatio = s.intCount / Math.max(s.nonEmpty, 1);
       const shortIsh = s.avgLen <= 8 ? 1 : 0.3;
-      return intRatio * shortIsh;
+      const varietyBonus = Math.min(s.uniqueCount / 10, 1); // reward some variety
+      return intRatio * shortIsh * (0.5 + 0.5 * varietyBonus);
     }, 0.3));
   }
+
 
   // 8) Tax = header hint only (usually 0/5/17)
   assign("tax_rate", hintMatch("tax_rate"));
