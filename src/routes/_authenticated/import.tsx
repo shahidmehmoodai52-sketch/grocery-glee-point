@@ -959,6 +959,10 @@ function SingleMergedFile() {
             <input type="checkbox" checked={autoSave} onChange={(e) => setAutoSave(e.target.checked)} />
             Auto-save on upload
           </label>
+          <Button variant="destructive" size="sm" onClick={wipeAll} disabled={wiping}>
+            {wiping ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <AlertCircle className="h-4 w-4 mr-1" />}
+            Wipe imported stock
+          </Button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files?.[0] && pickFile(e.target.files[0])} />
           <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />Choose file</Button>
           {file && <Button variant="outline" onClick={() => { setFile(null); setMapping({}); setResult(null); autoRanFor.current = null; }}>Clear</Button>}
