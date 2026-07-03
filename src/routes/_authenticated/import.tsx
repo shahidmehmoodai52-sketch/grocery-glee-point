@@ -913,6 +913,31 @@ function SingleMergedFile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file, mapping, grouped, autoSave]);
 
+  const wipeAll = async () => {
+    if (!confirm("Saare imported products aur barcodes delete kar diye jaen ge. Sales/purchases history rahegi. Continue?")) return;
+    setWiping(true);
+    try {
+      const { error: e1 } = await supabase.from("product_barcodes").delete().not("id", "is", null);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from("products").delete().not("id", "is", null);
+      if (e2) throw e2;
+      toast.success("Sab imported stock delete ho gaya. Ab dobara file upload karen.");
+    } catch (e: any) {
+      toast.error(e.message ?? "Wipe failed");
+    } finally { setWiping(false); }
+  };
+
+  // Small helper: show first non-empty sample of a header
+  const sampleFor = (h: string | undefined | null): string => {
+    if (!h || !file) return "";
+    for (const r of file.rows) {
+      const v = r[h];
+      if (v !== null && v !== undefined && String(v).trim() !== "") return String(v).trim().slice(0, 40);
+    }
+    return "";
+  };
+
+
   return (
     <div className="space-y-4">
       <Alert>
