@@ -144,6 +144,181 @@ function autoMap(headers: string[]): Record<string, string> {
   return out;
 }
 
+// --------- Content-based smart auto-mapping ---------
+// Looks at the ACTUAL data (first ~200 rows) to decide which column is what,
+// because some exports have misleading header names (e.g. label says "itemname"
+// but the column actually contains item codes).
+type ColStats = {
+  header: string;
+  nonEmpty: number;
+  total: number;
+  numericCount: number;
+  intCount: number;
+  decimalCount: number;
+  longDigitCount: number; // 8-14 digit pure numbers = barcodes
+  shortTokenCount: number; // 2-5 char short tokens = units
+  hasLettersCount: number;
+  dateCount: number;
+  uniqueCount: number;
+  avgLen: number;
+  samples: string[];
+};
+
+function analyzeColumns(headers: string[], rows: Record<string, any>[]): Record<string, ColStats> {
+  const sample = rows.slice(0, 200);
+  const stats: Record<string, ColStats> = {};
+  for (const h of headers) {
+    const uniques = new Set<string>();
+    let nonEmpty = 0, numericCount = 0, intCount = 0, decimalCount = 0;
+    let longDigit = 0, shortTok = 0, hasLetters = 0, dateCount = 0, lenSum = 0;
+    const samples: string[] = [];
+    for (const r of sample) {
+      const raw = r[h];
+      if (raw === null || raw === undefined || raw === "") continue;
+      const s = String(raw).trim();
+      if (!s) continue;
+      nonEmpty++;
+      uniques.add(s);
+      lenSum += s.length;
+      if (samples.length < 5) samples.push(s);
+      // date-ish?
+      if (/^\d{4}-\d{2}-\d{2}/.test(s) || /^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/.test(s)) { dateCount++; continue; }
+      // pure digits (barcode-ish)
+      if (/^\d{8,14}$/.test(s)) longDigit++;
+      // numeric
+      const n = Number(s.replace(/,/g, ""));
+      if (!isNaN(n) && /^-?\d+(\.\d+)?$/.test(s.replace(/,/g, ""))) {
+        numericCount++;
+        if (Number.isInteger(n)) intCount++;
+        if (s.includes(".")) decimalCount++;
+      }
+      if (/[a-zA-Z]/.test(s)) hasLetters++;
+      if (s.length <= 5 && /^[A-Za-z]+$/.test(s)) shortTok++;
+    }
+    stats[h] = {
+      header: h, nonEmpty, total: sample.length, numericCount, intCount, decimalCount,
+      longDigitCount: longDigit, shortTokenCount: shortTok, hasLettersCount: hasLetters,
+      dateCount, uniqueCount: uniques.size, avgLen: nonEmpty ? lenSum / nonEmpty : 0,
+      samples,
+    };
+  }
+  return stats;
+}
+
+function smartAutoMap(headers: string[], rows: Record<string, any>[]): Record<string, string> {
+  const stats = analyzeColumns(headers, rows);
+  const cols = headers.filter((h) => stats[h].nonEmpty > 0);
+  const used = new Set<string>();
+  const out: Record<string, string> = {};
+
+  // Header-hint match with content sanity
+  const hintMatch = (key: string): string | null => {
+    const hints = FIELD_HINTS[key] ?? [];
+    const normH = cols.map((h) => ({ raw: h, n: norm(h) }));
+    let hit = normH.find((h) => !used.has(h.raw) && hints.some((x) => h.n === norm(x)));
+    if (!hit) hit = normH.find((h) => !used.has(h.raw) && hints.some((x) => h.n.includes(norm(x))));
+    return hit?.raw ?? null;
+  };
+
+  const pickBy = (key: string, scorer: (s: ColStats) => number, minScore = 0.1) => {
+    let best: { h: string; s: number } | null = null;
+    for (const h of cols) {
+      if (used.has(h)) continue;
+      const sc = scorer(stats[h]);
+      if (sc > minScore && (!best || sc > best.s)) best = { h, s: sc };
+    }
+    return best?.h ?? null;
+  };
+
+  const assign = (key: string, h: string | null) => {
+    if (!h) return;
+    out[key] = h;
+    used.add(h);
+  };
+
+  // 1) Barcode = mostly long-digit column
+  const barcodeHint = hintMatch("barcode");
+  if (barcodeHint && stats[barcodeHint].longDigitCount / Math.max(stats[barcodeHint].nonEmpty, 1) > 0.5) {
+    assign("barcode", barcodeHint);
+  } else {
+    assign("barcode", pickBy("barcode", (s) => (s.longDigitCount / Math.max(s.nonEmpty, 1))));
+  }
+
+  // 2) Name = strings with letters, high avg length, not units
+  const namePick =
+    pickBy("name", (s) => {
+      const letterRatio = s.hasLettersCount / Math.max(s.nonEmpty, 1);
+      const notNumeric = 1 - s.numericCount / Math.max(s.nonEmpty, 1);
+      const notShort = Math.min(s.avgLen / 12, 1);
+      const notDate = s.dateCount === 0 ? 1 : 0;
+      return letterRatio * notNumeric * notShort * notDate;
+    });
+  assign("name", namePick);
+
+  // 3) SKU / item code = column that groups rows (unique count << non-empty count),
+  //    small numeric or alphanumeric, not barcode-length.
+  const skuPick =
+    pickBy("sku", (s) => {
+      if (s.longDigitCount / Math.max(s.nonEmpty, 1) > 0.5) return 0; // that's the barcode
+      const groupRatio = 1 - s.uniqueCount / Math.max(s.nonEmpty, 1); // repeats → grouping
+      const shortIsh = s.avgLen <= 10 ? 1 : 0.3;
+      return groupRatio * shortIsh;
+    }, 0.05);
+  assign("sku", skuPick);
+
+  // 4) Unit = short letter tokens (Pcs, Kg, Grm, Pck, Dzn, Nos, Ltr)
+  assign("unit", pickBy("unit", (s) => s.shortTokenCount / Math.max(s.nonEmpty, 1)));
+
+  // 5) Category = letters, medium unique (not too many, not one), not name
+  assign("category", pickBy("category", (s) => {
+    const letterRatio = s.hasLettersCount / Math.max(s.nonEmpty, 1);
+    const uniqRatio = s.uniqueCount / Math.max(s.nonEmpty, 1);
+    // categories repeat: uniqRatio small; not extremely small like a boolean
+    const catShape = uniqRatio > 0.02 && uniqRatio < 0.5 ? 1 : 0.2;
+    return letterRatio * catShape;
+  }, 0.15));
+
+  // 6) Cost & sale prices = decimals, non-zero. Prefer header hint, else pick top-2 numeric-decimal columns.
+  const priceCandidates = cols
+    .filter((h) => !used.has(h) && stats[h].numericCount / Math.max(stats[h].nonEmpty, 1) > 0.8)
+    .map((h) => ({ h, s: stats[h], nz: stats[h].nonEmpty > 0 ? 1 : 0 }))
+    .filter((c) => c.s.avgLen >= 1)
+    .sort((a, b) => (b.s.decimalCount + b.s.avgLen) - (a.s.decimalCount + a.s.avgLen));
+
+  const costHint = hintMatch("cost_price");
+  const saleHint = hintMatch("sell_price");
+  if (costHint && stats[costHint].numericCount / Math.max(stats[costHint].nonEmpty, 1) > 0.8) assign("cost_price", costHint);
+  if (saleHint && stats[saleHint].numericCount / Math.max(stats[saleHint].nonEmpty, 1) > 0.8) assign("sell_price", saleHint);
+
+  if (!out.cost_price) {
+    const p = priceCandidates.find((c) => !used.has(c.h));
+    if (p) assign("cost_price", p.h);
+  }
+  if (!out.sell_price) {
+    const p = priceCandidates.find((c) => !used.has(c.h));
+    if (p) assign("sell_price", p.h);
+  }
+
+  // 7) Stock = numeric (int), can be negative, not barcode length
+  const stockHint = hintMatch("stock");
+  if (stockHint && stats[stockHint].numericCount / Math.max(stats[stockHint].nonEmpty, 1) > 0.7) {
+    assign("stock", stockHint);
+  } else {
+    assign("stock", pickBy("stock", (s) => {
+      if (s.longDigitCount / Math.max(s.nonEmpty, 1) > 0.5) return 0;
+      const intRatio = s.intCount / Math.max(s.nonEmpty, 1);
+      const shortIsh = s.avgLen <= 8 ? 1 : 0.3;
+      return intRatio * shortIsh;
+    }, 0.3));
+  }
+
+  // 8) Tax = header hint only (usually 0/5/17)
+  assign("tax_rate", hintMatch("tax_rate"));
+
+  return out;
+}
+
+
 function SmartMerge() {
   const fileA = useRef<HTMLInputElement>(null);
   const fileB = useRef<HTMLInputElement>(null);
