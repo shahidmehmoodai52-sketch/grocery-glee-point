@@ -255,15 +255,21 @@ function smartAutoMap(headers: string[], rows: Record<string, any>[]): Record<st
     });
   assign("name", namePick);
 
-  // 3) SKU / item code = column that groups rows (unique count << non-empty count),
-  //    small numeric or alphanumeric, not barcode-length.
+  // 3) SKU / item code = column with MANY distinct short values that repeat
+  //    across rows (each product has one code, appearing on all its barcode rows).
+  //    Reject constant columns (uniques <= 1) and near-unique columns (looks like id).
   const skuPick =
     pickBy("sku", (s) => {
-      if (s.longDigitCount / Math.max(s.nonEmpty, 1) > 0.5) return 0; // that's the barcode
-      const groupRatio = 1 - s.uniqueCount / Math.max(s.nonEmpty, 1); // repeats → grouping
+      if (s.longDigitCount / Math.max(s.nonEmpty, 1) > 0.5) return 0; // barcode
+      if (s.uniqueCount <= 1) return 0; // all-same → useless
+      const uniqRatio = s.uniqueCount / Math.max(s.nonEmpty, 1);
+      // sweet spot: 5%–90% uniques (repeats but many distinct codes)
+      if (uniqRatio < 0.02 || uniqRatio > 0.95) return 0;
       const shortIsh = s.avgLen <= 10 ? 1 : 0.3;
-      return groupRatio * shortIsh;
-    }, 0.05);
+      // reward more distinct codes
+      return uniqRatio * shortIsh;
+    }, 0.02);
+
   assign("sku", skuPick);
 
   // 4) Unit = short letter tokens (Pcs, Kg, Grm, Pck, Dzn, Nos, Ltr)
