@@ -1,71 +1,73 @@
+## Problem (file inspect ke baad confirm)
 
-# Offline-First SaaS POS — Rebuild Plan
+Aap ki file `final_merged_correct_barcodes.xlsx` ke headers **jhoot bol rahe hen** — har column ka label uske andar ke data se match nahi karta. Actual mapping:
 
-Pichla Phase 1 (local Postgres + LAN Fastify) delete kar ke ek **true offline-first SaaS** banayenge. Cloud (Lovable) primary rahega, har PC apna local cache + write queue rakhega, net wapas aate hi auto-sync. GitHub Releases se auto-update.
+| Header (galat naam) | Andar asli data |
+|---|---|
+| `code` | khali |
+| `itemname` | **item code** (2, 3, 4…) |
+| `category` | **item name** (MS Foods Masala 20…) |
+| `barcode` | barcode ✓ |
+| `rackdetails` | **unit** (Pck, Grm, Pcs) |
+| `mrprate` | **purchase rate** |
+| `salesrate` | hamesha 0 |
+| `negativestock` | **sale rate** |
+| `currentstock` | hamesha 0 |
+| `dealercode` | **stock** (negative bhi) |
+| `tax` | item name (duplicate) |
 
-## Architecture
+Import tool ka `autoMap` sirf header naam pe bharosa karta hy, is liye:
+- `name` ← `itemname` (asli me code aa raha tha)
+- `sku` ← `code` (khali)
+- `cost_price` ← `purchaserate` (khali → 0)
+- `sell_price` ← `salesrate` (0)
+- `stock` ← `currentstock` (0)
 
-```text
-┌─ Windows .exe (Electron, auto-update on)  ─────────────┐
-│                                                        │
-│  Existing React app (kuch nahi todna)                  │
-│    │                                                   │
-│    ├─ Supabase client (unchanged)                      │
-│    │                                                   │
-│    └─ NEW: offline layer (src/lib/offline/)            │
-│        ├─ cache.ts     → Dexie/IndexedDB mirror of     │
-│        │                 products, barcodes, customers,│
-│        │                 suppliers, expense_persons,   │
-│        │                 store_settings, user_perms    │
-│        │                                               │
-│        ├─ outbox.ts    → queue of pending writes       │
-│        │                 (sales, purchases, returns,   │
-│        │                 expenses, payments, edits)    │
-│        │                                               │
-│        ├─ sync.ts      → net-status listener; drain    │
-│        │                 outbox to Supabase RPCs in    │
-│        │                 order; re-pull cache on push  │
-│        │                                               │
-│        └─ data-client  → thin wrapper: online = direct │
-│                          Supabase, offline = cache+queue│
-│                                                        │
-│  Electron shell (electron/main.cjs)                    │
-│    ├─ BrowserWindow loads local dist/ (works offline)  │
-│    ├─ electron-updater → GitHub Releases feed          │
-│    └─ Update UI: "Update ready, restart"               │
-└────────────────────────────────────────────────────────┘
-```
+Isi wajah se saab kuch mixup ho gaya.
 
-## Delivery in stages (aap ke big-bang ke andar visible chunks)
+Aur "Single merged file" tab me **manual mapping dropdowns hain hi nahin** — user auto-map override nahi kar sakta tha.
 
-| # | Stage | End state |
-|---|-------|-----------|
-| A | **Cleanup + Electron shell + auto-updater** | Purana Phase 1 code deleted. `pnpm dev:electron` chalne se app khulti hai. `pnpm build:win` se .exe banti hai. GitHub release publish karo → installed app auto-download karke restart pe update ho jati hai. |
-| B | **Offline cache (read-side)** | Dexie schema, initial pull, background refresh. Net band ho to products/customers/suppliers/settings sab load hote hain — POS UI khulti hai, search chalta hai, purani sales dikhti hain. |
-| C | **Outbox queue (write-side)** | Sale complete, purchase, return, expense, payment — sab offline mode me local queue me jate hain, temporary local ID milta hai, stock local cache me adjust hota hai. UI me "Pending sync: 3" badge. |
-| D | **Sync worker + conflict rules** | Net wapas aate hi outbox drain (FIFO), server RPCs same use hote hain (`complete_sale` etc.), success pe local ID → real UUID map, cache refresh. Fail hone pe row `sync_error` state me jaati hai, user manually retry kar sakta hai. |
-| E | **Auto-update polish + installer signing hints** | `checkForUpdates` on app start + har 4 ghante, download progress toast, "Restart to install" button. `desktop-docs/RELEASE.md` — kaise GitHub token set karke `pnpm release` chalana hai. |
+## Kya fix karunga
 
-Har stage ke baad aap test karke "next" bolen.
+### 1) Content-based smart auto-mapping (`src/routes/_authenticated/import.tsx`)
+Naya function `smartAutoMap(headers, rows)` jo pehle header naam try karega, phir **pehli 50-100 rows ka content dekh kar** score karega:
 
-## Trade-offs (senior-dev honesty)
+- **barcode** = column jis me 80%+ values 8–14 digit ke pure numbers hon
+- **sku / item code** = column jis me chhote integers (1–999999) ya alphanumeric codes hon aur unique-count kam ho (grouping karta ho)
+- **name** = column jis me letters wale strings hon (numbers nahi), 80%+ non-empty
+- **unit** = column jis me chhote 2–4 letter tokens hon (Pck, Grm, Pcs, Kg, Nos, Dzn)
+- **cost_price / sell_price** = decimal numbers (`.` wale), non-zero
+- **stock** = integer numbers (negative allowed), header hint check
+- Khali columns aur `date`-shaped columns ignore
 
-- **Realtime multi-user offline pe kaam nahi karega** — ye by design hai. Do PCs jab dono offline hon aur same item sell karen, dono ka stock local -1 hoga; net aane pe dono queue push hongi, server pe stock -2 ho jayega. Agar stock neeche 0 chala jaye to warning toast dikhayenge, block nahi karenge (grocery mart me realistic hai — bhai actual stock physical hai, digital sirf tracking hai).
-- **Invoice numbers offline me temporary honge** (`OFFLINE-<timestamp>`), sync ke baad server ka real invoice number replace ho jayega. Print receipt me clearly marked "Pending sync" jab tak sync na ho.
-- **Returns offline me** original sale ka reference chahiye — agar wo bhi offline queue me hai to return bhi queue me chala jayega aur sync order maintain hoga (sale pehle, phir return).
-- **Purchases WAC (weighted average cost)** offline me local calc karenge; sync pe server dobara calc karega — chhota discrepancy ho sakta hai agar do PCs ne offline purchase kiya. Owner dashboard me "Cost drift" alert dikha denge agar variance >2%.
-- **Auto-update ke liye GitHub repo public ho ya private + token** — private repo me har user PC me update token embed karna padta hai. Public repo (compiled binary, code alag) recommend karta hun.
-- **Pehli baar cache populate hone ke liye net chahiye** — fresh install offline nahi ho sakta.
-- **Editor preview me offline test nahi hota** — Electron app chahiye. Har stage ke baad main aap ko `.exe` build karke dunga, aap PC pe test karo.
+Header name hint + content score dono milake best column choose hoga.
 
-## Files touched summary
+### 2) Manual column mapping UI in "Single merged file" tab
+Har target field (Item Name, Item Code, Barcode, Category, Unit, Purchase Rate, Sale Rate, Stock, Tax) ke saath dropdown add karunga jis me file ke saare headers list honge — aap khud koi bhi override kar saken. `— skip —` option bhi.
 
-**Delete:** `electron/api-server.cjs`, `api-tables.cjs`, `api-rpcs.cjs`, `schema.sql`, `.lovable/plan.md` (replaced by this).
+Auto-detect ke saath, har badge ke neeche ek chhoti "sample" line dikhaunga (`e.g. "MS Foods Masala 20"`) taake foran pata chale mapping sahi hy ya galat.
 
-**New:** `electron/main.cjs` (rewrite, lighter), `electron/preload.cjs`, `electron/updater.cjs`, `src/lib/offline/{cache,outbox,sync,data-client,dexie-schema}.ts`, `src/hooks/use-online.ts`, `src/components/sync-badge.tsx`, `desktop-docs/RELEASE.md`.
+### 3) Live preview table (pehle 20 rows) grouped state ke naal
+Import se pehle table dikhega: SKU · Name · Barcode(s) · Unit · Cost · Sale · Stock — aap dekh ke confirm karen ge phir "Import" dabana ho ga. Auto-save checkbox default **off** kar dun ga taake accident dobara na ho.
 
-**Modified:** `package.json` (scripts + electron-updater dep), `electron-builder.yml` (GitHub publish target), `src/routes/_authenticated/route.tsx` (sync badge + boot cache), key write sites in POS/purchases/returns/expenses (route through data-client).
+### 4) "Wipe imported stock" button
+Ek chhota destructive button (confirm dialog ke saath) jo `product_barcodes` aur `products` empty kar dega. Sales/purchases history untouched rahegi (unke items name+price snapshot rakhte hen). Aap ne pehle jawab diya tha "sirf mapping fix karen" — is liye button optional rahega, aap khud dabaen ge jab chahen.
 
-## Approve karo to Stage A shuru karun
+### 5) Aap ki file ke liye expected result
+Naye smart-map se aap ki file me automatically ye pick hoga:
+- name ← `category` column
+- sku ← `itemname` column
+- barcode ← `barcode` column
+- unit ← `rackdetails` column
+- cost_price ← `mrprate` column
+- sell_price ← `negativestock` column
+- stock ← `dealercode` column
 
-Stage A me sirf cleanup + Electron shell + auto-updater lagegi — aapke offline features abhi nahi aayenge lekin app installable + auto-updating ban jayegi. Phir Stage B se offline layer.
+Preview me confirm ho ga → import → **~400 unique products, ~5500 barcodes properly linked**, aur POS me name/code/barcode search sahi chalega.
+
+## Technical notes
+
+- Sirf `src/routes/_authenticated/import.tsx` change hoga.
+- `smartAutoMap` pure client-side, koi DB migration nahi.
+- Wipe button `supabase.from("product_barcodes").delete()` + `supabase.from("products").delete()` — RLS `authenticated` users allow karta hy.
+- Existing "Products" / "Customers" / "Suppliers" tabs pe koi asar nahi.
