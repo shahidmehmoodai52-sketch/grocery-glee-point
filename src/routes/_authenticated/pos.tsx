@@ -443,20 +443,36 @@ function POSPage() {
                 />
               </div>
               {search.trim() && filtered.length > 0 && (
-                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg max-h-80 overflow-auto">
-                  {filtered.map((p, i) => (
-                    <button
-                      key={p.id}
-                      onMouseEnter={() => setHighlight(i)}
-                      onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
-                      className={`w-full text-left px-3 py-2 border-b last:border-0 ${
-                        i === highlight ? "bg-accent" : "hover:bg-accent/60"
-                      }`}
-                    >
-                      <div className="font-semibold text-base truncate">{p.name}</div>
-                    </button>
-                  ))}
-
+                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg max-h-96 overflow-auto">
+                  <div className="grid grid-cols-[1fr_100px_70px_80px_110px] gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0">
+                    <div>Item</div>
+                    <div className="text-right">Unit Rate</div>
+                    <div className="text-right">QTY</div>
+                    <div className="text-right">Dis</div>
+                    <div className="text-right">Amount</div>
+                  </div>
+                  {filtered.map((p, i) => {
+                    const rate = Number(p.sell_price ?? 0);
+                    const qty = 1;
+                    const dis = 0;
+                    const amount = rate * qty - dis;
+                    return (
+                      <button
+                        key={p.id}
+                        onMouseEnter={() => setHighlight(i)}
+                        onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
+                        className={`w-full grid grid-cols-[1fr_100px_70px_80px_110px] gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${
+                          i === highlight ? "bg-accent" : "hover:bg-accent/60"
+                        }`}
+                      >
+                        <div className="font-semibold text-base truncate">{p.name}</div>
+                        <div className="text-right tabular-nums text-sm">{fmtMoney(rate, sym)}</div>
+                        <div className="text-right tabular-nums text-sm">{fmtQty(qty)}</div>
+                        <div className="text-right tabular-nums text-sm">{fmtMoney(dis, sym)}</div>
+                        <div className="text-right tabular-nums text-sm font-medium">{fmtMoney(amount, sym)}</div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
               {search.trim() && filtered.length === 0 && (
