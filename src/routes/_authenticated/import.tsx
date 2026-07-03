@@ -144,6 +144,194 @@ function autoMap(headers: string[]): Record<string, string> {
   return out;
 }
 
+// --------- Content-based smart auto-mapping ---------
+// Looks at the ACTUAL data (first ~200 rows) to decide which column is what,
+// because some exports have misleading header names (e.g. label says "itemname"
+// but the column actually contains item codes).
+type ColStats = {
+  header: string;
+  nonEmpty: number;
+  total: number;
+  numericCount: number;
+  intCount: number;
+  decimalCount: number;
+  longDigitCount: number; // 8-14 digit pure numbers = barcodes
+  shortTokenCount: number; // 2-5 char short tokens = units
+  hasLettersCount: number;
+  dateCount: number;
+  uniqueCount: number;
+  avgLen: number;
+  samples: string[];
+};
+
+function analyzeColumns(headers: string[], rows: Record<string, any>[]): Record<string, ColStats> {
+  const sample = rows.slice(0, 200);
+  const stats: Record<string, ColStats> = {};
+  for (const h of headers) {
+    const uniques = new Set<string>();
+    let nonEmpty = 0, numericCount = 0, intCount = 0, decimalCount = 0;
+    let longDigit = 0, shortTok = 0, hasLetters = 0, dateCount = 0, lenSum = 0;
+    const samples: string[] = [];
+    for (const r of sample) {
+      const raw = r[h];
+      if (raw === null || raw === undefined || raw === "") continue;
+      const s = String(raw).trim();
+      if (!s) continue;
+      nonEmpty++;
+      uniques.add(s);
+      lenSum += s.length;
+      if (samples.length < 5) samples.push(s);
+      // date-ish?
+      if (/^\d{4}-\d{2}-\d{2}/.test(s) || /^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/.test(s)) { dateCount++; continue; }
+      // pure digits (barcode-ish)
+      if (/^\d{8,14}$/.test(s)) longDigit++;
+      // numeric
+      const n = Number(s.replace(/,/g, ""));
+      if (!isNaN(n) && /^-?\d+(\.\d+)?$/.test(s.replace(/,/g, ""))) {
+        numericCount++;
+        if (Number.isInteger(n)) intCount++;
+        if (s.includes(".")) decimalCount++;
+      }
+      if (/[a-zA-Z]/.test(s)) hasLetters++;
+      if (s.length <= 5 && /^[A-Za-z]+$/.test(s)) shortTok++;
+    }
+    stats[h] = {
+      header: h, nonEmpty, total: sample.length, numericCount, intCount, decimalCount,
+      longDigitCount: longDigit, shortTokenCount: shortTok, hasLettersCount: hasLetters,
+      dateCount, uniqueCount: uniques.size, avgLen: nonEmpty ? lenSum / nonEmpty : 0,
+      samples,
+    };
+  }
+  return stats;
+}
+
+function smartAutoMap(headers: string[], rows: Record<string, any>[]): Record<string, string> {
+  const stats = analyzeColumns(headers, rows);
+  const cols = headers.filter((h) => stats[h].nonEmpty > 0);
+  const used = new Set<string>();
+  const out: Record<string, string> = {};
+
+  // Header-hint match with content sanity
+  const hintMatch = (key: string): string | null => {
+    const hints = FIELD_HINTS[key] ?? [];
+    const normH = cols.map((h) => ({ raw: h, n: norm(h) }));
+    let hit = normH.find((h) => !used.has(h.raw) && hints.some((x) => h.n === norm(x)));
+    if (!hit) hit = normH.find((h) => !used.has(h.raw) && hints.some((x) => h.n.includes(norm(x))));
+    return hit?.raw ?? null;
+  };
+
+  const pickBy = (key: string, scorer: (s: ColStats) => number, minScore = 0.1) => {
+    let best: { h: string; s: number } | null = null;
+    for (const h of cols) {
+      if (used.has(h)) continue;
+      const sc = scorer(stats[h]);
+      if (sc > minScore && (!best || sc > best.s)) best = { h, s: sc };
+    }
+    return best?.h ?? null;
+  };
+
+  const assign = (key: string, h: string | null) => {
+    if (!h) return;
+    out[key] = h;
+    used.add(h);
+  };
+
+  // 1) Barcode = mostly long-digit column
+  const barcodeHint = hintMatch("barcode");
+  if (barcodeHint && stats[barcodeHint].longDigitCount / Math.max(stats[barcodeHint].nonEmpty, 1) > 0.5) {
+    assign("barcode", barcodeHint);
+  } else {
+    assign("barcode", pickBy("barcode", (s) => (s.longDigitCount / Math.max(s.nonEmpty, 1))));
+  }
+
+  // 2) Name = strings with letters, high avg length, not units
+  const namePick =
+    pickBy("name", (s) => {
+      const letterRatio = s.hasLettersCount / Math.max(s.nonEmpty, 1);
+      const notNumeric = 1 - s.numericCount / Math.max(s.nonEmpty, 1);
+      const notShort = Math.min(s.avgLen / 12, 1);
+      const notDate = s.dateCount === 0 ? 1 : 0;
+      return letterRatio * notNumeric * notShort * notDate;
+    });
+  assign("name", namePick);
+
+  // 3) SKU / item code = column with MANY distinct short values that repeat
+  //    across rows (each product has one code, appearing on all its barcode rows).
+  //    Reject constant columns (uniques <= 1) and near-unique columns (looks like id).
+  const skuPick =
+    pickBy("sku", (s) => {
+      if (s.longDigitCount / Math.max(s.nonEmpty, 1) > 0.5) return 0; // barcode
+      if (s.uniqueCount <= 1) return 0; // all-same → useless
+      const uniqRatio = s.uniqueCount / Math.max(s.nonEmpty, 1);
+      // sweet spot: 5%–90% uniques (repeats but many distinct codes)
+      if (uniqRatio < 0.02 || uniqRatio > 0.95) return 0;
+      const shortIsh = s.avgLen <= 10 ? 1 : 0.3;
+      // reward more distinct codes
+      return uniqRatio * shortIsh;
+    }, 0.02);
+
+  assign("sku", skuPick);
+
+  // 4) Unit = short letter tokens (Pcs, Kg, Grm, Pck, Dzn, Nos, Ltr)
+  assign("unit", pickBy("unit", (s) => s.shortTokenCount / Math.max(s.nonEmpty, 1)));
+
+  // 5) Category = letters, medium unique (not too many, not one), not name
+  assign("category", pickBy("category", (s) => {
+    const letterRatio = s.hasLettersCount / Math.max(s.nonEmpty, 1);
+    const uniqRatio = s.uniqueCount / Math.max(s.nonEmpty, 1);
+    // categories repeat: uniqRatio small; not extremely small like a boolean
+    const catShape = uniqRatio > 0.02 && uniqRatio < 0.5 ? 1 : 0.2;
+    return letterRatio * catShape;
+  }, 0.15));
+
+  // 6) Cost & sale prices = decimals, non-zero. Prefer header hint, else pick top-2 numeric-decimal columns.
+  const priceCandidates = cols
+    .filter((h) => !used.has(h) && stats[h].numericCount / Math.max(stats[h].nonEmpty, 1) > 0.8)
+    .map((h) => ({ h, s: stats[h], nz: stats[h].nonEmpty > 0 ? 1 : 0 }))
+    .filter((c) => c.s.avgLen >= 1)
+    .sort((a, b) => (b.s.decimalCount + b.s.avgLen) - (a.s.decimalCount + a.s.avgLen));
+
+  const costHint = hintMatch("cost_price");
+  const saleHint = hintMatch("sell_price");
+  if (costHint && stats[costHint].numericCount / Math.max(stats[costHint].nonEmpty, 1) > 0.8) assign("cost_price", costHint);
+  if (saleHint && stats[saleHint].numericCount / Math.max(stats[saleHint].nonEmpty, 1) > 0.8) assign("sell_price", saleHint);
+
+  if (!out.cost_price) {
+    const p = priceCandidates.find((c) => !used.has(c.h));
+    if (p) assign("cost_price", p.h);
+  }
+  if (!out.sell_price) {
+    const p = priceCandidates.find((c) => !used.has(c.h));
+    if (p) assign("sell_price", p.h);
+  }
+
+  // 7) Stock = numeric (int), can be negative, not barcode length, has variance
+  //    (skip columns where every row is the same value — those are usually zero placeholders).
+  const stockHint = hintMatch("stock");
+  const isValidStock = (s: ColStats) =>
+    s.longDigitCount / Math.max(s.nonEmpty, 1) <= 0.5 &&
+    s.uniqueCount > 1 &&
+    s.numericCount / Math.max(s.nonEmpty, 1) > 0.7;
+  if (stockHint && isValidStock(stats[stockHint])) {
+    assign("stock", stockHint);
+  } else {
+    assign("stock", pickBy("stock", (s) => {
+      if (!isValidStock(s)) return 0;
+      const intRatio = s.intCount / Math.max(s.nonEmpty, 1);
+      const shortIsh = s.avgLen <= 8 ? 1 : 0.3;
+      const varietyBonus = Math.min(s.uniqueCount / 10, 1); // reward some variety
+      return intRatio * shortIsh * (0.5 + 0.5 * varietyBonus);
+    }, 0.3));
+  }
+
+
+  // 8) Tax = header hint only (usually 0/5/17)
+  assign("tax_rate", hintMatch("tax_rate"));
+
+  return out;
+}
+
+
 function SmartMerge() {
   const fileA = useRef<HTMLInputElement>(null);
   const fileB = useRef<HTMLInputElement>(null);
@@ -584,7 +772,8 @@ function SingleMergedFile() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ products: number; barcodes: number; failed: number; errors: string[] } | null>(null);
-  const [autoSave, setAutoSave] = useState(true);
+  const [autoSave, setAutoSave] = useState(false);
+  const [wiping, setWiping] = useState(false);
   const autoRanFor = useRef<string | null>(null);
 
   const FIELDS = [
@@ -604,7 +793,7 @@ function SingleMergedFile() {
       const parsed = await parseSpreadsheet(f);
       if (!parsed.rows.length) return toast.error("File empty ya headers nahi mile");
       setFile({ ...parsed, name: f.name });
-      setMapping(autoMap(parsed.headers));
+      setMapping(smartAutoMap(parsed.headers, parsed.rows));
       toast.success(`Parsed ${parsed.rows.length} rows from ${f.name}`);
     } catch (e: any) { toast.error(`Read failed: ${e.message}`); }
   };
@@ -737,6 +926,31 @@ function SingleMergedFile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file, mapping, grouped, autoSave]);
 
+  const wipeAll = async () => {
+    if (!confirm("Saare imported products aur barcodes delete kar diye jaen ge. Sales/purchases history rahegi. Continue?")) return;
+    setWiping(true);
+    try {
+      const { error: e1 } = await supabase.from("product_barcodes").delete().not("id", "is", null);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from("products").delete().not("id", "is", null);
+      if (e2) throw e2;
+      toast.success("Sab imported stock delete ho gaya. Ab dobara file upload karen.");
+    } catch (e: any) {
+      toast.error(e.message ?? "Wipe failed");
+    } finally { setWiping(false); }
+  };
+
+  // Small helper: show first non-empty sample of a header
+  const sampleFor = (h: string | undefined | null): string => {
+    if (!h || !file) return "";
+    for (const r of file.rows) {
+      const v = r[h];
+      if (v !== null && v !== undefined && String(v).trim() !== "") return String(v).trim().slice(0, 40);
+    }
+    return "";
+  };
+
+
   return (
     <div className="space-y-4">
       <Alert>
@@ -758,6 +972,10 @@ function SingleMergedFile() {
             <input type="checkbox" checked={autoSave} onChange={(e) => setAutoSave(e.target.checked)} />
             Auto-save on upload
           </label>
+          <Button variant="destructive" size="sm" onClick={wipeAll} disabled={wiping}>
+            {wiping ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <AlertCircle className="h-4 w-4 mr-1" />}
+            Wipe imported stock
+          </Button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files?.[0] && pickFile(e.target.files[0])} />
           <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />Choose file</Button>
           {file && <Button variant="outline" onClick={() => { setFile(null); setMapping({}); setResult(null); autoRanFor.current = null; }}>Clear</Button>}
@@ -766,23 +984,32 @@ function SingleMergedFile() {
 
       {file && (
         <Card className="p-4 space-y-3">
-          <h3 className="font-medium">Step 2 — Map columns</h3>
+          <h3 className="font-medium">Step 2 — Map columns <span className="text-xs text-muted-foreground font-normal">(smart auto-detect · sample dikha raha hy taake foran verify kar saken)</span></h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {FIELDS.map((f) => (
-              <div key={f.key} className="space-y-1">
-                <Label className="text-xs">
-                  {f.label} {f.required && <span className="text-destructive">*</span>}
-                  {mapping[f.key] && <Badge variant="secondary" className="ml-2">auto</Badge>}
-                </Label>
-                <Select value={mapping[f.key] ?? "__none__"} onValueChange={(v) => setMapping({ ...mapping, [f.key]: v === "__none__" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="— skip —" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— skip —</SelectItem>
-                    {file.headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+            {FIELDS.map((f) => {
+              const src = mapping[f.key];
+              const sample = sampleFor(src);
+              return (
+                <div key={f.key} className="space-y-1">
+                  <Label className="text-xs">
+                    {f.label} {f.required && <span className="text-destructive">*</span>}
+                    {src && <Badge variant="secondary" className="ml-2">auto</Badge>}
+                  </Label>
+                  <Select value={src ?? "__none__"} onValueChange={(v) => setMapping({ ...mapping, [f.key]: v === "__none__" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="— skip —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— skip —</SelectItem>
+                      {file.headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {src && (
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      sample: <span className="font-mono">{sample || "(empty)"}</span>
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
