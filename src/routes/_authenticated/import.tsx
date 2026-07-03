@@ -780,7 +780,7 @@ function SingleMergedFile() {
       const parsed = await parseSpreadsheet(f);
       if (!parsed.rows.length) return toast.error("File empty ya headers nahi mile");
       setFile({ ...parsed, name: f.name });
-      setMapping(autoMap(parsed.headers));
+      setMapping(smartAutoMap(parsed.headers, parsed.rows));
       toast.success(`Parsed ${parsed.rows.length} rows from ${f.name}`);
     } catch (e: any) { toast.error(`Read failed: ${e.message}`); }
   };
