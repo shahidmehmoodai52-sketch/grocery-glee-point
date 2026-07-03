@@ -971,23 +971,32 @@ function SingleMergedFile() {
 
       {file && (
         <Card className="p-4 space-y-3">
-          <h3 className="font-medium">Step 2 — Map columns</h3>
+          <h3 className="font-medium">Step 2 — Map columns <span className="text-xs text-muted-foreground font-normal">(smart auto-detect · sample dikha raha hy taake foran verify kar saken)</span></h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {FIELDS.map((f) => (
-              <div key={f.key} className="space-y-1">
-                <Label className="text-xs">
-                  {f.label} {f.required && <span className="text-destructive">*</span>}
-                  {mapping[f.key] && <Badge variant="secondary" className="ml-2">auto</Badge>}
-                </Label>
-                <Select value={mapping[f.key] ?? "__none__"} onValueChange={(v) => setMapping({ ...mapping, [f.key]: v === "__none__" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="— skip —" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— skip —</SelectItem>
-                    {file.headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+            {FIELDS.map((f) => {
+              const src = mapping[f.key];
+              const sample = sampleFor(src);
+              return (
+                <div key={f.key} className="space-y-1">
+                  <Label className="text-xs">
+                    {f.label} {f.required && <span className="text-destructive">*</span>}
+                    {src && <Badge variant="secondary" className="ml-2">auto</Badge>}
+                  </Label>
+                  <Select value={src ?? "__none__"} onValueChange={(v) => setMapping({ ...mapping, [f.key]: v === "__none__" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="— skip —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— skip —</SelectItem>
+                      {file.headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {src && (
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      sample: <span className="font-mono">{sample || "(empty)"}</span>
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
