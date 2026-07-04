@@ -52,7 +52,7 @@ function Page() {
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => (await supabase.from("products").select("id,name,cost_price").order("name")).data ?? [],
+    queryFn: async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,cost_price").order("name").range(from, to)),
   });
 
   useEffect(() => {
