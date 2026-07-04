@@ -154,7 +154,7 @@ function POSPage() {
   });
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim().replace(/\s+/g, " ").toLowerCase();
     if (!q) return [];
     // Score each product so best matches float to the top.
     // 0 = exact sku/barcode, 1 = sku/barcode prefix, 2 = name prefix,
