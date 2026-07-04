@@ -37,11 +37,10 @@ function ProductsPage() {
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAll<any>((from, to) =>
+        supabase.from("products").select("*").order("name").range(from, to),
+      ),
   });
 
   const filtered = products.filter((p) => {
