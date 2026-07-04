@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Upload, FileDown, CheckCircle2, AlertCircle, Loader2, Database, FileSpreadsheet, Wand2 } from "lucide-react";
+import {
+  Upload, FileDown, CheckCircle2, AlertCircle, Loader2, Database,
+  FileSpreadsheet, Wand2, History, Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -15,6 +18,36 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/import")({ component: Page });
+
+// ---------- Import batches: create + finalize ----------
+
+type BatchSource = "single_merged" | "smart_merge" | "products" | "customers" | "suppliers";
+
+async function createImportBatch(filename: string, source: BatchSource): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("import_batches")
+    .insert({ filename, source })
+    .select("id")
+    .single();
+  if (error) { console.error(error); return null; }
+  return data?.id ?? null;
+}
+
+async function finalizeImportBatch(
+  id: string | null,
+  counts: { products?: number; barcodes?: number; customers?: number; suppliers?: number; failed?: number; notes?: string },
+) {
+  if (!id) return;
+  await supabase.from("import_batches").update({
+    products_count: counts.products ?? 0,
+    barcodes_count: counts.barcodes ?? 0,
+    customers_count: counts.customers ?? 0,
+    suppliers_count: counts.suppliers ?? 0,
+    failed_count: counts.failed ?? 0,
+    notes: counts.notes ?? null,
+  }).eq("id", id);
+}
+
 
 type EntityKey = "products" | "customers" | "suppliers";
 
