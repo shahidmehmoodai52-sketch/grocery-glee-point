@@ -69,10 +69,30 @@ function AuthPage() {
         await goToApp();
       }
     } catch (err: any) {
-      toast.error(err.message ?? "Authentication failed");
+      const msg = String(err?.message ?? "Authentication failed");
+      if (/already registered|already exists|user_already_exists/i.test(msg)) {
+        toast.info("Ye email pehle se registered hai. Sign in kar lein.");
+        setMode("signin");
+        setPassword("");
+      } else if (/invalid login credentials/i.test(msg)) {
+        toast.error("Ghalat email ya password.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleForgot = async () => {
+    if (!email) { toast.error("Pehle apni email daalein."); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setBusy(false);
+    if (error) toast.error(error.message);
+    else toast.success("Reset link email par bhej diya gaya.");
   };
 
   const handleGoogle = async () => {
