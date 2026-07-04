@@ -19,6 +19,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
+  const target = next ?? "/pos";
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,13 +29,11 @@ function AuthPage() {
 
   const goToApp = useCallback(async () => {
     try {
-      await navigate({ to: "/pos", replace: true });
+      await navigate({ to: target, replace: true });
     } finally {
-      // Electron + browser preview both work reliably with a hard route handoff.
-      // It also clears any stale auth-page render after Supabase stores the session.
-      window.location.replace("/pos");
+      window.location.replace(target);
     }
-  }, [navigate]);
+  }, [navigate, target]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
