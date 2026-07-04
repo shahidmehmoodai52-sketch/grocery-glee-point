@@ -606,7 +606,11 @@ function POSPage() {
                       const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
                       addProduct(pick);
                       setSearch("");
+                      return;
                     }
+                    // Nothing matched → offer quick-add
+                    openQuickAdd(raw);
+
                   }}
                   className="pl-9 h-10"
                 />
