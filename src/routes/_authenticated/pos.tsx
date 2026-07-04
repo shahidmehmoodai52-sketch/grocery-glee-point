@@ -129,6 +129,48 @@ function POSPage() {
   const [highlight, setHighlight] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const [editing, setEditing] = useState<{ idx: number; field: "price" | "qty" | "disc" } | null>(null);
+  const [quickAdd, setQuickAdd] = useState<{
+    open: boolean; barcode: string; name: string; unit: string;
+    cost_price: string; sell_price: string; stock: string;
+  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1" });
+
+  const openQuickAdd = (term: string) => {
+    const raw = term.trim();
+    // Detect scanner-style codes vs a name typed by hand
+    const looksLikeBarcode = /^[0-9A-Za-z\-]{4,}$/.test(raw) && /\d/.test(raw);
+    setQuickAdd({
+      open: true,
+      barcode: looksLikeBarcode ? raw : "",
+      name: looksLikeBarcode ? "" : raw,
+      unit: "pcs", cost_price: "", sell_price: "", stock: "1",
+    });
+  };
+
+  const saveQuickAdd = async () => {
+    const name = quickAdd.name.trim();
+    if (!name) return toast.error("Item name is required");
+    const sell = Number(quickAdd.sell_price || 0);
+    const cost = Number(quickAdd.cost_price || 0);
+    const stock = Number(quickAdd.stock || 0);
+    const bc = quickAdd.barcode.trim() || null;
+    const { data, error } = await supabase.from("products").insert({
+      name, barcode: bc, unit: quickAdd.unit || "pcs",
+      cost_price: cost, sell_price: sell, stock, tax_rate: 0, is_active: true,
+    }).select(PRODUCT_COLUMNS).single();
+    if (error) return toast.error(error.message);
+    if (bc) {
+      await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: bc });
+    }
+    toast.success(`Added "${name}" to catalog`);
+    addProduct(data);
+    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1" });
+    setSearch("");
+    setTimeout(() => searchRef.current?.focus(), 0);
+    qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["product_barcodes"] });
+  };
+
+
 
   
   const searchRef = useRef<HTMLInputElement>(null);
@@ -464,8 +506,11 @@ function POSPage() {
           addProduct(pick);
           setSearch("");
           searchRef.current?.focus();
+          return;
         }
+        openQuickAdd(raw);
       }
+
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -564,7 +609,11 @@ function POSPage() {
                       const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
                       addProduct(pick);
                       setSearch("");
+                      return;
                     }
+                    // Nothing matched → offer quick-add
+                    openQuickAdd(raw);
+
                   }}
                   className="pl-9 h-10"
                 />
@@ -628,14 +677,20 @@ function POSPage() {
                 </div>
               )}
               {search.trim() && filtered.length === 0 && (
-                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm">
                   {productsLoading || remoteProductsLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Loading products… please wait</>
+                    <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading products… please wait</div>
                   ) : (
-                    <>No products match "{search}". Try name, SKU, ya barcode.</>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-muted-foreground">No product matches "{search}".</div>
+                      <Button size="sm" onClick={() => openQuickAdd(search)}>
+                        <Plus className="h-4 w-4 mr-1" /> Add new item
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
+
 
             </div>
             <div>
@@ -967,6 +1022,57 @@ function POSPage() {
         settings={settings}
         onClose={() => setReprintView(null)}
       />
+
+      {/* Quick-add product dialog — for scanned/typed items not yet in catalog */}
+      <Dialog open={quickAdd.open} onOpenChange={(v) => setQuickAdd((q) => ({ ...q, open: v }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add new item to catalog</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label>Item name</Label>
+              <Input
+                autoFocus
+                value={quickAdd.name}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, name: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveQuickAdd(); } }}
+              />
+            </div>
+            <div className="col-span-2">
+              <Label>Barcode</Label>
+              <Input
+                value={quickAdd.barcode}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, barcode: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Unit</Label>
+              <Input value={quickAdd.unit} onChange={(e) => setQuickAdd((q) => ({ ...q, unit: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Stock</Label>
+              <Input type="number" step="0.001" value={quickAdd.stock}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, stock: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Purchase rate</Label>
+              <Input type="number" step="0.01" value={quickAdd.cost_price}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, cost_price: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Sell price</Label>
+              <Input type="number" step="0.01" value={quickAdd.sell_price}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, sell_price: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setQuickAdd((q) => ({ ...q, open: false }))}>Cancel</Button>
+            <Button onClick={saveQuickAdd}>Save & add to bill</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
       {false && lastInvoice}
     </div>
