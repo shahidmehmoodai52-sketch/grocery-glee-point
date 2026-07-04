@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { fetchAll } from "@/lib/supabase-page";
 
 
 export const Route = createFileRoute("/_authenticated/products")({
