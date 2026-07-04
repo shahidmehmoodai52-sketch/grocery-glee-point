@@ -983,3 +983,62 @@ function ReprintDialog({
   );
 }
 
+function EditableNumCell({
+  active,
+  value,
+  step,
+  min,
+  display,
+  onActivate,
+  onCommit,
+  onCancel,
+}: {
+  active: boolean;
+  value: number;
+  step?: string;
+  min?: number;
+  display: string;
+  onActivate: () => void;
+  onCommit: (v: number) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (active) {
+      setDraft(String(value));
+      setTimeout(() => { ref.current?.focus(); ref.current?.select(); }, 0);
+    }
+  }, [active, value]);
+
+  if (!active) {
+    return (
+      <button
+        type="button"
+        onClick={onActivate}
+        className="h-8 w-full px-2 text-right text-sm tabular-nums hover:bg-accent/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        title="Click to edit"
+      >
+        {display}
+      </button>
+    );
+  }
+  return (
+    <Input
+      ref={ref}
+      type="number"
+      step={step}
+      min={min}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => onCommit(Number(draft))}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); onCommit(Number(draft)); }
+        else if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+      }}
+      className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1"
+    />
+  );
+}
+
+
