@@ -91,7 +91,7 @@ function POSPage() {
     return () => clearInterval(t);
   }, []);
 
-  const { data: products = [] } = useQuery({
+  const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products", "active"],
     queryFn: async () =>
       fetchAll<any>((from, to) =>
@@ -102,6 +102,7 @@ function POSPage() {
           .order("name")
           .range(from, to),
       ),
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: extraBarcodes = [] } = useQuery({
