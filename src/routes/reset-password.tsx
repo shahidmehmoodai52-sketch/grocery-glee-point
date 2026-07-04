@@ -9,11 +9,15 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/reset-password")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//") ? s.next : undefined,
+  }),
   component: ResetPasswordPage,
 });
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,7 +40,7 @@ function ResetPasswordPage() {
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Password update ho gaya.");
-    await navigate({ to: "/pos", replace: true });
+    await navigate({ to: next ?? "/pos", replace: true });
   };
 
   return (
