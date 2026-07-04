@@ -91,7 +91,7 @@ function POSPage() {
     return () => clearInterval(t);
   }, []);
 
-  const { data: products = [] } = useQuery({
+  const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products", "active"],
     queryFn: async () =>
       fetchAll<any>((from, to) =>
@@ -102,6 +102,7 @@ function POSPage() {
           .order("name")
           .range(from, to),
       ),
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: extraBarcodes = [] } = useQuery({
@@ -502,8 +503,12 @@ function POSPage() {
                 </div>
               )}
               {search.trim() && filtered.length === 0 && (
-                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm text-muted-foreground">
-                  No products match "{search}". Try name, SKU, ya barcode.
+                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                  {productsLoading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Loading products… please wait</>
+                  ) : (
+                    <>No products match "{search}". Try name, SKU, ya barcode.</>
+                  )}
                 </div>
               )}
 
