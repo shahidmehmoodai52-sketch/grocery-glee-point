@@ -30,6 +30,7 @@ import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers.$id'
 import { Route as AuthenticatedExpensePersonsIdRouteImport } from './routes/_authenticated/expense-persons.$id'
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -142,6 +143,11 @@ const AuthenticatedCustomersIdRoute =
     path: '/customers/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/users': typeof AuthenticatedUsersRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/users': typeof AuthenticatedUsersRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
@@ -205,6 +213,7 @@ export interface FileRoutesById {
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/_authenticated/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/_authenticated/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/users'
+    | '/.lovable/oauth/consent'
     | '/customers/$id'
     | '/expense-persons/$id'
     | '/suppliers/$id'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/users'
+    | '/.lovable/oauth/consent'
     | '/customers/$id'
     | '/expense-persons/$id'
     | '/suppliers/$id'
@@ -274,6 +285,7 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/settings'
     | '/_authenticated/users'
+    | '/.lovable/oauth/consent'
     | '/_authenticated/customers/$id'
     | '/_authenticated/expense-persons/$id'
     | '/_authenticated/suppliers/$id'
@@ -285,6 +297,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -436,6 +449,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -488,6 +508,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
