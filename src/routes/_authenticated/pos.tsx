@@ -473,14 +473,14 @@ function POSPage() {
                         key={p.id}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
-                        className={`w-full grid ${showCost ? "grid-cols-[110px_1fr_80px_96px_70px_90px_110px]" : "grid-cols-[110px_1fr_96px_70px_90px_110px]"} gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${
+                        className={`w-full grid ${showCost ? "grid-cols-[80px_minmax(200px,1fr)_70px_80px_56px_72px_90px]" : "grid-cols-[80px_minmax(200px,1fr)_80px_56px_72px_90px]"} gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${
                           i === highlight ? "bg-accent" : "hover:bg-accent/60"
                         }`}
                       >
                         <div className="text-xs font-mono tabular-nums truncate">{code}</div>
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className="font-semibold text-sm truncate">{p.name}</div>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="font-semibold text-sm truncate min-w-0 flex-1">{p.name}</div>
                             <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
                               {fmtQty(stockNum)} {p.unit ?? ""}
                             </Badge>
