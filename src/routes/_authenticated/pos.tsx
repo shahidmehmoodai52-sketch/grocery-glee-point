@@ -82,6 +82,8 @@ function POSPage() {
   const [showStaff, setShowStaff] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [now, setNow] = useState(() => new Date());
+  const [editing, setEditing] = useState<{ idx: number; field: "price" | "qty" | "disc" } | null>(null);
+
   
   const searchRef = useRef<HTMLInputElement>(null);
   const paidRef = useRef<HTMLInputElement>(null);
@@ -668,20 +670,40 @@ function POSPage() {
                         </td>
                       )}
                       <td className="p-0">
-                        <Input type="number" step="0.01" value={it.price}
-                          onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
-                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "price"}
+                          value={it.price}
+                          step="0.01"
+                          display={fmtMoney(it.price, sym)}
+                          onActivate={() => setEditing({ idx, field: "price" })}
+                          onCommit={(v) => { updateLine(idx, { price: v }); setEditing(null); searchRef.current?.focus(); }}
+                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                        />
                       </td>
                       <td className="p-0">
-                        <Input type="number" step="0.001" value={it.qty}
-                          onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
-                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "qty"}
+                          value={it.qty}
+                          step="0.001"
+                          display={fmtQty(it.qty)}
+                          onActivate={() => setEditing({ idx, field: "qty" })}
+                          onCommit={(v) => { updateLine(idx, { qty: v }); setEditing(null); searchRef.current?.focus(); }}
+                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                        />
                       </td>
                       <td className="p-0">
-                        <Input type="number" step="0.01" min={0} value={it.disc}
-                          onChange={(e) => updateLine(idx, { disc: Math.max(0, Number(e.target.value)) })}
-                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "disc"}
+                          value={it.disc}
+                          step="0.01"
+                          min={0}
+                          display={fmtMoney(it.disc, sym)}
+                          onActivate={() => setEditing({ idx, field: "disc" })}
+                          onCommit={(v) => { updateLine(idx, { disc: Math.max(0, v) }); setEditing(null); searchRef.current?.focus(); }}
+                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                        />
                       </td>
+
                       <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(amount, sym)}</td>
                       <td className="px-1 py-1 text-center no-print border-0">
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeLine(idx)}>
@@ -960,4 +982,63 @@ function ReprintDialog({
     </Dialog>
   );
 }
+
+function EditableNumCell({
+  active,
+  value,
+  step,
+  min,
+  display,
+  onActivate,
+  onCommit,
+  onCancel,
+}: {
+  active: boolean;
+  value: number;
+  step?: string;
+  min?: number;
+  display: string;
+  onActivate: () => void;
+  onCommit: (v: number) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (active) {
+      setDraft(String(value));
+      setTimeout(() => { ref.current?.focus(); ref.current?.select(); }, 0);
+    }
+  }, [active, value]);
+
+  if (!active) {
+    return (
+      <button
+        type="button"
+        onClick={onActivate}
+        className="h-8 w-full px-2 text-right text-sm tabular-nums hover:bg-accent/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        title="Click to edit"
+      >
+        {display}
+      </button>
+    );
+  }
+  return (
+    <Input
+      ref={ref}
+      type="number"
+      step={step}
+      min={min}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => onCommit(Number(draft))}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); onCommit(Number(draft)); }
+        else if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+      }}
+      className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1"
+    />
+  );
+}
+
 
