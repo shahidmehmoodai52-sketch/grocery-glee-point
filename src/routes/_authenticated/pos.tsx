@@ -670,20 +670,40 @@ function POSPage() {
                         </td>
                       )}
                       <td className="p-0">
-                        <Input type="number" step="0.01" value={it.price}
-                          onChange={(e) => updateLine(idx, { price: Number(e.target.value) })}
-                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "price"}
+                          value={it.price}
+                          step="0.01"
+                          display={fmtMoney(it.price, sym)}
+                          onActivate={() => setEditing({ idx, field: "price" })}
+                          onCommit={(v) => { updateLine(idx, { price: v }); setEditing(null); searchRef.current?.focus(); }}
+                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                        />
                       </td>
                       <td className="p-0">
-                        <Input type="number" step="0.001" value={it.qty}
-                          onChange={(e) => updateLine(idx, { qty: Number(e.target.value) })}
-                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "qty"}
+                          value={it.qty}
+                          step="0.001"
+                          display={fmtQty(it.qty)}
+                          onActivate={() => setEditing({ idx, field: "qty" })}
+                          onCommit={(v) => { updateLine(idx, { qty: v }); setEditing(null); searchRef.current?.focus(); }}
+                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                        />
                       </td>
                       <td className="p-0">
-                        <Input type="number" step="0.01" min={0} value={it.disc}
-                          onChange={(e) => updateLine(idx, { disc: Math.max(0, Number(e.target.value)) })}
-                          className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1" />
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "disc"}
+                          value={it.disc}
+                          step="0.01"
+                          min={0}
+                          display={fmtMoney(it.disc, sym)}
+                          onActivate={() => setEditing({ idx, field: "disc" })}
+                          onCommit={(v) => { updateLine(idx, { disc: Math.max(0, v) }); setEditing(null); searchRef.current?.focus(); }}
+                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                        />
                       </td>
+
                       <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(amount, sym)}</td>
                       <td className="px-1 py-1 text-center no-print border-0">
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeLine(idx)}>
