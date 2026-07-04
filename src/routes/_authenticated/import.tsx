@@ -121,6 +121,13 @@ async function parseSpreadsheet(file: File): Promise<{ headers: string[]; rows: 
   return { headers, rows };
 }
 
+// Broadcast when an import batch is created / updated / deleted so the
+// history panel can refresh itself without prop-drilling.
+const BATCH_EVENT = "import-batch-changed";
+function notifyBatchChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(BATCH_EVENT));
+}
+
 function Page() {
   return (
     <div className="p-6 space-y-4">
@@ -139,6 +146,7 @@ function Page() {
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          <TabsTrigger value="history"><History className="h-4 w-4 mr-1" />Uploaded files</TabsTrigger>
         </TabsList>
         <TabsContent value="single" className="mt-4"><SingleMergedFile /></TabsContent>
         <TabsContent value="smart" className="mt-4"><SmartMerge /></TabsContent>
@@ -147,8 +155,153 @@ function Page() {
             <Importer entity={k} />
           </TabsContent>
         ))}
+        <TabsContent value="history" className="mt-4"><ImportHistory /></TabsContent>
       </Tabs>
+
+      {/* Compact history at the bottom of every tab so uploaded files are
+          always visible without hunting through tabs. */}
+      <ImportHistory compact />
     </div>
+  );
+}
+
+// ---------------- Import history: list uploaded files & delete their data ----------------
+
+type BatchRow = {
+  id: string;
+  filename: string;
+  source: string;
+  products_count: number;
+  barcodes_count: number;
+  customers_count: number;
+  suppliers_count: number;
+  failed_count: number;
+  notes: string | null;
+  created_at: string;
+};
+
+function ImportHistory({ compact = false }: { compact?: boolean }) {
+  const [rows, setRows] = useState<BatchRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("import_batches")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) toast.error(error.message);
+    setRows((data as BatchRow[]) ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+    const onChange = () => load();
+    window.addEventListener(BATCH_EVENT, onChange);
+    return () => window.removeEventListener(BATCH_EVENT, onChange);
+  }, [load]);
+
+  const deleteBatch = async (b: BatchRow) => {
+    const totalItems = b.products_count + b.barcodes_count + b.customers_count + b.suppliers_count;
+    const msg = `"${b.filename}" delete karen?\n\nIs file se imported ${totalItems} records (products/barcodes/customers/suppliers) bhi permanently delete ho jain ge. Sales/purchases history rahegi. Continue?`;
+    if (!confirm(msg)) return;
+    setDeletingId(b.id);
+    // ON DELETE CASCADE on the FK removes the tagged rows automatically.
+    const { error } = await supabase.from("import_batches").delete().eq("id", b.id);
+    setDeletingId(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`"${b.filename}" aur uska imported data delete ho gaya`);
+    notifyBatchChanged();
+  };
+
+  const shown = compact ? rows.slice(0, 5) : rows;
+
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 className="font-medium flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Uploaded files
+            {compact && rows.length > 5 && (
+              <span className="text-xs text-muted-foreground font-normal">
+                · latest 5 (see the “Uploaded files” tab for all)
+              </span>
+            )}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Har upload ka record — kisi file ko delete karen to us file se imported data bhi hat jayega.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+          Refresh
+        </Button>
+      </div>
+
+      {loading && rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">
+          Abhi tak koi file upload nahi ki gayi.
+        </p>
+      ) : (
+        <div className="max-h-96 overflow-auto border rounded">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>File</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Imported</TableHead>
+                <TableHead className="w-24"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {shown.map((b) => {
+                const parts: string[] = [];
+                if (b.products_count) parts.push(`${b.products_count} products`);
+                if (b.barcodes_count) parts.push(`${b.barcodes_count} barcodes`);
+                if (b.customers_count) parts.push(`${b.customers_count} customers`);
+                if (b.suppliers_count) parts.push(`${b.suppliers_count} suppliers`);
+                if (b.failed_count) parts.push(`${b.failed_count} failed`);
+                return (
+                  <TableRow key={b.id}>
+                    <TableCell className="text-xs">
+                      <div className="font-medium truncate max-w-[280px]" title={b.filename}>{b.filename}</div>
+                      {b.notes && <div className="text-[10px] text-muted-foreground truncate max-w-[280px]">{b.notes}</div>}
+                    </TableCell>
+                    <TableCell><Badge variant="outline" className="text-[10px]">{b.source}</Badge></TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {new Date(b.created_at).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-xs text-right">
+                      {parts.length ? parts.join(" · ") : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteBatch(b)}
+                        disabled={deletingId === b.id}
+                        title="Delete this file and all data it imported"
+                      >
+                        {deletingId === b.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Trash2 className="h-3 w-3" />}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </Card>
   );
 }
 
