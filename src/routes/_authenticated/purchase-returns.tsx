@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { Receipt } from "@/components/receipt";
+import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/purchase-returns")({ component: Page });
 
@@ -51,7 +52,7 @@ function Page() {
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => (await supabase.from("products").select("id,name,cost_price").order("name")).data ?? [],
+    queryFn: async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,cost_price").order("name").range(from, to)),
   });
 
   useEffect(() => {

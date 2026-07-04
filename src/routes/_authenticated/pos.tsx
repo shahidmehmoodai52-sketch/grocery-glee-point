@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { Receipt } from "@/components/receipt";
+import { fetchAll } from "@/lib/supabase-page";
 
 
 export const Route = createFileRoute("/_authenticated/pos")({
@@ -92,25 +93,25 @@ function POSPage() {
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", "active"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id,name,sku,barcode,sell_price,cost_price,stock,unit,category")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAll<any>((from, to) =>
+        supabase
+          .from("products")
+          .select("id,name,sku,barcode,sell_price,cost_price,stock,unit,category")
+          .eq("is_active", true)
+          .order("name")
+          .range(from, to),
+      ),
   });
 
   const { data: extraBarcodes = [] } = useQuery({
     queryKey: ["product_barcodes"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("product_barcodes").select("product_id,barcode");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAll<any>((from, to) =>
+        supabase.from("product_barcodes").select("product_id,barcode").range(from, to),
+      ),
   });
+
 
   // product_id -> array of all barcodes (primary + extras)
   const barcodesByProduct = useMemo(() => {

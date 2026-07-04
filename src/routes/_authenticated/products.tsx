@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { fetchAll } from "@/lib/supabase-page";
 
 
 export const Route = createFileRoute("/_authenticated/products")({
@@ -37,11 +38,10 @@ function ProductsPage() {
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAll<any>((from, to) =>
+        supabase.from("products").select("*").order("name").range(from, to),
+      ),
   });
 
   const filtered = products.filter((p) => {

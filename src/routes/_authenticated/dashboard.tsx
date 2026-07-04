@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
 
@@ -46,7 +47,13 @@ function Page() {
   const { data: products = [] } = useQuery({
     queryKey: ["dash-products"],
     queryFn: async () =>
-      (await supabase.from("products").select("id,name,stock,sell_price,cost_price,is_active").eq("is_active", true)).data ?? [],
+      fetchAll<any>((from, to) =>
+        supabase
+          .from("products")
+          .select("id,name,stock,sell_price,cost_price,is_active")
+          .eq("is_active", true)
+          .range(from, to),
+      ),
   });
   const { data: topItemsRaw = [] } = useQuery({
     queryKey: ["dash-top-items", since],
