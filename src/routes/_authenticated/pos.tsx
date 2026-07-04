@@ -129,6 +129,48 @@ function POSPage() {
   const [highlight, setHighlight] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const [editing, setEditing] = useState<{ idx: number; field: "price" | "qty" | "disc" } | null>(null);
+  const [quickAdd, setQuickAdd] = useState<{
+    open: boolean; barcode: string; name: string; unit: string;
+    cost_price: string; sell_price: string; stock: string;
+  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1" });
+
+  const openQuickAdd = (term: string) => {
+    const raw = term.trim();
+    // Detect scanner-style codes vs a name typed by hand
+    const looksLikeBarcode = /^[0-9A-Za-z\-]{4,}$/.test(raw) && /\d/.test(raw);
+    setQuickAdd({
+      open: true,
+      barcode: looksLikeBarcode ? raw : "",
+      name: looksLikeBarcode ? "" : raw,
+      unit: "pcs", cost_price: "", sell_price: "", stock: "1",
+    });
+  };
+
+  const saveQuickAdd = async () => {
+    const name = quickAdd.name.trim();
+    if (!name) return toast.error("Item name is required");
+    const sell = Number(quickAdd.sell_price || 0);
+    const cost = Number(quickAdd.cost_price || 0);
+    const stock = Number(quickAdd.stock || 0);
+    const bc = quickAdd.barcode.trim() || null;
+    const { data, error } = await supabase.from("products").insert({
+      name, barcode: bc, unit: quickAdd.unit || "pcs",
+      cost_price: cost, sell_price: sell, stock, tax_rate: 0, is_active: true,
+    }).select(PRODUCT_COLUMNS).single();
+    if (error) return toast.error(error.message);
+    if (bc) {
+      await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: bc });
+    }
+    toast.success(`Added "${name}" to catalog`);
+    addProduct(data);
+    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1" });
+    setSearch("");
+    setTimeout(() => searchRef.current?.focus(), 0);
+    qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["product_barcodes"] });
+  };
+
+
 
   
   const searchRef = useRef<HTMLInputElement>(null);
