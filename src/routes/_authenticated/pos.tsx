@@ -49,6 +49,8 @@ type Tab = {
   note: string;
 };
 
+const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category";
+
 const newTab = (n: number): Tab => ({
   id: crypto.randomUUID(),
   name: `Invoice ${n}`,
@@ -62,6 +64,49 @@ const newTab = (n: number): Tab => ({
   note: "",
 });
 
+async function searchProducts(term: string) {
+  const q = term.trim().replace(/\s+/g, " ");
+  if (!q) return [];
+
+  const like = `%${q}%`;
+  const [nameRes, skuRes, barcodeRes, extraBarcodeRes] = await Promise.all([
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("name", like).order("name").limit(12),
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("sku", like).order("name").limit(12),
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("barcode", like).order("name").limit(12),
+    supabase.from("product_barcodes").select("product_id,barcode").ilike("barcode", like).limit(24),
+  ]);
+
+  const firstError = nameRes.error ?? skuRes.error ?? barcodeRes.error ?? extraBarcodeRes.error;
+  if (firstError) throw firstError;
+
+  const matchedBarcodesByProduct: Record<string, string[]> = {};
+  for (const row of extraBarcodeRes.data ?? []) {
+    if (!matchedBarcodesByProduct[row.product_id]) matchedBarcodesByProduct[row.product_id] = [];
+    matchedBarcodesByProduct[row.product_id].push(row.barcode);
+  }
+
+  const extraIds = Object.keys(matchedBarcodesByProduct);
+  const extraProductsRes = extraIds.length
+    ? await supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).in("id", extraIds).limit(24)
+    : { data: [], error: null };
+  if (extraProductsRes.error) throw extraProductsRes.error;
+
+  const merged = new Map<string, any>();
+  for (const p of [
+    ...(nameRes.data ?? []),
+    ...(skuRes.data ?? []),
+    ...(barcodeRes.data ?? []),
+    ...(extraProductsRes.data ?? []),
+  ]) {
+    merged.set(p.id, {
+      ...p,
+      _matched_barcodes: matchedBarcodesByProduct[p.id] ?? [],
+    });
+  }
+
+  return Array.from(merged.values());
+}
+
 
 function POSPage() {
   const qc = useQueryClient();
@@ -74,6 +119,7 @@ function POSPage() {
   const tab = tabs.find((t) => t.id === active) ?? tabs[0];
 
   const [search, setSearch] = useState("");
+  const searchTerm = useMemo(() => search.trim().replace(/\s+/g, " "), [search]);
   const [lastInvoice, setLastInvoice] = useState<any>(null);
   const [reprintOpen, setReprintOpen] = useState(false);
   const [reprintView, setReprintView] = useState<any>(null);
@@ -99,13 +145,25 @@ function POSPage() {
       fetchAll<any>((from, to) =>
         supabase
           .from("products")
-          .select("id,name,sku,barcode,sell_price,cost_price,stock,unit,category")
+          .select(PRODUCT_COLUMNS)
           .eq("is_active", true)
           .order("name")
           .range(from, to),
       ),
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: remoteProducts = [], isFetching: remoteProductsLoading } = useQuery({
+    queryKey: ["products", "pos-search", searchTerm],
+    enabled: searchTerm.length > 0 && products.length === 0,
+    queryFn: () => searchProducts(searchTerm),
+    staleTime: 60 * 1000,
+  });
+
+  const searchableProducts = useMemo(
+    () => (products.length > 0 ? products : remoteProducts),
+    [products, remoteProducts],
+  );
 
   const { data: extraBarcodes = [] } = useQuery({
     queryKey: ["product_barcodes"],
@@ -119,24 +177,25 @@ function POSPage() {
   // product_id -> array of all barcodes (primary + extras)
   const barcodesByProduct = useMemo(() => {
     const m: Record<string, string[]> = {};
-    products.forEach((p) => {
-      m[p.id] = p.barcode ? [String(p.barcode)] : [];
+    searchableProducts.forEach((p) => {
+      const matched = Array.isArray(p._matched_barcodes) ? p._matched_barcodes.map(String) : [];
+      m[p.id] = Array.from(new Set([...(p.barcode ? [String(p.barcode)] : []), ...matched]));
     });
     extraBarcodes.forEach((b: any) => {
       if (!m[b.product_id]) m[b.product_id] = [];
       if (!m[b.product_id].includes(b.barcode)) m[b.product_id].push(b.barcode);
     });
     return m;
-  }, [products, extraBarcodes]);
+  }, [searchableProducts, extraBarcodes]);
 
   // Exact-barcode lookup for scan
   const productByBarcode = useMemo(() => {
     const m: Record<string, any> = {};
-    products.forEach((p) => {
+    searchableProducts.forEach((p) => {
       (barcodesByProduct[p.id] ?? []).forEach((bc) => { m[bc] = p; });
     });
     return m;
-  }, [products, barcodesByProduct]);
+  }, [searchableProducts, barcodesByProduct]);
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
@@ -165,7 +224,7 @@ function POSPage() {
     // 3 = word-start in name, 4 = name substring, 5 = sku/barcode substring,
     // 6 = category match. Lower is better.
     const scored: { p: any; s: number }[] = [];
-    for (const p of products) {
+    for (const p of searchableProducts) {
       const name = (p.name ?? "").toLowerCase();
       const sku = (p.sku ?? "").toLowerCase();
       const cat = (p.category ?? "").toLowerCase();
@@ -184,7 +243,7 @@ function POSPage() {
     }
     scored.sort((a, b) => a.s - b.s || a.p.name.localeCompare(b.p.name));
     return scored.slice(0, 12).map((x) => x.p);
-  }, [products, search, barcodesByProduct]);
+  }, [searchableProducts, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
   useEffect(() => { setHighlight(0); }, [search]);
@@ -332,17 +391,69 @@ function POSPage() {
 
 
 
-  // F2 add tab, F4 complete (capture phase so inputs can't swallow it)
+  // F2 add tab, F4 complete, and keep scanner/manual typing routed to search by default.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const inDialog = !!target?.closest('[role="dialog"]');
+      const selectOpen = !!document.querySelector('[role="listbox"]');
+      const isSearchInput = target === searchRef.current;
+      const isEditableTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        !!target?.isContentEditable;
+
       if (e.key === "F2") {
         e.preventDefault();
         e.stopPropagation();
         addTab();
         setSearch("");
         setTimeout(() => searchRef.current?.focus(), 0);
+        return;
       }
-      if (e.key === "F4") { e.preventDefault(); handleSale(); }
+      if (e.key === "F4" && !inDialog) { e.preventDefault(); handleSale(); return; }
+
+      if (inDialog || selectOpen || editing || e.ctrlKey || e.metaKey || e.altKey || isSearchInput || isEditableTarget) return;
+
+      if (e.key.length === 1) {
+        e.preventDefault();
+        searchRef.current?.focus();
+        setSearch((s) => `${s}${e.key}`);
+        return;
+      }
+
+      if (e.key === "Backspace" && search) {
+        e.preventDefault();
+        searchRef.current?.focus();
+        setSearch((s) => s.slice(0, -1));
+        return;
+      }
+
+      if (e.key === "Escape" && search) {
+        e.preventDefault();
+        setSearch("");
+        searchRef.current?.focus();
+        return;
+      }
+
+      if (e.key === "Enter" && search.trim()) {
+        e.preventDefault();
+        const raw = search.trim();
+        const exact = productByBarcode[raw];
+        if (exact) {
+          addProduct(exact);
+          setSearch("");
+          searchRef.current?.focus();
+          return;
+        }
+        if (filtered.length >= 1) {
+          const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
+          addProduct(pick);
+          setSearch("");
+          searchRef.current?.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -519,7 +630,7 @@ function POSPage() {
               <Label className="text-xs">Customer</Label>
               <Select
                 value={tab.customer_id ?? "walkin"}
-                onValueChange={(v) => setTab({ customer_id: v === "walkin" ? null : v })}
+                onValueChange={(v) => { setTab({ customer_id: v === "walkin" ? null : v }); setTimeout(() => searchRef.current?.focus(), 0); }}
               >
                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -537,11 +648,14 @@ function POSPage() {
                 <Label className="text-xs">Staff / Owner purchase</Label>
                 <Select
                   value={tab.expense_person_id ?? "none"}
-                  onValueChange={(v) => setTab({
-                    expense_person_id: v === "none" ? null : v,
-                    // When charged to staff/owner, clear customer (bill goes to their expense ledger).
-                    customer_id: v === "none" ? tab.customer_id : null,
-                  })}
+                  onValueChange={(v) => {
+                    setTab({
+                      expense_person_id: v === "none" ? null : v,
+                      // When charged to staff/owner, clear customer (bill goes to their expense ledger).
+                      customer_id: v === "none" ? tab.customer_id : null,
+                    });
+                    setTimeout(() => searchRef.current?.focus(), 0);
+                  }}
                 >
                   <SelectTrigger className={`h-10 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
                     <SelectValue />
@@ -559,7 +673,7 @@ function POSPage() {
             )}
             <div>
               <Label className="text-xs">Payment</Label>
-              <Select value={tab.payment_method} onValueChange={(v) => setTab({ payment_method: v })}>
+              <Select value={tab.payment_method} onValueChange={(v) => { setTab({ payment_method: v }); setTimeout(() => searchRef.current?.focus(), 0); }}>
                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
@@ -581,6 +695,7 @@ function POSPage() {
                     setTab({ expense_person_id: null });
                   }
                   setShowStaff((v) => !v);
+                  setTimeout(() => searchRef.current?.focus(), 0);
                 }}
                 title="Charge this bill to a staff/owner expense ledger"
               >
@@ -637,7 +752,7 @@ function POSPage() {
                   const amount = net;
                   const profit = net - Number(it.qty) * Number(it.cost);
                   const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
-                  const p = it.product_id ? products.find((x) => x.id === it.product_id) : null;
+                  const p = it.product_id ? searchableProducts.find((x) => x.id === it.product_id) : null;
                   const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
                   const subline = p
                     ? [
