@@ -630,13 +630,31 @@ function POSPage() {
                   const amount = net;
                   const profit = net - Number(it.qty) * Number(it.cost);
                   const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
+                  const p = it.product_id ? products.find((x) => x.id === it.product_id) : null;
+                  const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
+                  const subline = p
+                    ? [
+                        p.sku ? `SKU ${p.sku}` : null,
+                        bcs[0] ? `BC ${bcs[0]}` : null,
+                        p.category || null,
+                      ].filter(Boolean).join(" · ")
+                    : "";
+                  const stockNum = p ? Number(p.stock ?? 0) : null;
                   return (
                     <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
                       <td className="px-2 py-1 font-mono text-xs">{it.code || String(idx + 1).padStart(3, "0")}</td>
                       <td className="px-2 py-1">
-                        <div className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-                          {it.name}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="font-medium text-sm truncate min-w-0 flex-1">{it.name}</div>
+                          {stockNum !== null && (
+                            <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
+                              {fmtQty(stockNum)} {p?.unit ?? ""}
+                            </Badge>
+                          )}
                         </div>
+                        {subline && (
+                          <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
+                        )}
                       </td>
 
                       {showCost && (
