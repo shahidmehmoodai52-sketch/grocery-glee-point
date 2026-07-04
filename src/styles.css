@@ -129,7 +129,17 @@
     color: var(--color-foreground);
     font-feature-settings: "tnum" 1, "cv11" 1;
   }
+  /* Remove native number-input spinner arrows (they mis-adjust price / qty on scroll or click). */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+  /* Give numeric / text inputs enough width to comfortably type prices, quantities, and names. */
+  input[type="number"], input[type="text"], input:not([type]) { min-width: 0; }
 }
+
 
 @media print {
   @page { margin: 0; }
