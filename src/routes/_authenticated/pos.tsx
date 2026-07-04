@@ -670,14 +670,20 @@ function POSPage() {
                 </div>
               )}
               {search.trim() && filtered.length === 0 && (
-                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm">
                   {productsLoading || remoteProductsLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Loading products… please wait</>
+                    <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading products… please wait</div>
                   ) : (
-                    <>No products match "{search}". Try name, SKU, ya barcode.</>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-muted-foreground">No product matches "{search}".</div>
+                      <Button size="sm" onClick={() => openQuickAdd(search)}>
+                        <Plus className="h-4 w-4 mr-1" /> Add new item
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
+
 
             </div>
             <div>
