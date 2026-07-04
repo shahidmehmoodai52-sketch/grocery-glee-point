@@ -1015,6 +1015,57 @@ function POSPage() {
         settings={settings}
         onClose={() => setReprintView(null)}
       />
+
+      {/* Quick-add product dialog — for scanned/typed items not yet in catalog */}
+      <Dialog open={quickAdd.open} onOpenChange={(v) => setQuickAdd((q) => ({ ...q, open: v }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add new item to catalog</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label>Item name</Label>
+              <Input
+                autoFocus
+                value={quickAdd.name}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, name: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveQuickAdd(); } }}
+              />
+            </div>
+            <div className="col-span-2">
+              <Label>Barcode</Label>
+              <Input
+                value={quickAdd.barcode}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, barcode: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Unit</Label>
+              <Input value={quickAdd.unit} onChange={(e) => setQuickAdd((q) => ({ ...q, unit: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Stock</Label>
+              <Input type="number" step="0.001" value={quickAdd.stock}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, stock: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Purchase rate</Label>
+              <Input type="number" step="0.01" value={quickAdd.cost_price}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, cost_price: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Sell price</Label>
+              <Input type="number" step="0.01" value={quickAdd.sell_price}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, sell_price: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setQuickAdd((q) => ({ ...q, open: false }))}>Cancel</Button>
+            <Button onClick={saveQuickAdd}>Save & add to bill</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
       {false && lastInvoice}
     </div>
