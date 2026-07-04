@@ -11,11 +11,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//") ? s.next : undefined,
+  }),
   component: AuthPage,
 });
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
+  const target = next ?? "/pos";
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,13 +29,11 @@ function AuthPage() {
 
   const goToApp = useCallback(async () => {
     try {
-      await navigate({ to: "/pos", replace: true });
+      await navigate({ to: target, replace: true });
     } finally {
-      // Electron + browser preview both work reliably with a hard route handoff.
-      // It also clears any stale auth-page render after Supabase stores the session.
-      window.location.replace("/pos");
+      window.location.replace(target);
     }
-  }, [navigate]);
+  }, [navigate, target]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -47,7 +50,7 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/pos`,
+            emailRedirectTo: `${window.location.origin}${target}`,
             data: { full_name: fullName },
           },
         });
@@ -74,7 +77,7 @@ function AuthPage() {
 
   const handleGoogle = async () => {
     setBusy(true);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}${target}` });
     if (result.error) {
       toast.error(result.error.message ?? "Google sign-in failed");
       setBusy(false);
