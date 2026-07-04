@@ -792,16 +792,17 @@ function POSPage() {
             <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
               <thead className="sticky top-0 z-10 bg-[hsl(var(--muted))] text-[11px] uppercase tracking-wide">
                 <tr>
-                  <th className="px-2 py-2 text-left w-14">Item No</th>
+                  <th className="px-2 py-2 text-left w-16">Item No</th>
                   <th className="px-2 py-2 text-left">Item Name</th>
                   {showCost && (
-                    <th className="px-2 py-2 text-right w-20 no-print" title="Purchase rate (internal)">P.Rate</th>
+                    <th className="px-2 py-2 text-right w-24 no-print" title="Purchase rate (internal)">P.Rate</th>
                   )}
-                  <th className="px-2 py-2 text-right w-24">Unit Rate</th>
-                  <th className="px-2 py-2 text-right w-20">QTY</th>
-                  <th className="px-2 py-2 text-right w-24">Discount</th>
-                  <th className="px-2 py-2 text-right w-28">Amount</th>
+                  <th className="px-2 py-2 text-right w-32">Unit Rate</th>
+                  <th className="px-2 py-2 text-right w-28">QTY</th>
+                  <th className="px-2 py-2 text-right w-32">Discount</th>
+                  <th className="px-2 py-2 text-right w-36">Amount</th>
                   <th className="px-2 py-2 w-8 no-print"></th>
+
                 </tr>
               </thead>
               <tbody>
