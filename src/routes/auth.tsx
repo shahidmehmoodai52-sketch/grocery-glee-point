@@ -143,6 +143,16 @@ function AuthPage() {
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === "signin" ? "Sign in" : "Create account"}
             </Button>
+            {mode === "signin" && (
+              <button
+                type="button"
+                onClick={handleForgot}
+                disabled={busy}
+                className="text-xs text-muted-foreground hover:text-foreground w-full text-center mt-1"
+              >
+                Forgot password?
+              </button>
+            )}
           </form>
         </Tabs>
 
