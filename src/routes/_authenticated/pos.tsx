@@ -82,6 +82,8 @@ function POSPage() {
   const [showStaff, setShowStaff] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [now, setNow] = useState(() => new Date());
+  const [editing, setEditing] = useState<{ idx: number; field: "price" | "qty" | "disc" } | null>(null);
+
   
   const searchRef = useRef<HTMLInputElement>(null);
   const paidRef = useRef<HTMLInputElement>(null);
