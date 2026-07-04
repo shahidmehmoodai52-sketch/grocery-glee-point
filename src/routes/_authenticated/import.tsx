@@ -1052,6 +1052,10 @@ function SingleMergedFile() {
     let prodOk = 0, prodFail = 0, bcOk = 0;
     const chunkSize = 200;
 
+    // Track this upload as a batch so it appears in "Uploaded files"
+    // and can be deleted later along with its imported rows.
+    const batchId = await createImportBatch(file?.name ?? "merged-upload", "single_merged");
+
     // Split by whether SKU present
     const withSku = grouped.filter((g) => g.sku);
     const noSku = grouped.filter((g) => !g.sku);
@@ -1061,6 +1065,7 @@ function SingleMergedFile() {
       name: g.name, sku: g.sku, category: g.category, unit: g.unit || "pcs",
       cost_price: g.cost_price, sell_price: g.sell_price, stock: g.stock, tax_rate: g.tax_rate,
       barcode: g.barcodes[0] ?? null,
+      ...(batchId ? { import_batch_id: batchId } : {}),
     });
 
     // 1) Upsert products with SKU (grouped so no dupes in one batch)
@@ -1097,11 +1102,14 @@ function SingleMergedFile() {
     }
 
     // 4) Upsert all barcodes
-    const bcRows: { product_id: string; barcode: string }[] = [];
+    const bcRows: { product_id: string; barcode: string; import_batch_id?: string }[] = [];
     for (const g of grouped) {
       const pid = g.sku ? skuToId[g.sku] : nameToId[g.name];
       if (!pid) continue;
-      for (const b of g.barcodes) bcRows.push({ product_id: pid, barcode: b });
+      for (const b of g.barcodes) bcRows.push({
+        product_id: pid, barcode: b,
+        ...(batchId ? { import_batch_id: batchId } : {}),
+      });
     }
     // De-dupe by barcode
     const seen = new Set<string>();
@@ -1112,6 +1120,9 @@ function SingleMergedFile() {
       if (error) errors.push(`barcodes: ${error.message}`); else bcOk += chunk.length;
       setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
     }
+
+    await finalizeImportBatch(batchId, { products: prodOk, barcodes: bcOk, failed: prodFail });
+    notifyBatchChanged();
 
     setBusy(false);
     if (prodFail === 0) toast.success(`Imported ${prodOk} items · ${bcOk} barcodes linked`);
