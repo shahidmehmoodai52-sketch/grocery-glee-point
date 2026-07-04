@@ -815,8 +815,10 @@ function Importer({ entity }: { entity: EntityKey }) {
     setBusy(true); setResult({ ok: 0, failed: 0, errors: [] });
     const errors: string[] = []; let ok = 0, failed = 0;
     const chunkSize = 200;
+    const batchId = await createImportBatch(filename || `${entity}-upload`, entity);
+    const tag = (r: any) => (batchId ? { ...r, import_batch_id: batchId } : r);
     for (let i = 0; i < mapped.length; i += chunkSize) {
-      const chunk = mapped.slice(i, i + chunkSize);
+      const chunk = mapped.slice(i, i + chunkSize).map(tag);
       if (entity === "products" && schema.onConflict) {
         const withKey = chunk.filter((r) => r.sku);
         const withoutKey = chunk.filter((r) => !r.sku);
@@ -834,6 +836,13 @@ function Importer({ entity }: { entity: EntityKey }) {
       }
       setResult({ ok, failed, errors: [...new Set(errors)].slice(0, 5) });
     }
+    await finalizeImportBatch(batchId, {
+      products: entity === "products" ? ok : 0,
+      customers: entity === "customers" ? ok : 0,
+      suppliers: entity === "suppliers" ? ok : 0,
+      failed,
+    });
+    notifyBatchChanged();
     setBusy(false);
     if (failed === 0) toast.success(`Imported ${ok} rows`); else toast.error(`${ok} imported, ${failed} failed`);
   };
