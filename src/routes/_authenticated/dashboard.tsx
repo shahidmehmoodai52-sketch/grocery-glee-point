@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
 
