@@ -766,9 +766,11 @@ function Importer({ entity }: { entity: EntityKey }) {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: number; failed: number; errors: string[] } | null>(null);
+  const [filename, setFilename] = useState<string>("");
 
   const parseFile = async (file: File) => {
     setResult(null);
+    setFilename(file.name);
     try {
       const { headers: hdrs, rows: data } = await parseSpreadsheet(file);
       setHeaders(hdrs); setRows(data);
