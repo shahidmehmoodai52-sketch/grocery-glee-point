@@ -388,7 +388,19 @@ function POSPage() {
     }
   };
 
-
+  // Radix Dialog/Select sometimes leaves `pointer-events: none` on <body> after
+  // closing quickly, freezing the entire page to mouse input. Clear it whenever
+  // no overlay is actually open.
+  useEffect(() => {
+    const clearStuck = () => {
+      const hasOverlay = document.querySelector('[role="dialog"][data-state="open"], [role="listbox"][data-state="open"], [data-radix-popper-content-wrapper]');
+      if (!hasOverlay && document.body.style.pointerEvents === "none") {
+        document.body.style.pointerEvents = "";
+      }
+    };
+    const id = window.setInterval(clearStuck, 300);
+    return () => window.clearInterval(id);
+  }, []);
 
 
   // F2 add tab, F4 complete, and keep scanner/manual typing routed to search by default.
