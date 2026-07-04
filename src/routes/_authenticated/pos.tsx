@@ -154,7 +154,7 @@ function POSPage() {
   });
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim().replace(/\s+/g, " ").toLowerCase();
     if (!q) return [];
     // Score each product so best matches float to the top.
     // 0 = exact sku/barcode, 1 = sku/barcode prefix, 2 = name prefix,
@@ -444,31 +444,49 @@ function POSPage() {
               </div>
               {search.trim() && filtered.length > 0 && (
                 <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg max-h-96 overflow-auto">
-                  <div className="grid grid-cols-[1fr_100px_70px_80px_110px] gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0">
+                  <div className="grid grid-cols-[1fr_110px_90px_70px_70px_100px] gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0">
                     <div>Item</div>
-                    <div className="text-right">Unit Rate</div>
-                    <div className="text-right">QTY</div>
-                    <div className="text-right">Dis</div>
+                    <div>Code</div>
+                    <div className="text-right">Rate</div>
+                    <div className="text-right">Stock</div>
+                    <div className="text-right">Qty</div>
                     <div className="text-right">Amount</div>
                   </div>
                   {filtered.map((p, i) => {
                     const rate = Number(p.sell_price ?? 0);
                     const qty = 1;
-                    const dis = 0;
-                    const amount = rate * qty - dis;
+                    const amount = rate * qty;
+                    const code = p.sku || p.barcode || "—";
+                    const bcs = barcodesByProduct[p.id] ?? [];
+                    const subline = [
+                      p.sku ? `SKU ${p.sku}` : null,
+                      bcs[0] ? `BC ${bcs[0]}` : null,
+                      p.category || null,
+                    ].filter(Boolean).join(" · ");
+                    const stockNum = Number(p.stock ?? 0);
                     return (
                       <button
                         key={p.id}
                         onMouseEnter={() => setHighlight(i)}
                         onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
-                        className={`w-full grid grid-cols-[1fr_100px_70px_80px_110px] gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${
+                        className={`w-full grid grid-cols-[1fr_110px_90px_70px_70px_100px] gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${
                           i === highlight ? "bg-accent" : "hover:bg-accent/60"
                         }`}
                       >
-                        <div className="font-semibold text-base truncate">{p.name}</div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-base truncate">{p.name}</div>
+                          {subline && (
+                            <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
+                          )}
+                        </div>
+                        <div className="text-xs font-mono tabular-nums truncate">{code}</div>
                         <div className="text-right tabular-nums text-sm">{fmtMoney(rate, sym)}</div>
+                        <div className="text-right tabular-nums text-xs">
+                          <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal">
+                            {fmtQty(stockNum)} {p.unit ?? ""}
+                          </Badge>
+                        </div>
                         <div className="text-right tabular-nums text-sm">{fmtQty(qty)}</div>
-                        <div className="text-right tabular-nums text-sm">{fmtMoney(dis, sym)}</div>
                         <div className="text-right tabular-nums text-sm font-medium">{fmtMoney(amount, sym)}</div>
                       </button>
                     );
@@ -477,9 +495,10 @@ function POSPage() {
               )}
               {search.trim() && filtered.length === 0 && (
                 <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm text-muted-foreground">
-                  No products match "{search}".
+                  No products match "{search}". Try name, SKU, ya barcode.
                 </div>
               )}
+
             </div>
             <div>
               <Label className="text-xs">Customer</Label>
