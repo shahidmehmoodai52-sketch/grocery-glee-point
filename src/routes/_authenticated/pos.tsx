@@ -506,8 +506,11 @@ function POSPage() {
           addProduct(pick);
           setSearch("");
           searchRef.current?.focus();
+          return;
         }
+        openQuickAdd(raw);
       }
+
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
