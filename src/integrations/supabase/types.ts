@@ -21,6 +21,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          import_batch_id: string | null
           name: string
           phone: string | null
         }
@@ -30,6 +31,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          import_batch_id?: string | null
           name: string
           phone?: string | null
         }
@@ -39,10 +41,19 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          import_batch_id?: string | null
           name?: string
           phone?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customers_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expense_persons: {
         Row: {
@@ -137,6 +148,48 @@ export type Database = {
           },
         ]
       }
+      import_batches: {
+        Row: {
+          barcodes_count: number
+          created_at: string
+          customers_count: number
+          failed_count: number
+          filename: string
+          id: string
+          notes: string | null
+          products_count: number
+          source: string
+          suppliers_count: number
+          user_id: string | null
+        }
+        Insert: {
+          barcodes_count?: number
+          created_at?: string
+          customers_count?: number
+          failed_count?: number
+          filename: string
+          id?: string
+          notes?: string | null
+          products_count?: number
+          source: string
+          suppliers_count?: number
+          user_id?: string | null
+        }
+        Update: {
+          barcodes_count?: number
+          created_at?: string
+          customers_count?: number
+          failed_count?: number
+          filename?: string
+          id?: string
+          notes?: string | null
+          products_count?: number
+          source?: string
+          suppliers_count?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       party_payments: {
         Row: {
           amount: number
@@ -175,6 +228,7 @@ export type Database = {
           barcode: string
           created_at: string
           id: string
+          import_batch_id: string | null
           label: string | null
           product_id: string
         }
@@ -182,6 +236,7 @@ export type Database = {
           barcode: string
           created_at?: string
           id?: string
+          import_batch_id?: string | null
           label?: string | null
           product_id: string
         }
@@ -189,10 +244,18 @@ export type Database = {
           barcode?: string
           created_at?: string
           id?: string
+          import_batch_id?: string | null
           label?: string | null
           product_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "product_barcodes_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_barcodes_product_id_fkey"
             columns: ["product_id"]
@@ -209,6 +272,7 @@ export type Database = {
           cost_price: number
           created_at: string
           id: string
+          import_batch_id: string | null
           is_active: boolean
           name: string
           sell_price: number
@@ -224,6 +288,7 @@ export type Database = {
           cost_price?: number
           created_at?: string
           id?: string
+          import_batch_id?: string | null
           is_active?: boolean
           name: string
           sell_price?: number
@@ -239,6 +304,7 @@ export type Database = {
           cost_price?: number
           created_at?: string
           id?: string
+          import_batch_id?: string | null
           is_active?: boolean
           name?: string
           sell_price?: number
@@ -248,7 +314,15 @@ export type Database = {
           unit?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -769,6 +843,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          import_batch_id: string | null
           name: string
           phone: string | null
         }
@@ -778,6 +853,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          import_batch_id?: string | null
           name: string
           phone?: string | null
         }
@@ -787,10 +863,19 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          import_batch_id?: string | null
           name?: string
           phone?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_permissions: {
         Row: {
