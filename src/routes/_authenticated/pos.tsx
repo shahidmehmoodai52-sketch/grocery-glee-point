@@ -617,7 +617,7 @@ function POSPage() {
               )}
               {search.trim() && filtered.length === 0 && (
                 <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm text-muted-foreground flex items-center gap-2">
-                  {productsLoading ? (
+                  {productsLoading || remoteProductsLoading ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Loading products… please wait</>
                   ) : (
                     <>No products match "{search}". Try name, SKU, ya barcode.</>
