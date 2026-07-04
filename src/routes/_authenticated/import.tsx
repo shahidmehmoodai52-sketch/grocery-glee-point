@@ -579,10 +579,15 @@ function SmartMerge() {
     const errors: string[] = [];
     let ok = 0, failed = 0;
 
+    // Track this import as a batch so it can be reviewed / deleted later.
+    const batchName = [stockFile?.name, barcodeFile?.name].filter(Boolean).join(" + ") || "smart-merge";
+    const batchId = await createImportBatch(batchName, "smart_merge");
+    const tag = (p: any) => (batchId ? { ...p, import_batch_id: batchId } : p);
+
     // 1) Upsert products by SKU (when present)
     const chunkSize = 200;
-    const withSku = merged.filter((p) => p.sku);
-    const noSku = merged.filter((p) => !p.sku);
+    const withSku = merged.filter((p) => p.sku).map(tag);
+    const noSku = merged.filter((p) => !p.sku).map(tag);
     for (let i = 0; i < withSku.length; i += chunkSize) {
       const chunk = withSku.slice(i, i + chunkSize);
       const { error } = await supabase.from("products").upsert(chunk as any, { onConflict: "sku" });
@@ -605,7 +610,7 @@ function SmartMerge() {
         (data ?? []).forEach((p: any) => { if (p.sku) skuToId[p.sku] = p.id; });
       }
       const rows = extraBarcodes
-        .map((x) => ({ product_id: skuToId[x.sku], barcode: x.barcode }))
+        .map((x) => tag({ product_id: skuToId[x.sku], barcode: x.barcode }))
         .filter((x) => x.product_id);
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
@@ -613,6 +618,9 @@ function SmartMerge() {
         if (error) errors.push(error.message); else bcOk += chunk.length;
       }
     }
+
+    await finalizeImportBatch(batchId, { products: ok, barcodes: bcOk, failed });
+    notifyBatchChanged();
 
     setBusy(false);
     setResult({ products: ok, barcodes: bcOk, failed, errors: [...new Set(errors)].slice(0, 5) });
