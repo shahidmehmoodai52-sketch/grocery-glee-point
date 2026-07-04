@@ -444,8 +444,8 @@ function POSPage() {
                 />
               </div>
               {search.trim() && filtered.length > 0 && (
-                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg max-h-96 overflow-auto">
-                  <div className={`grid ${showCost ? "grid-cols-[110px_1fr_80px_96px_70px_90px_110px]" : "grid-cols-[110px_1fr_96px_70px_90px_110px]"} gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0`}>
+                <div className="absolute z-20 left-0 mt-1 rounded-md border bg-popover shadow-lg max-h-96 overflow-auto min-w-full w-[min(760px,95vw)]">
+                  <div className={`grid ${showCost ? "grid-cols-[80px_minmax(200px,1fr)_70px_80px_56px_72px_90px]" : "grid-cols-[80px_minmax(200px,1fr)_80px_56px_72px_90px]"} gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0`}>
                     <div>Item No</div>
                     <div>Item Name</div>
                     {showCost && <div className="text-right">P.Rate</div>}
