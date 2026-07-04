@@ -50,7 +50,7 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/pos`,
+            emailRedirectTo: `${window.location.origin}${target}`,
             data: { full_name: fullName },
           },
         });
