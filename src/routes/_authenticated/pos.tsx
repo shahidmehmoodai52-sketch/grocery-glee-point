@@ -518,9 +518,9 @@ function POSPage() {
   });
 
   return (
-    <div className="h-[calc(100vh-3rem)] flex flex-col">
+      <div className="h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
       {/* Top strip — open bills + clock + reprint (jahaan se sidebar khulti hai us patti ke saath) */}
-      <div className="flex items-center gap-2 px-2 py-1.5 border-b bg-card/60 no-print shrink-0">
+        <div className="flex items-center gap-2 px-2 py-1 border-b bg-card/60 no-print shrink-0">
         <ScrollArea className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
             {tabs.map((t) => (
@@ -556,6 +556,10 @@ function POSPage() {
         </div>
         <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setReprintOpen(true)}>
           <History className="h-3.5 w-3.5 mr-1" /> Reprint
+        </Button>
+        <Button size="sm" className="h-7 text-xs shrink-0" onClick={handleSale} disabled={submitting}>
+          {submitting && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+          Complete (F4)
         </Button>
       </div>
 
