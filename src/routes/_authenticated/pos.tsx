@@ -758,41 +758,6 @@ function POSPage() {
           )}
         </div>
 
-        {/* Open bills / tabs */}
-        <div className="p-2 border-b">
-          <div className="flex items-center justify-between mb-1 px-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Open bills</div>
-            <Button size="sm" variant="ghost" onClick={addTab} className="h-6 px-1.5 text-[11px]">
-              <Plus className="h-3 w-3 mr-0.5" /> New (F2)
-            </Button>
-          </div>
-          <ScrollArea className="max-h-28">
-            <div className="flex flex-col gap-1 pr-1">
-              {tabs.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => setActive(t.id)}
-                  className={`group flex items-center gap-2 rounded border px-2 py-1 text-xs cursor-pointer ${
-                    t.id === active ? "bg-accent border-primary/40" : "bg-background hover:bg-muted"
-                  }`}
-                >
-                  <ShoppingCart className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  <span className="truncate flex-1">{t.name}</span>
-                  {t.items.length > 0 && (
-                    <Badge variant="secondary" className="h-4 px-1 text-[10px]">{t.items.length}</Badge>
-                  )}
-                  <span
-                    role="button"
-                    onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
-                    className="rounded p-0.5 opacity-60 hover:opacity-100 hover:bg-destructive/20"
-                  >
-                    <X className="h-3 w-3" />
-                  </span>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
 
         {/* Party + payment */}
         <div className="p-2.5 border-b space-y-2">
