@@ -557,10 +557,6 @@ function POSPage() {
         <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setReprintOpen(true)}>
           <History className="h-3.5 w-3.5 mr-1" /> Reprint
         </Button>
-        <Button size="sm" className="h-7 text-xs shrink-0" onClick={handleSale} disabled={submitting}>
-          {submitting && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-          Complete (F4)
-        </Button>
       </div>
 
       {/* Two-column layout */}
@@ -950,15 +946,12 @@ function POSPage() {
             </div>
           </div>
 
-          <div className="pt-1">
-            <Label className="text-[11px] text-muted-foreground">Note (delivery address, house no…)</Label>
-            <Textarea
-              value={tab.note}
-              onChange={(e) => setTab({ note: e.target.value })}
-              placeholder="e.g. House #123, Street 4"
-              className="mt-0.5 h-[38px] min-h-[38px] resize-none text-sm"
-            />
-          </div>
+          <Input
+            value={tab.note}
+            onChange={(e) => setTab({ note: e.target.value })}
+            placeholder="Note / House #, street…"
+            className="h-7 text-xs"
+          />
 
           {tab.items.length > 0 && (() => {
             const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
@@ -966,7 +959,7 @@ function POSPage() {
             const net = subtotal - discount;
             const pct = net > 0 ? (cartProfit / net) * 100 : 0;
             return (
-              <div className="rounded-md border border-dashed bg-background/60 px-2 py-1 text-[11px] flex items-center justify-between">
+              <div className="rounded-md border border-dashed bg-background/60 px-2 py-0.5 text-[11px] flex items-center justify-between">
                 <span className="text-muted-foreground">Cost <span className="font-mono">{fmtMoney(cartCost, sym)}</span></span>
                 <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
                   Profit {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
@@ -974,6 +967,14 @@ function POSPage() {
               </div>
             );
           })()}
+        </div>
+
+        {/* Footer — Complete sale */}
+        <div className="p-2 border-t bg-card shrink-0">
+          <Button className="w-full h-10 text-sm font-semibold" onClick={handleSale} disabled={submitting}>
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Complete Sale (F4)
+          </Button>
         </div>
 
       </aside>
