@@ -518,263 +518,33 @@ function POSPage() {
   });
 
   return (
-    <div className="h-[calc(100vh-3rem)] flex flex-col">
-      {/* Tabs strip */}
-      <div className="flex items-center gap-2 px-3 pt-2 border-b bg-card/40">
-        <ScrollArea className="flex-1 max-w-full">
-          <div className="flex items-center gap-1 pb-2">
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setActive(t.id)}
-                className={`group flex items-center gap-2 rounded-t-md border border-b-0 px-3 py-1.5 text-sm whitespace-nowrap ${
-                  t.id === active ? "bg-background border-border" : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                <ShoppingCart className="h-3.5 w-3.5" />
-                <span>{t.name}</span>
-                {t.items.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 px-1.5">{t.items.length}</Badge>
-                )}
-                <span
-                  role="button"
-                  onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
-                  className="ml-1 rounded p-0.5 opacity-60 hover:opacity-100 hover:bg-destructive/20"
-                >
-                  <X className="h-3 w-3" />
-                </span>
-              </button>
-            ))}
-            <Button size="sm" variant="ghost" onClick={addTab} className="h-7 px-2">
-              <Plus className="h-4 w-4" /> New (F2)
-            </Button>
+    <div className="h-[calc(100vh-3rem)] flex">
+      {/* LEFT: items area (maximised) */}
+      <main className="flex-1 flex flex-col min-h-0 bg-background">
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b bg-muted/30 no-print">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium truncate">{tab.name}</span>
+            <Badge variant="secondary" className="h-5 px-1.5 text-[11px] shrink-0">
+              {tab.items.length} item{tab.items.length === 1 ? "" : "s"}
+            </Badge>
+            {tab.expense_person_id && (
+              <Badge variant="outline" className="border-warning text-warning text-[11px] shrink-0">
+                Staff purchase
+              </Badge>
+            )}
           </div>
-        </ScrollArea>
-
-        {/* Live clock + Reprint button */}
-        <div className="flex items-center gap-2 pb-2 shrink-0">
-          <div className="hidden sm:flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-mono tabular-nums">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>{now.toLocaleDateString()}</span>
-            <span className="text-muted-foreground">·</span>
-            <span>{now.toLocaleTimeString()}</span>
-          </div>
-          <Button size="sm" variant="outline" className="h-7" onClick={() => setReprintOpen(true)}>
-            <History className="h-3.5 w-3.5 mr-1" /> Reprint / Past invoices
+          <Button
+            size="sm"
+            variant={showCost ? "secondary" : "ghost"}
+            className="h-7 text-xs"
+            onClick={() => setShowCost((v) => !v)}
+          >
+            {showCost ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+            {showCost ? "Hide" : "Show"} P.Rate
           </Button>
         </div>
-      </div>
 
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Billing window */}
-        <div className="flex flex-col min-h-0 flex-1 bg-background">
-          {/* Scan / search bar + customer + payment */}
-          <div className={`p-3 border-b grid grid-cols-1 gap-2 items-end ${
-            (showStaff || tab.expense_person_id)
-              ? "md:grid-cols-[1fr_200px_200px_140px_auto]"
-              : "md:grid-cols-[1fr_200px_140px_auto]"
-          }`}>
-            <div className="relative">
-              <Label className="text-xs">Scan barcode / search item</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  ref={searchRef}
-                  autoFocus
-                  placeholder="Scan barcode or type name / SKU…  (↑/↓ to choose, Enter to add)"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") { setSearch(""); return; }
-                    if (e.key === "ArrowDown" && filtered.length) {
-                      e.preventDefault();
-                      setHighlight((h) => (h + 1) % filtered.length);
-                      return;
-                    }
-                    if (e.key === "ArrowUp" && filtered.length) {
-                      e.preventDefault();
-                      setHighlight((h) => (h - 1 + filtered.length) % filtered.length);
-                      return;
-                    }
-                    if (e.key !== "Enter") return;
-                    e.preventDefault();
-                    const raw = search.trim();
-                    // Empty search + items in cart → jump to Paid input
-                    if (!raw) {
-                      if (tab.items.length > 0) paidRef.current?.focus();
-                      return;
-                    }
-                    const exact = productByBarcode[raw];
-                    if (exact) { addProduct(exact); setSearch(""); return; }
-                    if (filtered.length >= 1) {
-                      const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
-                      addProduct(pick);
-                      setSearch("");
-                      return;
-                    }
-                    // Nothing matched → offer quick-add
-                    openQuickAdd(raw);
-
-                  }}
-                  className="pl-9 h-10"
-                />
-              </div>
-              {search.trim() && filtered.length > 0 && (
-                <div className="absolute z-20 left-0 mt-1 rounded-md border bg-popover shadow-lg max-h-96 overflow-auto min-w-full w-[min(760px,95vw)]">
-                  <div className={`grid ${showCost ? "grid-cols-[80px_minmax(200px,1fr)_70px_80px_56px_72px_90px]" : "grid-cols-[80px_minmax(200px,1fr)_80px_56px_72px_90px]"} gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0`}>
-                    <div>Item No</div>
-                    <div>Item Name</div>
-                    {showCost && <div className="text-right">P.Rate</div>}
-                    <div className="text-right">Unit Rate</div>
-                    <div className="text-right">QTY</div>
-                    <div className="text-right">Discount</div>
-                    <div className="text-right">Amount</div>
-                  </div>
-                  {filtered.map((p, i) => {
-                    const rate = Number(p.sell_price ?? 0);
-                    const pRate = Number(p.cost_price ?? 0);
-                    const qty = 1;
-                    const discount = 0;
-                    const amount = rate * qty - discount;
-                    const code = p.sku || p.barcode || "—";
-                    const bcs = barcodesByProduct[p.id] ?? [];
-                    const subline = [
-                      p.sku ? `SKU ${p.sku}` : null,
-                      bcs[0] ? `BC ${bcs[0]}` : null,
-                      p.category || null,
-                    ].filter(Boolean).join(" · ");
-                    const stockNum = Number(p.stock ?? 0);
-                    return (
-                      <button
-                        key={p.id}
-                        onMouseEnter={() => setHighlight(i)}
-                        onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
-                        className={`w-full grid ${showCost ? "grid-cols-[80px_minmax(200px,1fr)_70px_80px_56px_72px_90px]" : "grid-cols-[80px_minmax(200px,1fr)_80px_56px_72px_90px]"} gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${
-                          i === highlight ? "bg-accent" : "hover:bg-accent/60"
-                        }`}
-                      >
-                        <div className="text-xs font-mono tabular-nums truncate">{code}</div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="font-semibold text-sm truncate min-w-0 flex-1">{p.name}</div>
-                            <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
-                              {fmtQty(stockNum)} {p.unit ?? ""}
-                            </Badge>
-                          </div>
-                          {subline && (
-                            <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
-                          )}
-                        </div>
-                        {showCost && (
-                          <div className="text-right tabular-nums text-xs text-muted-foreground">{fmtMoney(pRate, sym)}</div>
-                        )}
-                        <div className="text-right tabular-nums text-sm">{fmtMoney(rate, sym)}</div>
-                        <div className="text-right tabular-nums text-sm">{fmtQty(qty)}</div>
-                        <div className="text-right tabular-nums text-sm">{fmtMoney(discount, sym)}</div>
-                        <div className="text-right tabular-nums text-sm font-medium">{fmtMoney(amount, sym)}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {search.trim() && filtered.length === 0 && (
-                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm">
-                  {productsLoading || remoteProductsLoading ? (
-                    <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading products… please wait</div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-muted-foreground">No product matches "{search}".</div>
-                      <Button size="sm" onClick={() => openQuickAdd(search)}>
-                        <Plus className="h-4 w-4 mr-1" /> Add new item
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-
-            </div>
-            <div>
-              <Label className="text-xs">Customer</Label>
-              <Select
-                value={tab.customer_id ?? "walkin"}
-                onValueChange={(v) => { setTab({ customer_id: v === "walkin" ? null : v }); setTimeout(() => searchRef.current?.focus(), 0); }}
-              >
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="walkin">Walk-in customer</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {(showStaff || tab.expense_person_id) && (
-              <div>
-                <Label className="text-xs">Staff / Owner purchase</Label>
-                <Select
-                  value={tab.expense_person_id ?? "none"}
-                  onValueChange={(v) => {
-                    setTab({
-                      expense_person_id: v === "none" ? null : v,
-                      // When charged to staff/owner, clear customer (bill goes to their expense ledger).
-                      customer_id: v === "none" ? tab.customer_id : null,
-                    });
-                    setTimeout(() => searchRef.current?.focus(), 0);
-                  }}
-                >
-                  <SelectTrigger className={`h-10 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Not staff purchase —</SelectItem>
-                    {persons.map((p: any) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} {p.role ? `· ${p.role}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div>
-              <Label className="text-xs">Payment</Label>
-              <Select value={tab.payment_method} onValueChange={(v) => { setTab({ payment_method: v }); setTimeout(() => searchRef.current?.focus(), 0); }}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="bank">Bank transfer</SelectItem>
-                  <SelectItem value="credit">Credit (later)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col items-end gap-1 self-end pb-1">
-              <Button
-                type="button"
-                size="sm"
-                variant={showStaff || tab.expense_person_id ? "secondary" : "outline"}
-                className="h-8 text-xs whitespace-nowrap"
-                onClick={() => {
-                  if (tab.expense_person_id) {
-                    // Hiding while a person is selected clears the assignment
-                    setTab({ expense_person_id: null });
-                  }
-                  setShowStaff((v) => !v);
-                  setTimeout(() => searchRef.current?.focus(), 0);
-                }}
-                title="Charge this bill to a staff/owner expense ledger"
-              >
-                <UserCog className="h-3.5 w-3.5 mr-1" />
-                {showStaff || tab.expense_person_id ? "Hide staff" : "Staff / Owner"}
-              </Button>
-              <div className="text-right text-[11px] text-muted-foreground">
-                {tab.items.length} item{tab.items.length === 1 ? "" : "s"} · {tab.name}
-              </div>
-            </div>
-          </div>
 
 
           {/* Item-wise detailed table — FAST SALES style spreadsheet */}
