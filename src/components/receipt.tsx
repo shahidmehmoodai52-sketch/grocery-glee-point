@@ -216,6 +216,15 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         )}
       </div>
 
+      {invoice.note && (
+        <div className="mt-2 border border-dashed border-black p-1.5 text-[10.5px] whitespace-pre-line">
+          <span className="font-bold uppercase tracking-wider text-[9px]">Note: </span>
+          {invoice.note}
+        </div>
+      )}
+
+
+
       {savings > 0 && !isReturn && (
         <div className="mt-2 text-center text-[10px] border border-dashed border-black py-1 font-semibold">
           ★ You saved {fmtMoney(savings, sym)} today! ★
