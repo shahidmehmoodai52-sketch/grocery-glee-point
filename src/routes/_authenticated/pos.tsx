@@ -11,6 +11,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -990,8 +991,16 @@ function POSPage() {
                   />
                 </div>
               </div>
+              <div className="pt-1">
+                <Label className="text-xs text-muted-foreground">Note (delivery address, house no, etc.)</Label>
+                <Textarea
+                  value={tab.note}
+                  onChange={(e) => setTab({ note: e.target.value })}
+                  placeholder="e.g. Deliver to House #123, Street 4"
+                  className="mt-1 min-h-[52px] text-sm"
+                />
+              </div>
 
-              
 
               <div className="flex justify-between items-center border-t-2 border-foreground/20 pt-2 mt-1">
                 <span className="text-base font-semibold">Grand Total</span>
