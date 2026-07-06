@@ -122,6 +122,40 @@ function Page() {
             </div>
           </Card>
 
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium">Payment QR code</div>
+                <div className="text-xs text-muted-foreground">Prints on receipt so customers can scan & pay (bank / EasyPaisa / JazzCash etc.)</div>
+              </div>
+              <Switch checked={!!form.show_payment_qr} onCheckedChange={(v) => set({ show_payment_qr: v })} />
+            </div>
+            <div>
+              <Label>QR image URL</Label>
+              <Input
+                value={form.payment_qr_url ?? ""}
+                onChange={(e) => set({ payment_qr_url: e.target.value })}
+                placeholder="https://…/my-bank-qr.png"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Upload your QR image anywhere public (or use the Backend storage) and paste the link here.</p>
+            </div>
+            <div>
+              <Label>Label / account details</Label>
+              <Textarea
+                rows={2}
+                value={form.payment_qr_label ?? ""}
+                onChange={(e) => set({ payment_qr_label: e.target.value })}
+                placeholder="e.g. Meezan Bank · Ali Traders · 1234-5678-9012"
+              />
+            </div>
+            {form.payment_qr_url && (
+              <div className="flex items-center gap-3 rounded border bg-muted/30 p-2">
+                <img src={form.payment_qr_url} alt="QR preview" className="h-20 w-20 object-contain bg-white p-1 rounded" />
+                <div className="text-xs text-muted-foreground whitespace-pre-line">{form.payment_qr_label || "Preview"}</div>
+              </div>
+            )}
+          </Card>
+
           <Button onClick={save}><Save className="h-4 w-4 mr-2" />Save settings</Button>
         </div>
 
