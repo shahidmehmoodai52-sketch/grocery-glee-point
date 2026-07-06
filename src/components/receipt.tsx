@@ -17,6 +17,9 @@ export type ReceiptSettings = {
   show_phone?: boolean | null;
   show_tax_lines?: boolean | null;
   show_cashier?: boolean | null;
+  payment_qr_url?: string | null;
+  payment_qr_label?: string | null;
+  show_payment_qr?: boolean | null;
 };
 
 export type ReceiptInvoice = {
@@ -244,6 +247,24 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
           ✦ RETURN ✦
         </div>
       )}
+
+      {settings?.show_payment_qr !== false && settings?.payment_qr_url && !isReturn && (
+        <div className="mt-2 border border-dashed border-black p-2 flex flex-col items-center">
+          <div className="text-[9px] uppercase tracking-[0.25em] font-bold mb-1">Scan & Pay</div>
+          <img
+            src={settings.payment_qr_url}
+            alt="Payment QR"
+            className="w-28 h-28 object-contain bg-white"
+          />
+          {settings.payment_qr_label && (
+            <div className="text-[10px] text-center whitespace-pre-line mt-1 font-medium">
+              {settings.payment_qr_label}
+            </div>
+          )}
+        </div>
+      )}
+
+
 
       {settings?.receipt_footer && (
         <>

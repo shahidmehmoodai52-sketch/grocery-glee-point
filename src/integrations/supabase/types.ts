@@ -778,12 +778,15 @@ export type Database = {
           id: number
           logo_url: string | null
           paper_width: string
+          payment_qr_label: string | null
+          payment_qr_url: string | null
           phone: string | null
           receipt_footer: string | null
           receipt_header: string | null
           show_address: boolean
           show_cashier: boolean
           show_logo: boolean
+          show_payment_qr: boolean
           show_phone: boolean
           show_tax_id: boolean
           show_tax_lines: boolean
@@ -799,12 +802,15 @@ export type Database = {
           id?: number
           logo_url?: string | null
           paper_width?: string
+          payment_qr_label?: string | null
+          payment_qr_url?: string | null
           phone?: string | null
           receipt_footer?: string | null
           receipt_header?: string | null
           show_address?: boolean
           show_cashier?: boolean
           show_logo?: boolean
+          show_payment_qr?: boolean
           show_phone?: boolean
           show_tax_id?: boolean
           show_tax_lines?: boolean
@@ -820,12 +826,15 @@ export type Database = {
           id?: number
           logo_url?: string | null
           paper_width?: string
+          payment_qr_label?: string | null
+          payment_qr_url?: string | null
           phone?: string | null
           receipt_footer?: string | null
           receipt_header?: string | null
           show_address?: boolean
           show_cashier?: boolean
           show_logo?: boolean
+          show_payment_qr?: boolean
           show_phone?: boolean
           show_tax_id?: boolean
           show_tax_lines?: boolean
