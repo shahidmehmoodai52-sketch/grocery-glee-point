@@ -796,7 +796,9 @@ function POSPage() {
         </div>
       </main>
 
-      {/* RIGHT: side panel — search, open bills, party, payment, totals */}
+      {/* RIGHT: side panel — open bills, party, payment, totals */}
+      <aside className="w-[340px] shrink-0 border-l bg-card flex flex-col min-h-0 overflow-hidden no-print">
+
 
 
 
