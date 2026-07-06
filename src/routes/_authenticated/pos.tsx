@@ -969,16 +969,6 @@ function POSPage() {
           </Button>
         </div>
 
-        {/* Footer: clock + reprint */}
-        <div className="p-2 border-t flex items-center justify-between gap-2">
-          <div className="text-[11px] font-mono tabular-nums text-muted-foreground truncate">
-            <Clock className="inline h-3 w-3 mr-1 -mt-0.5" />
-            {now.toLocaleTimeString()}
-          </div>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setReprintOpen(true)}>
-            <History className="h-3.5 w-3.5 mr-1" /> Reprint
-          </Button>
-        </div>
       </aside>
 
 
