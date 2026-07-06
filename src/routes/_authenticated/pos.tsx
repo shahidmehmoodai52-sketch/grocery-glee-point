@@ -873,7 +873,7 @@ function POSPage() {
         </div>
 
         {/* Totals + discount + paid + note + complete (scrolls if tight) */}
-        <div className="flex-1 min-h-0 overflow-auto p-2.5 space-y-1.5 bg-muted/20">
+        <div className="flex-1 min-h-0 p-2.5 space-y-1.5 bg-muted/20">
           <Row label="Gross" value={fmtMoney(subtotal + lineDiscountTotal, sym)} muted />
           {lineDiscountTotal > 0 && (
             <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
