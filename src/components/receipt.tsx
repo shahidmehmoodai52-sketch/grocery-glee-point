@@ -17,6 +17,9 @@ export type ReceiptSettings = {
   show_phone?: boolean | null;
   show_tax_lines?: boolean | null;
   show_cashier?: boolean | null;
+  payment_qr_url?: string | null;
+  payment_qr_label?: string | null;
+  show_payment_qr?: boolean | null;
 };
 
 export type ReceiptInvoice = {
