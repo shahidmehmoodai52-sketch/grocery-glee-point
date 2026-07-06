@@ -705,9 +705,9 @@ function POSPage() {
       </main>
 
       {/* RIGHT: side panel — search, open bills, party, payment, totals */}
-      <aside className="w-[340px] shrink-0 border-l bg-card flex flex-col min-h-0 no-print">
+      <aside className="w-[340px] shrink-0 border-l bg-card flex flex-col min-h-0 overflow-hidden no-print">
         {/* Search / scan */}
-        <div className="p-2.5 border-b relative">
+        <div className="p-2 border-b relative shrink-0">
           <Label className="text-[11px] text-muted-foreground">Scan / search item</Label>
           <div className="relative mt-0.5">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -737,7 +737,7 @@ function POSPage() {
                 }
                 openQuickAdd(raw);
               }}
-              className="pl-8 h-9"
+              className="pl-8 h-8"
             />
           </div>
           {search.trim() && filtered.length > 0 && (
@@ -807,14 +807,14 @@ function POSPage() {
 
 
         {/* Party + payment */}
-        <div className="p-2.5 border-b space-y-2">
+        <div className="p-2 border-b space-y-1.5 shrink-0">
           <div>
             <Label className="text-[11px] text-muted-foreground">Customer</Label>
             <Select
               value={tab.customer_id ?? "walkin"}
               onValueChange={(v) => { setTab({ customer_id: v === "walkin" ? null : v }); setTimeout(() => searchRef.current?.focus(), 0); }}
             >
-              <SelectTrigger className="h-9 mt-0.5"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 mt-0.5"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="walkin">Walk-in customer</SelectItem>
                 {customers.map((c) => (
@@ -839,7 +839,7 @@ function POSPage() {
                   setTimeout(() => searchRef.current?.focus(), 0);
                 }}
               >
-                <SelectTrigger className={`h-9 mt-0.5 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
+                <SelectTrigger className={`h-8 mt-0.5 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -858,7 +858,7 @@ function POSPage() {
             <div>
               <Label className="text-[11px] text-muted-foreground">Payment</Label>
               <Select value={tab.payment_method} onValueChange={(v) => { setTab({ payment_method: v }); setTimeout(() => searchRef.current?.focus(), 0); }}>
-                <SelectTrigger className="h-9 mt-0.5"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 mt-0.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Card</SelectItem>
@@ -871,7 +871,7 @@ function POSPage() {
               type="button"
               size="sm"
               variant={showStaff || tab.expense_person_id ? "secondary" : "outline"}
-              className="h-9"
+              className="h-8"
               title="Charge this bill to a staff/owner expense ledger"
               onClick={() => {
                 if (tab.expense_person_id) setTab({ expense_person_id: null });
@@ -884,8 +884,8 @@ function POSPage() {
           </div>
         </div>
 
-        {/* Totals + discount + paid + note + complete (scrolls if tight) */}
-        <div className="flex-1 min-h-0 p-2.5 space-y-1.5 bg-muted/20">
+        {/* Totals + discount + paid + note */}
+        <div className="flex-1 min-h-0 overflow-hidden p-2 space-y-1 bg-muted/20">
           <Row label="Gross" value={fmtMoney(subtotal + lineDiscountTotal, sym)} muted />
           {lineDiscountTotal > 0 && (
             <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
@@ -902,7 +902,7 @@ function POSPage() {
                   value={tab.discount_pct}
                   onChange={(e) => applyDiscountPct(e.target.value)}
                   placeholder="0"
-                  className="h-8 w-14 text-right text-sm pr-5"
+                  className="h-7 w-14 text-right text-sm pr-5"
                 />
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
               </div>
@@ -911,14 +911,14 @@ function POSPage() {
                 step="0.01"
                 value={tab.discount}
                 onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
-                className="h-8 w-20 text-right text-sm"
+                className="h-7 w-20 text-right text-sm"
               />
             </div>
           </div>
 
-          <div className="flex justify-between items-center border-t-2 border-foreground/20 pt-2 mt-1">
+          <div className="flex justify-between items-center border-t-2 border-foreground/20 pt-1.5 mt-1">
             <span className="text-sm font-semibold">Grand Total</span>
-            <span className="text-lg font-bold text-primary">{fmtMoney(total, sym)}</span>
+            <span className="text-base font-bold text-primary">{fmtMoney(total, sym)}</span>
           </div>
 
           <div className="pt-1">
@@ -934,7 +934,7 @@ function POSPage() {
                   if (e.key === "Enter") { e.preventDefault(); handleSale(); }
                 }}
                 placeholder={total.toFixed(2)}
-                className="h-9 flex-1"
+                className="h-8 flex-1"
               />
               <button
                 onClick={() => setTab({ paid: total.toFixed(2) })}
@@ -956,7 +956,7 @@ function POSPage() {
               value={tab.note}
               onChange={(e) => setTab({ note: e.target.value })}
               placeholder="e.g. House #123, Street 4"
-              className="mt-0.5 min-h-[44px] text-sm"
+              className="mt-0.5 h-[38px] min-h-[38px] resize-none text-sm"
             />
           </div>
 
@@ -974,11 +974,6 @@ function POSPage() {
               </div>
             );
           })()}
-
-          <Button className="w-full h-11 mt-2" onClick={handleSale} disabled={submitting}>
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Complete sale (F4)
-          </Button>
         </div>
 
       </aside>
