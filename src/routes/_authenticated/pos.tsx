@@ -978,6 +978,8 @@ function POSPage() {
         </div>
 
       </aside>
+      </div>
+
 
 
 
