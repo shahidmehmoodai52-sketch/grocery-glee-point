@@ -518,9 +518,52 @@ function POSPage() {
   });
 
   return (
-    <div className="h-[calc(100vh-3rem)] flex">
-      {/* LEFT: items area (maximised) */}
-      <main className="flex-1 flex flex-col min-h-0 bg-background">
+    <div className="h-[calc(100vh-3rem)] flex flex-col">
+      {/* Top strip — open bills + clock + reprint (jahaan se sidebar khulti hai us patti ke saath) */}
+      <div className="flex items-center gap-2 px-2 py-1.5 border-b bg-card/60 no-print shrink-0">
+        <ScrollArea className="flex-1 min-w-0">
+          <div className="flex items-center gap-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActive(t.id)}
+                className={`group flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs whitespace-nowrap ${
+                  t.id === active ? "bg-background border-primary/40" : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <ShoppingCart className="h-3 w-3" />
+                <span>{t.name}</span>
+                {t.items.length > 0 && (
+                  <Badge variant="secondary" className="h-4 px-1 text-[10px]">{t.items.length}</Badge>
+                )}
+                <span
+                  role="button"
+                  onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
+                  className="ml-0.5 rounded p-0.5 opacity-60 hover:opacity-100 hover:bg-destructive/20"
+                >
+                  <X className="h-3 w-3" />
+                </span>
+              </button>
+            ))}
+            <Button size="sm" variant="ghost" onClick={addTab} className="h-7 px-2 text-xs">
+              <Plus className="h-3.5 w-3.5 mr-0.5" /> New (F2)
+            </Button>
+          </div>
+        </ScrollArea>
+        <div className="hidden sm:flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-[11px] font-mono tabular-nums shrink-0">
+          <Clock className="h-3 w-3 text-muted-foreground" />
+          <span>{now.toLocaleTimeString()}</span>
+        </div>
+        <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setReprintOpen(true)}>
+          <History className="h-3.5 w-3.5 mr-1" /> Reprint
+        </Button>
+      </div>
+
+      {/* Two-column layout */}
+      <div className="flex-1 min-h-0 flex">
+        {/* LEFT: items area (maximised) */}
+        <main className="flex-1 flex flex-col min-h-0 bg-background">
+
         <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b bg-muted/30 no-print">
           <div className="flex items-center gap-2 min-w-0">
             <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
