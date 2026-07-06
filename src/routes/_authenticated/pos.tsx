@@ -518,231 +518,335 @@ function POSPage() {
   });
 
   return (
-    <div className="h-[calc(100vh-3rem)] flex flex-col">
-      {/* Tabs strip */}
-      <div className="flex items-center gap-2 px-3 pt-2 border-b bg-card/40">
-        <ScrollArea className="flex-1 max-w-full">
-          <div className="flex items-center gap-1 pb-2">
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setActive(t.id)}
-                className={`group flex items-center gap-2 rounded-t-md border border-b-0 px-3 py-1.5 text-sm whitespace-nowrap ${
-                  t.id === active ? "bg-background border-border" : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                <ShoppingCart className="h-3.5 w-3.5" />
-                <span>{t.name}</span>
-                {t.items.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 px-1.5">{t.items.length}</Badge>
-                )}
-                <span
-                  role="button"
-                  onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
-                  className="ml-1 rounded p-0.5 opacity-60 hover:opacity-100 hover:bg-destructive/20"
-                >
-                  <X className="h-3 w-3" />
-                </span>
-              </button>
-            ))}
-            <Button size="sm" variant="ghost" onClick={addTab} className="h-7 px-2">
-              <Plus className="h-4 w-4" /> New (F2)
-            </Button>
+    <div className="h-[calc(100vh-3rem)] flex">
+      {/* LEFT: items area (maximised) */}
+      <main className="flex-1 flex flex-col min-h-0 bg-background">
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b bg-muted/30 no-print">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium truncate">{tab.name}</span>
+            <Badge variant="secondary" className="h-5 px-1.5 text-[11px] shrink-0">
+              {tab.items.length} item{tab.items.length === 1 ? "" : "s"}
+            </Badge>
+            {tab.expense_person_id && (
+              <Badge variant="outline" className="border-warning text-warning text-[11px] shrink-0">
+                Staff purchase
+              </Badge>
+            )}
           </div>
-        </ScrollArea>
-
-        {/* Live clock + Reprint button */}
-        <div className="flex items-center gap-2 pb-2 shrink-0">
-          <div className="hidden sm:flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-mono tabular-nums">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>{now.toLocaleDateString()}</span>
-            <span className="text-muted-foreground">·</span>
-            <span>{now.toLocaleTimeString()}</span>
-          </div>
-          <Button size="sm" variant="outline" className="h-7" onClick={() => setReprintOpen(true)}>
-            <History className="h-3.5 w-3.5 mr-1" /> Reprint / Past invoices
+          <Button
+            size="sm"
+            variant={showCost ? "secondary" : "ghost"}
+            className="h-7 text-xs"
+            onClick={() => setShowCost((v) => !v)}
+          >
+            {showCost ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+            {showCost ? "Hide" : "Show"} P.Rate
           </Button>
         </div>
-      </div>
 
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Billing window */}
-        <div className="flex flex-col min-h-0 flex-1 bg-background">
-          {/* Scan / search bar + customer + payment */}
-          <div className={`p-3 border-b grid grid-cols-1 gap-2 items-end ${
-            (showStaff || tab.expense_person_id)
-              ? "md:grid-cols-[1fr_200px_200px_140px_auto]"
-              : "md:grid-cols-[1fr_200px_140px_auto]"
-          }`}>
-            <div className="relative">
-              <Label className="text-xs">Scan barcode / search item</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  ref={searchRef}
-                  autoFocus
-                  placeholder="Scan barcode or type name / SKU…  (↑/↓ to choose, Enter to add)"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") { setSearch(""); return; }
-                    if (e.key === "ArrowDown" && filtered.length) {
-                      e.preventDefault();
-                      setHighlight((h) => (h + 1) % filtered.length);
-                      return;
-                    }
-                    if (e.key === "ArrowUp" && filtered.length) {
-                      e.preventDefault();
-                      setHighlight((h) => (h - 1 + filtered.length) % filtered.length);
-                      return;
-                    }
-                    if (e.key !== "Enter") return;
-                    e.preventDefault();
-                    const raw = search.trim();
-                    // Empty search + items in cart → jump to Paid input
-                    if (!raw) {
-                      if (tab.items.length > 0) paidRef.current?.focus();
-                      return;
-                    }
-                    const exact = productByBarcode[raw];
-                    if (exact) { addProduct(exact); setSearch(""); return; }
-                    if (filtered.length >= 1) {
-                      const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
-                      addProduct(pick);
-                      setSearch("");
-                      return;
-                    }
-                    // Nothing matched → offer quick-add
-                    openQuickAdd(raw);
 
-                  }}
-                  className="pl-9 h-10"
-                />
-              </div>
-              {search.trim() && filtered.length > 0 && (
-                <div className="absolute z-20 left-0 mt-1 rounded-md border bg-popover shadow-lg max-h-96 overflow-auto min-w-full w-[min(760px,95vw)]">
-                  <div className={`grid ${showCost ? "grid-cols-[80px_minmax(200px,1fr)_70px_80px_56px_72px_90px]" : "grid-cols-[80px_minmax(200px,1fr)_80px_56px_72px_90px]"} gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0`}>
-                    <div>Item No</div>
-                    <div>Item Name</div>
-                    {showCost && <div className="text-right">P.Rate</div>}
-                    <div className="text-right">Unit Rate</div>
-                    <div className="text-right">QTY</div>
-                    <div className="text-right">Discount</div>
-                    <div className="text-right">Amount</div>
-                  </div>
-                  {filtered.map((p, i) => {
-                    const rate = Number(p.sell_price ?? 0);
-                    const pRate = Number(p.cost_price ?? 0);
-                    const qty = 1;
-                    const discount = 0;
-                    const amount = rate * qty - discount;
-                    const code = p.sku || p.barcode || "—";
-                    const bcs = barcodesByProduct[p.id] ?? [];
-                    const subline = [
+
+        {/* Item-wise detailed table — FAST SALES style spreadsheet */}
+        <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-background">
+          <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
+            <thead className="sticky top-0 z-10 bg-[hsl(var(--muted))] text-[11px] uppercase tracking-wide">
+              <tr>
+                <th className="px-2 py-2 text-left w-16">Item No</th>
+                <th className="px-2 py-2 text-left">Item Name</th>
+                {showCost && (
+                  <th className="px-2 py-2 text-right w-24 no-print" title="Purchase rate (internal)">P.Rate</th>
+                )}
+                <th className="px-2 py-2 text-right w-32">Unit Rate</th>
+                <th className="px-2 py-2 text-right w-28">QTY</th>
+                <th className="px-2 py-2 text-right w-32">Discount</th>
+                <th className="px-2 py-2 text-right w-36">Amount</th>
+                <th className="px-2 py-2 w-8 no-print"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {tab.items.length === 0 && (
+                <tr>
+                  <td colSpan={showCost ? 8 : 7} className="text-center text-muted-foreground py-16 border-0">
+                    Scan barcode ya product search karen — same item dobara scan hone par usi row me Qty +1 ho jaye gi.
+                  </td>
+                </tr>
+              )}
+              {tab.items.map((it, idx) => {
+                const gross = Number(it.qty) * Number(it.price);
+                const lineDisc = Number(it.disc || 0);
+                const net = Math.max(gross - lineDisc, 0);
+                const amount = net;
+                const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
+                const p = it.product_id ? searchableProducts.find((x) => x.id === it.product_id) : null;
+                const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
+                const subline = p
+                  ? [
                       p.sku ? `SKU ${p.sku}` : null,
                       bcs[0] ? `BC ${bcs[0]}` : null,
                       p.category || null,
-                    ].filter(Boolean).join(" · ");
-                    const stockNum = Number(p.stock ?? 0);
-                    return (
-                      <button
-                        key={p.id}
-                        onMouseEnter={() => setHighlight(i)}
-                        onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
-                        className={`w-full grid ${showCost ? "grid-cols-[80px_minmax(200px,1fr)_70px_80px_56px_72px_90px]" : "grid-cols-[80px_minmax(200px,1fr)_80px_56px_72px_90px]"} gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${
-                          i === highlight ? "bg-accent" : "hover:bg-accent/60"
-                        }`}
-                      >
-                        <div className="text-xs font-mono tabular-nums truncate">{code}</div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="font-semibold text-sm truncate min-w-0 flex-1">{p.name}</div>
-                            <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
-                              {fmtQty(stockNum)} {p.unit ?? ""}
-                            </Badge>
-                          </div>
-                          {subline && (
-                            <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
-                          )}
-                        </div>
-                        {showCost && (
-                          <div className="text-right tabular-nums text-xs text-muted-foreground">{fmtMoney(pRate, sym)}</div>
+                    ].filter(Boolean).join(" · ")
+                  : "";
+                const stockNum = p ? Number(p.stock ?? 0) : null;
+                return (
+                  <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
+                    <td className="px-2 py-1 font-mono text-xs">{it.code || String(idx + 1).padStart(3, "0")}</td>
+                    <td className="px-2 py-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="font-medium text-sm truncate min-w-0 flex-1">{it.name}</div>
+                        {stockNum !== null && (
+                          <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
+                            {fmtQty(stockNum)} {p?.unit ?? ""}
+                          </Badge>
                         )}
-                        <div className="text-right tabular-nums text-sm">{fmtMoney(rate, sym)}</div>
-                        <div className="text-right tabular-nums text-sm">{fmtQty(qty)}</div>
-                        <div className="text-right tabular-nums text-sm">{fmtMoney(discount, sym)}</div>
-                        <div className="text-right tabular-nums text-sm font-medium">{fmtMoney(amount, sym)}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {search.trim() && filtered.length === 0 && (
-                <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm">
-                  {productsLoading || remoteProductsLoading ? (
-                    <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading products… please wait</div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-muted-foreground">No product matches "{search}".</div>
-                      <Button size="sm" onClick={() => openQuickAdd(search)}>
-                        <Plus className="h-4 w-4 mr-1" /> Add new item
+                      </div>
+                      {subline && (
+                        <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
+                      )}
+                    </td>
+                    {showCost && (
+                      <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
+                        {fmtMoney(it.cost, sym)}
+                      </td>
+                    )}
+                    <td className="p-0">
+                      <EditableNumCell
+                        active={editing?.idx === idx && editing.field === "price"}
+                        value={it.price}
+                        step="0.01"
+                        display={fmtMoney(it.price, sym)}
+                        onActivate={() => setEditing({ idx, field: "price" })}
+                        onCommit={(v) => { updateLine(idx, { price: v }); setEditing(null); searchRef.current?.focus(); }}
+                        onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                      />
+                    </td>
+                    <td className="p-0">
+                      <EditableNumCell
+                        active={editing?.idx === idx && editing.field === "qty"}
+                        value={it.qty}
+                        step="0.001"
+                        display={fmtQty(it.qty)}
+                        onActivate={() => setEditing({ idx, field: "qty" })}
+                        onCommit={(v) => { updateLine(idx, { qty: v }); setEditing(null); searchRef.current?.focus(); }}
+                        onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                      />
+                    </td>
+                    <td className="p-0">
+                      <EditableNumCell
+                        active={editing?.idx === idx && editing.field === "disc"}
+                        value={it.disc}
+                        step="0.01"
+                        min={0}
+                        display={fmtMoney(it.disc, sym)}
+                        onActivate={() => setEditing({ idx, field: "disc" })}
+                        onCommit={(v) => { updateLine(idx, { disc: Math.max(0, v) }); setEditing(null); searchRef.current?.focus(); }}
+                        onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                      />
+                    </td>
+                    <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(amount, sym)}</td>
+                    <td className="px-1 py-1 text-center no-print border-0">
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeLine(idx)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </main>
+
+      {/* RIGHT: side panel — search, open bills, party, payment, totals */}
+      <aside className="w-[340px] shrink-0 border-l bg-card flex flex-col min-h-0 no-print">
+        {/* Search / scan */}
+        <div className="p-2.5 border-b relative">
+          <Label className="text-[11px] text-muted-foreground">Scan / search item</Label>
+          <div className="relative mt-0.5">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={searchRef}
+              autoFocus
+              placeholder="Barcode / name / SKU…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { setSearch(""); return; }
+                if (e.key === "ArrowDown" && filtered.length) {
+                  e.preventDefault(); setHighlight((h) => (h + 1) % filtered.length); return;
+                }
+                if (e.key === "ArrowUp" && filtered.length) {
+                  e.preventDefault(); setHighlight((h) => (h - 1 + filtered.length) % filtered.length); return;
+                }
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                const raw = search.trim();
+                if (!raw) { if (tab.items.length > 0) paidRef.current?.focus(); return; }
+                const exact = productByBarcode[raw];
+                if (exact) { addProduct(exact); setSearch(""); return; }
+                if (filtered.length >= 1) {
+                  const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
+                  addProduct(pick); setSearch(""); return;
+                }
+                openQuickAdd(raw);
+              }}
+              className="pl-8 h-9"
+            />
+          </div>
+          {search.trim() && filtered.length > 0 && (
+            <div className="absolute z-30 top-full right-2.5 mt-1 rounded-md border bg-popover shadow-lg max-h-[70vh] overflow-auto w-[min(560px,calc(100vw-24px))]">
+              <div className={`grid ${showCost ? "grid-cols-[70px_minmax(180px,1fr)_60px_70px_50px_60px_80px]" : "grid-cols-[70px_minmax(180px,1fr)_70px_50px_60px_80px]"} gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0`}>
+                <div>Code</div>
+                <div>Item</div>
+                {showCost && <div className="text-right">P.Rate</div>}
+                <div className="text-right">Rate</div>
+                <div className="text-right">Qty</div>
+                <div className="text-right">Disc</div>
+                <div className="text-right">Amount</div>
+              </div>
+              {filtered.map((p, i) => {
+                const rate = Number(p.sell_price ?? 0);
+                const pRate = Number(p.cost_price ?? 0);
+                const code = p.sku || p.barcode || "—";
+                const bcs = barcodesByProduct[p.id] ?? [];
+                const subline = [
+                  p.sku ? `SKU ${p.sku}` : null,
+                  bcs[0] ? `BC ${bcs[0]}` : null,
+                  p.category || null,
+                ].filter(Boolean).join(" · ");
+                const stockNum = Number(p.stock ?? 0);
+                return (
+                  <button
+                    key={p.id}
+                    onMouseEnter={() => setHighlight(i)}
+                    onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
+                    className={`w-full grid ${showCost ? "grid-cols-[70px_minmax(180px,1fr)_60px_70px_50px_60px_80px]" : "grid-cols-[70px_minmax(180px,1fr)_70px_50px_60px_80px]"} gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${i === highlight ? "bg-accent" : "hover:bg-accent/60"}`}
+                  >
+                    <div className="text-xs font-mono tabular-nums truncate">{code}</div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="font-semibold text-sm truncate min-w-0 flex-1">{p.name}</div>
+                        <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
+                          {fmtQty(stockNum)} {p.unit ?? ""}
+                        </Badge>
+                      </div>
+                      {subline && <div className="text-[11px] text-muted-foreground truncate">{subline}</div>}
                     </div>
-                  )}
+                    {showCost && <div className="text-right tabular-nums text-xs text-muted-foreground">{fmtMoney(pRate, sym)}</div>}
+                    <div className="text-right tabular-nums text-sm">{fmtMoney(rate, sym)}</div>
+                    <div className="text-right tabular-nums text-sm">1</div>
+                    <div className="text-right tabular-nums text-sm">{fmtMoney(0, sym)}</div>
+                    <div className="text-right tabular-nums text-sm font-medium">{fmtMoney(rate, sym)}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {search.trim() && filtered.length === 0 && (
+            <div className="absolute z-30 top-full right-2.5 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm w-[min(360px,calc(100vw-24px))]">
+              {productsLoading || remoteProductsLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading products…</div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-muted-foreground truncate">No match for "{search}".</div>
+                  <Button size="sm" onClick={() => openQuickAdd(search)}>
+                    <Plus className="h-4 w-4 mr-1" /> Add
+                  </Button>
                 </div>
               )}
-
-
             </div>
+          )}
+        </div>
+
+        {/* Open bills / tabs */}
+        <div className="p-2 border-b">
+          <div className="flex items-center justify-between mb-1 px-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Open bills</div>
+            <Button size="sm" variant="ghost" onClick={addTab} className="h-6 px-1.5 text-[11px]">
+              <Plus className="h-3 w-3 mr-0.5" /> New (F2)
+            </Button>
+          </div>
+          <ScrollArea className="max-h-28">
+            <div className="flex flex-col gap-1 pr-1">
+              {tabs.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => setActive(t.id)}
+                  className={`group flex items-center gap-2 rounded border px-2 py-1 text-xs cursor-pointer ${
+                    t.id === active ? "bg-accent border-primary/40" : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  <ShoppingCart className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <span className="truncate flex-1">{t.name}</span>
+                  {t.items.length > 0 && (
+                    <Badge variant="secondary" className="h-4 px-1 text-[10px]">{t.items.length}</Badge>
+                  )}
+                  <span
+                    role="button"
+                    onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
+                    className="rounded p-0.5 opacity-60 hover:opacity-100 hover:bg-destructive/20"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Party + payment */}
+        <div className="p-2.5 border-b space-y-2">
+          <div>
+            <Label className="text-[11px] text-muted-foreground">Customer</Label>
+            <Select
+              value={tab.customer_id ?? "walkin"}
+              onValueChange={(v) => { setTab({ customer_id: v === "walkin" ? null : v }); setTimeout(() => searchRef.current?.focus(), 0); }}
+            >
+              <SelectTrigger className="h-9 mt-0.5"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="walkin">Walk-in customer</SelectItem>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(showStaff || tab.expense_person_id) && (
             <div>
-              <Label className="text-xs">Customer</Label>
+              <Label className="text-[11px] text-muted-foreground">Staff / Owner purchase</Label>
               <Select
-                value={tab.customer_id ?? "walkin"}
-                onValueChange={(v) => { setTab({ customer_id: v === "walkin" ? null : v }); setTimeout(() => searchRef.current?.focus(), 0); }}
+                value={tab.expense_person_id ?? "none"}
+                onValueChange={(v) => {
+                  setTab({
+                    expense_person_id: v === "none" ? null : v,
+                    customer_id: v === "none" ? tab.customer_id : null,
+                  });
+                  setTimeout(() => searchRef.current?.focus(), 0);
+                }}
               >
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                <SelectTrigger className={`h-9 mt-0.5 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="walkin">Walk-in customer</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
+                  <SelectItem value="none">— Not staff purchase —</SelectItem>
+                  {persons.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.role ? `· ${p.role}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {(showStaff || tab.expense_person_id) && (
-              <div>
-                <Label className="text-xs">Staff / Owner purchase</Label>
-                <Select
-                  value={tab.expense_person_id ?? "none"}
-                  onValueChange={(v) => {
-                    setTab({
-                      expense_person_id: v === "none" ? null : v,
-                      // When charged to staff/owner, clear customer (bill goes to their expense ledger).
-                      customer_id: v === "none" ? tab.customer_id : null,
-                    });
-                    setTimeout(() => searchRef.current?.focus(), 0);
-                  }}
-                >
-                  <SelectTrigger className={`h-10 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Not staff purchase —</SelectItem>
-                    {persons.map((p: any) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} {p.role ? `· ${p.role}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+          )}
+
+          <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
             <div>
-              <Label className="text-xs">Payment</Label>
+              <Label className="text-[11px] text-muted-foreground">Payment</Label>
               <Select value={tab.payment_method} onValueChange={(v) => { setTab({ payment_method: v }); setTimeout(() => searchRef.current?.focus(), 0); }}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 mt-0.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Card</SelectItem>
@@ -751,270 +855,132 @@ function POSPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col items-end gap-1 self-end pb-1">
-              <Button
-                type="button"
-                size="sm"
-                variant={showStaff || tab.expense_person_id ? "secondary" : "outline"}
-                className="h-8 text-xs whitespace-nowrap"
-                onClick={() => {
-                  if (tab.expense_person_id) {
-                    // Hiding while a person is selected clears the assignment
-                    setTab({ expense_person_id: null });
-                  }
-                  setShowStaff((v) => !v);
-                  setTimeout(() => searchRef.current?.focus(), 0);
-                }}
-                title="Charge this bill to a staff/owner expense ledger"
-              >
-                <UserCog className="h-3.5 w-3.5 mr-1" />
-                {showStaff || tab.expense_person_id ? "Hide staff" : "Staff / Owner"}
-              </Button>
-              <div className="text-right text-[11px] text-muted-foreground">
-                {tab.items.length} item{tab.items.length === 1 ? "" : "s"} · {tab.name}
-              </div>
-            </div>
-          </div>
-
-
-          {/* Item-wise detailed table — FAST SALES style spreadsheet */}
-          <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-background">
-            <div className="flex items-center justify-end gap-2 px-3 py-1.5 border-b bg-muted/30 no-print">
-              <Button
-                size="sm"
-                variant={showCost ? "secondary" : "ghost"}
-                className="h-7 text-xs"
-                onClick={() => setShowCost((v) => !v)}
-              >
-                {showCost ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
-                {showCost ? "Hide" : "Show"} Purchase Rate
-              </Button>
-            </div>
-            <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
-              <thead className="sticky top-0 z-10 bg-[hsl(var(--muted))] text-[11px] uppercase tracking-wide">
-                <tr>
-                  <th className="px-2 py-2 text-left w-16">Item No</th>
-                  <th className="px-2 py-2 text-left">Item Name</th>
-                  {showCost && (
-                    <th className="px-2 py-2 text-right w-24 no-print" title="Purchase rate (internal)">P.Rate</th>
-                  )}
-                  <th className="px-2 py-2 text-right w-32">Unit Rate</th>
-                  <th className="px-2 py-2 text-right w-28">QTY</th>
-                  <th className="px-2 py-2 text-right w-32">Discount</th>
-                  <th className="px-2 py-2 text-right w-36">Amount</th>
-                  <th className="px-2 py-2 w-8 no-print"></th>
-
-                </tr>
-              </thead>
-              <tbody>
-                {tab.items.length === 0 && (
-                  <tr>
-                    <td colSpan={showCost ? 8 : 7} className="text-center text-muted-foreground py-16 border-0">
-                      Scan barcode ya product search karen — same item dobara scan hone par usi row me Qty +1 ho jaye gi.
-                    </td>
-                  </tr>
-                )}
-                {tab.items.map((it, idx) => {
-                  const gross = Number(it.qty) * Number(it.price);
-                  const lineDisc = Number(it.disc || 0);
-                  const net = Math.max(gross - lineDisc, 0);
-                  const amount = net;
-                  const profit = net - Number(it.qty) * Number(it.cost);
-                  const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
-                  const p = it.product_id ? searchableProducts.find((x) => x.id === it.product_id) : null;
-                  const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
-                  const subline = p
-                    ? [
-                        p.sku ? `SKU ${p.sku}` : null,
-                        bcs[0] ? `BC ${bcs[0]}` : null,
-                        p.category || null,
-                      ].filter(Boolean).join(" · ")
-                    : "";
-                  const stockNum = p ? Number(p.stock ?? 0) : null;
-                  return (
-                    <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
-                      <td className="px-2 py-1 font-mono text-xs">{it.code || String(idx + 1).padStart(3, "0")}</td>
-                      <td className="px-2 py-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="font-medium text-sm truncate min-w-0 flex-1">{it.name}</div>
-                          {stockNum !== null && (
-                            <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
-                              {fmtQty(stockNum)} {p?.unit ?? ""}
-                            </Badge>
-                          )}
-                        </div>
-                        {subline && (
-                          <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
-                        )}
-                      </td>
-
-                      {showCost && (
-                        <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
-                          {fmtMoney(it.cost, sym)}
-                        </td>
-                      )}
-                      <td className="p-0">
-                        <EditableNumCell
-                          active={editing?.idx === idx && editing.field === "price"}
-                          value={it.price}
-                          step="0.01"
-                          display={fmtMoney(it.price, sym)}
-                          onActivate={() => setEditing({ idx, field: "price" })}
-                          onCommit={(v) => { updateLine(idx, { price: v }); setEditing(null); searchRef.current?.focus(); }}
-                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
-                        />
-                      </td>
-                      <td className="p-0">
-                        <EditableNumCell
-                          active={editing?.idx === idx && editing.field === "qty"}
-                          value={it.qty}
-                          step="0.001"
-                          display={fmtQty(it.qty)}
-                          onActivate={() => setEditing({ idx, field: "qty" })}
-                          onCommit={(v) => { updateLine(idx, { qty: v }); setEditing(null); searchRef.current?.focus(); }}
-                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
-                        />
-                      </td>
-                      <td className="p-0">
-                        <EditableNumCell
-                          active={editing?.idx === idx && editing.field === "disc"}
-                          value={it.disc}
-                          step="0.01"
-                          min={0}
-                          display={fmtMoney(it.disc, sym)}
-                          onActivate={() => setEditing({ idx, field: "disc" })}
-                          onCommit={(v) => { updateLine(idx, { disc: Math.max(0, v) }); setEditing(null); searchRef.current?.focus(); }}
-                          onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
-                        />
-                      </td>
-
-                      <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(amount, sym)}</td>
-                      <td className="px-1 py-1 text-center no-print border-0">
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeLine(idx)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-
-
-          {/* Totals strip */}
-          <div className="border-t bg-card grid grid-cols-1 md:grid-cols-[1fr_360px]">
-            {/* Internal cost/profit + paid controls */}
-            <div className="p-3 space-y-2 border-r">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">Paid</Label>
-                  <Input
-                    ref={paidRef}
-                    type="number"
-                    step="0.01"
-                    value={tab.paid}
-                    onChange={(e) => setTab({ paid: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleSale();
-                      }
-                    }}
-                    placeholder={total.toFixed(2)}
-                    className="h-9"
-                  />
-                </div>
-                <div className="flex flex-col justify-end">
-                  <button
-                    onClick={() => setTab({ paid: total.toFixed(2) })}
-                    className="text-xs text-primary hover:underline self-start"
-                  >
-                    Exact amount
-                  </button>
-                  <div className="text-xs mt-1">
-                    {due > 0
-                      ? <span className="text-destructive font-medium">Due: {fmtMoney(due, sym)}</span>
-                      : <span className="text-success font-medium">Change: {fmtMoney(change, sym)}</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Internal profit summary — screen only */}
-              {tab.items.length > 0 && (() => {
-                const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
-                const cartProfit = subtotal - discount - cartCost;
-                const net = subtotal - discount;
-                const pct = net > 0 ? (cartProfit / net) * 100 : 0;
-                return (
-                  <div className="no-print rounded-md border border-dashed bg-muted/40 px-2 py-1.5 text-[11px] flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      Cost <span className="font-mono text-foreground/80">{fmtMoney(cartCost, sym)}</span>
-                    </span>
-                    <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
-                      Profit {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Money column */}
-            <div className="p-3 space-y-1.5 bg-muted/30">
-              <Row label="Gross" value={fmtMoney(subtotal + lineDiscountTotal, sym)} muted />
-              {lineDiscountTotal > 0 && (
-                <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
-              )}
-              <Row label="Subtotal" value={fmtMoney(subtotal, sym)} />
-
-              <div className="flex items-center justify-between text-sm gap-2">
-                <span className="text-muted-foreground">Discount</span>
-                <div className="flex items-center gap-1">
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={tab.discount_pct}
-                      onChange={(e) => applyDiscountPct(e.target.value)}
-                      placeholder="0"
-                      className="h-8 w-16 text-right text-sm pr-5"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                  </div>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={tab.discount}
-                    onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
-                    className="h-8 w-24 text-right text-sm"
-                  />
-                </div>
-              </div>
-              <div className="pt-1">
-                <Label className="text-xs text-muted-foreground">Note (delivery address, house no, etc.)</Label>
-                <Textarea
-                  value={tab.note}
-                  onChange={(e) => setTab({ note: e.target.value })}
-                  placeholder="e.g. Deliver to House #123, Street 4"
-                  className="mt-1 min-h-[52px] text-sm"
-                />
-              </div>
-
-
-              <div className="flex justify-between items-center border-t-2 border-foreground/20 pt-2 mt-1">
-                <span className="text-base font-semibold">Grand Total</span>
-                <span className="text-xl font-bold text-primary">{fmtMoney(total, sym)}</span>
-              </div>
-
-              <Button className="w-full h-11 mt-2" onClick={handleSale} disabled={submitting}>
-                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Complete sale (F4)
-              </Button>
-            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant={showStaff || tab.expense_person_id ? "secondary" : "outline"}
+              className="h-9"
+              title="Charge this bill to a staff/owner expense ledger"
+              onClick={() => {
+                if (tab.expense_person_id) setTab({ expense_person_id: null });
+                setShowStaff((v) => !v);
+                setTimeout(() => searchRef.current?.focus(), 0);
+              }}
+            >
+              <UserCog className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-      </div>
+
+        {/* Totals + discount + paid + note + complete (scrolls if tight) */}
+        <div className="flex-1 min-h-0 overflow-auto p-2.5 space-y-1.5 bg-muted/20">
+          <Row label="Gross" value={fmtMoney(subtotal + lineDiscountTotal, sym)} muted />
+          {lineDiscountTotal > 0 && (
+            <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
+          )}
+          <Row label="Subtotal" value={fmtMoney(subtotal, sym)} />
+
+          <div className="flex items-center justify-between text-sm gap-2">
+            <span className="text-muted-foreground">Discount</span>
+            <div className="flex items-center gap-1">
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={tab.discount_pct}
+                  onChange={(e) => applyDiscountPct(e.target.value)}
+                  placeholder="0"
+                  className="h-8 w-14 text-right text-sm pr-5"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                value={tab.discount}
+                onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
+                className="h-8 w-20 text-right text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center border-t-2 border-foreground/20 pt-2 mt-1">
+            <span className="text-sm font-semibold">Grand Total</span>
+            <span className="text-lg font-bold text-primary">{fmtMoney(total, sym)}</span>
+          </div>
+
+          <div className="pt-1">
+            <Label className="text-[11px] text-muted-foreground">Paid</Label>
+            <div className="flex items-center gap-2 mt-0.5">
+              <Input
+                ref={paidRef}
+                type="number"
+                step="0.01"
+                value={tab.paid}
+                onChange={(e) => setTab({ paid: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleSale(); }
+                }}
+                placeholder={total.toFixed(2)}
+                className="h-9 flex-1"
+              />
+              <button
+                onClick={() => setTab({ paid: total.toFixed(2) })}
+                className="text-[11px] text-primary hover:underline shrink-0"
+              >
+                Exact
+              </button>
+            </div>
+            <div className="text-[11px] mt-1">
+              {due > 0
+                ? <span className="text-destructive font-medium">Due: {fmtMoney(due, sym)}</span>
+                : <span className="text-success font-medium">Change: {fmtMoney(change, sym)}</span>}
+            </div>
+          </div>
+
+          <div className="pt-1">
+            <Label className="text-[11px] text-muted-foreground">Note (delivery address, house no…)</Label>
+            <Textarea
+              value={tab.note}
+              onChange={(e) => setTab({ note: e.target.value })}
+              placeholder="e.g. House #123, Street 4"
+              className="mt-0.5 min-h-[44px] text-sm"
+            />
+          </div>
+
+          {tab.items.length > 0 && (() => {
+            const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
+            const cartProfit = subtotal - discount - cartCost;
+            const net = subtotal - discount;
+            const pct = net > 0 ? (cartProfit / net) * 100 : 0;
+            return (
+              <div className="rounded-md border border-dashed bg-background/60 px-2 py-1 text-[11px] flex items-center justify-between">
+                <span className="text-muted-foreground">Cost <span className="font-mono">{fmtMoney(cartCost, sym)}</span></span>
+                <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
+                  Profit {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
+                </span>
+              </div>
+            );
+          })()}
+
+          <Button className="w-full h-11 mt-2" onClick={handleSale} disabled={submitting}>
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Complete sale (F4)
+          </Button>
+        </div>
+
+        {/* Footer: clock + reprint */}
+        <div className="p-2 border-t flex items-center justify-between gap-2">
+          <div className="text-[11px] font-mono tabular-nums text-muted-foreground truncate">
+            <Clock className="inline h-3 w-3 mr-1 -mt-0.5" />
+            {now.toLocaleTimeString()}
+          </div>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setReprintOpen(true)}>
+            <History className="h-3.5 w-3.5 mr-1" /> Reprint
+          </Button>
+        </div>
+      </aside>
+
 
 
       {/* Reprint browser */}
