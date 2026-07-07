@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog } from "lucide-react";
@@ -816,10 +816,29 @@ function POSPage() {
         {/* Party + payment */}
         <div className="p-3 border-b space-y-2.5 shrink-0">
           <div>
-            <Label className="text-xs text-muted-foreground">Customer</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Customer</Label>
+              {tab.customer_id && (
+                <Link
+                  to="/customers/$id"
+                  params={{ id: tab.customer_id }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  View ledger →
+                </Link>
+              )}
+            </div>
             <Select
               value={tab.customer_id ?? "walkin"}
-              onValueChange={(v) => { setTab({ customer_id: v === "walkin" ? null : v }); setTimeout(() => searchRef.current?.focus(), 0); }}
+              onValueChange={(v) => {
+                const isWalkin = v === "walkin";
+                setTab({
+                  customer_id: isWalkin ? null : v,
+                  // Auto-switch: named customer → credit, walk-in → cash
+                  payment_method: isWalkin ? "cash" : "credit",
+                });
+                setTimeout(() => searchRef.current?.focus(), 0);
+              }}
             >
               <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
