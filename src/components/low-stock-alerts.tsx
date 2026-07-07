@@ -150,16 +150,18 @@ export function LowStockAlerts() {
             Dismiss all
           </Button>
         )}
-        {activeOOS.length === 0 && lowStock.length > 0 && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setLowHidden(true)}
-            className="h-7"
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            if (activeOOS.length > 0) dismissAll();
+            setLowHidden(true);
+          }}
+          className="h-7"
+          title="Hide alert"
+        >
+          <X className="h-3 w-3" />
+        </Button>
       </div>
 
       {expanded && (
