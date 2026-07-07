@@ -88,16 +88,16 @@ function Page() {
   const entries: Entry[] = useMemo(() => {
     const e: Entry[] = [];
     for (const p of purchases as any[]) {
-      e.push({ date: p.created_at, type: "purchase", ref: p.invoice_no, note: p.note ?? "", debit: Number(p.total), credit: 0, purchase_id: p.id, paid: Number(p.paid), total: Number(p.total) });
+      e.push({ id: p.id, entity: "purchase", date: p.created_at, type: "purchase", ref: p.invoice_no, note: p.note ?? "", debit: Number(p.total), credit: 0, purchase_id: p.id, paid: Number(p.paid), total: Number(p.total) });
       if (Number(p.paid) > 0) {
         e.push({ date: p.created_at, type: "payment", ref: `${p.invoice_no} · on-invoice`, note: "Paid at purchase time", debit: 0, credit: Number(p.paid) });
       }
     }
     for (const r of returns as any[]) {
-      e.push({ date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
+      e.push({ id: r.id, entity: "purchase_return", date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
     }
     for (const pay of payments as any[]) {
-      e.push({ date: pay.created_at, type: "payment", ref: pay.method, note: pay.note ?? "", debit: 0, credit: Number(pay.amount) });
+      e.push({ id: pay.id, entity: "payment", date: pay.created_at, type: "payment", ref: pay.method, note: pay.note ?? "", debit: 0, credit: Number(pay.amount) });
     }
     e.sort((a, b) => a.date.localeCompare(b.date));
     return e;
