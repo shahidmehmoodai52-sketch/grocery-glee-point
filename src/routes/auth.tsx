@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Store, Loader2, KeyRound } from "lucide-react";
+import { Store, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -27,7 +26,6 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [needsReset, setNeedsReset] = useState(false);
 
   const goToApp = useCallback(async () => {
     await navigate({ to: target, replace: true });
@@ -35,36 +33,32 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) return;
-      const savedNext = window.sessionStorage.getItem("postAuthNext");
-      if (savedNext?.startsWith("/") && !savedNext.startsWith("//")) {
-        window.sessionStorage.removeItem("postAuthNext");
-        void navigate({ to: savedNext, replace: true });
-        return;
-      }
-      void goToApp();
+      if (data.session) void goToApp();
     });
-  }, [goToApp, navigate]);
+  }, [goToApp]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    setNeedsReset(false);
     const cleanEmail = email.trim().toLowerCase();
     try {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth?next=${encodeURIComponent(target)}`,
-            data: { full_name: fullName },
-          },
+          options: { data: { full_name: fullName } },
         });
-        if (error) throw error;
-        // Auto-confirm is enabled → a session is returned immediately.
+        if (error) {
+          if (/already registered|already exists|user_already_exists/i.test(error.message)) {
+            toast.info("Account already exists. Please sign in.");
+            setMode("signin");
+            setPassword("");
+          } else {
+            toast.error("Could not create account. Please try again.");
+          }
+          return;
+        }
         if (data.session) {
-          toast.success("Account created. Signing you in…");
           await goToApp();
         } else {
           toast.success("Account created. You can sign in now.");
@@ -72,51 +66,15 @@ function AuthPage() {
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-        if (error) throw error;
+        if (error) {
+          toast.error("Invalid username or password");
+          return;
+        }
         await goToApp();
-      }
-    } catch (err: any) {
-      const msg = String(err?.message ?? "Authentication failed");
-      if (/already registered|already exists|user_already_exists/i.test(msg)) {
-        toast.info("Ye email pehle se registered hai. Sign in kar lein.");
-        setMode("signin");
-        setPassword("");
-      } else if (/invalid login credentials/i.test(msg)) {
-        setNeedsReset(true);
-        toast.error("Password match nahi ho raha. Reset password use karein ya sahi password daalein.");
-      } else {
-        toast.error(msg);
       }
     } finally {
       setBusy(false);
     }
-  };
-
-  const handleForgot = async () => {
-    if (!email) { toast.error("Pehle apni email daalein."); return; }
-    setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/reset-password?next=${encodeURIComponent(target)}`,
-    });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else {
-      setNeedsReset(false);
-      toast.success("Reset link email par bhej diya gaya.");
-    }
-  };
-
-  const handleGoogle = async () => {
-    setBusy(true);
-    window.sessionStorage.setItem("postAuthNext", target);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) {
-      toast.error(result.error.message ?? "Google sign-in failed");
-      setBusy(false);
-      return;
-    }
-    if (result.redirected) return;
-    await goToApp();
   };
 
   return (
@@ -128,10 +86,10 @@ function AuthPage() {
             <Store className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-semibold">Grocery POS</h1>
-          <p className="text-sm text-muted-foreground mt-1">Sign in to manage your store</p>
+          <p className="text-sm text-muted-foreground mt-1">Create an account, then sign in</p>
         </div>
 
-        <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")}>
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="signin">Sign in</TabsTrigger>
             <TabsTrigger value="signup">Create account</TabsTrigger>
@@ -156,42 +114,8 @@ function AuthPage() {
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === "signin" ? "Sign in" : "Create account"}
             </Button>
-            {mode === "signin" && needsReset && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground">
-                <div className="flex items-start gap-2">
-                  <KeyRound className="mt-0.5 h-4 w-4 text-destructive" />
-                  <div className="space-y-2">
-                    <p>Password ghalat hai ya purana password yaad nahi. Is email ka account already exists ho sakta hai.</p>
-                    <Button type="button" size="sm" variant="secondary" onClick={handleForgot} disabled={busy}>
-                      Send reset link
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {mode === "signin" && (
-              <button
-                type="button"
-                onClick={handleForgot}
-                disabled={busy}
-                className="text-xs text-muted-foreground hover:text-foreground w-full text-center mt-1"
-              >
-                Forgot password?
-              </button>
-            )}
           </form>
         </Tabs>
-
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">or</span>
-          </div>
-        </div>
-
-        <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={busy}>
-          Continue with Google
-        </Button>
 
         <p className="text-xs text-muted-foreground text-center mt-6">
           The first account created becomes the admin.
