@@ -5,9 +5,10 @@ export function useSettings() {
   return useQuery({
     queryKey: ["store_settings"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("store_settings").select("*").eq("id", 1).maybeSingle();
+      // Tenant-safe: my_store_settings() returns the row for the current tenant.
+      const { data, error } = await supabase.rpc("my_store_settings");
       if (error) throw error;
-      return data;
+      return Array.isArray(data) ? data[0] ?? null : data ?? null;
     },
     staleTime: 60_000,
   });

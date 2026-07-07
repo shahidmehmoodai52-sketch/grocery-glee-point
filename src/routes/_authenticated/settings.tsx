@@ -28,7 +28,11 @@ function Page() {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["store_settings"],
-    queryFn: async () => (await supabase.from("store_settings").select("*").eq("id", 1).maybeSingle()).data,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("my_store_settings");
+      if (error) throw error;
+      return Array.isArray(data) ? data[0] ?? null : data ?? null;
+    },
   });
   const [form, setForm] = useState<any>({
     store_name: "", currency: "USD", currency_symbol: "$", tax_rate: 0,
@@ -44,10 +48,12 @@ function Page() {
   const set = (patch: any) => setForm((f: any) => ({ ...f, ...patch }));
 
   const save = async () => {
+    if (!data?.id) return toast.error("Store settings not ready — please refresh.");
     const payload: any = {};
     for (const k of FIELDS) payload[k] = form[k];
-    const { error } = await supabase.from("store_settings").update(payload).eq("id", 1);
-    if (error) return toast.error(error.message);
+    // RLS ensures we can only update our own tenant's row; scope by id for safety.
+    const { error } = await supabase.from("store_settings").update(payload).eq("id", data.id);
+    if (error) return toast.error("Couldn't save settings. Please try again.", { description: error.message });
     toast.success("Settings saved");
     qc.invalidateQueries({ queryKey: ["store_settings"] });
   };
