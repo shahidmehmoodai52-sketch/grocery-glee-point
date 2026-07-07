@@ -204,6 +204,9 @@ function Page() {
               <TableHead className="text-right">Balance</TableHead>
             </TableRow>
           </TableHeader>
+              <TableHead className="text-right no-print w-32">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
           <TableBody>
             <TableRow className="bg-muted/40 font-medium">
               <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
