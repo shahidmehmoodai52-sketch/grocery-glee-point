@@ -598,69 +598,6 @@ function POSPage() {
               className="pl-9 h-9 text-sm"
             />
 
-            {search.trim() && filtered.length > 0 && (
-              <div className="absolute z-30 top-full left-0 mt-1 rounded-md border bg-popover shadow-lg max-h-[70vh] overflow-auto w-[min(560px,calc(100vw-24px))]">
-                <div className={`grid ${showCost ? "grid-cols-[70px_minmax(180px,1fr)_60px_70px_50px_60px_80px]" : "grid-cols-[70px_minmax(180px,1fr)_70px_50px_60px_80px]"} gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0`}>
-                  <div>Code</div>
-                  <div>Item</div>
-                  {showCost && <div className="text-right">P.Rate</div>}
-                  <div className="text-right">Rate</div>
-                  <div className="text-right">Qty</div>
-                  <div className="text-right">Disc</div>
-                  <div className="text-right">Amount</div>
-                </div>
-                {filtered.map((p, i) => {
-                  const rate = Number(p.sell_price ?? 0);
-                  const pRate = Number(p.cost_price ?? 0);
-                  const code = p.sku || p.barcode || "—";
-                  const bcs = barcodesByProduct[p.id] ?? [];
-                  const subline = [
-                    p.sku ? `SKU ${p.sku}` : null,
-                    bcs[0] ? `BC ${bcs[0]}` : null,
-                    p.category || null,
-                  ].filter(Boolean).join(" · ");
-                  const stockNum = Number(p.stock ?? 0);
-                  return (
-                    <button
-                      key={p.id}
-                      onMouseEnter={() => setHighlight(i)}
-                      onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
-                      className={`w-full grid ${showCost ? "grid-cols-[70px_minmax(180px,1fr)_60px_70px_50px_60px_80px]" : "grid-cols-[70px_minmax(180px,1fr)_70px_50px_60px_80px]"} gap-2 items-center px-3 py-2 border-b last:border-0 text-left ${i === highlight ? "bg-accent" : "hover:bg-accent/60"}`}
-                    >
-                      <div className="text-xs font-mono tabular-nums truncate">{code}</div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="font-semibold text-sm truncate min-w-0 flex-1">{p.name}</div>
-                          <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
-                            {fmtQty(stockNum)} {p.unit ?? ""}
-                          </Badge>
-                        </div>
-                        {subline && <div className="text-[11px] text-muted-foreground truncate">{subline}</div>}
-                      </div>
-                      {showCost && <div className="text-right tabular-nums text-xs text-muted-foreground">{fmtMoney(pRate, sym)}</div>}
-                      <div className="text-right tabular-nums text-sm">{fmtMoney(rate, sym)}</div>
-                      <div className="text-right tabular-nums text-sm">1</div>
-                      <div className="text-right tabular-nums text-sm">{fmtMoney(0, sym)}</div>
-                      <div className="text-right tabular-nums text-sm font-medium">{fmtMoney(rate, sym)}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {search.trim() && filtered.length === 0 && (
-              <div className="absolute z-30 top-full left-0 mt-1 rounded-md border bg-popover shadow-lg px-3 py-3 text-sm w-[min(360px,calc(100vw-24px))]">
-                {productsLoading || remoteProductsLoading ? (
-                  <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading products…</div>
-                ) : (
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-muted-foreground truncate">No match for "{search}".</div>
-                    <Button size="sm" onClick={() => openQuickAdd(search)}>
-                      <Plus className="h-4 w-4 mr-1" /> Add
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -793,6 +730,72 @@ function POSPage() {
                   </tr>
                 );
               })}
+
+              {search.trim() && filtered.length > 0 && filtered.map((p, i) => {
+                const rate = Number(p.sell_price ?? 0);
+                const pRate = Number(p.cost_price ?? 0);
+                const code = p.sku || p.barcode || "—";
+                const bcs = barcodesByProduct[p.id] ?? [];
+                const subline = [
+                  p.sku ? `SKU ${p.sku}` : null,
+                  bcs[0] ? `BC ${bcs[0]}` : null,
+                  p.category || null,
+                ].filter(Boolean).join(" · ");
+                const stockNum = Number(p.stock ?? 0);
+                const isHi = i === highlight;
+                return (
+                  <tr
+                    key={`search-${p.id}`}
+                    onMouseEnter={() => setHighlight(i)}
+                    onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
+                    className={`cursor-pointer ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
+                  >
+                    <td className="px-2 py-1 font-mono text-xs">{code}</td>
+                    <td className="px-2 py-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="font-medium text-sm truncate min-w-0 flex-1">{p.name}</div>
+                        <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
+                          {fmtQty(stockNum)} {p.unit ?? ""}
+                        </Badge>
+                      </div>
+                      {subline && (
+                        <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
+                      )}
+                    </td>
+                    {showCost && (
+                      <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
+                        {fmtMoney(pRate, sym)}
+                      </td>
+                    )}
+                    <td className="px-2 py-1 text-right tabular-nums text-sm">{fmtMoney(rate, sym)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-sm">1</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-sm">{fmtMoney(0, sym)}</td>
+                    <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(rate, sym)}</td>
+                    <td className="px-1 py-1 text-center no-print border-0">
+                      <Plus className="h-3.5 w-3.5 mx-auto text-primary" />
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {search.trim() && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={showCost ? 8 : 7} className="text-center py-6 border-0">
+                    {productsLoading || remoteProductsLoading ? (
+                      <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-3 text-sm">
+                        <span className="text-muted-foreground">No match for "{search}".</span>
+                        <Button size="sm" onClick={() => openQuickAdd(search)}>
+                          <Plus className="h-4 w-4 mr-1" /> Add
+                        </Button>
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
