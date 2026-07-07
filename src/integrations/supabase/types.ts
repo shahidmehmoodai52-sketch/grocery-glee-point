@@ -146,6 +146,53 @@ export type Database = {
           },
         ]
       }
+      billing_events: {
+        Row: {
+          amount: number | null
+          created_at: string
+          currency: string
+          event_type: string
+          id: string
+          metadata: Json
+          provider: string
+          provider_event_id: string | null
+          status: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          currency?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          provider: string
+          provider_event_id?: string | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          currency?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          provider?: string
+          provider_event_id?: string | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -357,6 +404,66 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "import_batches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          due_date: string | null
+          id: string
+          invoice_number: string | null
+          metadata: Json
+          paid_at: string | null
+          status: string
+          subscription_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          metadata?: Json
+          paid_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          metadata?: Json
+          paid_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
