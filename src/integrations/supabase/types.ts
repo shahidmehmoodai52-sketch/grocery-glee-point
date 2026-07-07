@@ -1003,7 +1003,7 @@ export type Database = {
           {
             foreignKeyName: "store_settings_tenant_id_fkey"
             columns: ["tenant_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -1256,6 +1256,40 @@ export type Database = {
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
+      }
+      my_store_settings: {
+        Args: never
+        Returns: {
+          address: string | null
+          currency: string
+          currency_symbol: string
+          id: number
+          logo_url: string | null
+          paper_width: string
+          payment_qr_label: string | null
+          payment_qr_url: string | null
+          phone: string | null
+          receipt_footer: string | null
+          receipt_header: string | null
+          show_address: boolean
+          show_cashier: boolean
+          show_logo: boolean
+          show_payment_qr: boolean
+          show_phone: boolean
+          show_tax_id: boolean
+          show_tax_lines: boolean
+          store_name: string
+          tax_id: string | null
+          tax_rate: number
+          tenant_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "store_settings"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       record_payment: {
         Args: {
