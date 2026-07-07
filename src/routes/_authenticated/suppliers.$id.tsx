@@ -156,6 +156,9 @@ function Page() {
             const a = document.createElement("a"); a.href = url; a.download = `Ledger-${supplier?.name?.replace(/\s+/g,"_")}.pdf`; a.click();
             setTimeout(() => URL.revokeObjectURL(url), 5000);
           }}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
+          <Button onClick={() => { setPayDefault(Math.max(Number(supplier?.balance ?? 0), 0)); setAddPayOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1" />Add payment
+          </Button>
         </div>
       </div>
 
