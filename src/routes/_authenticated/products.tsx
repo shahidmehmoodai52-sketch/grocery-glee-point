@@ -102,6 +102,7 @@ function ProductsPage() {
       category: p.category ?? "",
       unit: p.unit ?? "pcs", cost_price: Number(p.cost_price), sell_price: Number(p.sell_price),
       stock: Number(p.stock), tax_rate: Number(p.tax_rate), is_active: p.is_active,
+      low_stock_threshold: Number(p.low_stock_threshold ?? 5),
     });
     setOpen(true);
   };
