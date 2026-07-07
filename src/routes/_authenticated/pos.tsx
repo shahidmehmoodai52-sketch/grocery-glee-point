@@ -567,8 +567,8 @@ function POSPage() {
 
         <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-muted/30 no-print">
           {/* Search / scan */}
-          <div className="relative shrink-0 w-[280px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <div className="relative shrink-0 w-[440px] max-w-[55vw]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               ref={searchRef}
               autoFocus
@@ -595,8 +595,9 @@ function POSPage() {
                 }
                 openQuickAdd(raw);
               }}
-              className="pl-8 h-7 text-xs"
+              className="pl-9 h-9 text-sm"
             />
+
             {search.trim() && filtered.length > 0 && (
               <div className="absolute z-30 top-full left-0 mt-1 rounded-md border bg-popover shadow-lg max-h-[70vh] overflow-auto w-[min(560px,calc(100vw-24px))]">
                 <div className={`grid ${showCost ? "grid-cols-[70px_minmax(180px,1fr)_60px_70px_50px_60px_80px]" : "grid-cols-[70px_minmax(180px,1fr)_70px_50px_60px_80px]"} gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/60 border-b sticky top-0`}>
