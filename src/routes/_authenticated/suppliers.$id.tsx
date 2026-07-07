@@ -211,9 +211,10 @@ function Page() {
               <TableCell className="text-right">—</TableCell>
               <TableCell className="text-right">—</TableCell>
               <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
+              <TableCell className="no-print"></TableCell>
             </TableRow>
             {rows.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
             )}
             {rows.map((x, i) => {
               const isPurchase = x.type === "purchase" && x.purchase_id;
@@ -247,10 +248,29 @@ function Page() {
                     <TableCell className={`text-right font-medium ${x.balance > 0 ? "text-destructive" : x.balance < 0 ? "text-success" : ""}`}>
                       {fmtMoney(x.balance, sym)}
                     </TableCell>
+                    <TableCell className="text-right no-print">
+                      <div className="flex justify-end gap-1">
+                        {isPurchase && due > 0 && (
+                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>
+                            <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
+                          </Button>
+                        )}
+                        {x.entity === "payment" && x.id && (
+                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date })}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {x.entity && x.entity !== "payment" && x.id && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: x.entity as Exclude<LedgerEntity,"payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                   {open && (
                     <TableRow key={`${i}-d`} className="bg-muted/30">
-                      <TableCell colSpan={7} className="p-0">
+                      <TableCell colSpan={8} className="p-0">
                         <div className="p-3">
                           <div className="text-xs font-medium mb-2 text-muted-foreground">Items in {x.ref} · Total {fmtMoney(Number(x.total||0), sym)} · Paid {fmtMoney(Number(x.paid||0), sym)} · Due {fmtMoney(due, sym)}</div>
                           {items.length === 0 ? (
