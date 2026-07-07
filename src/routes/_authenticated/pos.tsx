@@ -296,23 +296,30 @@ function POSPage() {
   const setTab = (patch: Partial<Tab>) =>
     setTabs((ts) => ts.map((t) => (t.id === active ? { ...t, ...patch } : t)));
 
-  const addProduct = (p: any) => {
+  const addProduct = (p: any): number => {
     const items = [...tab.items];
-    const ex = items.find((i) => i.product_id === p.id);
-    if (ex) ex.qty = Number(ex.qty) + 1;
-    else items.push({
-      product_id: p.id,
-      code: p.sku ?? p.barcode ?? "",
-      name: p.name,
-      qty: 1,
-      price: Number(p.sell_price),
-      mrp: Number(p.sell_price),
-      cost: Number(p.cost_price),
-      disc_pct: 0,
-      tax_pct: 0,
-      disc: 0,
-    });
+    const exIdx = items.findIndex((i) => i.product_id === p.id);
+    let idx: number;
+    if (exIdx >= 0) {
+      items[exIdx] = { ...items[exIdx], qty: Number(items[exIdx].qty) + 1 };
+      idx = exIdx;
+    } else {
+      items.push({
+        product_id: p.id,
+        code: p.sku ?? p.barcode ?? "",
+        name: p.name,
+        qty: 1,
+        price: Number(p.sell_price),
+        mrp: Number(p.sell_price),
+        cost: Number(p.cost_price),
+        disc_pct: 0,
+        tax_pct: 0,
+        disc: 0,
+      });
+      idx = items.length - 1;
+    }
     setTab({ items });
+    return idx;
   };
 
   const updateLine = (idx: number, patch: Partial<CartItem>) => {
@@ -591,7 +598,9 @@ function POSPage() {
                 if (exact) { addProduct(exact); setSearch(""); return; }
                 if (filtered.length >= 1) {
                   const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
-                  addProduct(pick); setSearch(""); return;
+                  const idx = addProduct(pick); setSearch("");
+                  setTimeout(() => setEditing({ idx, field: "qty" }), 0);
+                  return;
                 }
                 openQuickAdd(raw);
               }}
@@ -747,7 +756,7 @@ function POSPage() {
                   <tr
                     key={`search-${p.id}`}
                     onMouseEnter={() => setHighlight(i)}
-                    onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
+                    onClick={() => { const idx = addProduct(p); setSearch(""); setTimeout(() => setEditing({ idx, field: "qty" }), 0); }}
                     className={`cursor-pointer ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
                   >
                     <td className="px-2 py-1 font-mono text-xs">{code}</td>
