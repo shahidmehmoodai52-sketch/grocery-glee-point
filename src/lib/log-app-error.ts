@@ -23,7 +23,7 @@ export async function logAppError(input: LogAppErrorInput): Promise<void> {
       _page_or_module:
         input.pageOrModule ??
         (typeof window !== "undefined" ? window.location.pathname : undefined),
-      _metadata: (input.metadata ?? null) as never,
+      _metadata: (input.metadata ?? undefined) as never,
     });
   } catch {
     // swallow — logger must never break the app
