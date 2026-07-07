@@ -60,6 +60,8 @@ export const createStaff = createServerFn({ method: "POST" })
         data.perms.map((p) => ({ user_id: uid, perm: p, granted_by: context.userId }))
       );
     }
+    // Attach the new user to the admin's tenant so they can see uploaded data.
+    await attachToMyTenant(context, uid, data.role === "admin" ? "admin" : "cashier");
     return { id: uid };
   });
 
