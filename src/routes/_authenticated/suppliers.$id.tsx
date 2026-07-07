@@ -19,6 +19,8 @@ import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
 
 type Entry = {
+  id?: string;
+  entity?: LedgerEntity;
   date: string;
   type: "purchase" | "payment" | "return";
   ref: string;
@@ -37,6 +39,10 @@ function Page() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [addPayOpen, setAddPayOpen] = useState(false);
+  const [payDefault, setPayDefault] = useState(0);
+  const [editPayment, setEditPayment] = useState<any>(null);
+  const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
   const toggle = (pid: string) => setExpanded((s) => { const n = new Set(s); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
 
   const { data: purchaseItems = [] } = useQuery({
