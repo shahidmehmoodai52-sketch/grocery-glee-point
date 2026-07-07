@@ -6,6 +6,21 @@ async function assertAdmin(context: any) {
   if (error || !data) throw new Error("Forbidden: admin only");
 }
 
+// Ensure the target user shares the caller-admin's tenant so RLS lets them
+// see products/customers/etc. that the admin uploaded. Removes any other
+// tenant memberships — current_tenant_id() returns NULL when count != 1.
+async function attachToMyTenant(context: any, targetUserId: string, memberRole: "admin" | "cashier" | "manager" | "owner" | "staff" | "viewer" = "cashier") {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: mine, error: e1 } = await supabaseAdmin
+    .from("tenant_members").select("tenant_id").eq("user_id", context.userId).limit(1).maybeSingle();
+  if (e1) throw e1;
+  if (!mine?.tenant_id) return;
+  await supabaseAdmin.from("tenant_members").delete().eq("user_id", targetUserId);
+  await supabaseAdmin.from("tenant_members").insert({
+    user_id: targetUserId, tenant_id: mine.tenant_id, role: memberRole,
+  });
+}
+
 export const listStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -45,6 +60,8 @@ export const createStaff = createServerFn({ method: "POST" })
         data.perms.map((p) => ({ user_id: uid, perm: p, granted_by: context.userId }))
       );
     }
+    // Attach the new user to the admin's tenant so they can see uploaded data.
+    await attachToMyTenant(context, uid, data.role === "admin" ? "admin" : "cashier");
     return { id: uid };
   });
 
@@ -74,6 +91,8 @@ export const setStaffPermissions = createServerFn({ method: "POST" })
         data.perms.map((p) => ({ user_id: data.user_id, perm: p, granted_by: context.userId }))
       );
     }
+    // Move the user into the admin's tenant so RLS lets them see uploaded data.
+    await attachToMyTenant(context, data.user_id, data.role === "admin" ? "admin" : "cashier");
     return { ok: true };
   });
 
