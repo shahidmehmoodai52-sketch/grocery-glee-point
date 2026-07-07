@@ -1588,6 +1588,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      active_plan_for_tenant: {
+        Args: { _tenant_id: string }
+        Returns: {
+          active: boolean
+          created_at: string
+          description: string | null
+          features: Json
+          id: string
+          max_products: number | null
+          max_users: number | null
+          name: string
+          price_monthly: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "subscription_plans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      can_add_product: { Args: { _tenant_id: string }; Returns: boolean }
+      can_add_user: { Args: { _tenant_id: string }; Returns: boolean }
       complete_purchase: { Args: { payload: Json }; Returns: string }
       complete_purchase_return: { Args: { payload: Json }; Returns: string }
       complete_sale: { Args: { payload: Json }; Returns: string }
@@ -1596,6 +1618,10 @@ export type Database = {
       delete_party_payment: { Args: { _id: string }; Returns: undefined }
       has_active_subscription: {
         Args: { _tenant_id: string }
+        Returns: boolean
+      }
+      has_feature_access: {
+        Args: { _feature: string; _tenant_id: string }
         Returns: boolean
       }
       has_permission:
