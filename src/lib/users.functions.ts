@@ -91,6 +91,8 @@ export const setStaffPermissions = createServerFn({ method: "POST" })
         data.perms.map((p) => ({ user_id: data.user_id, perm: p, granted_by: context.userId }))
       );
     }
+    // Move the user into the admin's tenant so RLS lets them see uploaded data.
+    await attachToMyTenant(context, data.user_id, data.role === "admin" ? "admin" : "cashier");
     return { ok: true };
   });
 
