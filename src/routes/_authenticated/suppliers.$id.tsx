@@ -309,21 +309,27 @@ function Page() {
                   <TableCell className="text-right">{fmtMoney(totalIn, sym)}</TableCell>
                   <TableCell className="text-right text-success">{fmtMoney(totalOut, sym)}</TableCell>
                   <TableCell></TableCell>
+                  <TableCell className="no-print"></TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/5 text-xs">
-                  <TableCell colSpan={7} className="text-muted-foreground text-right">
+                  <TableCell colSpan={8} className="text-muted-foreground text-right">
                     {fmtMoney(opening, sym)} (Opening) + {fmtMoney(totalIn, sym)} (In) − {fmtMoney(totalOut, sym)} (Out) = <span className="font-semibold text-foreground">{fmtMoney(closing, sym)}</span>
                   </TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/10 font-bold">
                   <TableCell colSpan={6}>Closing balance · {closingLabel}</TableCell>
                   <TableCell className={`text-right ${closing > 0 ? "text-destructive" : closing < 0 ? "text-success" : ""}`}>{fmtMoney(closing, sym)}</TableCell>
+                  <TableCell className="no-print"></TableCell>
                 </TableRow>
               </>
             )}
           </TableBody>
         </Table>
       </Card>
+
+      <AddPaymentDialog open={addPayOpen} onOpenChange={setAddPayOpen} party="supplier" partyId={id} party_name={supplier?.name} defaultAmount={payDefault} />
+      <EditPaymentDialog open={!!editPayment} onOpenChange={(o) => !o && setEditPayment(null)} payment={editPayment} />
+      <EditEntryDialog open={!!editEntry} onOpenChange={(o) => !o && setEditEntry(null)} entity={editEntry?.entity ?? null} entry={editEntry?.entry ?? null} />
     </div>
   );
 }
