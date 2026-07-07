@@ -1192,6 +1192,62 @@ export type Database = {
           },
         ]
       }
+      sync_queue: {
+        Row: {
+          client_uuid: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          last_error: string | null
+          operation: string
+          payload: Json
+          retry_count: number
+          status: string
+          tenant_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          client_uuid?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          last_error?: string | null
+          operation: string
+          payload: Json
+          retry_count?: number
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          client_uuid?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          last_error?: string | null
+          operation?: string
+          payload?: Json
+          retry_count?: number
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_invitations: {
         Row: {
           accepted_at: string | null
