@@ -305,10 +305,10 @@ function Page() {
             {rows.length > 0 && (
               <>
                 <TableRow className="bg-muted/40 font-semibold">
-                  <TableCell colSpan={4}>Period totals</TableCell>
-                  <TableCell className="text-right">{fmtMoney(totalIn, sym)}</TableCell>
-                  <TableCell className="text-right text-success">{fmtMoney(totalOut, sym)}</TableCell>
-                  <TableCell></TableCell>
+                  <TableCell colSpan={4}>Grand totals (incl. opening)</TableCell>
+                  <TableCell className="text-right">{fmtMoney(totalIn + Math.max(opening, 0), sym)}</TableCell>
+                  <TableCell className="text-right text-success">{fmtMoney(totalOut + Math.max(-opening, 0), sym)}</TableCell>
+                  <TableCell className={`text-right ${closing > 0 ? "text-destructive" : closing < 0 ? "text-success" : ""}`}>{fmtMoney(closing, sym)}</TableCell>
                   <TableCell className="no-print"></TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/5 text-xs">
