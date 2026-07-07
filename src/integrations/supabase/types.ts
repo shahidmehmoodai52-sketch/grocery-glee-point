@@ -576,6 +576,7 @@ export type Database = {
           id: string
           import_batch_id: string | null
           is_active: boolean
+          low_stock_threshold: number
           name: string
           sell_price: number
           sku: string | null
@@ -593,6 +594,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           is_active?: boolean
+          low_stock_threshold?: number
           name: string
           sell_price?: number
           sku?: string | null
@@ -610,6 +612,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           is_active?: boolean
+          low_stock_threshold?: number
           name?: string
           sell_price?: number
           sku?: string | null
@@ -1169,6 +1172,7 @@ export type Database = {
           currency_symbol: string
           id: number
           logo_url: string | null
+          low_stock_threshold: number
           paper_width: string
           payment_qr_label: string | null
           payment_qr_url: string | null
@@ -1194,6 +1198,7 @@ export type Database = {
           currency_symbol?: string
           id?: number
           logo_url?: string | null
+          low_stock_threshold?: number
           paper_width?: string
           payment_qr_label?: string | null
           payment_qr_url?: string | null
@@ -1219,6 +1224,7 @@ export type Database = {
           currency_symbol?: string
           id?: number
           logo_url?: string | null
+          low_stock_threshold?: number
           paper_width?: string
           payment_qr_label?: string | null
           payment_qr_url?: string | null
@@ -1779,6 +1785,7 @@ export type Database = {
           currency_symbol: string
           id: number
           logo_url: string | null
+          low_stock_threshold: number
           paper_width: string
           payment_qr_label: string | null
           payment_qr_url: string | null
