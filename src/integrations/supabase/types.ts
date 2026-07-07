@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      application_errors: {
+        Row: {
+          created_at: string
+          error_message: string
+          error_type: string
+          id: string
+          metadata: Json | null
+          page_or_module: string | null
+          stack_trace: string | null
+          tenant_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message: string
+          error_type: string
+          id?: string
+          metadata?: Json | null
+          page_or_module?: string | null
+          stack_trace?: string | null
+          tenant_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string
+          error_type?: string
+          id?: string
+          metadata?: Json | null
+          page_or_module?: string | null
+          stack_trace?: string | null
+          tenant_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_errors_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1300,6 +1344,16 @@ export type Database = {
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
+      }
+      log_application_error: {
+        Args: {
+          _error_message: string
+          _error_type: string
+          _metadata?: Json
+          _page_or_module?: string
+          _stack_trace?: string
+        }
+        Returns: string
       }
       my_store_settings: {
         Args: never

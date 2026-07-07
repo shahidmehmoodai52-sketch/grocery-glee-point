@@ -11,6 +11,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { logAppError } from "../lib/log-app-error";
+import { AppErrorBoundary } from "../components/error-boundary";
 
 function NotFoundComponent() {
   return (
@@ -39,6 +41,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    void logAppError({
+      errorType: "route_error",
+      errorMessage: error.message || "Route render error",
+      stackTrace: error.stack ?? null,
+    });
   }, [error]);
 
   return (
@@ -117,8 +124,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AppErrorBoundary module="root">
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </AppErrorBoundary>
     </QueryClientProvider>
   );
 }
