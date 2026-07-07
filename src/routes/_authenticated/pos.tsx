@@ -567,7 +567,7 @@ function POSPage() {
 
         <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-muted/30 no-print">
           {/* Search / scan */}
-          <div className="relative shrink-0 w-[440px] max-w-[55vw]">
+          <div className="relative flex-1 min-w-0 max-w-[440px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               ref={searchRef}
