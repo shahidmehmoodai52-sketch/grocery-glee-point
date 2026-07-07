@@ -19,10 +19,10 @@ export async function logAppError(input: LogAppErrorInput): Promise<void> {
     await supabase.rpc("log_application_error", {
       _error_type: (input.errorType ?? "unknown").slice(0, 200),
       _error_message: (input.errorMessage ?? "unspecified error").slice(0, 2000),
-      _stack_trace: input.stackTrace ? input.stackTrace.slice(0, 8000) : null,
+      _stack_trace: input.stackTrace ? input.stackTrace.slice(0, 8000) : undefined,
       _page_or_module:
         input.pageOrModule ??
-        (typeof window !== "undefined" ? window.location.pathname : null),
+        (typeof window !== "undefined" ? window.location.pathname : undefined),
       _metadata: (input.metadata ?? null) as never,
     });
   } catch {
