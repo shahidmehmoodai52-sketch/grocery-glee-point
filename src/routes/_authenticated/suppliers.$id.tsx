@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, FileDown, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, FileDown, ChevronDown, ChevronRight, Pencil, DollarSign, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import { fmtMoney } from "@/lib/format";
 
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
 
