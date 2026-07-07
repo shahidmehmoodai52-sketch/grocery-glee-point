@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { maybeRunDaily } from "@/lib/backup";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { RouteGuard } from "@/components/route-guard";
+import { LowStockAlerts } from "@/components/low-stock-alerts";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -34,6 +35,7 @@ function Layout() {
           <header className="h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print">
             <SidebarTrigger />
           </header>
+          <LowStockAlerts />
           <main className="flex-1 min-w-0 overflow-auto">
             <RouteGuard><Outlet /></RouteGuard>
           </main>

@@ -23,9 +23,9 @@ export const Route = createFileRoute("/_authenticated/products")({
 
 type ProductForm = {
   id?: string; name: string; sku: string; barcode: string; barcodes_text: string; category: string; unit: string;
-  cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean;
+  cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean; low_stock_threshold: number;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true };
+const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5 };
 
 function ProductsPage() {
   const qc = useQueryClient();
@@ -102,6 +102,7 @@ function ProductsPage() {
       category: p.category ?? "",
       unit: p.unit ?? "pcs", cost_price: Number(p.cost_price), sell_price: Number(p.sell_price),
       stock: Number(p.stock), tax_rate: Number(p.tax_rate), is_active: p.is_active,
+      low_stock_threshold: Number(p.low_stock_threshold ?? 5),
     });
     setOpen(true);
   };
@@ -138,6 +139,7 @@ function ProductsPage() {
               <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
               <div><Label>Price</Label><Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} /></div>
               <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
+              <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
               <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
             </div>
             <DialogFooter>
@@ -180,9 +182,13 @@ function ProductsPage() {
                 <TableCell className="text-right">{fmtMoney(p.cost_price, sym)}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(p.sell_price, sym)}</TableCell>
                 <TableCell className="text-right">
-                  <Badge variant={Number(p.stock) > 0 ? "outline" : "destructive"}>
-                    {fmtQty(p.stock)} {p.unit}
-                  </Badge>
+                  {(() => {
+                    const s = Number(p.stock);
+                    const t = Number(p.low_stock_threshold ?? 5);
+                    if (s <= 0) return <Badge variant="destructive">Out · {fmtQty(p.stock)} {p.unit}</Badge>;
+                    if (s <= t) return <Badge className="bg-amber-500 text-white hover:bg-amber-500">Low · {fmtQty(p.stock)} {p.unit}</Badge>;
+                    return <Badge variant="outline">{fmtQty(p.stock)} {p.unit}</Badge>;
+                  })()}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => edit(p)}><Pencil className="h-4 w-4" /></Button>
