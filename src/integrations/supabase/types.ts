@@ -1333,6 +1333,44 @@ export type Database = {
           },
         ]
       }
+      tenant_onboarding: {
+        Row: {
+          completed: boolean
+          created_at: string
+          id: string
+          metadata: Json | null
+          step: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          step: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          step?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_onboarding_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_role_permissions: {
         Row: {
           permission: string
