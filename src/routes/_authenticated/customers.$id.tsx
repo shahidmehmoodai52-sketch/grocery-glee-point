@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, FileDown, Eye } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, FileDown, Eye, Pencil, DollarSign, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,18 +16,22 @@ import { fmtMoney, fmtQty } from "@/lib/format";
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { Receipt } from "@/components/receipt";
-import { toast } from "sonner";
+import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
 
 type Entry = {
+  id?: string;
+  entity?: LedgerEntity;
   date: string;
   type: "sale" | "payment" | "return";
   ref: string;
   note: string;
   debit: number;
   credit: number;
-  sale?: any;       // attached for sale rows so we can re-open / re-print the invoice
+  sale?: any;
+  paid?: number;
+  total?: number;
 };
 
 function Page() {
@@ -38,6 +42,10 @@ function Page() {
   const [to, setTo] = useState("");
   const [openInvoice, setOpenInvoice] = useState<any>(null);
   const [pdfPrompt, setPdfPrompt] = useState(false);
+  const [addPayOpen, setAddPayOpen] = useState(false);
+  const [payDefault, setPayDefault] = useState(0);
+  const [editPayment, setEditPayment] = useState<any>(null);
+  const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
@@ -66,16 +74,16 @@ function Page() {
   const entries: Entry[] = useMemo(() => {
     const e: Entry[] = [];
     for (const s of sales as any[]) {
-      e.push({ date: s.created_at, type: "sale", ref: s.invoice_no, note: s.note ?? "", debit: Number(s.total), credit: 0, sale: s });
+      e.push({ id: s.id, entity: "sale", date: s.created_at, type: "sale", ref: s.invoice_no, note: s.note ?? "", debit: Number(s.total), credit: 0, sale: s, paid: Number(s.paid), total: Number(s.total) });
       if (Number(s.paid) > 0) {
         e.push({ date: s.created_at, type: "payment", ref: `${s.invoice_no} · on-invoice`, note: "Paid at sale", debit: 0, credit: Number(s.paid) });
       }
     }
     for (const r of returns as any[]) {
-      e.push({ date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
+      e.push({ id: r.id, entity: "sale_return", date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
     }
     for (const p of payments as any[]) {
-      e.push({ date: p.created_at, type: "payment", ref: p.method, note: p.note ?? "", debit: 0, credit: Number(p.amount) });
+      e.push({ id: p.id, entity: "payment", date: p.created_at, type: "payment", ref: p.method, note: p.note ?? "", debit: 0, credit: Number(p.amount) });
     }
     e.sort((a, b) => a.date.localeCompare(b.date));
     return e;
@@ -157,6 +165,9 @@ function Page() {
           <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
           <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
           <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
+          <Button onClick={() => { setPayDefault(Math.max(Number(customer?.balance ?? 0), 0)); setAddPayOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1" />Add payment
+          </Button>
         </div>
       </div>
 
@@ -198,7 +209,7 @@ function Page() {
             <TableHead className="text-right">In (+)</TableHead>
             <TableHead className="text-right">Out (−)</TableHead>
             <TableHead className="text-right">Balance</TableHead>
-            <TableHead className="text-right no-print w-20">Invoice</TableHead>
+            <TableHead className="text-right no-print w-40">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             <TableRow className="bg-muted/40 font-medium">
@@ -209,7 +220,9 @@ function Page() {
               <TableCell className="no-print"></TableCell>
             </TableRow>
             {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
-            {rows.map((x, i) => (
+            {rows.map((x, i) => {
+              const due = x.entity === "sale" ? Math.max(Number(x.total || 0) - Number(x.paid || 0), 0) : 0;
+              return (
               <TableRow key={i} className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
 
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
@@ -219,21 +232,42 @@ function Page() {
                   </Badge>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{x.ref}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{x.note || "—"}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {x.note || "—"}
+                  {x.entity === "sale" && due > 0 && <Badge variant="destructive" className="ml-2 text-[10px]">Unpaid {fmtMoney(due, sym)}</Badge>}
+                </TableCell>
                 <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
                 <TableCell className="text-right text-success">{x.credit > 0 ? fmtMoney(x.credit, sym) : "—"}</TableCell>
                 <TableCell className={`text-right font-medium ${x.balance > 0 ? "text-destructive" : x.balance < 0 ? "text-success" : ""}`}>
                   {fmtMoney(x.balance, sym)}
                 </TableCell>
                 <TableCell className="text-right no-print">
-                  {x.type === "sale" && x.sale && (
-                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
-                      <Eye className="h-3.5 w-3.5 mr-1" />Open
-                    </Button>
-                  )}
+                  <div className="flex justify-end gap-1">
+                    {x.type === "sale" && x.sale && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {x.entity === "sale" && due > 0 && (
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>
+                        <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
+                      </Button>
+                    )}
+                    {x.entity === "payment" && x.id && (
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date })}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {x.entity && x.entity !== "payment" && x.id && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: x.entity as Exclude<LedgerEntity,"payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
             {rows.length > 0 && (
               <>
                 <TableRow className="bg-muted/40 font-semibold">
@@ -276,6 +310,11 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddPaymentDialog open={addPayOpen} onOpenChange={setAddPayOpen} party="customer" partyId={id} party_name={customer?.name} defaultAmount={payDefault} />
+      <EditPaymentDialog open={!!editPayment} onOpenChange={(o) => !o && setEditPayment(null)} payment={editPayment} />
+      <EditEntryDialog open={!!editEntry} onOpenChange={(o) => !o && setEditEntry(null)} entity={editEntry?.entity ?? null} entry={editEntry?.entry ?? null} />
+
 
 
 
