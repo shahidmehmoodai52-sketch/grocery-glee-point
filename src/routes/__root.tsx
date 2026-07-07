@@ -41,6 +41,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    void logAppError({
+      errorType: "route_error",
+      errorMessage: error.message || "Route render error",
+      stackTrace: error.stack ?? null,
+    });
   }, [error]);
 
   return (
