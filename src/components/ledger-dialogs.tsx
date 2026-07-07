@@ -98,8 +98,8 @@ export function EditPaymentDialog({
     if (!amount || amount <= 0) return toast.error("Amount must be positive");
     setSaving(true);
     const { error } = await supabase.rpc("update_party_payment", {
-      _id: payment.id, _amount: amount, _method: method, _note: note || null,
-      _created_at: when ? new Date(when).toISOString() : null,
+      _id: payment.id, _amount: amount, _method: method, _note: note || "",
+      _created_at: when ? new Date(when).toISOString() : payment.created_at,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
