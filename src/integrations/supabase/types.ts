@@ -102,6 +102,50 @@ export type Database = {
           },
         ]
       }
+      backup_metadata: {
+        Row: {
+          backup_type: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          size_bytes: number | null
+          started_at: string | null
+          status: string
+          tenant_id: string | null
+        }
+        Insert: {
+          backup_type: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          size_bytes?: number | null
+          started_at?: string | null
+          status: string
+          tenant_id?: string | null
+        }
+        Update: {
+          backup_type?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          size_bytes?: number | null
+          started_at?: string | null
+          status?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backup_metadata_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
