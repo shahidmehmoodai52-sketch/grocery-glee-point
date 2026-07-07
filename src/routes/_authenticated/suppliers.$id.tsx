@@ -202,8 +202,6 @@ function Page() {
               <TableHead className="text-right">In (+)</TableHead>
               <TableHead className="text-right">Out (−)</TableHead>
               <TableHead className="text-right">Balance</TableHead>
-            </TableRow>
-          </TableHeader>
               <TableHead className="text-right no-print w-32">Actions</TableHead>
             </TableRow>
           </TableHeader>
