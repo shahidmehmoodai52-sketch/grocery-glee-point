@@ -209,7 +209,7 @@ function Page() {
             <TableHead className="text-right">In (+)</TableHead>
             <TableHead className="text-right">Out (−)</TableHead>
             <TableHead className="text-right">Balance</TableHead>
-            <TableHead className="text-right no-print w-20">Invoice</TableHead>
+            <TableHead className="text-right no-print w-40">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             <TableRow className="bg-muted/40 font-medium">
@@ -220,7 +220,9 @@ function Page() {
               <TableCell className="no-print"></TableCell>
             </TableRow>
             {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
-            {rows.map((x, i) => (
+            {rows.map((x, i) => {
+              const due = x.entity === "sale" ? Math.max(Number(x.total || 0) - Number(x.paid || 0), 0) : 0;
+              return (
               <TableRow key={i} className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
 
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
@@ -230,21 +232,42 @@ function Page() {
                   </Badge>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{x.ref}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{x.note || "—"}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {x.note || "—"}
+                  {x.entity === "sale" && due > 0 && <Badge variant="destructive" className="ml-2 text-[10px]">Unpaid {fmtMoney(due, sym)}</Badge>}
+                </TableCell>
                 <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
                 <TableCell className="text-right text-success">{x.credit > 0 ? fmtMoney(x.credit, sym) : "—"}</TableCell>
                 <TableCell className={`text-right font-medium ${x.balance > 0 ? "text-destructive" : x.balance < 0 ? "text-success" : ""}`}>
                   {fmtMoney(x.balance, sym)}
                 </TableCell>
                 <TableCell className="text-right no-print">
-                  {x.type === "sale" && x.sale && (
-                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
-                      <Eye className="h-3.5 w-3.5 mr-1" />Open
-                    </Button>
-                  )}
+                  <div className="flex justify-end gap-1">
+                    {x.type === "sale" && x.sale && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {x.entity === "sale" && due > 0 && (
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>
+                        <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
+                      </Button>
+                    )}
+                    {x.entity === "payment" && x.id && (
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date })}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {x.entity && x.entity !== "payment" && x.id && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: x.entity as Exclude<LedgerEntity,"payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
             {rows.length > 0 && (
               <>
                 <TableRow className="bg-muted/40 font-semibold">
