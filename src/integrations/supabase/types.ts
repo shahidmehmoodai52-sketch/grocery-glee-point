@@ -1141,6 +1141,42 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          features: Json
+          id: string
+          max_products: number | null
+          max_users: number | null
+          name: string
+          price_monthly: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          features?: Json
+          id?: string
+          max_products?: number | null
+          max_users?: number | null
+          name: string
+          price_monthly?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          features?: Json
+          id?: string
+          max_products?: number | null
+          max_users?: number | null
+          name?: string
+          price_monthly?: number
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           address: string | null
@@ -1386,6 +1422,54 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          plan_id: string
+          started_at: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan_id: string
+          started_at?: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan_id?: string
+          started_at?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_user_permissions: {
         Row: {
           created_at: string
@@ -1510,6 +1594,10 @@ export type Database = {
       complete_sale_return: { Args: { payload: Json }; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       delete_party_payment: { Args: { _id: string }; Returns: undefined }
+      has_active_subscription: {
+        Args: { _tenant_id: string }
+        Returns: boolean
+      }
       has_permission:
         | { Args: { _perm: string; _user_id: string }; Returns: boolean }
         | {
