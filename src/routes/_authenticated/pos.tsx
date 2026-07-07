@@ -756,7 +756,7 @@ function POSPage() {
                   <tr
                     key={`search-${p.id}`}
                     onMouseEnter={() => setHighlight(i)}
-                    onClick={() => { addProduct(p); setSearch(""); searchRef.current?.focus(); }}
+                    onClick={() => { const idx = addProduct(p); setSearch(""); setTimeout(() => setEditing({ idx, field: "qty" }), 0); }}
                     className={`cursor-pointer ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
                   >
                     <td className="px-2 py-1 font-mono text-xs">{code}</td>
