@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -33,9 +34,16 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) void goToApp();
+      if (!data.session) return;
+      const savedNext = window.sessionStorage.getItem("postAuthNext");
+      if (savedNext?.startsWith("/") && !savedNext.startsWith("//")) {
+        window.sessionStorage.removeItem("postAuthNext");
+        void navigate({ to: savedNext, replace: true });
+        return;
+      }
+      void goToApp();
     });
-  }, [goToApp]);
+  }, [goToApp, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +85,31 @@ function AuthPage() {
     }
   };
 
+  const handleForgot = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) { toast.error("Please enter your email first."); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: `${window.location.origin}/reset-password?next=${encodeURIComponent(target)}`,
+    });
+    setBusy(false);
+    if (error) toast.error("Could not send reset link. Please try again.");
+    else toast.success("Password reset link sent to your email.");
+  };
+
+  const handleGoogle = async () => {
+    setBusy(true);
+    window.sessionStorage.setItem("postAuthNext", target);
+    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    if (result.error) {
+      toast.error("Google sign-in failed");
+      setBusy(false);
+      return;
+    }
+    if (result.redirected) return;
+    await goToApp();
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
       <Toaster richColors position="top-right" />
@@ -107,7 +140,19 @@ function AuthPage() {
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {mode === "signin" && (
+                  <button
+                    type="button"
+                    onClick={handleForgot}
+                    disabled={busy}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
@@ -116,6 +161,17 @@ function AuthPage() {
             </Button>
           </form>
         </Tabs>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">or</span>
+          </div>
+        </div>
+
+        <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={busy}>
+          Continue with Google
+        </Button>
 
         <p className="text-xs text-muted-foreground text-center mt-6">
           The first account created becomes the admin.
