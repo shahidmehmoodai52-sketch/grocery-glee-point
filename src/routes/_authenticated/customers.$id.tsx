@@ -214,8 +214,8 @@ function Page() {
           <TableBody>
             <TableRow className="bg-muted/40 font-medium">
               <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
-              <TableCell className="text-right">—</TableCell>
-              <TableCell className="text-right">—</TableCell>
+              <TableCell className="text-right">{opening > 0 ? fmtMoney(opening, sym) : "—"}</TableCell>
+              <TableCell className="text-right text-success">{opening < 0 ? fmtMoney(-opening, sym) : "—"}</TableCell>
               <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
               <TableCell className="no-print"></TableCell>
             </TableRow>
