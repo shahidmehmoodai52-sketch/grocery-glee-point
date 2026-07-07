@@ -35,6 +35,7 @@ function Layout() {
           <header className="h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print">
             <SidebarTrigger />
           </header>
+          <LowStockAlerts />
           <main className="flex-1 min-w-0 overflow-auto">
             <RouteGuard><Outlet /></RouteGuard>
           </main>
