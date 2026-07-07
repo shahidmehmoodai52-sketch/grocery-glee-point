@@ -296,23 +296,30 @@ function POSPage() {
   const setTab = (patch: Partial<Tab>) =>
     setTabs((ts) => ts.map((t) => (t.id === active ? { ...t, ...patch } : t)));
 
-  const addProduct = (p: any) => {
+  const addProduct = (p: any): number => {
     const items = [...tab.items];
-    const ex = items.find((i) => i.product_id === p.id);
-    if (ex) ex.qty = Number(ex.qty) + 1;
-    else items.push({
-      product_id: p.id,
-      code: p.sku ?? p.barcode ?? "",
-      name: p.name,
-      qty: 1,
-      price: Number(p.sell_price),
-      mrp: Number(p.sell_price),
-      cost: Number(p.cost_price),
-      disc_pct: 0,
-      tax_pct: 0,
-      disc: 0,
-    });
+    const exIdx = items.findIndex((i) => i.product_id === p.id);
+    let idx: number;
+    if (exIdx >= 0) {
+      items[exIdx] = { ...items[exIdx], qty: Number(items[exIdx].qty) + 1 };
+      idx = exIdx;
+    } else {
+      items.push({
+        product_id: p.id,
+        code: p.sku ?? p.barcode ?? "",
+        name: p.name,
+        qty: 1,
+        price: Number(p.sell_price),
+        mrp: Number(p.sell_price),
+        cost: Number(p.cost_price),
+        disc_pct: 0,
+        tax_pct: 0,
+        disc: 0,
+      });
+      idx = items.length - 1;
+    }
     setTab({ items });
+    return idx;
   };
 
   const updateLine = (idx: number, patch: Partial<CartItem>) => {
