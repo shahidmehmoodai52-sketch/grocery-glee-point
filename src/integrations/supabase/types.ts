@@ -203,7 +203,7 @@ export type Database = {
           import_batch_id: string | null
           name: string
           phone: string | null
-          tenant_id: string | null
+          tenant_id: string
         }
         Insert: {
           address?: string | null
@@ -214,7 +214,7 @@ export type Database = {
           import_batch_id?: string | null
           name: string
           phone?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Update: {
           address?: string | null
@@ -225,7 +225,7 @@ export type Database = {
           import_batch_id?: string | null
           name?: string
           phone?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -253,7 +253,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           role: string | null
-          tenant_id: string | null
+          tenant_id: string
           updated_at: string
           user_id: string
         }
@@ -265,7 +265,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           role?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -277,7 +277,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           role?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -302,7 +302,7 @@ export type Database = {
           method: string
           person_id: string | null
           sale_id: string | null
-          tenant_id: string | null
+          tenant_id: string
           updated_at: string
           user_id: string
         }
@@ -316,7 +316,7 @@ export type Database = {
           method?: string
           person_id?: string | null
           sale_id?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -330,7 +330,7 @@ export type Database = {
           method?: string
           person_id?: string | null
           sale_id?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -370,7 +370,7 @@ export type Database = {
           products_count: number
           source: string
           suppliers_count: number
-          tenant_id: string | null
+          tenant_id: string
           user_id: string | null
         }
         Insert: {
@@ -384,7 +384,7 @@ export type Database = {
           products_count?: number
           source: string
           suppliers_count?: number
-          tenant_id?: string | null
+          tenant_id?: string
           user_id?: string | null
         }
         Update: {
@@ -398,7 +398,7 @@ export type Database = {
           products_count?: number
           source?: string
           suppliers_count?: number
-          tenant_id?: string | null
+          tenant_id?: string
           user_id?: string | null
         }
         Relationships: [
@@ -480,7 +480,7 @@ export type Database = {
           note: string | null
           party_id: string
           party_type: string
-          tenant_id: string | null
+          tenant_id: string
           user_id: string | null
         }
         Insert: {
@@ -491,7 +491,7 @@ export type Database = {
           note?: string | null
           party_id: string
           party_type: string
-          tenant_id?: string | null
+          tenant_id?: string
           user_id?: string | null
         }
         Update: {
@@ -502,7 +502,7 @@ export type Database = {
           note?: string | null
           party_id?: string
           party_type?: string
-          tenant_id?: string | null
+          tenant_id?: string
           user_id?: string | null
         }
         Relationships: [
@@ -523,7 +523,7 @@ export type Database = {
           import_batch_id: string | null
           label: string | null
           product_id: string
-          tenant_id: string | null
+          tenant_id: string
         }
         Insert: {
           barcode: string
@@ -532,7 +532,7 @@ export type Database = {
           import_batch_id?: string | null
           label?: string | null
           product_id: string
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Update: {
           barcode?: string
@@ -541,7 +541,7 @@ export type Database = {
           import_batch_id?: string | null
           label?: string | null
           product_id?: string
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -582,7 +582,7 @@ export type Database = {
           sku: string | null
           stock: number
           tax_rate: number
-          tenant_id: string | null
+          tenant_id: string
           unit: string | null
           updated_at: string
         }
@@ -600,7 +600,7 @@ export type Database = {
           sku?: string | null
           stock?: number
           tax_rate?: number
-          tenant_id?: string | null
+          tenant_id?: string
           unit?: string | null
           updated_at?: string
         }
@@ -618,7 +618,7 @@ export type Database = {
           sku?: string | null
           stock?: number
           tax_rate?: number
-          tenant_id?: string | null
+          tenant_id?: string
           unit?: string | null
           updated_at?: string
         }
@@ -666,7 +666,7 @@ export type Database = {
           product_id: string | null
           purchase_id: string
           qty: number
-          tenant_id: string | null
+          tenant_id: string
         }
         Insert: {
           cost: number
@@ -676,7 +676,7 @@ export type Database = {
           product_id?: string | null
           purchase_id: string
           qty: number
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Update: {
           cost?: number
@@ -686,7 +686,7 @@ export type Database = {
           product_id?: string | null
           purchase_id?: string
           qty?: number
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -721,7 +721,7 @@ export type Database = {
           product_id: string | null
           qty: number
           return_id: string
-          tenant_id: string | null
+          tenant_id: string
         }
         Insert: {
           cost: number
@@ -731,7 +731,7 @@ export type Database = {
           product_id?: string | null
           qty: number
           return_id: string
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Update: {
           cost?: number
@@ -741,7 +741,7 @@ export type Database = {
           product_id?: string | null
           qty?: number
           return_id?: string
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -779,7 +779,7 @@ export type Database = {
           subtotal: number
           supplier_id: string | null
           tax: number
-          tenant_id: string | null
+          tenant_id: string
           total: number
           user_id: string | null
         }
@@ -794,7 +794,7 @@ export type Database = {
           subtotal?: number
           supplier_id?: string | null
           tax?: number
-          tenant_id?: string | null
+          tenant_id?: string
           total?: number
           user_id?: string | null
         }
@@ -809,7 +809,7 @@ export type Database = {
           subtotal?: number
           supplier_id?: string | null
           tax?: number
-          tenant_id?: string | null
+          tenant_id?: string
           total?: number
           user_id?: string | null
         }
@@ -848,7 +848,7 @@ export type Database = {
           subtotal: number
           supplier_id: string | null
           tax: number
-          tenant_id: string | null
+          tenant_id: string
           total: number
           user_id: string | null
         }
@@ -862,7 +862,7 @@ export type Database = {
           subtotal?: number
           supplier_id?: string | null
           tax?: number
-          tenant_id?: string | null
+          tenant_id?: string
           total?: number
           user_id?: string | null
         }
@@ -876,7 +876,7 @@ export type Database = {
           subtotal?: number
           supplier_id?: string | null
           tax?: number
-          tenant_id?: string | null
+          tenant_id?: string
           total?: number
           user_id?: string | null
         }
@@ -907,7 +907,7 @@ export type Database = {
           product_id: string | null
           qty: number
           sale_id: string
-          tenant_id: string | null
+          tenant_id: string
         }
         Insert: {
           cost?: number
@@ -918,7 +918,7 @@ export type Database = {
           product_id?: string | null
           qty: number
           sale_id: string
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Update: {
           cost?: number
@@ -929,7 +929,7 @@ export type Database = {
           product_id?: string | null
           qty?: number
           sale_id?: string
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -965,7 +965,7 @@ export type Database = {
           product_id: string | null
           qty: number
           return_id: string
-          tenant_id: string | null
+          tenant_id: string
         }
         Insert: {
           cost?: number
@@ -976,7 +976,7 @@ export type Database = {
           product_id?: string | null
           qty: number
           return_id: string
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Update: {
           cost?: number
@@ -987,7 +987,7 @@ export type Database = {
           product_id?: string | null
           qty?: number
           return_id?: string
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -1025,7 +1025,7 @@ export type Database = {
           sale_id: string | null
           subtotal: number
           tax: number
-          tenant_id: string | null
+          tenant_id: string
           total: number
           user_id: string | null
         }
@@ -1040,7 +1040,7 @@ export type Database = {
           sale_id?: string | null
           subtotal?: number
           tax?: number
-          tenant_id?: string | null
+          tenant_id?: string
           total?: number
           user_id?: string | null
         }
@@ -1055,7 +1055,7 @@ export type Database = {
           sale_id?: string | null
           subtotal?: number
           tax?: number
-          tenant_id?: string | null
+          tenant_id?: string
           total?: number
           user_id?: string | null
         }
@@ -1100,7 +1100,7 @@ export type Database = {
           status: string
           subtotal: number
           tax: number
-          tenant_id: string | null
+          tenant_id: string
           total: number
         }
         Insert: {
@@ -1119,7 +1119,7 @@ export type Database = {
           status?: string
           subtotal?: number
           tax?: number
-          tenant_id?: string | null
+          tenant_id?: string
           total?: number
         }
         Update: {
@@ -1138,7 +1138,7 @@ export type Database = {
           status?: string
           subtotal?: number
           tax?: number
-          tenant_id?: string | null
+          tenant_id?: string
           total?: number
         }
         Relationships: [
@@ -1189,7 +1189,7 @@ export type Database = {
           store_name: string
           tax_id: string | null
           tax_rate: number
-          tenant_id: string | null
+          tenant_id: string
           updated_at: string
         }
         Insert: {
@@ -1215,7 +1215,7 @@ export type Database = {
           store_name?: string
           tax_id?: string | null
           tax_rate?: number
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
         }
         Update: {
@@ -1241,7 +1241,7 @@ export type Database = {
           store_name?: string
           tax_id?: string | null
           tax_rate?: number
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -1300,7 +1300,7 @@ export type Database = {
           import_batch_id: string | null
           name: string
           phone: string | null
-          tenant_id: string | null
+          tenant_id: string
         }
         Insert: {
           address?: string | null
@@ -1311,7 +1311,7 @@ export type Database = {
           import_batch_id?: string | null
           name: string
           phone?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Update: {
           address?: string | null
@@ -1322,7 +1322,7 @@ export type Database = {
           import_batch_id?: string | null
           name?: string
           phone?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -1802,7 +1802,7 @@ export type Database = {
           store_name: string
           tax_id: string | null
           tax_rate: number
-          tenant_id: string | null
+          tenant_id: string
           updated_at: string
         }[]
         SetofOptions: {
