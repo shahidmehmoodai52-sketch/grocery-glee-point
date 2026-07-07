@@ -182,9 +182,13 @@ function ProductsPage() {
                 <TableCell className="text-right">{fmtMoney(p.cost_price, sym)}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(p.sell_price, sym)}</TableCell>
                 <TableCell className="text-right">
-                  <Badge variant={Number(p.stock) > 0 ? "outline" : "destructive"}>
-                    {fmtQty(p.stock)} {p.unit}
-                  </Badge>
+                  {(() => {
+                    const s = Number(p.stock);
+                    const t = Number(p.low_stock_threshold ?? 5);
+                    if (s <= 0) return <Badge variant="destructive">Out · {fmtQty(p.stock)} {p.unit}</Badge>;
+                    if (s <= t) return <Badge className="bg-amber-500 text-white hover:bg-amber-500">Low · {fmtQty(p.stock)} {p.unit}</Badge>;
+                    return <Badge variant="outline">{fmtQty(p.stock)} {p.unit}</Badge>;
+                  })()}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => edit(p)}><Pencil className="h-4 w-4" /></Button>
