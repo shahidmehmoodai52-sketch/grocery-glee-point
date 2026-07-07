@@ -9,7 +9,7 @@ async function assertAdmin(context: any) {
 // Ensure the target user shares the caller-admin's tenant so RLS lets them
 // see products/customers/etc. that the admin uploaded. Removes any other
 // tenant memberships — current_tenant_id() returns NULL when count != 1.
-async function attachToMyTenant(context: any, targetUserId: string, memberRole: string = "cashier") {
+async function attachToMyTenant(context: any, targetUserId: string, memberRole: "admin" | "cashier" | "manager" | "owner" | "staff" | "viewer" = "cashier") {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: mine, error: e1 } = await supabaseAdmin
     .from("tenant_members").select("tenant_id").eq("user_id", context.userId).limit(1).maybeSingle();
