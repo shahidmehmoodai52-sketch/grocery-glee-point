@@ -598,7 +598,9 @@ function POSPage() {
                 if (exact) { addProduct(exact); setSearch(""); return; }
                 if (filtered.length >= 1) {
                   const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
-                  addProduct(pick); setSearch(""); return;
+                  const idx = addProduct(pick); setSearch("");
+                  setTimeout(() => setEditing({ idx, field: "qty" }), 0);
+                  return;
                 }
                 openQuickAdd(raw);
               }}
