@@ -1333,6 +1333,59 @@ export type Database = {
           },
         ]
       }
+      tenant_role_permissions: {
+        Row: {
+          permission: string
+          role: Database["public"]["Enums"]["tenant_role"]
+        }
+        Insert: {
+          permission: string
+          role: Database["public"]["Enums"]["tenant_role"]
+        }
+        Update: {
+          permission?: string
+          role?: Database["public"]["Enums"]["tenant_role"]
+        }
+        Relationships: []
+      }
+      tenant_user_permissions: {
+        Row: {
+          created_at: string
+          granted: boolean
+          granted_by: string | null
+          id: string
+          permission: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted?: boolean
+          granted_by?: string | null
+          id?: string
+          permission: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted?: boolean
+          granted_by?: string | null
+          id?: string
+          permission?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_user_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
@@ -1441,6 +1494,10 @@ export type Database = {
             }
             Returns: boolean
           }
+      has_tenant_permission: {
+        Args: { _perm: string; _tenant_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
