@@ -21,13 +21,17 @@ import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
 
 type Entry = {
+  id?: string;
+  entity?: LedgerEntity;
   date: string;
   type: "sale" | "payment" | "return";
   ref: string;
   note: string;
   debit: number;
   credit: number;
-  sale?: any;       // attached for sale rows so we can re-open / re-print the invoice
+  sale?: any;
+  paid?: number;
+  total?: number;
 };
 
 function Page() {
@@ -38,6 +42,10 @@ function Page() {
   const [to, setTo] = useState("");
   const [openInvoice, setOpenInvoice] = useState<any>(null);
   const [pdfPrompt, setPdfPrompt] = useState(false);
+  const [addPayOpen, setAddPayOpen] = useState(false);
+  const [payDefault, setPayDefault] = useState(0);
+  const [editPayment, setEditPayment] = useState<any>(null);
+  const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
@@ -66,16 +74,16 @@ function Page() {
   const entries: Entry[] = useMemo(() => {
     const e: Entry[] = [];
     for (const s of sales as any[]) {
-      e.push({ date: s.created_at, type: "sale", ref: s.invoice_no, note: s.note ?? "", debit: Number(s.total), credit: 0, sale: s });
+      e.push({ id: s.id, entity: "sale", date: s.created_at, type: "sale", ref: s.invoice_no, note: s.note ?? "", debit: Number(s.total), credit: 0, sale: s, paid: Number(s.paid), total: Number(s.total) });
       if (Number(s.paid) > 0) {
         e.push({ date: s.created_at, type: "payment", ref: `${s.invoice_no} · on-invoice`, note: "Paid at sale", debit: 0, credit: Number(s.paid) });
       }
     }
     for (const r of returns as any[]) {
-      e.push({ date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
+      e.push({ id: r.id, entity: "sale_return", date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
     }
     for (const p of payments as any[]) {
-      e.push({ date: p.created_at, type: "payment", ref: p.method, note: p.note ?? "", debit: 0, credit: Number(p.amount) });
+      e.push({ id: p.id, entity: "payment", date: p.created_at, type: "payment", ref: p.method, note: p.note ?? "", debit: 0, credit: Number(p.amount) });
     }
     e.sort((a, b) => a.date.localeCompare(b.date));
     return e;
