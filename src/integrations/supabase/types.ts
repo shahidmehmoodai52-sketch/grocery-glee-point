@@ -934,6 +934,7 @@ export type Database = {
       complete_purchase_return: { Args: { payload: Json }; Returns: string }
       complete_sale: { Args: { payload: Json }; Returns: string }
       complete_sale_return: { Args: { payload: Json }; Returns: string }
+      delete_party_payment: { Args: { _id: string }; Returns: undefined }
       has_permission: {
         Args: { _perm: string; _user_id: string }
         Returns: boolean
@@ -954,6 +955,16 @@ export type Database = {
           p_party_type: string
         }
         Returns: string
+      }
+      update_party_payment: {
+        Args: {
+          _amount: number
+          _created_at: string
+          _id: string
+          _method: string
+          _note: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
