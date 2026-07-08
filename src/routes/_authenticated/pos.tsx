@@ -144,7 +144,31 @@ function POSPage() {
   const undoWindowMin = Math.max(1, Number((settings as any)?.undo_window_minutes ?? 5));
   const [showCost, setShowCost] = useState(false);
   const [showStaff, setShowStaff] = useState(false);
+  const [showProfit, setShowProfit] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [scanFlash, setScanFlash] = useState(false);
+  const [undoReason, setUndoReason] = useState<string>(UNDO_REASONS[0]);
+  const [undoReasonNote, setUndoReasonNote] = useState<string>("");
+  const [quickAddCustomerOpen, setQuickAddCustomerOpen] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "" });
+  const triggerScanFlash = () => {
+    setScanFlash(true);
+    window.setTimeout(() => setScanFlash(false), 300);
+  };
+  const saveQuickCustomer = async () => {
+    const name = newCustomer.name.trim();
+    if (!name) return toast.error("Customer name required");
+    const { data, error } = await supabase.from("customers")
+      .insert({ name, phone: newCustomer.phone.trim() || null })
+      .select("id,name,balance").single();
+    if (error) return toast.error(error.message);
+    setTab({ customer_id: data.id, payment_method: "credit" });
+    toast.success(`Added ${data.name}`);
+    setQuickAddCustomerOpen(false);
+    setNewCustomer({ name: "", phone: "" });
+    qc.invalidateQueries({ queryKey: ["customers"] });
+    setTimeout(() => searchRef.current?.focus(), 0);
+  };
   const [now, setNow] = useState(() => new Date());
   const [editing, setEditing] = useState<{ idx: number; field: "price" | "qty" | "disc" } | null>(null);
   const [quickAdd, setQuickAdd] = useState<{
