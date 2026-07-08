@@ -495,6 +495,8 @@ function POSPage() {
         duration: 5000,
       });
       closeTab(active);
+      // restored badge is cleared implicitly since tab is closed
+      void 0;
       setTimeout(() => searchRef.current?.focus(), 50);
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
