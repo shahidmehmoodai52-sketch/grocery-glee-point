@@ -565,7 +565,7 @@ function POSPage() {
       });
       const restored: Tab = {
         id: crypto.randomUUID(),
-        name: `Undo · ${payload.invoice_no ?? undoCandidate.invoice_no}`,
+        name: `↩ ${payload.invoice_no ?? undoCandidate.invoice_no}`,
         items: restoredItems,
         customer_id: payload.customer_id ?? null,
         expense_person_id: payload.expense_person_id ?? null,
@@ -574,13 +574,27 @@ function POSPage() {
         discount_pct: "",
         paid: String(payload.paid ?? ""),
         note: payload.note ?? "",
+        restored: true,
       };
       setTabs((ts) => [...ts, restored]);
       setActive(restored.id);
 
-      toast.success(`Sale ${payload.invoice_no ?? undoCandidate.invoice_no} undone — cart restored`);
+      // Log undo reason to audit_logs (best-effort; ignore error)
+      const reasonText = undoReason === "Other" ? undoReasonNote.trim() || "Other" : undoReason;
+      try {
+        await supabase.from("audit_logs").insert({
+          action: "undo_last_sale.reason",
+          entity: "sales",
+          entity_id: undoCandidate.sale_id,
+          details: { invoice_no: payload.invoice_no ?? undoCandidate.invoice_no, reason: reasonText },
+        } as any);
+      } catch { /* noop */ }
+
+      toast.success(`✓ Sale ${payload.invoice_no ?? undoCandidate.invoice_no} restored successfully`);
       setUndoCandidate(null);
       setUndoOpen(false);
+      setUndoReason(UNDO_REASONS[0]);
+      setUndoReasonNote("");
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
