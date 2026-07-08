@@ -1157,7 +1157,7 @@ function POSPage() {
                     key={p.v}
                     type="button"
                     onClick={() => { setTab({ payment_method: p.v }); setTimeout(() => searchRef.current?.focus(), 0); }}
-                    className={`h-11 rounded-lg text-sm font-medium transition-all ${
+                    className={`h-9 rounded-lg text-sm font-medium transition-all ${
                       active
                         ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
                         : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
