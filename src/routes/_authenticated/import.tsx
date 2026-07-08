@@ -986,6 +986,7 @@ function ExportAllButton() {
 // ---------------- Single merged file: name/sku + multiple barcodes ----------------
 
 function SingleMergedFile() {
+  const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<{ headers: string[]; rows: Record<string, any>[]; name: string } | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
