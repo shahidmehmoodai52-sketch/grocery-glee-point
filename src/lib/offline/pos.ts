@@ -1,0 +1,181 @@
+// POS-specific offline-first helpers.
+//
+// - Warm local IndexedDB cache from cloud reads (products, customers, barcodes).
+// - Fall back to local cache when offline or a network error occurs.
+// - Complete a sale offline: generate a local invoice, decrement local stock,
+//   enqueue the `complete_sale` RPC for sync.
+
+import { supabase } from "@/integrations/supabase/client";
+import { db } from "./db";
+import { getOfflineStatus } from "./status";
+import { enqueueWrite } from "./sync";
+
+function isOffline() {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return true;
+  return false;
+}
+
+/** Try cloud, warm local cache on success. On network failure (offline / fetch throw),
+ *  fall back to local cache. On other errors, rethrow so the UI shows them. */
+export async function offlineFirst<T>(
+  onlineFn: () => Promise<T>,
+  cacheReader: () => Promise<T>,
+  cacheWriter?: (data: T) => Promise<void>,
+): Promise<T> {
+  const enabled = getOfflineStatus().enabled;
+  if (isOffline() && enabled) {
+    return cacheReader();
+  }
+  try {
+    const data = await onlineFn();
+    if (enabled && cacheWriter) { try { await cacheWriter(data); } catch {/* cache write is best-effort */} }
+    return data;
+  } catch (e: any) {
+    if (enabled && (e?.message?.match(/failed to fetch|network|offline/i))) {
+      return cacheReader();
+    }
+    throw e;
+  }
+}
+
+/** Warm helpers used by both queryFns and the sync engine. */
+export async function cacheProducts(rows: any[]) {
+  if (!rows?.length) return;
+  await db().products.bulkPut(rows);
+}
+export async function cacheCustomers(rows: any[]) {
+  if (!rows?.length) return;
+  await db().customers.bulkPut(rows);
+}
+export async function cacheProductBarcodes(rows: any[]) {
+  if (!rows?.length) return;
+  // product_barcodes primary key in cloud is `id`, but our sparse rows here
+  // may not have `id`. Derive a stable synthetic key `product_id:barcode` so
+  // bulkPut doesn't fail.
+  const withKey = rows.map((r: any) => ({ ...r, id: r.id ?? `${r.product_id}:${r.barcode}` }));
+  await db().product_barcodes.bulkPut(withKey);
+}
+
+/** Local-generated invoice numbers use OFF-<epoch>-<counter> prefix so they
+ *  never collide with server numbers. Server assigns the final number on sync. */
+function nextLocalInvoiceNo(): string {
+  const key = "pos_local_invoice_counter";
+  let n = 0;
+  try { n = Number(window.localStorage.getItem(key) ?? "0") || 0; } catch {}
+  n += 1;
+  try { window.localStorage.setItem(key, String(n)); } catch {}
+  return `OFF-${Date.now().toString(36).toUpperCase()}-${n}`;
+}
+
+export interface CompleteSalePayload {
+  customer_id: string | null;
+  expense_person_id: string | null;
+  payment_method: string;
+  tax: number;
+  discount: number;
+  paid: number;
+  note: string;
+  items: Array<{ product_id: string | null; name: string; qty: number; price: number; cost: number }>;
+}
+
+/** Online-first sale. When offline, records the sale locally and queues the RPC.
+ *  Returns a sale-shaped object matching the cloud response so the UI can print it. */
+export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
+  const enabled = getOfflineStatus().enabled;
+  const offline = isOffline() && enabled;
+
+  if (!offline) {
+    // Normal online path.
+    const { data, error } = await supabase.rpc("complete_sale", { payload: payload as any });
+    if (error) throw error;
+    const { data: sale, error: readErr } = await supabase
+      .from("sales")
+      .select("*, sale_items(*), customers(name,phone)")
+      .eq("id", data as string)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    // Cache locally so reprint works after refresh even offline.
+    if (enabled && sale) {
+      try {
+        await db().sales.put(sale);
+        if (Array.isArray((sale as any).sale_items)) {
+          await db().sale_items.bulkPut((sale as any).sale_items);
+        }
+      } catch {/* best effort */}
+    }
+    return { sale, offline: false };
+  }
+
+  // Offline path — build a local sale record and enqueue the RPC for sync.
+  const subtotal = payload.items.reduce((s, i) => s + i.qty * i.price, 0);
+  const total = +(subtotal - payload.discount + payload.tax).toFixed(2);
+  const paid = +Number(payload.paid ?? 0).toFixed(2);
+  const cost_total = +payload.items.reduce((s, i) => s + i.qty * i.cost, 0).toFixed(2);
+  const invoice_no = nextLocalInvoiceNo();
+  const now = new Date().toISOString();
+  const localId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+    ? crypto.randomUUID()
+    : `local-${Date.now()}`;
+
+  // Look up customer name for the receipt.
+  let customerName: string | null = null;
+  if (payload.customer_id) {
+    try {
+      const c = await db().customers.get(payload.customer_id);
+      customerName = c?.name ?? null;
+    } catch {/* ignore */}
+  }
+
+  const sale: any = {
+    id: localId,
+    invoice_no,
+    customer_id: payload.customer_id,
+    expense_person_id: payload.expense_person_id,
+    payment_method: payload.payment_method,
+    subtotal,
+    discount: payload.discount,
+    tax: payload.tax,
+    total,
+    paid,
+    cost_total,
+    status: paid >= total ? "completed" : "credit",
+    note: payload.note,
+    created_at: now,
+    updated_at: now,
+    _offline_pending: true, // marker so the UI can badge it
+    customers: customerName ? { name: customerName, phone: null } : null,
+  };
+
+  const sale_items = payload.items.map((i, idx) => ({
+    id: `${localId}:${idx}`,
+    sale_id: localId,
+    product_id: i.product_id,
+    name: i.name,
+    qty: i.qty,
+    price: i.price,
+    cost: i.cost,
+  }));
+
+  await db().sales.put(sale);
+  await db().sale_items.bulkPut(sale_items);
+
+  // Optimistic local stock decrement.
+  for (const it of payload.items) {
+    if (!it.product_id) continue;
+    try {
+      const p = await db().products.get(it.product_id);
+      if (p && typeof p.stock_qty === "number") {
+        await db().products.put({ ...p, stock_qty: +(p.stock_qty - it.qty).toFixed(3) });
+      }
+    } catch {/* ignore */}
+  }
+
+  // Enqueue the RPC so the sync engine can replay it against the cloud.
+  await enqueueWrite({
+    op: "rpc",
+    table: "complete_sale",
+    payload: { payload: { ...payload, _local_id: localId, _local_invoice_no: invoice_no } },
+  });
+
+  return { sale: { ...sale, sale_items }, offline: true };
+}
