@@ -1,13 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Eye, Printer, Undo2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eye, Printer, Undo2, Ban } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
@@ -19,7 +21,12 @@ export const Route = createFileRoute("/_authenticated/sales")({ component: Page 
 function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "$";
+  const qc = useQueryClient();
   const [viewing, setViewing] = useState<any>(null);
+  const [voidTarget, setVoidTarget] = useState<any>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [voiding, setVoiding] = useState(false);
+  const voidRequireReason = !!(settings as any)?.ops_void_requires_reason;
 
   const { data: sales = [] } = useQuery({
     queryKey: ["sales"],
@@ -31,6 +38,21 @@ function Page() {
   const todaySales = sales.filter((s: any) => new Date(s.created_at) >= today);
   const todayTotal = todaySales.reduce((s: number, x: any) => s + Number(x.total), 0);
   const todayProfit = todaySales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+
+  const confirmVoid = async () => {
+    if (!voidTarget) return;
+    if (voidRequireReason && !voidReason.trim()) return toast.error("Reason required");
+    setVoiding(true);
+    const { error } = await supabase.rpc("void_sale", {
+      _sale_id: voidTarget.id, _reason: voidReason.trim() || "voided",
+    });
+    setVoiding(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Sale ${voidTarget.invoice_no} voided`);
+    setVoidTarget(null); setVoidReason("");
+    qc.invalidateQueries({ queryKey: ["sales"] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
 
   return (
     <div className="p-6 space-y-4">
@@ -80,7 +102,12 @@ function Page() {
                   <Button asChild variant="ghost" size="sm" title="Create return">
                     <Link to="/sale-returns"><Undo2 className="h-4 w-4" /></Link>
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setViewing(s)}><Eye className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => setViewing(s)} title="View invoice"><Eye className="h-4 w-4" /></Button>
+                  {s.status !== "voided" && (
+                    <Button variant="ghost" size="icon" onClick={() => { setVoidTarget(s); setVoidReason(""); }} title="Void sale">
+                      <Ban className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -100,6 +127,34 @@ function Page() {
           )}
           <DialogFooter className="no-print">
             <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!voidTarget} onOpenChange={(o) => !o && setVoidTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Void sale {voidTarget?.invoice_no}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p className="text-muted-foreground">
+              Voiding restores stock and reverses ledger entries. This action is logged.
+            </p>
+            <div>
+              <label className="text-xs font-medium">Reason {voidRequireReason && <span className="text-destructive">*</span>}</label>
+              <Textarea
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value)}
+                placeholder="Why is this sale being voided?"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVoidTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmVoid} disabled={voiding}>
+              {voiding ? "Voiding…" : "Void sale"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

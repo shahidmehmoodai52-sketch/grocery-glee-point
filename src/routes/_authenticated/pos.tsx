@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog } from "lucide-react";
+import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog, PauseCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -136,6 +136,8 @@ function POSPage() {
   const [lastInvoice, setLastInvoice] = useState<any>(null);
   const [reprintOpen, setReprintOpen] = useState(false);
   const [reprintView, setReprintView] = useState<any>(null);
+  const [heldOpen, setHeldOpen] = useState(false);
+  const [holding, setHolding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [undoCandidate, setUndoCandidate] = useState<{
     sale_id: string; invoice_no: string; total: number; item_count: number; created_at: string;
@@ -446,6 +448,119 @@ function POSPage() {
     });
   };
 
+  // ---- Held bills ----
+  const holdBillsEnabled = !!(settings as any)?.ops_hold_bills_enabled;
+  const { data: heldBills = [], refetch: refetchHeld } = useQuery({
+    queryKey: ["held_bills", "pos"],
+    enabled: holdBillsEnabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("held_bills")
+        .select("id,label,total,item_count,created_at,customer_id,payload,customers(name)")
+        .eq("status", "held")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    staleTime: 30_000,
+  });
+
+  const restorePayloadIntoNewTab = (payload: any, labelPrefix = "↺") => {
+    if (!payload || !Array.isArray(payload.items)) return;
+    const restoredItems: CartItem[] = payload.items.map((i: any) => {
+      const qty = Number(i.qty ?? 1);
+      const price = Number(i.price ?? 0);
+      return {
+        product_id: i.product_id ?? null,
+        code: i.code ?? "",
+        name: String(i.name ?? "Item"),
+        qty, price,
+        mrp: Number(i.mrp ?? price),
+        cost: Number(i.cost ?? 0),
+        disc_pct: Number(i.disc_pct ?? 0),
+        tax_pct: Number(i.tax_pct ?? 0),
+        disc: Number(i.disc ?? 0),
+      };
+    });
+    const restored: Tab = {
+      id: crypto.randomUUID(),
+      name: `${labelPrefix} ${payload.label ?? "Bill"}`,
+      items: restoredItems,
+      customer_id: payload.customer_id ?? null,
+      expense_person_id: payload.expense_person_id ?? null,
+      payment_method: payload.payment_method ?? "cash",
+      discount: Number(payload.discount ?? 0),
+      discount_pct: "",
+      paid: String(payload.paid ?? ""),
+      note: payload.note ?? "",
+      restored: true,
+    };
+    setTabs((ts) => [...ts, restored]);
+    setActive(restored.id);
+  };
+
+  const resumeHeld = async (id: string) => {
+    const { data, error } = await supabase.rpc("resume_bill", { _id: id });
+    if (error) return toast.error(error.message);
+    restorePayloadIntoNewTab(data as any, "↺");
+    setHeldOpen(false);
+    refetchHeld();
+    toast.success("Bill resumed");
+  };
+
+  const discardHeld = async (id: string) => {
+    if (!confirm("Discard this held bill?")) return;
+    const { error } = await (supabase.rpc as any)("discard_held_bill", { _id: id, _reason: null });
+    if (error) return toast.error(error.message);
+    refetchHeld();
+    toast.success("Discarded");
+  };
+
+  const holdCurrent = async () => {
+    if (!tab.items.length) return toast.error("Cart is empty");
+    if (!holdBillsEnabled) return toast.error("Hold bills is disabled in Settings");
+    setHolding(true);
+    try {
+      const payload = {
+        items: tab.items,
+        customer_id: tab.customer_id,
+        expense_person_id: tab.expense_person_id,
+        payment_method: tab.payment_method,
+        discount: Number(tab.discount || 0),
+        paid: tab.paid,
+        note: tab.note,
+        label: tab.name,
+      };
+      const { error } = await supabase.rpc("hold_bill", {
+        _customer: tab.customer_id as any,
+        _item_count: tab.items.length,
+        _label: tab.name,
+        _payload: payload as any,
+        _total: total,
+      });
+      if (error) throw error;
+      toast.success("Bill held");
+      closeTab(active);
+      refetchHeld();
+    } catch (err: any) {
+      toast.error(err.message ?? "Could not hold bill");
+    } finally {
+      setHolding(false);
+    }
+  };
+
+  // Pick up a resumed payload handed off from Operations page
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("pos:resume_payload");
+      if (!raw) return;
+      localStorage.removeItem("pos:resume_payload");
+      restorePayloadIntoNewTab(JSON.parse(raw), "↺");
+      toast.success("Bill resumed");
+    } catch {/* noop */}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSale = async () => {
     if (!tab.items.length) return toast.error("Cart is empty");
     const isCredit = due > 0;
@@ -754,6 +869,27 @@ function POSPage() {
           <Clock className="h-3 w-3 text-muted-foreground" />
           <span>{now.toLocaleTimeString()}</span>
         </div>
+        {holdBillsEnabled && (
+          <>
+            <Button
+              size="sm" variant="outline" className="h-7 text-xs shrink-0"
+              onClick={holdCurrent} disabled={holding || !tab.items.length}
+              title="Hold current bill (park cart)"
+            >
+              <PauseCircle className="h-3.5 w-3.5 mr-1" /> Hold
+            </Button>
+            <Button
+              size="sm" variant="outline" className="h-7 text-xs shrink-0"
+              onClick={() => setHeldOpen(true)}
+              title="Resume a held bill"
+            >
+              <Play className="h-3.5 w-3.5 mr-1" /> Held
+              {heldBills.length > 0 && (
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{heldBills.length}</Badge>
+              )}
+            </Button>
+          </>
+        )}
         <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setReprintOpen(true)}>
           <History className="h-3.5 w-3.5 mr-1" /> Reprint
         </Button>
@@ -1309,8 +1445,52 @@ function POSPage() {
         onOpenChange={setReprintOpen}
         settings={settings}
         sym={sym}
+        reprintAuditEnabled={!!(settings as any)?.ops_reprint_audit_enabled}
         onView={(s: any) => setReprintView(s)}
       />
+
+      {/* Held bills tray */}
+      <Dialog open={heldOpen} onOpenChange={setHeldOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Held bills</DialogTitle></DialogHeader>
+          <div className="rounded-md border max-h-[60vh] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-xs uppercase tracking-wide sticky top-0">
+                <tr>
+                  <th className="text-left px-3 py-2">Label</th>
+                  <th className="text-left px-3 py-2">Customer</th>
+                  <th className="text-left px-3 py-2">Held at</th>
+                  <th className="text-right px-3 py-2">Items</th>
+                  <th className="text-right px-3 py-2">Total</th>
+                  <th className="px-2 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {heldBills.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">No held bills</td></tr>
+                )}
+                {heldBills.map((b: any) => (
+                  <tr key={b.id} className="border-t hover:bg-accent/40">
+                    <td className="px-3 py-1.5">{b.label || "Untitled"}</td>
+                    <td className="px-3 py-1.5">{b.customers?.name ?? "Walk-in"}</td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">{new Date(b.created_at).toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-right">{b.item_count}</td>
+                    <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(b.total, sym)}</td>
+                    <td className="px-2 py-1 text-right whitespace-nowrap">
+                      <Button size="sm" variant="ghost" onClick={() => resumeHeld(b.id)}>
+                        <Play className="h-3.5 w-3.5 mr-1" /> Resume
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => discardHeld(b.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Single invoice viewer (used by both reprint and the post-sale toast action) */}
       <InvoiceDialog
@@ -1551,12 +1731,14 @@ function ReprintDialog({
   onOpenChange,
   settings,
   sym,
+  reprintAuditEnabled,
   onView,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   settings: any;
   sym: string;
+  reprintAuditEnabled?: boolean;
   onView: (s: any) => void;
 }) {
   const [q, setQ] = useState("");
@@ -1635,7 +1817,14 @@ function ReprintDialog({
                     <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(s.total, sym)}</td>
                     <td className="px-2 py-1 text-right">
-                      <Button size="sm" variant="ghost" onClick={() => { onView(s); onOpenChange(false); }}>
+                      <Button size="sm" variant="ghost" onClick={async () => {
+                        if (reprintAuditEnabled) {
+                          try {
+                            await supabase.rpc("log_receipt_reprint", { _sale_id: s.id, _reason: "reprint from POS" });
+                          } catch {/* audit-only */}
+                        }
+                        onView(s); onOpenChange(false);
+                      }}>
                         <Printer className="h-3.5 w-3.5 mr-1" /> Open
                       </Button>
                     </td>
