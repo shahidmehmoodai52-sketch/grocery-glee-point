@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { logAppError } from "../lib/log-app-error";
 import { AppErrorBoundary } from "../components/error-boundary";
+import { SuspendedGate } from "../components/suspended-gate";
 
 function NotFoundComponent() {
   return (
@@ -131,8 +132,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppErrorBoundary module="root">
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <SuspendedGate>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </SuspendedGate>
       </AppErrorBoundary>
     </QueryClientProvider>
   );
