@@ -1,10 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Wallet, ArrowDownCircle, ArrowUpCircle, ShieldCheck, StickyNote, ListTodo,
   Printer, Ban, ClipboardCheck, Sunrise, Play, Trash2, CheckCircle2, PauseCircle,
+  Target, AlertTriangle, TrendingUp, TrendingDown, CalendarDays, Zap, Sparkles,
+  ShoppingCart, Package, Receipt, BarChart3, ClipboardList, Brain, CalendarClock,
+  ChevronLeft, ChevronRight, Activity, Save,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
