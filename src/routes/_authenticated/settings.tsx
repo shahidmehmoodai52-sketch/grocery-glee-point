@@ -26,7 +26,12 @@ const FIELDS = [
   "stock_count_scan_mode",
   "expiring_soon_days",
   "critical_days",
+  "ops_shift_enabled", "ops_business_day_start_hour", "ops_require_manager_approval",
+  "ops_allow_multiple_shifts", "ops_cash_drawer_enabled", "ops_safe_drop_enabled",
+  "ops_paid_in_out_enabled", "ops_shift_notes_enabled", "ops_pending_tasks_enabled",
+  "ops_receipt_reprint_enabled",
 ] as const;
+
 
 
 function Page() {
@@ -147,6 +152,57 @@ function Page() {
               </div>
             </div>
           </Card>
+
+          <Card className="p-5 space-y-3">
+            <div>
+              <div className="font-medium">Business Operations</div>
+              <div className="text-xs text-muted-foreground">
+                Optional shift management, cash drawer and daily operations. When Shift Management is off, POS behaves exactly like today with zero extra queries.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {([
+                ["ops_shift_enabled", "Enable shift management", "Cashiers can open/close shifts, run X/Z reports."],
+                ["ops_require_manager_approval", "Require manager approval on close", "Cashier close is 'closed'; admin must approve."],
+                ["ops_allow_multiple_shifts", "Allow multiple concurrent shifts per cashier", "Otherwise one open shift per cashier at a time."],
+                ["ops_cash_drawer_enabled", "Cash drawer tracking (Phase 2)", "Track expected vs actual drawer cash."],
+                ["ops_safe_drop_enabled", "Safe drop (Phase 2)", "Record cash removed from drawer."],
+                ["ops_paid_in_out_enabled", "Paid in / Paid out (Phase 2)", "Non-sale drawer movements."],
+                ["ops_shift_notes_enabled", "Shift notes (Phase 2)", "Cashier can log operational notes."],
+                ["ops_pending_tasks_enabled", "Pending tasks (Phase 2)", "Operational tasks visible until completed."],
+                ["ops_receipt_reprint_enabled", "Receipt reprint audit (Phase 2)", "Log every receipt reprint."],
+              ] as const).map(([k, label, hint]) => (
+                <label key={k} className="flex items-start justify-between gap-3 rounded border p-2 text-sm">
+                  <div className="min-w-0">
+                    <div className="font-medium">{label}</div>
+                    <div className="text-xs text-muted-foreground">{hint}</div>
+                  </div>
+                  <Switch checked={!!form[k]} onCheckedChange={(v) => set({ [k]: v })} />
+                </label>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div>
+                <Label>Business day starts at</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={String(form.ops_business_day_start_hour ?? 0)}
+                  onChange={(e) => set({ ops_business_day_start_hour: Number(e.target.value) })}
+                >
+                  <option value="0">12:00 AM (midnight)</option>
+                  <option value="1">1:00 AM</option>
+                  <option value="2">2:00 AM</option>
+                  <option value="3">3:00 AM</option>
+                  <option value="4">4:00 AM</option>
+                  <option value="5">5:00 AM</option>
+                  <option value="6">6:00 AM</option>
+                </select>
+                <div className="text-xs text-muted-foreground mt-1">Sales after midnight but before this hour count for the previous business day.</div>
+              </div>
+            </div>
+          </Card>
+
+
 
 
           <Card className="p-5 space-y-4">

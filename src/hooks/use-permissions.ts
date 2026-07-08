@@ -17,6 +17,8 @@ export const ALL_PERMS = [
   { key: "expiry", label: "Expiry & waste" },
   { key: "intelligence", label: "Inventory intelligence" },
   { key: "reports", label: "Reports / P&L" },
+  { key: "shifts", label: "Shifts & cash drawer" },
+
 
   { key: "backup", label: "Auto backup" },
   { key: "settings", label: "Store settings" },

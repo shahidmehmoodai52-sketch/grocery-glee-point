@@ -1,8 +1,9 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain,
+  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock,
 } from "lucide-react";
+
 
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -29,6 +30,8 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Purchases", url: "/purchases", icon: ClipboardList, perm: "purchases" },
       { title: "Purchase returns", url: "/purchase-returns", icon: RotateCcw, perm: "purchase-returns" },
       { title: "Expenses", url: "/expenses", icon: Wallet, perm: "expenses" },
+      { title: "Shifts", url: "/shifts", icon: Clock, perm: "shifts" },
+
     ],
   },
   {

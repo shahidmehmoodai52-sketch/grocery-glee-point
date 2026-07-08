@@ -19,6 +19,8 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { Receipt } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
+import { ShiftBanner } from "@/components/shift-banner";
+
 
 
 export const Route = createFileRoute("/_authenticated/pos")({
@@ -715,8 +717,10 @@ function POSPage() {
 
   return (
       <div className="h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
+      <ShiftBanner />
       {/* Top strip — open bills + clock + reprint (jahaan se sidebar khulti hai us patti ke saath) */}
         <div className="flex items-center gap-2 px-2 py-1 border-b bg-card/60 no-print shrink-0">
+
         <ScrollArea className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
             {tabs.map((t) => (
