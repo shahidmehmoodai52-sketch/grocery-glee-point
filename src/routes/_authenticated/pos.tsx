@@ -628,6 +628,13 @@ function POSPage() {
         setTimeout(() => searchRef.current?.focus(), 0);
         return;
       }
+      if (e.key === "F3") {
+        e.preventDefault();
+        e.stopPropagation();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
       if (e.key === "F4" && !inDialog) { e.preventDefault(); handleSale(); return; }
 
       // Ctrl+Z or F10 → undo last sale by current cashier (if still within window).
