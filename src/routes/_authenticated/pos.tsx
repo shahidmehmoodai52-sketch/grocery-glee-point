@@ -1731,12 +1731,14 @@ function ReprintDialog({
   onOpenChange,
   settings,
   sym,
+  reprintAuditEnabled,
   onView,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   settings: any;
   sym: string;
+  reprintAuditEnabled?: boolean;
   onView: (s: any) => void;
 }) {
   const [q, setQ] = useState("");
