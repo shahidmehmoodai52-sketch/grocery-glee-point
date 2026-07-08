@@ -125,6 +125,13 @@ function POSPage() {
   const [reprintOpen, setReprintOpen] = useState(false);
   const [reprintView, setReprintView] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [undoCandidate, setUndoCandidate] = useState<{
+    sale_id: string; invoice_no: string; total: number; item_count: number; created_at: string;
+  } | null>(null);
+  const [undoOpen, setUndoOpen] = useState(false);
+  const [undoing, setUndoing] = useState(false);
+  const [undoTick, setUndoTick] = useState(0);
+  const undoWindowMin = Math.max(1, Number((settings as any)?.undo_window_minutes ?? 5));
   const [showCost, setShowCost] = useState(false);
   const [showStaff, setShowStaff] = useState(false);
   const [highlight, setHighlight] = useState(0);
