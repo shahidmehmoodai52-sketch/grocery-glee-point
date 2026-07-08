@@ -18,6 +18,8 @@ export const ALL_PERMS = [
   { key: "intelligence", label: "Inventory intelligence" },
   { key: "reports", label: "Reports / P&L" },
   { key: "shifts", label: "Shifts & cash drawer" },
+  { key: "operations", label: "Business operations" },
+
 
 
   { key: "backup", label: "Auto backup" },
