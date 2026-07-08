@@ -831,10 +831,26 @@ function POSPage() {
               </tr>
             </thead>
             <tbody>
-              {tab.items.length === 0 && (
+              {tab.items.length === 0 && !search.trim() && (
                 <tr>
-                  <td colSpan={showCost ? 8 : 7} className="text-center text-muted-foreground py-16 border-0">
-                    Scan barcode ya product search karen — same item dobara scan hone par usi row me Qty +1 ho jaye gi.
+                  <td colSpan={showCost ? 8 : 7} className="border-0 py-14">
+                    <div className="mx-auto max-w-md flex flex-col items-center gap-4 text-center animate-in fade-in duration-300">
+                      <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center text-4xl">
+                        📦
+                      </div>
+                      <div>
+                        <div className="text-lg font-semibold">Ready to start</div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Scan a barcode or search a product to add to this bill.
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-2">
+                        <Kbd label="F2" hint="New bill" />
+                        <Kbd label="F3" hint="Search" />
+                        <Kbd label="F4" hint="Complete sale" />
+                        <Kbd label="F10" hint="Undo last sale" />
+                      </div>
+                    </div>
                   </td>
                 </tr>
               )}
