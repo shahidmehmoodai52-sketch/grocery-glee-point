@@ -1058,7 +1058,7 @@ function POSPage() {
                   setTimeout(() => searchRef.current?.focus(), 0);
                 }}
               >
-                <SelectTrigger className="h-11 flex-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 flex-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="walkin">Walk-in customer</SelectItem>
                   {customers.map((c) => (
@@ -1072,7 +1072,7 @@ function POSPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-11 w-11 shrink-0"
+                className="h-9 w-9 shrink-0"
                 title="Quick add customer"
                 onClick={() => setQuickAddCustomerOpen(true)}
               >
@@ -1111,7 +1111,7 @@ function POSPage() {
                   setTimeout(() => searchRef.current?.focus(), 0);
                 }}
               >
-                <SelectTrigger className={`h-10 mt-1 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
+                <SelectTrigger className={`h-9 mt-1 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
