@@ -1393,6 +1393,23 @@ function POSPage() {
                   muted
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Reason (optional)</Label>
+                <Select value={undoReason} onValueChange={setUndoReason}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {UNDO_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {undoReason === "Other" && (
+                  <Textarea
+                    rows={2}
+                    value={undoReasonNote}
+                    onChange={(e) => setUndoReasonNote(e.target.value)}
+                    placeholder="Describe reason…"
+                  />
+                )}
+              </div>
               {undoExpired && (
                 <p className="text-destructive text-xs">
                   Undo window has expired. Please create a Sale Return instead.
