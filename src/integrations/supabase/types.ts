@@ -1190,6 +1190,7 @@ export type Database = {
           tax_id: string | null
           tax_rate: number
           tenant_id: string
+          undo_window_minutes: number
           updated_at: string
         }
         Insert: {
@@ -1216,6 +1217,7 @@ export type Database = {
           tax_id?: string | null
           tax_rate?: number
           tenant_id?: string
+          undo_window_minutes?: number
           updated_at?: string
         }
         Update: {
@@ -1242,6 +1244,7 @@ export type Database = {
           tax_id?: string | null
           tax_rate?: number
           tenant_id?: string
+          undo_window_minutes?: number
           updated_at?: string
         }
         Relationships: [
@@ -1803,6 +1806,7 @@ export type Database = {
           tax_id: string | null
           tax_rate: number
           tenant_id: string
+          undo_window_minutes: number
           updated_at: string
         }[]
         SetofOptions: {
@@ -1822,6 +1826,7 @@ export type Database = {
         }
         Returns: string
       }
+      undo_last_sale: { Args: { _sale_id: string }; Returns: Json }
       update_party_payment: {
         Args: {
           _amount: number
