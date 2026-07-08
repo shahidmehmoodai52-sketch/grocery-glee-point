@@ -38,7 +38,9 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Customers", url: "/customers", icon: Users, perm: "customers" },
       { title: "Suppliers", url: "/suppliers", icon: Truck, perm: "suppliers" },
       { title: "Bulk import", url: "/import", icon: Upload, perm: "import" },
+      { title: "Stock count", url: "/stock-count", icon: ClipboardCheck, perm: "stock-count" },
     ],
+
   },
   {
     label: "Insights",
