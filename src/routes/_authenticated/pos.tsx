@@ -596,6 +596,17 @@ function POSPage() {
       }
       if (e.key === "F4" && !inDialog) { e.preventDefault(); handleSale(); return; }
 
+      // Ctrl+Z or F10 → undo last sale by current cashier (if still within window).
+      const isUndoShortcut =
+        e.key === "F10" ||
+        ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "z" || e.key === "Z"));
+      if (isUndoShortcut && !inDialog) {
+        e.preventDefault();
+        e.stopPropagation();
+        attemptUndo();
+        return;
+      }
+
       if (inDialog || selectOpen || editing || e.ctrlKey || e.metaKey || e.altKey || isSearchInput || isEditableTarget) return;
 
       if (e.key.length === 1) {
