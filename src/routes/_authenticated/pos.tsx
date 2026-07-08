@@ -474,6 +474,90 @@ function POSPage() {
     }
   };
 
+  // Live "elapsed since last sale" ticker so the undo dialog counts down.
+  useEffect(() => {
+    if (!undoCandidate) return;
+    const id = window.setInterval(() => setUndoTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [undoCandidate]);
+
+  const undoAgeSeconds = undoCandidate
+    ? Math.max(0, Math.floor((Date.now() - new Date(undoCandidate.created_at).getTime()) / 1000))
+    : 0;
+  const undoExpired = undoCandidate ? undoAgeSeconds > undoWindowMin * 60 : true;
+  // Reference undoTick so the expiry recomputes each second.
+  void undoTick;
+
+  const attemptUndo = () => {
+    if (!undoCandidate) {
+      toast.error("No recent sale to undo");
+      return;
+    }
+    if (undoExpired) {
+      toast.error(`Undo window (${undoWindowMin} min) has expired`);
+      setUndoCandidate(null);
+      return;
+    }
+    setUndoOpen(true);
+  };
+
+  const confirmUndo = async () => {
+    if (!undoCandidate) return;
+    setUndoing(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("undo_last_sale", {
+        _sale_id: undoCandidate.sale_id,
+      });
+      if (error) throw error;
+      const payload: any = data ?? {};
+      const items: any[] = Array.isArray(payload.items) ? payload.items : [];
+
+      // Restore the cart into a fresh tab so the cashier can edit & re-checkout.
+      const restoredItems: CartItem[] = items.map((i: any) => {
+        const qty = Number(i.qty ?? 0);
+        const price = Number(i.price ?? 0);
+        return {
+          product_id: i.product_id ?? null,
+          code: "",
+          name: String(i.name ?? "Item"),
+          qty,
+          price,
+          mrp: price,
+          cost: Number(i.cost ?? 0),
+          disc_pct: 0,
+          tax_pct: 0,
+          disc: 0,
+        };
+      });
+      const restored: Tab = {
+        id: crypto.randomUUID(),
+        name: `Undo · ${payload.invoice_no ?? undoCandidate.invoice_no}`,
+        items: restoredItems,
+        customer_id: payload.customer_id ?? null,
+        expense_person_id: payload.expense_person_id ?? null,
+        payment_method: payload.payment_method ?? "cash",
+        discount: Number(payload.discount ?? 0),
+        discount_pct: "",
+        paid: String(payload.paid ?? ""),
+        note: payload.note ?? "",
+      };
+      setTabs((ts) => [...ts, restored]);
+      setActive(restored.id);
+
+      toast.success(`Sale ${payload.invoice_no ?? undoCandidate.invoice_no} undone — cart restored`);
+      setUndoCandidate(null);
+      setUndoOpen(false);
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["sales"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to undo sale");
+    } finally {
+      setUndoing(false);
+    }
+  };
+
   // Radix Dialog/Select sometimes leaves `pointer-events: none` on <body> after
   // closing quickly, freezing the entire page to mouse input. Clear it whenever
   // no overlay is actually open.
