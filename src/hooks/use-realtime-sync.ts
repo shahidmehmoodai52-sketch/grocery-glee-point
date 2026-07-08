@@ -19,6 +19,9 @@ const MAP: Record<string, string[][]> = {
   expenses: [["expenses"]],
   party_payments: [["party_payments"], ["customers"], ["suppliers"]],
   inventory_movements: [["product-movements"], ["product-health"]],
+  product_batches: [["batches-status"]],
+  inventory_damages: [["damage-log"], ["expiry-reports"]],
+  inventory_waste: [["waste-log"], ["expiry-reports"]],
 };
 
 
