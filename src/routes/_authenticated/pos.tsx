@@ -836,6 +836,7 @@ function POSPage() {
               <tr>
                 <th className="px-2 py-2 text-left w-16">Item No</th>
                 <th className="px-2 py-2 text-left">Item Name</th>
+                <th className="px-2 py-2 text-right w-20">Stock</th>
                 {showCost && (
                   <th className="px-2 py-2 text-right w-24 no-print" title="Purchase rate (internal)">P.Rate</th>
                 )}
