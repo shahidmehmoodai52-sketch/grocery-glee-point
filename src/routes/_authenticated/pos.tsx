@@ -836,6 +836,7 @@ function POSPage() {
               <tr>
                 <th className="px-2 py-2 text-left w-16">Item No</th>
                 <th className="px-2 py-2 text-left">Item Name</th>
+                <th className="px-2 py-2 text-right w-20">Stock</th>
                 {showCost && (
                   <th className="px-2 py-2 text-right w-24 no-print" title="Purchase rate (internal)">P.Rate</th>
                 )}
@@ -849,7 +850,7 @@ function POSPage() {
             <tbody>
               {tab.items.length === 0 && !search.trim() && (
                 <tr>
-                  <td colSpan={showCost ? 8 : 7} className="border-0 py-14">
+                  <td colSpan={showCost ? 9 : 8} className="border-0 py-14">
                     <div className="mx-auto max-w-md flex flex-col items-center gap-4 text-center animate-in fade-in duration-300">
                       <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center text-4xl">
                         📦
@@ -892,15 +893,18 @@ function POSPage() {
                     <td className="px-2 py-1">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="font-medium text-sm truncate min-w-0 flex-1">{it.name}</div>
-                        {stockNum !== null && (
-                          <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
-                            {fmtQty(stockNum)} {p?.unit ?? ""}
-                          </Badge>
-                        )}
                       </div>
                       {subline && (
                         <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
                       )}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {stockNum !== null ? (
+                        <span className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}>
+                          {fmtQty(stockNum)}
+                          {p?.unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{p.unit}</span> : null}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
                     </td>
                     {showCost && (
                       <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
@@ -974,13 +978,16 @@ function POSPage() {
                     <td className="px-2 py-1">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="font-medium text-sm truncate min-w-0 flex-1">{p.name}</div>
-                        <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
-                          {fmtQty(stockNum)} {p.unit ?? ""}
-                        </Badge>
                       </div>
                       {subline && (
                         <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
                       )}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      <span className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}>
+                        {fmtQty(stockNum)}
+                        {p.unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{p.unit}</span> : null}
+                      </span>
                     </td>
                     {showCost && (
                       <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
@@ -1000,7 +1007,7 @@ function POSPage() {
 
               {search.trim() && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={showCost ? 8 : 7} className="text-center py-6 border-0">
+                  <td colSpan={showCost ? 9 : 8} className="text-center py-6 border-0">
                     {productsLoading || remoteProductsLoading ? (
                       <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
                         <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
@@ -1025,7 +1032,7 @@ function POSPage() {
       <aside className="w-[280px] md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-l bg-card flex flex-col min-h-0 overflow-hidden no-print">
 
         {/* Party + payment */}
-        <div className="p-4 border-b space-y-3 shrink-0">
+        <div className="p-2.5 border-b space-y-2 shrink-0">
           <div>
             <div className="flex items-center justify-between">
               <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</Label>
@@ -1051,7 +1058,7 @@ function POSPage() {
                   setTimeout(() => searchRef.current?.focus(), 0);
                 }}
               >
-                <SelectTrigger className="h-11 flex-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 flex-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="walkin">Walk-in customer</SelectItem>
                   {customers.map((c) => (
@@ -1065,7 +1072,7 @@ function POSPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-11 w-11 shrink-0"
+                className="h-9 w-9 shrink-0"
                 title="Quick add customer"
                 onClick={() => setQuickAddCustomerOpen(true)}
               >
@@ -1104,7 +1111,7 @@ function POSPage() {
                   setTimeout(() => searchRef.current?.focus(), 0);
                 }}
               >
-                <SelectTrigger className={`h-10 mt-1 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
+                <SelectTrigger className={`h-9 mt-1 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1150,7 +1157,7 @@ function POSPage() {
                     key={p.v}
                     type="button"
                     onClick={() => { setTab({ payment_method: p.v }); setTimeout(() => searchRef.current?.focus(), 0); }}
-                    className={`h-11 rounded-lg text-sm font-medium transition-all ${
+                    className={`h-9 rounded-lg text-sm font-medium transition-all ${
                       active
                         ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
                         : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
@@ -1165,7 +1172,7 @@ function POSPage() {
         </div>
 
         {/* Totals + discount + paid + note */}
-        <div className="flex-1 min-h-0 overflow-auto p-4 space-y-2.5 bg-muted/10">
+        <div className="flex-1 min-h-0 overflow-auto p-2.5 space-y-1.5 bg-muted/10">
           <Row label="Subtotal" value={fmtMoney(subtotal, sym)} muted />
           {lineDiscountTotal > 0 && (
             <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
@@ -1181,7 +1188,7 @@ function POSPage() {
                   value={tab.discount_pct}
                   onChange={(e) => applyDiscountPct(e.target.value)}
                   placeholder="0"
-                  className="h-9 w-16 text-right text-sm pr-5"
+                  className="h-8 w-14 text-right text-sm pr-5"
                 />
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
               </div>
@@ -1190,17 +1197,17 @@ function POSPage() {
                 step="0.01"
                 value={tab.discount}
                 onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
-                className="h-9 w-24 text-right text-sm"
+                className="h-8 w-24 text-right text-sm"
               />
             </div>
           </div>
 
-          <div className="rounded-xl bg-primary/5 border border-primary/20 px-4 py-3 mt-2">
+          <div className="rounded-xl bg-primary/5 border border-primary/20 px-3 py-2 mt-1">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Grand Total</div>
-            <div className="text-3xl font-bold text-primary tabular-nums leading-tight mt-0.5">{fmtMoney(total, sym)}</div>
+            <div className="text-2xl font-bold text-primary tabular-nums leading-tight mt-0.5">{fmtMoney(total, sym)}</div>
           </div>
 
-          <div className="pt-1">
+          <div className="pt-0.5">
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Paid</Label>
             <div className="flex items-center gap-2 mt-1">
               <Input
@@ -1213,7 +1220,7 @@ function POSPage() {
                   if (e.key === "Enter") { e.preventDefault(); handleSale(); }
                 }}
                 placeholder={total.toFixed(2)}
-                className="h-12 flex-1 text-lg font-semibold tabular-nums"
+                className="h-10 flex-1 text-base font-semibold tabular-nums"
               />
               <button
                 onClick={() => setTab({ paid: total.toFixed(2) })}
@@ -1222,10 +1229,10 @@ function POSPage() {
                 Exact
               </button>
             </div>
-            <div className="mt-2">
+            <div className="mt-1.5">
               {due > 0
-                ? <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive font-semibold">Due: {fmtMoney(due, sym)}</div>
-                : <div className="rounded-lg bg-success/10 border border-success/20 px-3 py-2 text-lg text-success font-bold tabular-nums">Change: {fmtMoney(change, sym)}</div>}
+                ? <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-1.5 text-sm text-destructive font-semibold">Due: {fmtMoney(due, sym)}</div>
+                : <div className="rounded-lg bg-success/10 border border-success/20 px-3 py-1.5 text-base text-success font-bold tabular-nums">Change: {fmtMoney(change, sym)}</div>}
             </div>
           </div>
 
@@ -1233,7 +1240,7 @@ function POSPage() {
             value={tab.note}
             onChange={(e) => setTab({ note: e.target.value })}
             placeholder="Note / House #, street…"
-            className="h-9 text-xs"
+            className="h-8 text-xs"
           />
 
           {tab.items.length > 0 && (() => {
@@ -1242,7 +1249,7 @@ function POSPage() {
             const net = subtotal - discount;
             const pct = net > 0 ? (cartProfit / net) * 100 : 0;
             return (
-              <div className="rounded-md border border-dashed bg-background/60 px-2 py-1.5 text-[11px]">
+              <div className="rounded-md border border-dashed bg-background/60 px-2 py-1 text-[11px]">
                 <button
                   type="button"
                   onClick={() => setShowProfit((v) => !v)}
@@ -1252,7 +1259,7 @@ function POSPage() {
                   {showProfit ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                 </button>
                 {showProfit && (
-                  <div className="flex items-center justify-between pt-1.5 mt-1.5 border-t">
+                  <div className="flex items-center justify-between pt-1 mt-1 border-t">
                     <span className="text-muted-foreground">Cost <span className="font-mono">{fmtMoney(cartCost, sym)}</span></span>
                     <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
                       {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
@@ -1265,9 +1272,9 @@ function POSPage() {
         </div>
 
         {/* Footer — Complete sale */}
-        <div className="p-3 border-t bg-card shrink-0">
+        <div className="p-2 border-t bg-card shrink-0">
           <Button
-            className="w-full h-14 text-base font-bold rounded-xl shadow-md hover:shadow-lg transition-shadow"
+            className="w-full h-11 text-base font-bold rounded-xl shadow-md hover:shadow-lg transition-shadow"
             onClick={handleSale}
             disabled={submitting}
           >
