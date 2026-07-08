@@ -2008,6 +2008,81 @@ export type Database = {
           },
         ]
       }
+      security_blocklist: {
+        Row: {
+          auto_blocked: boolean
+          blocked_by: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          kind: string
+          reason: string | null
+          value: string
+        }
+        Insert: {
+          auto_blocked?: boolean
+          blocked_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          kind: string
+          reason?: string | null
+          value: string
+        }
+        Update: {
+          auto_blocked?: boolean
+          blocked_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          reason?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
+      security_events: {
+        Row: {
+          created_at: string
+          email: string | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          path: string | null
+          severity: string
+          tenant_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          path?: string | null
+          severity?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          path?: string | null
+          severity?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       shift_checklist: {
         Row: {
           completed: boolean
@@ -3165,6 +3240,37 @@ export type Database = {
         }
         Returns: string
       }
+      admin_block_identifier: {
+        Args: {
+          _hours?: number
+          _kind: string
+          _reason: string
+          _value: string
+        }
+        Returns: string
+      }
+      admin_list_security_events: {
+        Args: { _limit?: number; _severity?: string }
+        Returns: {
+          created_at: string
+          email: string | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          path: string | null
+          severity: string
+          tenant_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "security_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       admin_list_tenants: {
         Args: never
         Returns: {
@@ -3205,11 +3311,13 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_security_summary: { Args: never; Returns: Json }
       admin_set_tenant_status: {
         Args: { _reason?: string; _status: string; _tenant_id: string }
         Returns: string
       }
       admin_tenant_detail: { Args: { _tenant_id: string }; Returns: Json }
+      admin_unblock_identifier: { Args: { _id: string }; Returns: undefined }
       am_i_super_admin: { Args: never; Returns: boolean }
       approve_shift: { Args: { _shift_id: string }; Returns: string }
       approve_stock_count_session: {
@@ -3355,6 +3463,7 @@ export type Database = {
         }
         Returns: string
       }
+      is_blocked: { Args: { _email?: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
@@ -3372,6 +3481,16 @@ export type Database = {
       }
       log_receipt_reprint: {
         Args: { _reason: string; _sale_id: string }
+        Returns: string
+      }
+      log_security_event: {
+        Args: {
+          _email?: string
+          _event_type: string
+          _metadata?: Json
+          _path?: string
+          _severity?: string
+        }
         Returns: string
       }
       morning_dashboard: { Args: never; Returns: Json }

@@ -14,6 +14,11 @@ import {
   Store,
   Package,
   ShoppingCart,
+  ShieldAlert,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  Plus,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -79,9 +84,11 @@ function AdminPanelPage() {
       <Tabs defaultValue="tenants">
         <TabsList>
           <TabsTrigger value="tenants"><Store className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
+          <TabsTrigger value="security"><ShieldAlert className="h-4 w-4 mr-1" />Security</TabsTrigger>
           <TabsTrigger value="errors"><Bug className="h-4 w-4 mr-1" />Errors</TabsTrigger>
         </TabsList>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
+        <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
       </Tabs>
     </div>
@@ -383,5 +390,267 @@ function ErrorsTab() {
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+type SecurityEvent = {
+  id: string;
+  event_type: string;
+  severity: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  email: string | null;
+  path: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type BlocklistRow = {
+  id: string;
+  kind: "ip" | "email";
+  value: string;
+  reason: string | null;
+  auto_blocked: boolean;
+  expires_at: string | null;
+  created_at: string;
+};
+
+type SecuritySummary = {
+  failed_logins_24h: number;
+  critical_24h: number;
+  total_24h: number;
+  active_blocks: number;
+  unique_ips_24h: number;
+};
+
+function SecurityTab() {
+  const qc = useQueryClient();
+  const [severity, setSeverity] = useState<"all" | "info" | "warning" | "critical">("all");
+  const [blockOpen, setBlockOpen] = useState(false);
+
+  const { data: summary } = useQuery({
+    queryKey: ["admin-security-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_security_summary");
+      if (error) throw error;
+      return (data as unknown as SecuritySummary) ?? null;
+    },
+    refetchInterval: 30_000,
+  });
+
+  const { data: events = [], isLoading: eventsLoading } = useQuery({
+    queryKey: ["admin-security-events", severity],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_security_events", {
+        _limit: 200,
+        _severity: severity === "all" ? undefined : severity,
+      });
+      if (error) throw error;
+      return (data as SecurityEvent[]) ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+
+  const { data: blocks = [], isLoading: blocksLoading } = useQuery({
+    queryKey: ["admin-security-blocks"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("security_blocklist")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data as BlocklistRow[]) ?? [];
+    },
+  });
+
+  const unblock = async (id: string) => {
+    const { error } = await supabase.rpc("admin_unblock_identifier", { _id: id });
+    if (error) return toast.error(error.message);
+    toast.success("Unblocked");
+    qc.invalidateQueries({ queryKey: ["admin-security-blocks"] });
+    qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <StatCard label="Events (24h)" value={summary?.total_24h ?? 0} icon={ShieldAlert} />
+        <StatCard label="Failed logins (24h)" value={summary?.failed_logins_24h ?? 0} icon={AlertTriangle} tone="warning" />
+        <StatCard label="Critical (24h)" value={summary?.critical_24h ?? 0} icon={ShieldAlert} tone="danger" />
+        <StatCard label="Active blocks" value={summary?.active_blocks ?? 0} icon={Lock} tone="danger" />
+        <StatCard label="Unique IPs (24h)" value={summary?.unique_ips_24h ?? 0} icon={Users} />
+      </div>
+
+      <Card className="p-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4" />
+            <div className="font-medium">Blocklist</div>
+            <span className="text-xs text-muted-foreground">Blocked IPs & emails cannot sign in</span>
+          </div>
+          <Button size="sm" onClick={() => setBlockOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Block IP or email
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Type</TableHead>
+              <TableHead>Value</TableHead>
+              <TableHead>Reason</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>Expires</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {blocksLoading && (
+              <TableRow><TableCell colSpan={6} className="py-4"><TableSkeleton rows={3} columns={5} /></TableCell></TableRow>
+            )}
+            {!blocksLoading && blocks.length === 0 && (
+              <TableRow><TableCell colSpan={6} className="py-8">
+                <EmptyState icon={ShieldCheck} title="Nothing blocked" description="No IPs or emails currently blocked." />
+              </TableCell></TableRow>
+            )}
+            {blocks.map((b) => (
+              <TableRow key={b.id}>
+                <TableCell><StatusBadge tone={b.kind === "ip" ? "warning" : "neutral"}>{b.kind}</StatusBadge></TableCell>
+                <TableCell className="font-mono text-xs">{b.value}</TableCell>
+                <TableCell className="max-w-sm truncate text-xs" title={b.reason ?? ""}>{b.reason ?? "—"}</TableCell>
+                <TableCell className="text-xs">
+                  {b.auto_blocked
+                    ? <StatusBadge tone="danger">Auto</StatusBadge>
+                    : <StatusBadge tone="neutral">Manual</StatusBadge>}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {b.expires_at ? new Date(b.expires_at).toLocaleString() : "Never"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="outline" onClick={() => unblock(b.id)}>
+                    <Unlock className="h-4 w-4 mr-1" /> Unblock
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <Card className="p-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4" />
+            <div className="font-medium">Security event log</div>
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {(["all", "info", "warning", "critical"] as const).map((s) => (
+              <Button key={s} size="sm" variant={severity === s ? "default" : "outline"} onClick={() => setSeverity(s)}>
+                {s}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Severity</TableHead>
+              <TableHead>Event</TableHead>
+              <TableHead>IP</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Path</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {eventsLoading && (
+              <TableRow><TableCell colSpan={6} className="py-4"><TableSkeleton rows={5} columns={6} /></TableCell></TableRow>
+            )}
+            {!eventsLoading && events.length === 0 && (
+              <TableRow><TableCell colSpan={6} className="py-8">
+                <EmptyState icon={ShieldCheck} title="No events" description="No security events recorded yet." />
+              </TableCell></TableRow>
+            )}
+            {events.map((e) => (
+              <TableRow key={e.id}>
+                <TableCell className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()}</TableCell>
+                <TableCell>
+                  {e.severity === "critical" && <StatusBadge tone="danger">Critical</StatusBadge>}
+                  {e.severity === "warning" && <StatusBadge tone="warning">Warning</StatusBadge>}
+                  {e.severity === "info" && <StatusBadge tone="neutral">Info</StatusBadge>}
+                </TableCell>
+                <TableCell className="text-sm font-medium">{e.event_type}</TableCell>
+                <TableCell className="font-mono text-xs">{e.ip_address ?? "—"}</TableCell>
+                <TableCell className="text-xs">{e.email ?? "—"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{e.path ?? "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <BlockDialog open={blockOpen} onClose={() => setBlockOpen(false)} onDone={() => {
+        qc.invalidateQueries({ queryKey: ["admin-security-blocks"] });
+        qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
+      }} />
+    </div>
+  );
+}
+
+function BlockDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const [kind, setKind] = useState<"ip" | "email">("ip");
+  const [value, setValue] = useState("");
+  const [reason, setReason] = useState("");
+  const [hours, setHours] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!value.trim()) return toast.error("Enter a value");
+    setBusy(true);
+    const { error } = await supabase.rpc("admin_block_identifier", {
+      _kind: kind,
+      _value: value.trim(),
+      _reason: reason.trim() || "Manually blocked by admin",
+      _hours: hours ? Number(hours) : undefined,
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success(`${kind === "ip" ? "IP" : "Email"} blocked`);
+    setValue(""); setReason(""); setHours("");
+    onDone();
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Block IP or email</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Button size="sm" variant={kind === "ip" ? "default" : "outline"} onClick={() => setKind("ip")}>IP address</Button>
+            <Button size="sm" variant={kind === "email" ? "default" : "outline"} onClick={() => setKind("email")}>Email</Button>
+          </div>
+          <div>
+            <div className="text-xs mb-1 text-muted-foreground">{kind === "ip" ? "IP address" : "Email address"}</div>
+            <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={kind === "ip" ? "1.2.3.4" : "user@example.com"} />
+          </div>
+          <div>
+            <div className="text-xs mb-1 text-muted-foreground">Reason (audit)</div>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Suspicious activity, brute force, etc." />
+          </div>
+          <div>
+            <div className="text-xs mb-1 text-muted-foreground">Duration (hours, blank = permanent)</div>
+            <Input value={hours} onChange={(e) => setHours(e.target.value.replace(/[^0-9]/g, ""))} placeholder="24" />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={submit} disabled={busy}>
+              <Ban className="h-4 w-4 mr-1" /> Block
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
