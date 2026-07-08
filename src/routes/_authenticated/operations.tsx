@@ -6,8 +6,9 @@ import {
   Printer, Ban, ClipboardCheck, Sunrise, Play, Trash2, CheckCircle2, PauseCircle,
   Target, AlertTriangle, TrendingUp, TrendingDown, CalendarDays, Zap, Sparkles,
   ShoppingCart, Package, Receipt, BarChart3, ClipboardList, Brain, CalendarClock,
-  ChevronLeft, ChevronRight, Activity, Save,
+  ChevronLeft, ChevronRight, Activity, Save, Handshake,
 } from "lucide-react";
+
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,7 @@ function Page() {
           <TabsTrigger value="checklist"><ClipboardCheck className="h-4 w-4 mr-1" />Checklist</TabsTrigger>
           <TabsTrigger value="reprints"><Printer className="h-4 w-4 mr-1" />Reprints</TabsTrigger>
           <TabsTrigger value="voids"><Ban className="h-4 w-4 mr-1" />Voids</TabsTrigger>
+          <TabsTrigger value="handover"><Handshake className="h-4 w-4 mr-1" />Handover</TabsTrigger>
         </TabsList>
 
         <TabsContent value="morning"><OwnerControlCenter settings={settings} /></TabsContent>
@@ -68,6 +70,8 @@ function Page() {
         <TabsContent value="checklist"><ChecklistPanel settings={settings} /></TabsContent>
         <TabsContent value="reprints"><ReprintsLog /></TabsContent>
         <TabsContent value="voids"><VoidsLog /></TabsContent>
+        <TabsContent value="handover"><HandoverPanel /></TabsContent>
+
       </Tabs>
     </div>
   );
@@ -923,3 +927,142 @@ function VoidsLog() {
     </Card>
   );
 }
+
+/* ---------------- MANAGER HANDOVER ---------------- */
+function HandoverPanel() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const [cash, setCash] = useState("");
+  const [notes, setNotes] = useState("");
+  const [toUser, setToUser] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+
+  const { data: staff = [] } = useQuery({
+    queryKey: ["staff-lite"],
+    queryFn: async () => {
+      const { data } = await sb.from("tenant_members").select("user_id");
+      return (data || []) as any[];
+    },
+  });
+
+  const { data: currentShift } = useQuery({
+    queryKey: ["current-shift"],
+    queryFn: async () => {
+      const { data } = await sb.rpc("current_shift" as any);
+      return data as any;
+    },
+  });
+
+  const { data: handovers = [], refetch } = useQuery({
+    queryKey: ["manager-handovers"],
+    queryFn: async () => {
+      const { data, error } = await sb
+        .from("manager_handovers")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const submit = async () => {
+    if (!user) return;
+    const amt = Number(cash || 0);
+    if (isNaN(amt) || amt < 0) return toast.error("Enter a valid cash amount");
+    setSaving(true);
+    const { data: t } = await sb.rpc("current_tenant_id" as any);
+    const shiftId = currentShift?.id || currentShift?.[0]?.id || null;
+    const { error } = await sb.from("manager_handovers").insert({
+      tenant_id: t,
+      from_user: user.id,
+      to_user: toUser || null,
+      from_shift_id: shiftId,
+      cash_amount: amt,
+      notes: notes.trim() || null,
+    } as any);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Handover recorded");
+    setCash(""); setNotes(""); setToUser("");
+    qc.invalidateQueries({ queryKey: ["manager-handovers"] });
+  };
+
+  const acknowledge = async (id: string) => {
+    const { error } = await sb
+      .from("manager_handovers")
+      .update({ acknowledged_at: new Date().toISOString(), to_user: user?.id })
+      .eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Acknowledged");
+    refetch();
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Handshake className="h-5 w-5 text-primary" />
+          <div>
+            <div className="font-semibold">Record handover</div>
+            <div className="text-xs text-muted-foreground">Pass cash & context to the next manager/cashier</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label>Cash handed over</Label>
+            <Input type="number" step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} placeholder="0.00" />
+          </div>
+          <div>
+            <Label>Handing to</Label>
+            <Select value={toUser} onValueChange={setToUser}>
+              <SelectTrigger><SelectValue placeholder="Select staff (optional)" /></SelectTrigger>
+              <SelectContent>
+                {staff.filter((s: any) => s.user_id !== user?.id).map((s: any) => (
+                  <SelectItem key={s.user_id} value={s.user_id}>{s.user_id.slice(0, 8)}…</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label>Notes / context</Label>
+          <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Pending tasks, incidents, customer follow-ups…" />
+        </div>
+        <Button onClick={submit} disabled={saving} className="w-full">
+          <Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Record handover"}
+        </Button>
+      </Card>
+
+      <Card className="p-4 space-y-2">
+        <div className="font-semibold mb-2">Recent handovers</div>
+        {!handovers.length && <div className="text-sm text-muted-foreground">No handovers yet</div>}
+        <div className="space-y-2 max-h-[520px] overflow-auto">
+          {handovers.map((h: any) => (
+            <div key={h.id} className="border rounded-lg p-3">
+              <div className="flex items-center justify-between text-sm">
+                <div className="font-medium flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                  {fmtMoney(h.cash_amount)}
+                </div>
+                {h.acknowledged_at ? (
+                  <Badge variant="outline" className="gap-1"><CheckCircle2 className="h-3 w-3" />Acknowledged</Badge>
+                ) : h.to_user === user?.id ? (
+                  <Button size="sm" variant="outline" onClick={() => acknowledge(h.id)}>Acknowledge</Button>
+                ) : (
+                  <Badge variant="secondary">Pending</Badge>
+                )}
+              </div>
+              {h.notes && <div className="text-sm mt-2 whitespace-pre-wrap">{h.notes}</div>}
+              <div className="text-xs text-muted-foreground mt-2">
+                From {String(h.from_user).slice(0, 8)}… → {h.to_user ? String(h.to_user).slice(0, 8) + "…" : "anyone"} · {new Date(h.created_at).toLocaleString()}
+                {h.acknowledged_at && <> · ack {new Date(h.acknowledged_at).toLocaleString()}</>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
