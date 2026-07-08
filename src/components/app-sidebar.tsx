@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
+import { OfflineStatusBadge } from "@/components/offline-status";
+
 
 type Item = { title: string; url: string; icon: any; perm: string; adminOnly?: boolean };
 const groups: { label: string; items: Item[] }[] = [
