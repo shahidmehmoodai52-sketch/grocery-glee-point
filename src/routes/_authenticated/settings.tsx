@@ -22,6 +22,7 @@ const FIELDS = [
   "logo_url", "tax_id", "receipt_header", "receipt_footer", "paper_width",
   "show_logo", "show_tax_id", "show_address", "show_phone", "show_tax_lines", "show_cashier",
   "payment_qr_url", "payment_qr_label", "show_payment_qr",
+  "undo_window_minutes",
 ] as const;
 
 function Page() {
@@ -42,6 +43,7 @@ function Page() {
     show_logo: true, show_tax_id: true, show_address: true,
     show_phone: true, show_tax_lines: true, show_cashier: true,
     payment_qr_url: "", payment_qr_label: "", show_payment_qr: true,
+    undo_window_minutes: 5,
   });
   useEffect(() => { if (data) setForm({ ...form, ...data }); /* eslint-disable-next-line */ }, [data]);
 
@@ -81,6 +83,26 @@ function Page() {
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => set({ phone: e.target.value })} /></div>
               <div><Label>Address</Label><Input value={form.address ?? ""} onChange={(e) => set({ address: e.target.value })} /></div>
+            </div>
+          </Card>
+
+          <Card className="p-5 space-y-3">
+            <div>
+              <div className="font-medium">POS behaviour</div>
+              <div className="text-xs text-muted-foreground">Controls how long a cashier can undo a just-completed sale (Ctrl+Z / F10).</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Undo window (minutes)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={120}
+                  step={1}
+                  value={form.undo_window_minutes ?? 5}
+                  onChange={(e) => set({ undo_window_minutes: Math.max(1, Number(e.target.value) || 5) })}
+                />
+              </div>
             </div>
           </Card>
 
