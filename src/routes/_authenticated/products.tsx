@@ -207,9 +207,13 @@ function ProductsPage() {
                   })()}
                 </TableCell>
                 <TableCell className="text-right">
+                  <Link to="/products/$id" params={{ id: p.id }}>
+                    <Button variant="ghost" size="icon" title="Stock timeline"><History className="h-4 w-4" /></Button>
+                  </Link>
                   <Button variant="ghost" size="icon" onClick={() => edit(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
+
               </TableRow>
             ))}
           </TableBody>
