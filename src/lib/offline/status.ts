@@ -13,7 +13,6 @@ export interface OfflineStatus {
   error: string | null;
 }
 
-const LS_ENABLED = "pos_offline_enabled";
 const LS_LAST = "pos_offline_last_synced";
 
 type Listener = (s: OfflineStatus) => void;
@@ -21,12 +20,13 @@ const listeners = new Set<Listener>();
 
 let state: OfflineStatus = {
   online: typeof navigator === "undefined" ? true : navigator.onLine,
-  enabled: false,
+  enabled: true, // Auto — always on. Offline works transparently, no toggle.
   phase: "idle",
   pending: 0,
   lastSyncedAt: null,
   error: null,
 };
+
 
 function emit() {
   for (const l of listeners) l(state);
