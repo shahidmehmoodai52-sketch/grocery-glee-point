@@ -37,6 +37,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney, fmtQty } from "@/lib/format";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const Route = createFileRoute("/_authenticated/intelligence")({
   component: IntelligencePage,
@@ -147,15 +148,12 @@ function IntelligencePage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center gap-3">
-        <Brain className="h-6 w-6 text-primary" />
-        <div>
-          <h1 className="text-2xl font-semibold">Inventory Intelligence</h1>
-          <p className="text-sm text-muted-foreground">
-            ABC classification, velocity, reorder suggestions & smart alerts. Updates automatically from sales.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Inventory Intelligence"
+        description="ABC classification, velocity, reorder suggestions & smart alerts. Updates automatically from sales."
+        icon={<Brain className="h-5 w-5" />}
+      />
+
 
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">

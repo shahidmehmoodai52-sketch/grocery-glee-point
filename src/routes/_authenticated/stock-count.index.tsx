@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Plus, ClipboardCheck, FileDown, ArrowRight } from "lucide-react";
+import { Plus, ClipboardCheck, ArrowRight, ListChecks, CheckCircle2, Clock, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,10 @@ import {
 import {
   Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
@@ -76,41 +80,32 @@ function StockCountListPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Stock Count</h1>
-          <p className="text-sm text-muted-foreground">
-            Physical audit sessions — compare system stock against actual shelf count.
-          </p>
-        </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> New count
-        </Button>
-      </div>
+      <PageHeader
+        title="Stock Count"
+        description="Physical audit sessions — compare system stock against actual shelf count."
+        icon={<ClipboardCheck className="h-5 w-5" />}
+        actions={
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> New count
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">Total sessions</div>
-          <div className="text-2xl font-semibold mt-1">{sessions.length}</div>
-        </Card>
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">Approved</div>
-          <div className="text-2xl font-semibold mt-1">{completed.length}</div>
-        </Card>
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">Last count</div>
-          <div className="text-lg font-medium mt-1">
-            {lastCompleted ? format(new Date(lastCompleted.completed_at), "PP") : "—"}
-          </div>
-        </Card>
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">Last variance value</div>
-          <div className="text-lg font-medium mt-1">
-            {lastCompleted?.total_variance_value != null
-              ? fmtMoney(lastCompleted.total_variance_value, sym)
-              : "—"}
-          </div>
-        </Card>
+        <StatCard label="Total sessions" value={String(sessions.length)} icon={ListChecks} tone="primary" />
+        <StatCard label="Approved" value={String(completed.length)} icon={CheckCircle2} tone="success" />
+        <StatCard
+          label="Last count"
+          value={lastCompleted ? format(new Date(lastCompleted.completed_at), "PP") : "—"}
+          icon={Clock}
+          tone="info"
+        />
+        <StatCard
+          label="Last variance value"
+          value={lastCompleted?.total_variance_value != null ? fmtMoney(lastCompleted.total_variance_value, sym) : "—"}
+          icon={TrendingDown}
+          tone="warning"
+        />
       </div>
 
       <Card className="p-3">
@@ -127,13 +122,16 @@ function StockCountListPage() {
           </TableHeader>
           <TableBody>
             {sessionsQ.isLoading && (
-              <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="py-4"><TableSkeleton rows={4} columns={5} /></TableCell></TableRow>
             )}
             {!sessionsQ.isLoading && sessions.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                  No stock counts yet. Start one to audit your shelves.
+                <TableCell colSpan={6} className="py-8">
+                  <EmptyState
+                    icon={ClipboardCheck}
+                    title="No stock counts yet"
+                    description="Start one to audit your shelves."
+                  />
                 </TableCell>
               </TableRow>
             )}

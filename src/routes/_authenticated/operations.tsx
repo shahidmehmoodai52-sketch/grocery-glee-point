@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const Route = createFileRoute("/_authenticated/operations")({ component: Page });
 
@@ -38,12 +39,12 @@ function Page() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Business Operations</h1>
-          <p className="text-sm text-muted-foreground">Daily cash operations, held bills, tasks & audit</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Business Operations"
+        description="Daily cash operations, held bills, tasks & audit"
+        icon={<ClipboardCheck className="h-5 w-5" />}
+      />
+
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="flex-wrap h-auto">
