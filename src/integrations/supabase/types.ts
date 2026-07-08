@@ -3165,6 +3165,52 @@ export type Database = {
         }
         Returns: string
       }
+      admin_list_tenants: {
+        Args: never
+        Returns: {
+          created_at: string
+          id: string
+          member_count: number
+          name: string
+          owner_email: string
+          owner_id: string
+          owner_name: string
+          plan: string
+          product_count: number
+          sales_count: number
+          sales_total: number
+          slug: string
+          status: string
+          subscription_expires_at: string
+          subscription_status: string
+        }[]
+      }
+      admin_recent_errors: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          error_message: string
+          error_type: string
+          id: string
+          metadata: Json | null
+          page_or_module: string | null
+          stack_trace: string | null
+          tenant_id: string | null
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "application_errors"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_set_tenant_status: {
+        Args: { _reason?: string; _status: string; _tenant_id: string }
+        Returns: string
+      }
+      admin_tenant_detail: { Args: { _tenant_id: string }; Returns: Json }
+      am_i_super_admin: { Args: never; Returns: boolean }
       approve_shift: { Args: { _shift_id: string }; Returns: string }
       approve_stock_count_session: {
         Args: { _session_id: string }
@@ -3309,6 +3355,7 @@ export type Database = {
         }
         Returns: string
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
@@ -3386,6 +3433,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      my_tenant_status: { Args: never; Returns: string }
       open_shift: {
         Args: { _notes?: string; _opening_cash: number }
         Returns: string
