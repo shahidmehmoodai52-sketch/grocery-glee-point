@@ -2336,6 +2336,9 @@ export type Database = {
           ops_safe_drop_threshold: number
           ops_shift_enabled: boolean
           ops_shift_notes_enabled: boolean
+          ops_target_invoices: number
+          ops_target_profit: number
+          ops_target_sales: number
           ops_void_requires_reason: boolean
           paper_width: string
           payment_qr_label: string | null
@@ -2382,6 +2385,9 @@ export type Database = {
           ops_safe_drop_threshold?: number
           ops_shift_enabled?: boolean
           ops_shift_notes_enabled?: boolean
+          ops_target_invoices?: number
+          ops_target_profit?: number
+          ops_target_sales?: number
           ops_void_requires_reason?: boolean
           paper_width?: string
           payment_qr_label?: string | null
@@ -2428,6 +2434,9 @@ export type Database = {
           ops_safe_drop_threshold?: number
           ops_shift_enabled?: boolean
           ops_shift_notes_enabled?: boolean
+          ops_target_invoices?: number
+          ops_target_profit?: number
+          ops_target_sales?: number
           ops_void_requires_reason?: boolean
           paper_width?: string
           payment_qr_label?: string | null
@@ -3163,6 +3172,19 @@ export type Database = {
         }
       }
       current_tenant_id: { Args: never; Returns: string }
+      daily_summary: { Args: { _date: string }; Returns: Json }
+      daily_timeline: {
+        Args: { _date: string }
+        Returns: {
+          amount: number
+          detail: string
+          kind: string
+          ref_id: string
+          title: string
+          ts: string
+          user_id: string
+        }[]
+      }
       delete_party_payment: { Args: { _id: string }; Returns: undefined }
       discard_held_bill: {
         Args: { _id: string; _reason: string }
@@ -3261,6 +3283,9 @@ export type Database = {
           ops_safe_drop_threshold: number
           ops_shift_enabled: boolean
           ops_shift_notes_enabled: boolean
+          ops_target_invoices: number
+          ops_target_profit: number
+          ops_target_sales: number
           ops_void_requires_reason: boolean
           paper_width: string
           payment_qr_label: string | null
@@ -3294,6 +3319,8 @@ export type Database = {
         Args: { _notes?: string; _opening_cash: number }
         Returns: string
       }
+      owner_alerts: { Args: never; Returns: Json }
+      owner_recommendations: { Args: never; Returns: Json }
       record_cash_event: {
         Args: {
           _amount: number
