@@ -15,6 +15,7 @@ export const ALL_PERMS = [
   { key: "import", label: "Bulk import" },
   { key: "stock-count", label: "Stock count" },
   { key: "expiry", label: "Expiry & waste" },
+  { key: "intelligence", label: "Inventory intelligence" },
   { key: "reports", label: "Reports / P&L" },
 
   { key: "backup", label: "Auto backup" },
