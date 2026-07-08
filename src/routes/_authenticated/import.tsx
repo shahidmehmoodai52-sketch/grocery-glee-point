@@ -632,6 +632,7 @@ function SmartMerge() {
 
     await finalizeImportBatch(batchId, { products: ok, barcodes: bcOk, failed });
     notifyBatchChanged();
+    invalidateAfterImport(qc);
 
     setBusy(false);
     setResult({ products: ok, barcodes: bcOk, failed, errors: [...new Set(errors)].slice(0, 5) });
