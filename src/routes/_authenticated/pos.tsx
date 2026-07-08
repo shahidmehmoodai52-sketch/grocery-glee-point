@@ -1364,6 +1364,15 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
   );
 }
 
+function Kbd({ label, hint }: { label: string; hint: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5">
+      <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono font-semibold text-foreground">{label}</kbd>
+      <span>{hint}</span>
+    </div>
+  );
+}
+
 function InvoiceDialog({ invoice, settings, onClose }: any) {
   if (!invoice) return null;
   return (
