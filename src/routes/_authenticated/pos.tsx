@@ -744,14 +744,14 @@ function POSPage() {
         {/* LEFT: items area (maximised) */}
         <main className="flex-1 flex flex-col min-h-0 bg-background">
 
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-muted/30 no-print">
+        <div className="flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
           {/* Search / scan */}
-          <div className="relative flex-1 min-w-0 max-w-[440px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative flex-1 min-w-0 max-w-[560px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               ref={searchRef}
               autoFocus
-              placeholder="Scan / search item (barcode, name, SKU)…"
+              placeholder="🔍  Scan barcode or search product…  (F3)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
@@ -767,7 +767,7 @@ function POSPage() {
                 const raw = search.trim();
                 if (!raw) { if (tab.items.length > 0) paidRef.current?.focus(); return; }
                 const exact = productByBarcode[raw];
-                if (exact) { addProduct(exact); setSearch(""); return; }
+                if (exact) { addProduct(exact); setSearch(""); triggerScanFlash(); return; }
                 if (filtered.length >= 1) {
                   const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
                   const idx = addProduct(pick); setSearch("");
@@ -776,16 +776,22 @@ function POSPage() {
                 }
                 openQuickAdd(raw);
               }}
-              className="pl-9 h-9 text-sm"
+              className={`pl-12 h-14 text-base rounded-xl border-2 shadow-sm transition-all duration-300 ${
+                scanFlash ? "border-success ring-4 ring-success/30 bg-success/5" : "focus:border-primary"
+              }`}
             />
-
           </div>
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-sm font-medium truncate">{tab.name}</span>
+            <span className="text-sm font-semibold truncate">{tab.name}</span>
             <Badge variant="secondary" className="h-5 px-1.5 text-[11px] shrink-0">
               {tab.items.length} item{tab.items.length === 1 ? "" : "s"}
             </Badge>
+            {tab.restored && (
+              <Badge className="bg-warning text-warning-foreground text-[11px] shrink-0 rounded-full">
+                ↩ RESTORED SALE
+              </Badge>
+            )}
             {tab.expense_person_id && (
               <Badge variant="outline" className="border-warning text-warning text-[11px] shrink-0">
                 Staff purchase
@@ -795,7 +801,7 @@ function POSPage() {
           <Button
             size="sm"
             variant={showCost ? "secondary" : "ghost"}
-            className="h-7 text-xs shrink-0"
+            className="h-9 text-xs shrink-0"
             onClick={() => setShowCost((v) => !v)}
           >
             {showCost ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
