@@ -14,6 +14,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, sampleInvoice } from "@/components/receipt";
+import { OfflineModeCard } from "@/components/offline-mode-card";
+
 
 export const Route = createFileRoute("/_authenticated/settings")({ component: Page });
 
