@@ -86,6 +86,25 @@ function Page() {
             </div>
           </Card>
 
+          <Card className="p-5 space-y-3">
+            <div>
+              <div className="font-medium">POS behaviour</div>
+              <div className="text-xs text-muted-foreground">Controls how long a cashier can undo a just-completed sale (Ctrl+Z / F10).</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Undo window (minutes)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={120}
+                  step={1}
+                  value={form.undo_window_minutes ?? 5}
+                  onChange={(e) => set({ undo_window_minutes: Math.max(1, Number(e.target.value) || 5) })}
+                />
+              </div>
+            </div>
+
           <Card className="p-5 space-y-4">
             <div className="font-medium">Receipt layout</div>
             <div className="grid grid-cols-2 gap-3">
