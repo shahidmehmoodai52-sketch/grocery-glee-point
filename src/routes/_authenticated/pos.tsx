@@ -1816,7 +1816,10 @@ function ReprintDialog({
                     <td className="px-3 py-1.5 text-xs">{new Date(s.created_at).toLocaleString()}</td>
                     <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(s.total, sym)}</td>
-                    <td className="px-2 py-1 text-right">
+                    <td className="px-2 py-1 text-right whitespace-nowrap">
+                      <Button size="sm" variant="ghost" onClick={() => { onView(s); onOpenChange(false); }} title="Review invoice (no reprint log)">
+                        <Eye className="h-3.5 w-3.5 mr-1" /> Review
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={async () => {
                         if (reprintAuditEnabled) {
                           try {
@@ -1824,10 +1827,11 @@ function ReprintDialog({
                           } catch {/* audit-only */}
                         }
                         onView(s); onOpenChange(false);
-                      }}>
-                        <Printer className="h-3.5 w-3.5 mr-1" /> Open
+                      }} title="Reprint invoice">
+                        <Printer className="h-3.5 w-3.5 mr-1" /> Reprint
                       </Button>
                     </td>
+
                   </tr>
                 ))}
               </tbody>
