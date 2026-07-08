@@ -1169,6 +1169,7 @@ function SingleMergedFile() {
       // Also wipe the batch history for product uploads so counts stay in sync.
       await supabase.from("import_batches").delete().in("source", ["single_merged", "smart_merge", "products"]);
       notifyBatchChanged();
+      invalidateAfterImport(qc);
       toast.success("Sab imported stock delete ho gaya. Ab dobara file upload karen.");
     } catch (e: any) {
       toast.error(e.message ?? "Wipe failed");
