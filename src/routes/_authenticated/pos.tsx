@@ -869,6 +869,27 @@ function POSPage() {
           <Clock className="h-3 w-3 text-muted-foreground" />
           <span>{now.toLocaleTimeString()}</span>
         </div>
+        {holdBillsEnabled && (
+          <>
+            <Button
+              size="sm" variant="outline" className="h-7 text-xs shrink-0"
+              onClick={holdCurrent} disabled={holding || !tab.items.length}
+              title="Hold current bill (park cart)"
+            >
+              <PauseCircle className="h-3.5 w-3.5 mr-1" /> Hold
+            </Button>
+            <Button
+              size="sm" variant="outline" className="h-7 text-xs shrink-0"
+              onClick={() => setHeldOpen(true)}
+              title="Resume a held bill"
+            >
+              <Play className="h-3.5 w-3.5 mr-1" /> Held
+              {heldBills.length > 0 && (
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{heldBills.length}</Badge>
+              )}
+            </Button>
+          </>
+        )}
         <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setReprintOpen(true)}>
           <History className="h-3.5 w-3.5 mr-1" /> Reprint
         </Button>
