@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library,
+  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library, ShieldCheck,
 } from "lucide-react";
 
 
@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useSuperAdmin } from "@/hooks/use-super-admin";
 
 type Item = { title: string; url: string; icon: any; perm: string; adminOnly?: boolean };
 const groups: { label: string; items: Item[] }[] = [
@@ -68,8 +69,20 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { data: settings } = useSettings();
   const { isAdmin, can } = usePermissions();
-  const visibleGroups = groups
-    .map((g) => ({ ...g, items: g.items.filter((it) => (it.adminOnly ? isAdmin : can(it.perm))) }))
+  const { isSuperAdmin } = useSuperAdmin();
+  const withPlatform = isSuperAdmin
+    ? [
+        ...groups,
+        {
+          label: "Platform",
+          items: [
+            { title: "Admin panel", url: "/admin", icon: ShieldCheck, perm: "admin", adminOnly: false } as Item,
+          ],
+        },
+      ]
+    : groups;
+  const visibleGroups = withPlatform
+    .map((g) => ({ ...g, items: g.items.filter((it) => (it.url === "/admin" ? isSuperAdmin : it.adminOnly ? isAdmin : can(it.perm))) }))
     .filter((g) => g.items.length > 0);
   const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
 
