@@ -1817,7 +1817,14 @@ function ReprintDialog({
                     <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(s.total, sym)}</td>
                     <td className="px-2 py-1 text-right">
-                      <Button size="sm" variant="ghost" onClick={() => { onView(s); onOpenChange(false); }}>
+                      <Button size="sm" variant="ghost" onClick={async () => {
+                        if (reprintAuditEnabled) {
+                          try {
+                            await supabase.rpc("log_receipt_reprint", { _sale_id: s.id, _reason: "reprint from POS" });
+                          } catch {/* audit-only */}
+                        }
+                        onView(s); onOpenChange(false);
+                      }}>
                         <Printer className="h-3.5 w-3.5 mr-1" /> Open
                       </Button>
                     </td>
