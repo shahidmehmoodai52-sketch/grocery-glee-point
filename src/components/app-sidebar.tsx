@@ -46,6 +46,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Stock count", url: "/stock-count", icon: ClipboardCheck, perm: "stock-count" },
       { title: "Expiry & waste", url: "/expiry", icon: CalendarClock, perm: "expiry" },
       { title: "Intelligence", url: "/intelligence", icon: Brain, perm: "intelligence" },
+      { title: "Global library", url: "/library", icon: Library, perm: "library" },
     ],
 
   },

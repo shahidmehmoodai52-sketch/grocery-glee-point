@@ -16,6 +16,7 @@ export const ALL_PERMS = [
   { key: "stock-count", label: "Stock count" },
   { key: "expiry", label: "Expiry & waste" },
   { key: "intelligence", label: "Inventory intelligence" },
+  { key: "library", label: "Global product library" },
   { key: "reports", label: "Reports / P&L" },
   { key: "shifts", label: "Shifts & cash drawer" },
   { key: "operations", label: "Business operations" },
@@ -47,7 +48,7 @@ export function usePermissions() {
   // POS + Sales are always allowed; everything else requires admin or grant
   const can = (perm: string) => {
     if (isAdmin) return true;
-    if (perm === "pos" || perm === "sales") return true;
+    if (perm === "pos" || perm === "sales" || perm === "library") return true;
     return q.data?.perms.has(perm) ?? false;
   };
   return { isAdmin, can, loading: authLoading || q.isLoading };
