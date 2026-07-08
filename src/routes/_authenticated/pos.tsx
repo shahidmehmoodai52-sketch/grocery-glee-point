@@ -893,15 +893,18 @@ function POSPage() {
                     <td className="px-2 py-1">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="font-medium text-sm truncate min-w-0 flex-1">{it.name}</div>
-                        {stockNum !== null && (
-                          <Badge variant={stockNum > 0 ? "outline" : "destructive"} className="font-normal shrink-0 text-[10px]">
-                            {fmtQty(stockNum)} {p?.unit ?? ""}
-                          </Badge>
-                        )}
                       </div>
                       {subline && (
                         <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
                       )}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {stockNum !== null ? (
+                        <span className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}>
+                          {fmtQty(stockNum)}
+                          {p?.unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{p.unit}</span> : null}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
                     </td>
                     {showCost && (
                       <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
