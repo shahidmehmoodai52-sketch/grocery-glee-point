@@ -58,6 +58,7 @@ function Page() {
           <TabsTrigger value="checklist"><ClipboardCheck className="h-4 w-4 mr-1" />Checklist</TabsTrigger>
           <TabsTrigger value="reprints"><Printer className="h-4 w-4 mr-1" />Reprints</TabsTrigger>
           <TabsTrigger value="voids"><Ban className="h-4 w-4 mr-1" />Voids</TabsTrigger>
+          <TabsTrigger value="handover"><Handshake className="h-4 w-4 mr-1" />Handover</TabsTrigger>
         </TabsList>
 
         <TabsContent value="morning"><OwnerControlCenter settings={settings} /></TabsContent>
@@ -69,6 +70,8 @@ function Page() {
         <TabsContent value="checklist"><ChecklistPanel settings={settings} /></TabsContent>
         <TabsContent value="reprints"><ReprintsLog /></TabsContent>
         <TabsContent value="voids"><VoidsLog /></TabsContent>
+        <TabsContent value="handover"><HandoverPanel /></TabsContent>
+
       </Tabs>
     </div>
   );
