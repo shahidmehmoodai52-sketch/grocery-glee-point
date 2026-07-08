@@ -133,7 +133,8 @@ function POSPage() {
   const [quickAdd, setQuickAdd] = useState<{
     open: boolean; barcode: string; name: string; unit: string;
     cost_price: string; sell_price: string; stock: string;
-  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1" });
+    category: string; supplier_id: string;
+  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
 
   const openQuickAdd = (term: string) => {
     const raw = term.trim();
@@ -144,8 +145,24 @@ function POSPage() {
       barcode: looksLikeBarcode ? raw : "",
       name: looksLikeBarcode ? "" : raw,
       unit: "pcs", cost_price: "", sell_price: "", stock: "1",
+      category: "", supplier_id: "",
     });
   };
+
+  const { data: quickAddSuppliers = [] } = useQuery({
+    queryKey: ["suppliers", "quickadd"],
+    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+  });
+
+  const { data: quickAddCategories = [] } = useQuery({
+    queryKey: ["products", "categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("category").not("category", "is", null).limit(1000);
+      const set = new Set<string>();
+      (data ?? []).forEach((r: any) => { if (r.category) set.add(String(r.category)); });
+      return Array.from(set).sort();
+    },
+  });
 
   const saveQuickAdd = async () => {
     const name = quickAdd.name.trim();
@@ -154,8 +171,9 @@ function POSPage() {
     const cost = Number(quickAdd.cost_price || 0);
     const stock = Number(quickAdd.stock || 0);
     const bc = quickAdd.barcode.trim() || null;
+    const category = quickAdd.category.trim() || null;
     const { data, error } = await supabase.from("products").insert({
-      name, barcode: bc, unit: quickAdd.unit || "pcs",
+      name, barcode: bc, unit: quickAdd.unit || "pcs", category,
       cost_price: cost, sell_price: sell, stock, tax_rate: 0, is_active: true,
     }).select(PRODUCT_COLUMNS).single();
     if (error) return toast.error(error.message);
@@ -164,12 +182,14 @@ function POSPage() {
     }
     toast.success(`Added "${name}" to catalog`);
     addProduct(data);
-    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1" });
+    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
     setSearch("");
     setTimeout(() => searchRef.current?.focus(), 0);
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["product_barcodes"] });
+    qc.invalidateQueries({ queryKey: ["products", "categories"] });
   };
+
 
 
 
@@ -1072,7 +1092,36 @@ function POSPage() {
               <Input type="number" step="0.01" value={quickAdd.sell_price}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, sell_price: e.target.value }))} />
             </div>
+            <div className="col-span-2">
+              <Label>Category</Label>
+              <Input
+                list="quickadd-category-list"
+                placeholder="e.g. Grocery, Drinks"
+                value={quickAdd.category}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, category: e.target.value }))}
+              />
+              <datalist id="quickadd-category-list">
+                {quickAddCategories.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="col-span-2">
+              <Label>Supplier</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                value={quickAdd.supplier_id}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, supplier_id: e.target.value }))}
+              >
+                <option value="">— None —</option>
+                {quickAddSuppliers.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Supplier is for your reference. Record actual purchases from the Purchases page to update supplier ledger.
+              </p>
+            </div>
           </div>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setQuickAdd((q) => ({ ...q, open: false }))}>Cancel</Button>
             <Button onClick={saveQuickAdd}>Save & add to bill</Button>
