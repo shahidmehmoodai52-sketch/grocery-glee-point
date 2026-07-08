@@ -140,11 +140,19 @@
 
 @layer base {
   * { border-color: var(--color-border); }
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "tnum" 1, "cv11" 1;
+    font-feature-settings: "tnum" 1, "cv11" 1, "ss01" 1;
+    letter-spacing: -0.005em;
   }
+  h1, h2, h3, h4 { letter-spacing: -0.02em; }
   /* Remove native number-input spinner arrows (they mis-adjust price / qty on scroll or click). */
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
@@ -152,8 +160,8 @@
     margin: 0;
   }
   input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
-  /* Give numeric / text inputs enough width to comfortably type prices, quantities, and names. */
   input[type="number"], input[type="text"], input:not([type]) { min-width: 0; }
+  :focus-visible { outline: none; }
 }
 
 
