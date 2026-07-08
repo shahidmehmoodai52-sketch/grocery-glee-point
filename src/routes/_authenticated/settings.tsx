@@ -23,7 +23,9 @@ const FIELDS = [
   "show_logo", "show_tax_id", "show_address", "show_phone", "show_tax_lines", "show_cashier",
   "payment_qr_url", "payment_qr_label", "show_payment_qr",
   "undo_window_minutes",
+  "stock_count_scan_mode",
 ] as const;
+
 
 function Page() {
   const qc = useQueryClient();
@@ -44,7 +46,9 @@ function Page() {
     show_phone: true, show_tax_lines: true, show_cashier: true,
     payment_qr_url: "", payment_qr_label: "", show_payment_qr: true,
     undo_window_minutes: 5,
+    stock_count_scan_mode: "prompt",
   });
+
   useEffect(() => { if (data) setForm({ ...form, ...data }); /* eslint-disable-next-line */ }, [data]);
 
   const set = (patch: any) => setForm((f: any) => ({ ...f, ...patch }));
