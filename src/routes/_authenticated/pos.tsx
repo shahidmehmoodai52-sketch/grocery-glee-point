@@ -1445,8 +1445,52 @@ function POSPage() {
         onOpenChange={setReprintOpen}
         settings={settings}
         sym={sym}
+        reprintAuditEnabled={!!(settings as any)?.ops_reprint_audit_enabled}
         onView={(s: any) => setReprintView(s)}
       />
+
+      {/* Held bills tray */}
+      <Dialog open={heldOpen} onOpenChange={setHeldOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Held bills</DialogTitle></DialogHeader>
+          <div className="rounded-md border max-h-[60vh] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-xs uppercase tracking-wide sticky top-0">
+                <tr>
+                  <th className="text-left px-3 py-2">Label</th>
+                  <th className="text-left px-3 py-2">Customer</th>
+                  <th className="text-left px-3 py-2">Held at</th>
+                  <th className="text-right px-3 py-2">Items</th>
+                  <th className="text-right px-3 py-2">Total</th>
+                  <th className="px-2 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {heldBills.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">No held bills</td></tr>
+                )}
+                {heldBills.map((b: any) => (
+                  <tr key={b.id} className="border-t hover:bg-accent/40">
+                    <td className="px-3 py-1.5">{b.label || "Untitled"}</td>
+                    <td className="px-3 py-1.5">{b.customers?.name ?? "Walk-in"}</td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">{new Date(b.created_at).toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-right">{b.item_count}</td>
+                    <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(b.total, sym)}</td>
+                    <td className="px-2 py-1 text-right whitespace-nowrap">
+                      <Button size="sm" variant="ghost" onClick={() => resumeHeld(b.id)}>
+                        <Play className="h-3.5 w-3.5 mr-1" /> Resume
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => discardHeld(b.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Single invoice viewer (used by both reprint and the post-sale toast action) */}
       <InvoiceDialog
