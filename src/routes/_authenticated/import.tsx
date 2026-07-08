@@ -129,6 +129,15 @@ function notifyBatchChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(BATCH_EVENT));
 }
 
+// Invalidate every query that surfaces product / customer / supplier data so
+// pages like POS pick up freshly imported stock and prices without waiting for
+// realtime replication or the 5-minute staleTime.
+function invalidateAfterImport(qc: ReturnType<typeof useQueryClient>) {
+  ["products", "product_barcodes", "customers", "suppliers", "dash-products"].forEach((key) => {
+    qc.invalidateQueries({ queryKey: [key] });
+  });
+}
+
 function Page() {
   return (
     <div className="p-6 space-y-4">
