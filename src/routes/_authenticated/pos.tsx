@@ -1032,7 +1032,7 @@ function POSPage() {
       <aside className="w-[280px] md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-l bg-card flex flex-col min-h-0 overflow-hidden no-print">
 
         {/* Party + payment */}
-        <div className="p-4 border-b space-y-3 shrink-0">
+        <div className="p-2.5 border-b space-y-2 shrink-0">
           <div>
             <div className="flex items-center justify-between">
               <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</Label>
