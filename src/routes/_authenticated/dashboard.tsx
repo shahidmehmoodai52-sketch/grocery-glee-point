@@ -13,6 +13,8 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
@@ -137,18 +139,18 @@ function Page() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-end justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Overview of the last 30 days · {new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild><Link to="/pos"><ShoppingCart className="h-4 w-4 mr-2" />Open POS</Link></Button>
-          <Button asChild variant="outline"><Link to="/reports"><Receipt className="h-4 w-4 mr-2" />Reports</Link></Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description={`Overview of the last 30 days · ${new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`}
+        icon={<TrendingUp className="h-5 w-5" />}
+        actions={
+          <>
+            <Button asChild><Link to="/pos"><ShoppingCart className="h-4 w-4 mr-2" />Open POS</Link></Button>
+            <Button asChild variant="outline"><Link to="/reports"><Receipt className="h-4 w-4 mr-2" />Reports</Link></Button>
+          </>
+        }
+      />
+
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -294,9 +296,9 @@ function Page() {
             ) : lowStock.map((p: any) => (
               <div key={p.id} className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0">
                 <div className="text-sm truncate pr-2">{p.name}</div>
-                <Badge variant={Number(p.stock) === 0 ? "destructive" : "secondary"}>
+                <StatusBadge tone={Number(p.stock) === 0 ? "danger" : "warning"}>
                   {Number(p.stock)} left
-                </Badge>
+                </StatusBadge>
               </div>
             ))}
           </div>
