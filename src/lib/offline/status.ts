@@ -36,12 +36,12 @@ export function getOfflineStatus() {
   return state;
 }
 
-export function setOfflineEnabled(v: boolean) {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(LS_ENABLED, v ? "1" : "0"); } catch {}
-  state = { ...state, enabled: v };
+/** Kept for backward compat — offline is always on now, this is a no-op. */
+export function setOfflineEnabled(_v: boolean) {
+  state = { ...state, enabled: true };
   emit();
 }
+
 
 export function markSyncStart() {
   state = { ...state, phase: "syncing", error: null };
