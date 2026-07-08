@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import {
@@ -126,6 +127,15 @@ async function parseSpreadsheet(file: File): Promise<{ headers: string[]; rows: 
 const BATCH_EVENT = "import-batch-changed";
 function notifyBatchChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(BATCH_EVENT));
+}
+
+// Invalidate every query that surfaces product / customer / supplier data so
+// pages like POS pick up freshly imported stock and prices without waiting for
+// realtime replication or the 5-minute staleTime.
+function invalidateAfterImport(qc: ReturnType<typeof useQueryClient>) {
+  ["products", "product_barcodes", "customers", "suppliers", "dash-products"].forEach((key) => {
+    qc.invalidateQueries({ queryKey: [key] });
+  });
 }
 
 function Page() {
@@ -519,6 +529,7 @@ function smartAutoMap(headers: string[], rows: Record<string, any>[]): Record<st
 
 
 function SmartMerge() {
+  const qc = useQueryClient();
   const fileA = useRef<HTMLInputElement>(null);
   const fileB = useRef<HTMLInputElement>(null);
   const [stockFile, setStockFile] = useState<{ headers: string[]; rows: Record<string, any>[]; name: string } | null>(null);
@@ -621,6 +632,7 @@ function SmartMerge() {
 
     await finalizeImportBatch(batchId, { products: ok, barcodes: bcOk, failed });
     notifyBatchChanged();
+    invalidateAfterImport(qc);
 
     setBusy(false);
     setResult({ products: ok, barcodes: bcOk, failed, errors: [...new Set(errors)].slice(0, 5) });
@@ -759,6 +771,7 @@ function FileSlot({ label, file, map, required, inputRef, onPick, onClear }: {
 // ---------------- Single-entity importer (now supports xlsx) ----------------
 
 function Importer({ entity }: { entity: EntityKey }) {
+  const qc = useQueryClient();
   const schema = SCHEMAS[entity];
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<Record<string, any>[]>([]);
@@ -843,6 +856,7 @@ function Importer({ entity }: { entity: EntityKey }) {
       failed,
     });
     notifyBatchChanged();
+    invalidateAfterImport(qc);
     setBusy(false);
     if (failed === 0) toast.success(`Imported ${ok} rows`); else toast.error(`${ok} imported, ${failed} failed`);
   };
@@ -972,6 +986,7 @@ function ExportAllButton() {
 // ---------------- Single merged file: name/sku + multiple barcodes ----------------
 
 function SingleMergedFile() {
+  const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<{ headers: string[]; rows: Record<string, any>[]; name: string } | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -1123,6 +1138,7 @@ function SingleMergedFile() {
 
     await finalizeImportBatch(batchId, { products: prodOk, barcodes: bcOk, failed: prodFail });
     notifyBatchChanged();
+    invalidateAfterImport(qc);
 
     setBusy(false);
     if (prodFail === 0) toast.success(`Imported ${prodOk} items · ${bcOk} barcodes linked`);
@@ -1153,6 +1169,7 @@ function SingleMergedFile() {
       // Also wipe the batch history for product uploads so counts stay in sync.
       await supabase.from("import_batches").delete().in("source", ["single_merged", "smart_merge", "products"]);
       notifyBatchChanged();
+      invalidateAfterImport(qc);
       toast.success("Sab imported stock delete ho gaya. Ab dobara file upload karen.");
     } catch (e: any) {
       toast.error(e.message ?? "Wipe failed");
