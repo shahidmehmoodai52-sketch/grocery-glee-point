@@ -48,7 +48,17 @@ type Tab = {
   discount_pct: string;
   paid: string;
   note: string;
+  restored?: boolean;
 };
+
+const UNDO_REASONS = [
+  "Customer forgot item",
+  "Wrong quantity",
+  "Wrong customer",
+  "Wrong payment method",
+  "Cashier mistake",
+  "Other",
+];
 
 const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category";
 
