@@ -129,6 +129,25 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    // Boot offline layer (safe no-op if disabled / unsupported).
+    (async () => {
+      try {
+        const { bootOfflineStatus, getOfflineStatus } = await import("@/lib/offline/status");
+        const { runSync } = await import("@/lib/offline/sync");
+        bootOfflineStatus();
+        const s = getOfflineStatus();
+        if (s.enabled && s.online) void runSync({ silent: true });
+        const onOnline = () => { if (getOfflineStatus().enabled) void runSync({ silent: true }); };
+        window.addEventListener("online", onOnline);
+        const interval = window.setInterval(() => {
+          if (getOfflineStatus().enabled && getOfflineStatus().online) void runSync({ silent: true });
+        }, 5 * 60_000);
+        return () => { window.removeEventListener("online", onOnline); window.clearInterval(interval); };
+      } catch {/* SSR / unsupported */}
+    })();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AppErrorBoundary module="root">
@@ -140,3 +159,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+

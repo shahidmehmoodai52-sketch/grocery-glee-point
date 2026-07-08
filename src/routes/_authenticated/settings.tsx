@@ -14,6 +14,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, sampleInvoice } from "@/components/receipt";
+import { OfflineModeCard } from "@/components/offline-mode-card";
+
 
 export const Route = createFileRoute("/_authenticated/settings")({ component: Page });
 
@@ -283,8 +285,11 @@ function Page() {
             )}
           </Card>
 
+          <OfflineModeCard />
+
           <Button onClick={save}><Save className="h-4 w-4 mr-2" />Save settings</Button>
         </div>
+
 
         <div className="space-y-2">
           <div className="text-sm font-medium">Live receipt preview</div>

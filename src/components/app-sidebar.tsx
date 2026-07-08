@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
+import { OfflineStatusBadge } from "@/components/offline-status";
+
 
 type Item = { title: string; url: string; icon: any; perm: string; adminOnly?: boolean };
 const groups: { label: string; items: Item[] }[] = [
@@ -128,6 +130,11 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
+        {!collapsed && (
+          <div className="px-2 pt-2">
+            <OfflineStatusBadge />
+          </div>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleSignOut} tooltip="Sign out">
@@ -137,6 +144,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
     </Sidebar>
   );
 }
