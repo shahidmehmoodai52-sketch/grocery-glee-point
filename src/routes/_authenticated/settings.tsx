@@ -22,6 +22,7 @@ const FIELDS = [
   "logo_url", "tax_id", "receipt_header", "receipt_footer", "paper_width",
   "show_logo", "show_tax_id", "show_address", "show_phone", "show_tax_lines", "show_cashier",
   "payment_qr_url", "payment_qr_label", "show_payment_qr",
+  "undo_window_minutes",
 ] as const;
 
 function Page() {
