@@ -607,13 +607,7 @@ function POSPage() {
         })),
       };
 
-      const { data, error } = await supabase.rpc("complete_sale", { payload });
-      if (error) throw error;
-      const { data: sale } = await supabase
-        .from("sales")
-        .select("*, sale_items(*), customers(name,phone)")
-        .eq("id", data as string)
-        .maybeSingle();
+      const { sale, offline } = await completeSaleOfflineAware(payload as any);
       setLastInvoice(sale);
       if (sale?.id) {
         setUndoCandidate({
@@ -625,10 +619,15 @@ function POSPage() {
         });
       }
 
-      toast.success(`Sale ${sale?.invoice_no} saved`, {
-        action: { label: "Print", onClick: () => setReprintView(sale) },
-        duration: 5000,
-      });
+      toast.success(
+        offline
+          ? `Sale ${sale?.invoice_no} saved offline — will sync when online`
+          : `Sale ${sale?.invoice_no} saved`,
+        {
+          action: { label: "Print", onClick: () => setReprintView(sale) },
+          duration: 5000,
+        },
+      );
       closeTab(active);
       // restored badge is cleared implicitly since tab is closed
       void 0;
@@ -638,6 +637,7 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["expense_persons"] });
+
     } catch (err: any) {
       toast.error(err.message ?? "Failed to complete sale");
     } finally {
