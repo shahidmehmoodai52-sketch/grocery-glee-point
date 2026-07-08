@@ -1240,6 +1240,49 @@ function POSPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Undo last sale confirmation */}
+      <Dialog open={undoOpen} onOpenChange={(o) => !undoing && setUndoOpen(o)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Undo last sale?</DialogTitle>
+          </DialogHeader>
+          {undoCandidate && (
+            <div className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                This will reverse the sale, restore stock and any customer balance,
+                and put the items back in a new bill for editing.
+              </p>
+              <div className="rounded-md border bg-muted/40 p-3 space-y-1.5">
+                <Row label="Invoice" value={undoCandidate.invoice_no} />
+                <Row label="Total" value={fmtMoney(undoCandidate.total, sym)} />
+                <Row label="Items" value={String(undoCandidate.item_count)} />
+                <Row
+                  label="Elapsed"
+                  value={`${Math.floor(undoAgeSeconds / 60)}m ${undoAgeSeconds % 60}s of ${undoWindowMin}m window`}
+                  muted
+                />
+              </div>
+              {undoExpired && (
+                <p className="text-destructive text-xs">
+                  Undo window has expired. Please create a Sale Return instead.
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUndoOpen(false)} disabled={undoing}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={confirmUndo}
+              disabled={undoing || undoExpired || !undoCandidate}
+            >
+              {undoing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Undo sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
       {false && lastInvoice}
     </div>
