@@ -256,17 +256,17 @@ function POSPage() {
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products", "active"],
-    queryFn: async () =>
-      fetchAll<any>((from, to) =>
-        supabase
-          .from("products")
-          .select(PRODUCT_COLUMNS)
-          .eq("is_active", true)
-          .order("name")
-          .range(from, to),
+    queryFn: () =>
+      offlineFirst(
+        () => fetchAll<any>((from, to) =>
+          supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name").range(from, to),
+        ),
+        async () => (await offlineDb().products.toArray()).filter((p: any) => p.is_active !== false).sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
+        (rows) => cacheProducts(rows),
       ),
     staleTime: 5 * 60 * 1000,
   });
+
 
   const { data: remoteProducts = [], isFetching: remoteProductsLoading } = useQuery({
     queryKey: ["products", "pos-search", searchTerm],
