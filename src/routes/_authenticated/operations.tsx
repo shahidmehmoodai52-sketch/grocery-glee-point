@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/operations")({ component: 
 const sb = supabase as any;
 
 function Page() {
-  const { settings } = useSettings();
+  const { data: settings } = useSettings();
   const [tab, setTab] = useState("morning");
 
   return (
