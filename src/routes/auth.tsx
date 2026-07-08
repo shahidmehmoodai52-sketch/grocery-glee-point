@@ -51,6 +51,12 @@ function AuthPage() {
     setBusy(true);
     const cleanEmail = email.trim().toLowerCase();
     try {
+      // Firewall check: is this IP or email blocked?
+      if (await isBlocked(cleanEmail)) {
+        await logSecurityEvent("blocked_attempt", { severity: "warning", email: cleanEmail });
+        toast.error("Access blocked. Contact support if this is a mistake.");
+        return;
+      }
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
@@ -63,6 +69,7 @@ function AuthPage() {
             setMode("signin");
             setPassword("");
           } else {
+            void logSecurityEvent("signup_error", { severity: "info", email: cleanEmail, metadata: { message: error.message } });
             toast.error("Could not create account. Please try again.");
           }
           return;
@@ -76,9 +83,11 @@ function AuthPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) {
+          void logSecurityEvent("failed_login", { severity: "warning", email: cleanEmail });
           toast.error("Invalid username or password");
           return;
         }
+        void logSecurityEvent("successful_login", { severity: "info", email: cleanEmail });
         await goToApp();
       }
     } finally {
