@@ -850,7 +850,7 @@ function POSPage() {
             <tbody>
               {tab.items.length === 0 && !search.trim() && (
                 <tr>
-                  <td colSpan={showCost ? 8 : 7} className="border-0 py-14">
+                  <td colSpan={showCost ? 9 : 8} className="border-0 py-14">
                     <div className="mx-auto max-w-md flex flex-col items-center gap-4 text-center animate-in fade-in duration-300">
                       <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center text-4xl">
                         📦
