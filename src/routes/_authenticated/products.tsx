@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, History } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,17 +57,32 @@ function ProductsPage() {
     if (!form.name) return toast.error("Name is required");
     const allBarcodes = parseBarcodes(form.barcodes_text);
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
-    const { barcodes_text: _bt, ...rest } = form;
+    const { barcodes_text: _bt, stock: newStock, ...rest } = form;
     const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null };
     let productId = form.id;
     if (form.id) {
+      // Update all non-stock fields directly
       const { error } = await supabase.from("products").update(payload).eq("id", form.id);
       if (error) return toast.error(error.message);
+      // Route stock changes through the adjustment RPC so a movement is recorded
+      const existing = products.find((p) => p.id === form.id);
+      const oldStock = Number(existing?.stock ?? 0);
+      if (Number(newStock) !== oldStock) {
+        const { error: adjErr } = await supabase.rpc("adjust_product_stock", {
+          _product_id: form.id,
+          _new_stock: Number(newStock),
+          _reason: "Manual adjustment",
+          _note: undefined,
+        });
+        if (adjErr) return toast.error(adjErr.message);
+      }
+      productId = form.id;
     } else {
-      const { data, error } = await supabase.from("products").insert(payload).select("id").single();
+      const { data, error } = await supabase.from("products").insert({ ...payload, stock: newStock }).select("id").single();
       if (error) return toast.error(error.message);
       productId = data.id;
     }
+
     if (productId) {
       // Sync extra barcodes (all entries except the primary go into product_barcodes; primary also stored there for scan lookup)
       await supabase.from("product_barcodes").delete().eq("product_id", productId);
@@ -191,9 +207,13 @@ function ProductsPage() {
                   })()}
                 </TableCell>
                 <TableCell className="text-right">
+                  <Link to="/products/$id" params={{ id: p.id }}>
+                    <Button variant="ghost" size="icon" title="Stock timeline"><History className="h-4 w-4" /></Button>
+                  </Link>
                   <Button variant="ghost" size="icon" onClick={() => edit(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
+
               </TableRow>
             ))}
           </TableBody>

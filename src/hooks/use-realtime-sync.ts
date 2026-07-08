@@ -18,7 +18,9 @@ const MAP: Record<string, string[][]> = {
   suppliers: [["suppliers"]],
   expenses: [["expenses"]],
   party_payments: [["party_payments"], ["customers"], ["suppliers"]],
+  inventory_movements: [["product-movements"], ["product-health"]],
 };
+
 
 export function useRealtimeSync() {
   const qc = useQueryClient();

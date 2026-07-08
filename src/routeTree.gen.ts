@@ -32,6 +32,7 @@ import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]
 import { Route as AuthenticatedSuppliersIndexRouteImport } from './routes/_authenticated/suppliers.index'
 import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authenticated/customers.index'
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers.$id'
+import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
 import { Route as AuthenticatedExpensePersonsIdRouteImport } from './routes/_authenticated/expense-persons.$id'
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
@@ -158,6 +159,11 @@ const AuthenticatedSuppliersIdRoute =
     path: '/suppliers/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedProductsRoute,
+} as any)
 const AuthenticatedExpensePersonsIdRoute =
   AuthenticatedExpensePersonsIdRouteImport.update({
     id: '/expense-persons/$id',
@@ -194,7 +200,7 @@ export interface FileRoutesByFullPath {
   '/expenses': typeof AuthenticatedExpensesRoute
   '/import': typeof AuthenticatedImportRoute
   '/pos': typeof AuthenticatedPosRoute
-  '/products': typeof AuthenticatedProductsRoute
+  '/products': typeof AuthenticatedProductsRouteWithChildren
   '/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
   '/purchases': typeof AuthenticatedPurchasesRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -206,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
+  '/products/$id': typeof AuthenticatedProductsIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/suppliers/': typeof AuthenticatedSuppliersIndexRoute
@@ -222,7 +229,7 @@ export interface FileRoutesByTo {
   '/expenses': typeof AuthenticatedExpensesRoute
   '/import': typeof AuthenticatedImportRoute
   '/pos': typeof AuthenticatedPosRoute
-  '/products': typeof AuthenticatedProductsRoute
+  '/products': typeof AuthenticatedProductsRouteWithChildren
   '/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
   '/purchases': typeof AuthenticatedPurchasesRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
+  '/products/$id': typeof AuthenticatedProductsIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/suppliers': typeof AuthenticatedSuppliersIndexRoute
@@ -252,7 +260,7 @@ export interface FileRoutesById {
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/pos': typeof AuthenticatedPosRoute
-  '/_authenticated/products': typeof AuthenticatedProductsRoute
+  '/_authenticated/products': typeof AuthenticatedProductsRouteWithChildren
   '/_authenticated/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
   '/_authenticated/purchases': typeof AuthenticatedPurchasesRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -264,6 +272,7 @@ export interface FileRoutesById {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/_authenticated/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
+  '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
   '/_authenticated/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/suppliers/': typeof AuthenticatedSuppliersIndexRoute
@@ -294,6 +303,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/customers/$id'
     | '/expense-persons/$id'
+    | '/products/$id'
     | '/suppliers/$id'
     | '/customers/'
     | '/suppliers/'
@@ -322,6 +332,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/customers/$id'
     | '/expense-persons/$id'
+    | '/products/$id'
     | '/suppliers/$id'
     | '/customers'
     | '/suppliers'
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/customers/$id'
     | '/_authenticated/expense-persons/$id'
+    | '/_authenticated/products/$id'
     | '/_authenticated/suppliers/$id'
     | '/_authenticated/customers/'
     | '/_authenticated/suppliers/'
@@ -531,6 +543,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSuppliersIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/products/$id': {
+      id: '/_authenticated/products/$id'
+      path: '/$id'
+      fullPath: '/products/$id'
+      preLoaderRoute: typeof AuthenticatedProductsIdRouteImport
+      parentRoute: typeof AuthenticatedProductsRoute
+    }
     '/_authenticated/expense-persons/$id': {
       id: '/_authenticated/expense-persons/$id'
       path: '/expense-persons/$id'
@@ -562,13 +581,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedProductsRouteChildren {
+  AuthenticatedProductsIdRoute: typeof AuthenticatedProductsIdRoute
+}
+
+const AuthenticatedProductsRouteChildren: AuthenticatedProductsRouteChildren = {
+  AuthenticatedProductsIdRoute: AuthenticatedProductsIdRoute,
+}
+
+const AuthenticatedProductsRouteWithChildren =
+  AuthenticatedProductsRoute._addFileChildren(
+    AuthenticatedProductsRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedBackupRoute: typeof AuthenticatedBackupRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
-  AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
+  AuthenticatedProductsRoute: typeof AuthenticatedProductsRouteWithChildren
   AuthenticatedPurchaseReturnsRoute: typeof AuthenticatedPurchaseReturnsRoute
   AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -589,7 +621,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
-  AuthenticatedProductsRoute: AuthenticatedProductsRoute,
+  AuthenticatedProductsRoute: AuthenticatedProductsRouteWithChildren,
   AuthenticatedPurchaseReturnsRoute: AuthenticatedPurchaseReturnsRoute,
   AuthenticatedPurchasesRoute: AuthenticatedPurchasesRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,

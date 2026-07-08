@@ -411,6 +411,84 @@ export type Database = {
           },
         ]
       }
+      inventory_movements: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          id: string
+          movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          note: string | null
+          product_id: string
+          qty_change: number
+          reason: string | null
+          reference_id: string | null
+          reference_no: string | null
+          reference_type: Database["public"]["Enums"]["inventory_reference_type"]
+          stock_after: number
+          stock_before: number
+          supplier_id: string | null
+          tenant_id: string
+          total_cost: number | null
+          unit_cost: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          note?: string | null
+          product_id: string
+          qty_change: number
+          reason?: string | null
+          reference_id?: string | null
+          reference_no?: string | null
+          reference_type: Database["public"]["Enums"]["inventory_reference_type"]
+          stock_after?: number
+          stock_before?: number
+          supplier_id?: string | null
+          tenant_id: string
+          total_cost?: number | null
+          unit_cost?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          movement_type?: Database["public"]["Enums"]["inventory_movement_type"]
+          note?: string | null
+          product_id?: string
+          qty_change?: number
+          reason?: string | null
+          reference_id?: string | null
+          reference_no?: string | null
+          reference_type?: Database["public"]["Enums"]["inventory_reference_type"]
+          stock_after?: number
+          stock_before?: number
+          supplier_id?: string | null
+          tenant_id?: string
+          total_cost?: number | null
+          unit_cost?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number
@@ -1724,6 +1802,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      adjust_product_stock: {
+        Args: {
+          _new_stock: number
+          _note?: string
+          _product_id: string
+          _reason?: string
+        }
+        Returns: string
+      }
       can_add_product: { Args: { _tenant_id: string }; Returns: boolean }
       can_add_user: { Args: { _tenant_id: string }; Returns: boolean }
       complete_purchase: { Args: { payload: Json }; Returns: string }
@@ -1816,6 +1903,24 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      record_inventory_movement: {
+        Args: {
+          _customer_id: string
+          _movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          _note: string
+          _product_id: string
+          _qty_change: number
+          _reason: string
+          _reference_id: string
+          _reference_no: string
+          _reference_type: Database["public"]["Enums"]["inventory_reference_type"]
+          _supplier_id: string
+          _tenant_id: string
+          _unit_cost: number
+          _user_id: string
+        }
+        Returns: string
+      }
       record_payment: {
         Args: {
           p_amount: number
@@ -1840,6 +1945,30 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "cashier"
+      inventory_movement_type:
+        | "purchase"
+        | "sale"
+        | "sale_return"
+        | "purchase_return"
+        | "adjustment"
+        | "undo_sale"
+        | "opening_balance"
+        | "transfer"
+        | "stock_count"
+        | "expired"
+        | "damaged"
+        | "lost"
+      inventory_reference_type:
+        | "sale"
+        | "purchase"
+        | "sale_return"
+        | "purchase_return"
+        | "adjustment"
+        | "undo_sale"
+        | "opening_balance"
+        | "manual"
+        | "transfer"
+        | "stock_count"
       tenant_role:
         | "owner"
         | "admin"
@@ -1975,6 +2104,32 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "cashier"],
+      inventory_movement_type: [
+        "purchase",
+        "sale",
+        "sale_return",
+        "purchase_return",
+        "adjustment",
+        "undo_sale",
+        "opening_balance",
+        "transfer",
+        "stock_count",
+        "expired",
+        "damaged",
+        "lost",
+      ],
+      inventory_reference_type: [
+        "sale",
+        "purchase",
+        "sale_return",
+        "purchase_return",
+        "adjustment",
+        "undo_sale",
+        "opening_balance",
+        "manual",
+        "transfer",
+        "stock_count",
+      ],
       tenant_role: ["owner", "admin", "manager", "cashier", "viewer", "staff"],
     },
   },
