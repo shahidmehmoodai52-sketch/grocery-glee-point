@@ -529,6 +529,7 @@ function smartAutoMap(headers: string[], rows: Record<string, any>[]): Record<st
 
 
 function SmartMerge() {
+  const qc = useQueryClient();
   const fileA = useRef<HTMLInputElement>(null);
   const fileB = useRef<HTMLInputElement>(null);
   const [stockFile, setStockFile] = useState<{ headers: string[]; rows: Record<string, any>[]; name: string } | null>(null);
