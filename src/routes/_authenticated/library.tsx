@@ -31,7 +31,7 @@ type GlobalProduct = {
   unit: string | null;
   image_url: string | null;
   description: string | null;
-  status: "pending" | "approved" | "rejected";
+  status: string;
   contributed_by_tenant: string | null;
   contributed_by_user: string | null;
   reviewed_by: string | null;
