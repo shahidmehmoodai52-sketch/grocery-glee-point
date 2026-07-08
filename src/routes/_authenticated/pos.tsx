@@ -1447,6 +1447,37 @@ function POSPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Quick-add customer */}
+      <Dialog open={quickAddCustomerOpen} onOpenChange={setQuickAddCustomerOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add customer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Name</Label>
+              <Input
+                autoFocus
+                value={newCustomer.name}
+                onChange={(e) => setNewCustomer((c) => ({ ...c, name: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveQuickCustomer(); } }}
+              />
+            </div>
+            <div>
+              <Label>Phone (optional)</Label>
+              <Input
+                value={newCustomer.phone}
+                onChange={(e) => setNewCustomer((c) => ({ ...c, phone: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setQuickAddCustomerOpen(false)}>Cancel</Button>
+            <Button onClick={saveQuickCustomer}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
       {false && lastInvoice}
     </div>
