@@ -282,11 +282,16 @@ function POSPage() {
 
   const { data: extraBarcodes = [] } = useQuery({
     queryKey: ["product_barcodes"],
-    queryFn: async () =>
-      fetchAll<any>((from, to) =>
-        supabase.from("product_barcodes").select("product_id,barcode").range(from, to),
+    queryFn: () =>
+      offlineFirst(
+        () => fetchAll<any>((from, to) =>
+          supabase.from("product_barcodes").select("id,product_id,barcode").range(from, to),
+        ),
+        () => offlineDb().product_barcodes.toArray(),
+        (rows) => cacheProductBarcodes(rows),
       ),
   });
+
 
 
   // product_id -> array of all barcodes (primary + extras)
