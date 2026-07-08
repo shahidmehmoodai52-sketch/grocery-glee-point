@@ -43,6 +43,7 @@ function Page() {
     show_logo: true, show_tax_id: true, show_address: true,
     show_phone: true, show_tax_lines: true, show_cashier: true,
     payment_qr_url: "", payment_qr_label: "", show_payment_qr: true,
+    undo_window_minutes: 5,
   });
   useEffect(() => { if (data) setForm({ ...form, ...data }); /* eslint-disable-next-line */ }, [data]);
 
