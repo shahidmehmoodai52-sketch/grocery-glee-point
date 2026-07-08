@@ -319,12 +319,18 @@ function POSPage() {
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("customers").select("id,name,balance").order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () =>
+      offlineFirst(
+        async () => {
+          const { data, error } = await supabase.from("customers").select("id,name,balance,phone,updated_at").order("name");
+          if (error) throw error;
+          return data ?? [];
+        },
+        async () => (await offlineDb().customers.toArray()).sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
+        (rows) => cacheCustomers(rows),
+      ),
   });
+
 
   const { data: persons = [] } = useQuery({
     queryKey: ["expense_persons", "active"],
