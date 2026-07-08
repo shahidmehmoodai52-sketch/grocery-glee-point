@@ -20,6 +20,13 @@ import { fmtMoney, fmtQty } from "@/lib/format";
 import { Receipt } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
+import {
+  offlineFirst, cacheProducts, cacheCustomers, cacheProductBarcodes,
+  completeSaleOfflineAware,
+} from "@/lib/offline/pos";
+import { db as offlineDb } from "@/lib/offline/db";
+import { getOfflineStatus } from "@/lib/offline/status";
+
 
 
 
