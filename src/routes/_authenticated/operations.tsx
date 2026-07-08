@@ -47,7 +47,8 @@ function Page() {
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="morning"><Sunrise className="h-4 w-4 mr-1" />Morning</TabsTrigger>
+          <TabsTrigger value="morning"><Sunrise className="h-4 w-4 mr-1" />Owner</TabsTrigger>
+          <TabsTrigger value="calendar"><CalendarDays className="h-4 w-4 mr-1" />Calendar</TabsTrigger>
           <TabsTrigger value="cash"><Wallet className="h-4 w-4 mr-1" />Cash Drawer</TabsTrigger>
           <TabsTrigger value="held"><PauseCircle className="h-4 w-4 mr-1" />Held Bills</TabsTrigger>
           <TabsTrigger value="tasks"><ListTodo className="h-4 w-4 mr-1" />Tasks</TabsTrigger>
@@ -57,7 +58,8 @@ function Page() {
           <TabsTrigger value="voids"><Ban className="h-4 w-4 mr-1" />Voids</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="morning"><MorningDashboard /></TabsContent>
+        <TabsContent value="morning"><OwnerControlCenter settings={settings} /></TabsContent>
+        <TabsContent value="calendar"><BusinessCalendar /></TabsContent>
         <TabsContent value="cash"><CashDrawer settings={settings} /></TabsContent>
         <TabsContent value="held"><HeldBills /></TabsContent>
         <TabsContent value="tasks"><TasksPanel /></TabsContent>
@@ -69,6 +71,7 @@ function Page() {
     </div>
   );
 }
+
 
 /* ---------------- MORNING DASHBOARD ---------------- */
 function MorningDashboard() {
