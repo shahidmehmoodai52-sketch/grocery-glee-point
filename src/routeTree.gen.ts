@@ -24,6 +24,7 @@ import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedPurchaseReturnsRouteImport } from './routes/_authenticated/purchase-returns'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
+import { Route as AuthenticatedOperationsRouteImport } from './routes/_authenticated/operations'
 import { Route as AuthenticatedIntelligenceRouteImport } from './routes/_authenticated/intelligence'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedExpiryRouteImport } from './routes/_authenticated/expiry'
@@ -117,6 +118,11 @@ const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
 const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
   id: '/pos',
   path: '/pos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOperationsRoute = AuthenticatedOperationsRouteImport.update({
+  id: '/operations',
+  path: '/operations',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedIntelligenceRoute =
@@ -234,6 +240,7 @@ export interface FileRoutesByFullPath {
   '/expiry': typeof AuthenticatedExpiryRoute
   '/import': typeof AuthenticatedImportRoute
   '/intelligence': typeof AuthenticatedIntelligenceRoute
+  '/operations': typeof AuthenticatedOperationsRoute
   '/pos': typeof AuthenticatedPosRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
   '/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
@@ -268,6 +275,7 @@ export interface FileRoutesByTo {
   '/expiry': typeof AuthenticatedExpiryRoute
   '/import': typeof AuthenticatedImportRoute
   '/intelligence': typeof AuthenticatedIntelligenceRoute
+  '/operations': typeof AuthenticatedOperationsRoute
   '/pos': typeof AuthenticatedPosRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
   '/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
@@ -304,6 +312,7 @@ export interface FileRoutesById {
   '/_authenticated/expiry': typeof AuthenticatedExpiryRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/intelligence': typeof AuthenticatedIntelligenceRoute
+  '/_authenticated/operations': typeof AuthenticatedOperationsRoute
   '/_authenticated/pos': typeof AuthenticatedPosRoute
   '/_authenticated/products': typeof AuthenticatedProductsRouteWithChildren
   '/_authenticated/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
@@ -340,6 +349,7 @@ export interface FileRouteTypes {
     | '/expiry'
     | '/import'
     | '/intelligence'
+    | '/operations'
     | '/pos'
     | '/products'
     | '/purchase-returns'
@@ -374,6 +384,7 @@ export interface FileRouteTypes {
     | '/expiry'
     | '/import'
     | '/intelligence'
+    | '/operations'
     | '/pos'
     | '/products'
     | '/purchase-returns'
@@ -409,6 +420,7 @@ export interface FileRouteTypes {
     | '/_authenticated/expiry'
     | '/_authenticated/import'
     | '/_authenticated/intelligence'
+    | '/_authenticated/operations'
     | '/_authenticated/pos'
     | '/_authenticated/products'
     | '/_authenticated/purchase-returns'
@@ -548,6 +560,13 @@ declare module '@tanstack/react-router' {
       path: '/pos'
       fullPath: '/pos'
       preLoaderRoute: typeof AuthenticatedPosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/operations': {
+      id: '/_authenticated/operations'
+      path: '/operations'
+      fullPath: '/operations'
+      preLoaderRoute: typeof AuthenticatedOperationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/intelligence': {
@@ -699,6 +718,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExpiryRoute: typeof AuthenticatedExpiryRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedIntelligenceRoute: typeof AuthenticatedIntelligenceRoute
+  AuthenticatedOperationsRoute: typeof AuthenticatedOperationsRoute
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRouteWithChildren
   AuthenticatedPurchaseReturnsRoute: typeof AuthenticatedPurchaseReturnsRoute
@@ -725,6 +745,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedExpiryRoute: AuthenticatedExpiryRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedIntelligenceRoute: AuthenticatedIntelligenceRoute,
+  AuthenticatedOperationsRoute: AuthenticatedOperationsRoute,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRouteWithChildren,
   AuthenticatedPurchaseReturnsRoute: AuthenticatedPurchaseReturnsRoute,

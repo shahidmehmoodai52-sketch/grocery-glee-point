@@ -31,6 +31,8 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Purchase returns", url: "/purchase-returns", icon: RotateCcw, perm: "purchase-returns" },
       { title: "Expenses", url: "/expenses", icon: Wallet, perm: "expenses" },
       { title: "Shifts", url: "/shifts", icon: Clock, perm: "shifts" },
+      { title: "Operations", url: "/operations", icon: ClipboardCheck, perm: "operations" },
+
 
     ],
   },

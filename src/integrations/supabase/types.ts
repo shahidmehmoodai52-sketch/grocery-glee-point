@@ -193,6 +193,60 @@ export type Database = {
           },
         ]
       }
+      cash_drawer_events: {
+        Row: {
+          amount: number
+          approved_by: string | null
+          created_at: string
+          event_type: string
+          id: string
+          reason: string | null
+          reference: string | null
+          shift_id: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          approved_by?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          reason?: string | null
+          reference?: string | null
+          shift_id?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          approved_by?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          reason?: string | null
+          reference?: string | null
+          shift_id?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_drawer_events_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_drawer_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -351,6 +405,82 @@ export type Database = {
           },
           {
             foreignKeyName: "expenses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      held_bills: {
+        Row: {
+          cashier_id: string
+          created_at: string
+          customer_id: string | null
+          discarded_at: string | null
+          id: string
+          item_count: number
+          label: string | null
+          payload: Json
+          resumed_at: string | null
+          resumed_by: string | null
+          shift_id: string | null
+          status: string
+          tenant_id: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          cashier_id: string
+          created_at?: string
+          customer_id?: string | null
+          discarded_at?: string | null
+          id?: string
+          item_count?: number
+          label?: string | null
+          payload: Json
+          resumed_at?: string | null
+          resumed_by?: string | null
+          shift_id?: string | null
+          status?: string
+          tenant_id: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          cashier_id?: string
+          created_at?: string
+          customer_id?: string | null
+          discarded_at?: string | null
+          id?: string
+          item_count?: number
+          label?: string | null
+          payload?: Json
+          resumed_at?: string | null
+          resumed_by?: string | null
+          shift_id?: string | null
+          status?: string
+          tenant_id?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "held_bills_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "held_bills_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "held_bills_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -735,6 +865,67 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manager_handovers: {
+        Row: {
+          acknowledged_at: string | null
+          cash_amount: number
+          created_at: string
+          from_shift_id: string | null
+          from_user: string
+          id: string
+          notes: string | null
+          tenant_id: string
+          to_shift_id: string | null
+          to_user: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          cash_amount?: number
+          created_at?: string
+          from_shift_id?: string | null
+          from_user: string
+          id?: string
+          notes?: string | null
+          tenant_id: string
+          to_shift_id?: string | null
+          to_user?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          cash_amount?: number
+          created_at?: string
+          from_shift_id?: string | null
+          from_user?: string
+          id?: string
+          notes?: string | null
+          tenant_id?: string
+          to_shift_id?: string | null
+          to_user?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manager_handovers_from_shift_id_fkey"
+            columns: ["from_shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manager_handovers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manager_handovers_to_shift_id_fkey"
+            columns: ["to_shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -1350,6 +1541,58 @@ export type Database = {
           },
         ]
       }
+      receipt_reprints: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string | null
+          sale_id: string
+          shift_id: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          sale_id: string
+          shift_id?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          sale_id?: string
+          shift_id?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipt_reprints_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_reprints_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_reprints_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sale_items: {
         Row: {
           cost: number
@@ -1564,6 +1807,63 @@ export type Database = {
           },
         ]
       }
+      sale_voids: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          id: string
+          invoice_no: string | null
+          original_total: number
+          payload: Json
+          reason: string
+          sale_id: string
+          shift_id: string | null
+          tenant_id: string
+          voided_by: string
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          invoice_no?: string | null
+          original_total: number
+          payload: Json
+          reason: string
+          sale_id: string
+          shift_id?: string | null
+          tenant_id: string
+          voided_by: string
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          invoice_no?: string | null
+          original_total?: number
+          payload?: Json
+          reason?: string
+          sale_id?: string
+          shift_id?: string | null
+          tenant_id?: string
+          voided_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_voids_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_voids_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           cashier_id: string | null
@@ -1646,6 +1946,105 @@ export type Database = {
           },
         ]
       }
+      shift_checklist: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          item_key: string
+          label: string
+          note: string | null
+          shift_id: string
+          tenant_id: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          item_key: string
+          label: string
+          note?: string | null
+          shift_id: string
+          tenant_id: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          item_key?: string
+          label?: string
+          note?: string | null
+          shift_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_checklist_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_checklist_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_notes: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          note: string
+          shift_id: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          note: string
+          shift_id?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          note?: string
+          shift_id?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_notes_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_notes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_sessions: {
         Row: {
           actual_cash: number | null
@@ -1711,6 +2110,72 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      shift_tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_at: string | null
+          id: string
+          priority: string
+          shift_id: string | null
+          status: string
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          priority?: string
+          shift_id?: string | null
+          status?: string
+          tenant_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          priority?: string
+          shift_id?: string | null
+          status?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_tasks_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_tasks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_count_items: {
         Row: {
@@ -1859,13 +2324,19 @@ export type Database = {
           ops_allow_multiple_shifts: boolean
           ops_business_day_start_hour: number
           ops_cash_drawer_enabled: boolean
+          ops_checklist_enabled: boolean
+          ops_checklist_items: Json
+          ops_hold_bills_enabled: boolean
           ops_paid_in_out_enabled: boolean
           ops_pending_tasks_enabled: boolean
           ops_receipt_reprint_enabled: boolean
+          ops_reprint_audit_enabled: boolean
           ops_require_manager_approval: boolean
           ops_safe_drop_enabled: boolean
+          ops_safe_drop_threshold: number
           ops_shift_enabled: boolean
           ops_shift_notes_enabled: boolean
+          ops_void_requires_reason: boolean
           paper_width: string
           payment_qr_label: string | null
           payment_qr_url: string | null
@@ -1899,13 +2370,19 @@ export type Database = {
           ops_allow_multiple_shifts?: boolean
           ops_business_day_start_hour?: number
           ops_cash_drawer_enabled?: boolean
+          ops_checklist_enabled?: boolean
+          ops_checklist_items?: Json
+          ops_hold_bills_enabled?: boolean
           ops_paid_in_out_enabled?: boolean
           ops_pending_tasks_enabled?: boolean
           ops_receipt_reprint_enabled?: boolean
+          ops_reprint_audit_enabled?: boolean
           ops_require_manager_approval?: boolean
           ops_safe_drop_enabled?: boolean
+          ops_safe_drop_threshold?: number
           ops_shift_enabled?: boolean
           ops_shift_notes_enabled?: boolean
+          ops_void_requires_reason?: boolean
           paper_width?: string
           payment_qr_label?: string | null
           payment_qr_url?: string | null
@@ -1939,13 +2416,19 @@ export type Database = {
           ops_allow_multiple_shifts?: boolean
           ops_business_day_start_hour?: number
           ops_cash_drawer_enabled?: boolean
+          ops_checklist_enabled?: boolean
+          ops_checklist_items?: Json
+          ops_hold_bills_enabled?: boolean
           ops_paid_in_out_enabled?: boolean
           ops_pending_tasks_enabled?: boolean
           ops_receipt_reprint_enabled?: boolean
+          ops_reprint_audit_enabled?: boolean
           ops_require_manager_approval?: boolean
           ops_safe_drop_enabled?: boolean
+          ops_safe_drop_threshold?: number
           ops_shift_enabled?: boolean
           ops_shift_notes_enabled?: boolean
+          ops_void_requires_reason?: boolean
           paper_width?: string
           payment_qr_label?: string | null
           payment_qr_url?: string | null
@@ -2681,6 +3164,10 @@ export type Database = {
       }
       current_tenant_id: { Args: never; Returns: string }
       delete_party_payment: { Args: { _id: string }; Returns: undefined }
+      discard_held_bill: {
+        Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
       emergency_close_shift: {
         Args: { _reason: string; _shift_id: string }
         Returns: string
@@ -2719,6 +3206,16 @@ export type Database = {
         Args: { _perm: string; _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      hold_bill: {
+        Args: {
+          _customer: string
+          _item_count: number
+          _label: string
+          _payload: Json
+          _total: number
+        }
+        Returns: string
+      }
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
@@ -2733,6 +3230,11 @@ export type Database = {
         }
         Returns: string
       }
+      log_receipt_reprint: {
+        Args: { _reason: string; _sale_id: string }
+        Returns: string
+      }
+      morning_dashboard: { Args: never; Returns: Json }
       my_store_settings: {
         Args: never
         Returns: {
@@ -2747,13 +3249,19 @@ export type Database = {
           ops_allow_multiple_shifts: boolean
           ops_business_day_start_hour: number
           ops_cash_drawer_enabled: boolean
+          ops_checklist_enabled: boolean
+          ops_checklist_items: Json
+          ops_hold_bills_enabled: boolean
           ops_paid_in_out_enabled: boolean
           ops_pending_tasks_enabled: boolean
           ops_receipt_reprint_enabled: boolean
+          ops_reprint_audit_enabled: boolean
           ops_require_manager_approval: boolean
           ops_safe_drop_enabled: boolean
+          ops_safe_drop_threshold: number
           ops_shift_enabled: boolean
           ops_shift_notes_enabled: boolean
+          ops_void_requires_reason: boolean
           paper_width: string
           payment_qr_label: string | null
           payment_qr_url: string | null
@@ -2784,6 +3292,15 @@ export type Database = {
       }
       open_shift: {
         Args: { _notes?: string; _opening_cash: number }
+        Returns: string
+      }
+      record_cash_event: {
+        Args: {
+          _amount: number
+          _reason: string
+          _reference: string
+          _type: string
+        }
         Returns: string
       }
       record_damage: {
@@ -2836,6 +3353,17 @@ export type Database = {
         }
         Returns: string
       }
+      resume_bill: { Args: { _id: string }; Returns: Json }
+      set_checklist_item: {
+        Args: {
+          _completed: boolean
+          _key: string
+          _label: string
+          _note: string
+          _shift_id: string
+        }
+        Returns: string
+      }
       shift_report: { Args: { _shift_id: string }; Returns: Json }
       undo_last_sale: { Args: { _sale_id: string }; Returns: Json }
       update_party_payment: {
@@ -2848,6 +3376,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      void_sale: { Args: { _reason: string; _sale_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "cashier"
