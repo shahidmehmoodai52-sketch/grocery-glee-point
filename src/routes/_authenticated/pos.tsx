@@ -1092,7 +1092,36 @@ function POSPage() {
               <Input type="number" step="0.01" value={quickAdd.sell_price}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, sell_price: e.target.value }))} />
             </div>
+            <div className="col-span-2">
+              <Label>Category</Label>
+              <Input
+                list="quickadd-category-list"
+                placeholder="e.g. Grocery, Drinks"
+                value={quickAdd.category}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, category: e.target.value }))}
+              />
+              <datalist id="quickadd-category-list">
+                {quickAddCategories.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="col-span-2">
+              <Label>Supplier</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                value={quickAdd.supplier_id}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, supplier_id: e.target.value }))}
+              >
+                <option value="">— None —</option>
+                {quickAddSuppliers.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Supplier is for your reference. Record actual purchases from the Purchases page to update supplier ledger.
+              </p>
+            </div>
           </div>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setQuickAdd((q) => ({ ...q, open: false }))}>Cancel</Button>
             <Button onClick={saveQuickAdd}>Save & add to bill</Button>
