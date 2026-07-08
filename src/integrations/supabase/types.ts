@@ -1646,6 +1646,72 @@ export type Database = {
           },
         ]
       }
+      shift_sessions: {
+        Row: {
+          actual_cash: number | null
+          approved_at: string | null
+          approved_by: string | null
+          business_date: string
+          cashier_id: string
+          close_reason: string | null
+          closed_at: string | null
+          closing_notes: string | null
+          created_at: string
+          difference: number | null
+          emergency_reason: string | null
+          expected_cash: number | null
+          id: string
+          opened_at: string
+          opening_cash: number
+          opening_notes: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_cash?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          business_date: string
+          cashier_id: string
+          close_reason?: string | null
+          closed_at?: string | null
+          closing_notes?: string | null
+          created_at?: string
+          difference?: number | null
+          emergency_reason?: string | null
+          expected_cash?: number | null
+          id?: string
+          opened_at?: string
+          opening_cash?: number
+          opening_notes?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_cash?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          business_date?: string
+          cashier_id?: string
+          close_reason?: string | null
+          closed_at?: string | null
+          closing_notes?: string | null
+          created_at?: string
+          difference?: number | null
+          emergency_reason?: string | null
+          expected_cash?: number | null
+          id?: string
+          opened_at?: string
+          opening_cash?: number
+          opening_notes?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stock_count_items: {
         Row: {
           actual_qty: number
@@ -1790,6 +1856,16 @@ export type Database = {
           id: number
           logo_url: string | null
           low_stock_threshold: number
+          ops_allow_multiple_shifts: boolean
+          ops_business_day_start_hour: number
+          ops_cash_drawer_enabled: boolean
+          ops_paid_in_out_enabled: boolean
+          ops_pending_tasks_enabled: boolean
+          ops_receipt_reprint_enabled: boolean
+          ops_require_manager_approval: boolean
+          ops_safe_drop_enabled: boolean
+          ops_shift_enabled: boolean
+          ops_shift_notes_enabled: boolean
           paper_width: string
           payment_qr_label: string | null
           payment_qr_url: string | null
@@ -1820,6 +1896,16 @@ export type Database = {
           id?: number
           logo_url?: string | null
           low_stock_threshold?: number
+          ops_allow_multiple_shifts?: boolean
+          ops_business_day_start_hour?: number
+          ops_cash_drawer_enabled?: boolean
+          ops_paid_in_out_enabled?: boolean
+          ops_pending_tasks_enabled?: boolean
+          ops_receipt_reprint_enabled?: boolean
+          ops_require_manager_approval?: boolean
+          ops_safe_drop_enabled?: boolean
+          ops_shift_enabled?: boolean
+          ops_shift_notes_enabled?: boolean
           paper_width?: string
           payment_qr_label?: string | null
           payment_qr_url?: string | null
@@ -1850,6 +1936,16 @@ export type Database = {
           id?: number
           logo_url?: string | null
           low_stock_threshold?: number
+          ops_allow_multiple_shifts?: boolean
+          ops_business_day_start_hour?: number
+          ops_cash_drawer_enabled?: boolean
+          ops_paid_in_out_enabled?: boolean
+          ops_pending_tasks_enabled?: boolean
+          ops_receipt_reprint_enabled?: boolean
+          ops_require_manager_approval?: boolean
+          ops_safe_drop_enabled?: boolean
+          ops_shift_enabled?: boolean
+          ops_shift_notes_enabled?: boolean
           paper_width?: string
           payment_qr_label?: string | null
           payment_qr_url?: string | null
@@ -2515,12 +2611,23 @@ export type Database = {
         }
         Returns: string
       }
+      approve_shift: { Args: { _shift_id: string }; Returns: string }
       approve_stock_count_session: {
         Args: { _session_id: string }
         Returns: string
       }
+      business_date_of: { Args: { _ts: string }; Returns: string }
       can_add_product: { Args: { _tenant_id: string }; Returns: boolean }
       can_add_user: { Args: { _tenant_id: string }; Returns: boolean }
+      close_shift: {
+        Args: {
+          _actual_cash: number
+          _closing_notes?: string
+          _reason?: string
+          _shift_id: string
+        }
+        Returns: string
+      }
       complete_purchase: { Args: { payload: Json }; Returns: string }
       complete_purchase_return: { Args: { payload: Json }; Returns: string }
       complete_sale: { Args: { payload: Json }; Returns: string }
@@ -2542,8 +2649,42 @@ export type Database = {
         }
         Returns: string
       }
+      current_shift: {
+        Args: never
+        Returns: {
+          actual_cash: number | null
+          approved_at: string | null
+          approved_by: string | null
+          business_date: string
+          cashier_id: string
+          close_reason: string | null
+          closed_at: string | null
+          closing_notes: string | null
+          created_at: string
+          difference: number | null
+          emergency_reason: string | null
+          expected_cash: number | null
+          id: string
+          opened_at: string
+          opening_cash: number
+          opening_notes: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "shift_sessions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       current_tenant_id: { Args: never; Returns: string }
       delete_party_payment: { Args: { _id: string }; Returns: undefined }
+      emergency_close_shift: {
+        Args: { _reason: string; _shift_id: string }
+        Returns: string
+      }
       has_active_subscription: {
         Args: { _tenant_id: string }
         Returns: boolean
@@ -2603,6 +2744,16 @@ export type Database = {
           id: number
           logo_url: string | null
           low_stock_threshold: number
+          ops_allow_multiple_shifts: boolean
+          ops_business_day_start_hour: number
+          ops_cash_drawer_enabled: boolean
+          ops_paid_in_out_enabled: boolean
+          ops_pending_tasks_enabled: boolean
+          ops_receipt_reprint_enabled: boolean
+          ops_require_manager_approval: boolean
+          ops_safe_drop_enabled: boolean
+          ops_shift_enabled: boolean
+          ops_shift_notes_enabled: boolean
           paper_width: string
           payment_qr_label: string | null
           payment_qr_url: string | null
@@ -2630,6 +2781,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      open_shift: {
+        Args: { _notes?: string; _opening_cash: number }
+        Returns: string
       }
       record_damage: {
         Args: {
@@ -2681,6 +2836,7 @@ export type Database = {
         }
         Returns: string
       }
+      shift_report: { Args: { _shift_id: string }; Returns: Json }
       undo_last_sale: { Args: { _sale_id: string }; Returns: Json }
       update_party_payment: {
         Args: {

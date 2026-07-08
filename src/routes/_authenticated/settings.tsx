@@ -26,7 +26,12 @@ const FIELDS = [
   "stock_count_scan_mode",
   "expiring_soon_days",
   "critical_days",
+  "ops_shift_enabled", "ops_business_day_start_hour", "ops_require_manager_approval",
+  "ops_allow_multiple_shifts", "ops_cash_drawer_enabled", "ops_safe_drop_enabled",
+  "ops_paid_in_out_enabled", "ops_shift_notes_enabled", "ops_pending_tasks_enabled",
+  "ops_receipt_reprint_enabled",
 ] as const;
+
 
 
 function Page() {

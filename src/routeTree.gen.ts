@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
+import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated/shifts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
 import { Route as AuthenticatedSaleReturnsRouteImport } from './routes/_authenticated/sale-returns'
@@ -69,6 +70,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedShiftsRoute = AuthenticatedShiftsRouteImport.update({
+  id: '/shifts',
+  path: '/shifts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/sale-returns': typeof AuthenticatedSaleReturnsRoute
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/shifts': typeof AuthenticatedShiftsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/sale-returns': typeof AuthenticatedSaleReturnsRoute
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/shifts': typeof AuthenticatedShiftsRoute
   '/users': typeof AuthenticatedUsersRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -304,6 +312,7 @@ export interface FileRoutesById {
   '/_authenticated/sale-returns': typeof AuthenticatedSaleReturnsRoute
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -339,6 +348,7 @@ export interface FileRouteTypes {
     | '/sale-returns'
     | '/sales'
     | '/settings'
+    | '/shifts'
     | '/users'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -372,6 +382,7 @@ export interface FileRouteTypes {
     | '/sale-returns'
     | '/sales'
     | '/settings'
+    | '/shifts'
     | '/users'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/_authenticated/sale-returns'
     | '/_authenticated/sales'
     | '/_authenticated/settings'
+    | '/_authenticated/shifts'
     | '/_authenticated/users'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -473,6 +485,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/shifts': {
+      id: '/_authenticated/shifts'
+      path: '/shifts'
+      fullPath: '/shifts'
+      preLoaderRoute: typeof AuthenticatedShiftsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -688,6 +707,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSaleReturnsRoute: typeof AuthenticatedSaleReturnsRoute
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedShiftsRoute: typeof AuthenticatedShiftsRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedCustomersIdRoute: typeof AuthenticatedCustomersIdRoute
   AuthenticatedExpensePersonsIdRoute: typeof AuthenticatedExpensePersonsIdRoute
@@ -713,6 +733,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSaleReturnsRoute: AuthenticatedSaleReturnsRoute,
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedShiftsRoute: AuthenticatedShiftsRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedCustomersIdRoute: AuthenticatedCustomersIdRoute,
   AuthenticatedExpensePersonsIdRoute: AuthenticatedExpensePersonsIdRoute,
