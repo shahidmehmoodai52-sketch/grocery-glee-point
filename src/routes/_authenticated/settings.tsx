@@ -24,6 +24,8 @@ const FIELDS = [
   "payment_qr_url", "payment_qr_label", "show_payment_qr",
   "undo_window_minutes",
   "stock_count_scan_mode",
+  "expiring_soon_days",
+  "critical_days",
 ] as const;
 
 
