@@ -6,8 +6,9 @@ import {
   Printer, Ban, ClipboardCheck, Sunrise, Play, Trash2, CheckCircle2, PauseCircle,
   Target, AlertTriangle, TrendingUp, TrendingDown, CalendarDays, Zap, Sparkles,
   ShoppingCart, Package, Receipt, BarChart3, ClipboardList, Brain, CalendarClock,
-  ChevronLeft, ChevronRight, Activity, Save,
+  ChevronLeft, ChevronRight, Activity, Save, Handshake,
 } from "lucide-react";
+
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
