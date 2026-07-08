@@ -33,6 +33,7 @@ import { Route as AuthenticatedSuppliersIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedStockCountIndexRouteImport } from './routes/_authenticated/stock-count.index'
 import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authenticated/customers.index'
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers.$id'
+import { Route as AuthenticatedStockCountIdRouteImport } from './routes/_authenticated/stock-count.$id'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
 import { Route as AuthenticatedExpensePersonsIdRouteImport } from './routes/_authenticated/expense-persons.$id'
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
@@ -166,6 +167,12 @@ const AuthenticatedSuppliersIdRoute =
     path: '/suppliers/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedStockCountIdRoute =
+  AuthenticatedStockCountIdRouteImport.update({
+    id: '/stock-count/$id',
+    path: '/stock-count/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -220,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
+  '/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/stock-count/': typeof AuthenticatedStockCountIndexRoute
@@ -250,6 +258,7 @@ export interface FileRoutesByTo {
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
+  '/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/stock-count': typeof AuthenticatedStockCountIndexRoute
@@ -282,6 +291,7 @@ export interface FileRoutesById {
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/_authenticated/expense-persons/$id': typeof AuthenticatedExpensePersonsIdRoute
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
+  '/_authenticated/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/_authenticated/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/stock-count/': typeof AuthenticatedStockCountIndexRoute
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/customers/$id'
     | '/expense-persons/$id'
     | '/products/$id'
+    | '/stock-count/$id'
     | '/suppliers/$id'
     | '/customers/'
     | '/stock-count/'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/customers/$id'
     | '/expense-persons/$id'
     | '/products/$id'
+    | '/stock-count/$id'
     | '/suppliers/$id'
     | '/customers'
     | '/stock-count'
@@ -375,6 +387,7 @@ export interface FileRouteTypes {
     | '/_authenticated/customers/$id'
     | '/_authenticated/expense-persons/$id'
     | '/_authenticated/products/$id'
+    | '/_authenticated/stock-count/$id'
     | '/_authenticated/suppliers/$id'
     | '/_authenticated/customers/'
     | '/_authenticated/stock-count/'
@@ -563,6 +576,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSuppliersIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/stock-count/$id': {
+      id: '/_authenticated/stock-count/$id'
+      path: '/stock-count/$id'
+      fullPath: '/stock-count/$id'
+      preLoaderRoute: typeof AuthenticatedStockCountIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/products/$id': {
       id: '/_authenticated/products/$id'
       path: '/$id'
@@ -630,6 +650,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedCustomersIdRoute: typeof AuthenticatedCustomersIdRoute
   AuthenticatedExpensePersonsIdRoute: typeof AuthenticatedExpensePersonsIdRoute
+  AuthenticatedStockCountIdRoute: typeof AuthenticatedStockCountIdRoute
   AuthenticatedSuppliersIdRoute: typeof AuthenticatedSuppliersIdRoute
   AuthenticatedCustomersIndexRoute: typeof AuthenticatedCustomersIndexRoute
   AuthenticatedStockCountIndexRoute: typeof AuthenticatedStockCountIndexRoute
@@ -652,6 +673,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedCustomersIdRoute: AuthenticatedCustomersIdRoute,
   AuthenticatedExpensePersonsIdRoute: AuthenticatedExpensePersonsIdRoute,
+  AuthenticatedStockCountIdRoute: AuthenticatedStockCountIdRoute,
   AuthenticatedSuppliersIdRoute: AuthenticatedSuppliersIdRoute,
   AuthenticatedCustomersIndexRoute: AuthenticatedCustomersIndexRoute,
   AuthenticatedStockCountIndexRoute: AuthenticatedStockCountIndexRoute,
