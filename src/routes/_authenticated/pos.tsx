@@ -133,7 +133,8 @@ function POSPage() {
   const [quickAdd, setQuickAdd] = useState<{
     open: boolean; barcode: string; name: string; unit: string;
     cost_price: string; sell_price: string; stock: string;
-  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1" });
+    category: string; supplier_id: string;
+  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
 
   const openQuickAdd = (term: string) => {
     const raw = term.trim();
@@ -144,8 +145,24 @@ function POSPage() {
       barcode: looksLikeBarcode ? raw : "",
       name: looksLikeBarcode ? "" : raw,
       unit: "pcs", cost_price: "", sell_price: "", stock: "1",
+      category: "", supplier_id: "",
     });
   };
+
+  const { data: quickAddSuppliers = [] } = useQuery({
+    queryKey: ["suppliers", "quickadd"],
+    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+  });
+
+  const { data: quickAddCategories = [] } = useQuery({
+    queryKey: ["products", "categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("category").not("category", "is", null).limit(1000);
+      const set = new Set<string>();
+      (data ?? []).forEach((r: any) => { if (r.category) set.add(String(r.category)); });
+      return Array.from(set).sort();
+    },
+  });
 
   const saveQuickAdd = async () => {
     const name = quickAdd.name.trim();
@@ -154,8 +171,9 @@ function POSPage() {
     const cost = Number(quickAdd.cost_price || 0);
     const stock = Number(quickAdd.stock || 0);
     const bc = quickAdd.barcode.trim() || null;
+    const category = quickAdd.category.trim() || null;
     const { data, error } = await supabase.from("products").insert({
-      name, barcode: bc, unit: quickAdd.unit || "pcs",
+      name, barcode: bc, unit: quickAdd.unit || "pcs", category,
       cost_price: cost, sell_price: sell, stock, tax_rate: 0, is_active: true,
     }).select(PRODUCT_COLUMNS).single();
     if (error) return toast.error(error.message);
@@ -164,12 +182,14 @@ function POSPage() {
     }
     toast.success(`Added "${name}" to catalog`);
     addProduct(data);
-    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1" });
+    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
     setSearch("");
     setTimeout(() => searchRef.current?.focus(), 0);
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["product_barcodes"] });
+    qc.invalidateQueries({ queryKey: ["products", "categories"] });
   };
+
 
 
 
