@@ -1259,12 +1259,18 @@ function POSPage() {
             Complete Sale · F4
           </Button>
         </div>
-            Complete Sale (F4)
-          </Button>
-        </div>
 
 
       </aside>
+      </div>
+
+      {/* Keyboard shortcut bar */}
+      <div className="hidden md:flex items-center justify-center gap-4 border-t bg-muted/30 px-4 py-1.5 text-[11px] text-muted-foreground no-print shrink-0">
+        <ShortcutHint k="F2" label="New" />
+        <ShortcutHint k="F3" label="Search" />
+        <ShortcutHint k="F4" label="Complete sale" />
+        <ShortcutHint k="F10" label="Undo last" />
+        <ShortcutHint k="Esc" label="Clear" />
       </div>
 
 
