@@ -1007,7 +1007,7 @@ function POSPage() {
 
               {search.trim() && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={showCost ? 8 : 7} className="text-center py-6 border-0">
+                  <td colSpan={showCost ? 9 : 8} className="text-center py-6 border-0">
                     {productsLoading || remoteProductsLoading ? (
                       <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
                         <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
