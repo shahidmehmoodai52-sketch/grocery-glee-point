@@ -13,7 +13,6 @@ export interface OfflineStatus {
   error: string | null;
 }
 
-const LS_ENABLED = "pos_offline_enabled";
 const LS_LAST = "pos_offline_last_synced";
 
 type Listener = (s: OfflineStatus) => void;
@@ -21,12 +20,13 @@ const listeners = new Set<Listener>();
 
 let state: OfflineStatus = {
   online: typeof navigator === "undefined" ? true : navigator.onLine,
-  enabled: false,
+  enabled: true, // Auto — always on. Offline works transparently, no toggle.
   phase: "idle",
   pending: 0,
   lastSyncedAt: null,
   error: null,
 };
+
 
 function emit() {
   for (const l of listeners) l(state);
@@ -36,12 +36,12 @@ export function getOfflineStatus() {
   return state;
 }
 
-export function setOfflineEnabled(v: boolean) {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(LS_ENABLED, v ? "1" : "0"); } catch {}
-  state = { ...state, enabled: v };
+/** Kept for backward compat — offline is always on now, this is a no-op. */
+export function setOfflineEnabled(_v: boolean) {
+  state = { ...state, enabled: true };
   emit();
 }
+
 
 export function markSyncStart() {
   state = { ...state, phase: "syncing", error: null };
@@ -71,11 +71,12 @@ export function bootOfflineStatus() {
   try {
     state = {
       ...state,
-      enabled: window.localStorage.getItem(LS_ENABLED) === "1",
+      enabled: true, // always on
       lastSyncedAt: window.localStorage.getItem(LS_LAST),
       online: navigator.onLine,
     };
   } catch {}
+
   window.addEventListener("online", () => { state = { ...state, online: true }; emit(); });
   window.addEventListener("offline", () => { state = { ...state, online: false }; emit(); });
   emit();
