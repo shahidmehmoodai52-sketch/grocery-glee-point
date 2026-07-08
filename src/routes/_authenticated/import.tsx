@@ -1138,6 +1138,7 @@ function SingleMergedFile() {
 
     await finalizeImportBatch(batchId, { products: prodOk, barcodes: bcOk, failed: prodFail });
     notifyBatchChanged();
+    invalidateAfterImport(qc);
 
     setBusy(false);
     if (prodFail === 0) toast.success(`Imported ${prodOk} items · ${bcOk} barcodes linked`);
