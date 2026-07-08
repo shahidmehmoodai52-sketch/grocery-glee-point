@@ -23,6 +23,7 @@ import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedPurchaseReturnsRouteImport } from './routes/_authenticated/purchase-returns'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
+import { Route as AuthenticatedIntelligenceRouteImport } from './routes/_authenticated/intelligence'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedExpiryRouteImport } from './routes/_authenticated/expiry'
 import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticated/expenses'
@@ -112,6 +113,12 @@ const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
   path: '/pos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedIntelligenceRoute =
+  AuthenticatedIntelligenceRouteImport.update({
+    id: '/intelligence',
+    path: '/intelligence',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
   id: '/import',
   path: '/import',
@@ -220,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/expenses': typeof AuthenticatedExpensesRoute
   '/expiry': typeof AuthenticatedExpiryRoute
   '/import': typeof AuthenticatedImportRoute
+  '/intelligence': typeof AuthenticatedIntelligenceRoute
   '/pos': typeof AuthenticatedPosRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
   '/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
@@ -252,6 +260,7 @@ export interface FileRoutesByTo {
   '/expenses': typeof AuthenticatedExpensesRoute
   '/expiry': typeof AuthenticatedExpiryRoute
   '/import': typeof AuthenticatedImportRoute
+  '/intelligence': typeof AuthenticatedIntelligenceRoute
   '/pos': typeof AuthenticatedPosRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
   '/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
@@ -286,6 +295,7 @@ export interface FileRoutesById {
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
   '/_authenticated/expiry': typeof AuthenticatedExpiryRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
+  '/_authenticated/intelligence': typeof AuthenticatedIntelligenceRoute
   '/_authenticated/pos': typeof AuthenticatedPosRoute
   '/_authenticated/products': typeof AuthenticatedProductsRouteWithChildren
   '/_authenticated/purchase-returns': typeof AuthenticatedPurchaseReturnsRoute
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/expenses'
     | '/expiry'
     | '/import'
+    | '/intelligence'
     | '/pos'
     | '/products'
     | '/purchase-returns'
@@ -352,6 +363,7 @@ export interface FileRouteTypes {
     | '/expenses'
     | '/expiry'
     | '/import'
+    | '/intelligence'
     | '/pos'
     | '/products'
     | '/purchase-returns'
@@ -385,6 +397,7 @@ export interface FileRouteTypes {
     | '/_authenticated/expenses'
     | '/_authenticated/expiry'
     | '/_authenticated/import'
+    | '/_authenticated/intelligence'
     | '/_authenticated/pos'
     | '/_authenticated/products'
     | '/_authenticated/purchase-returns'
@@ -516,6 +529,13 @@ declare module '@tanstack/react-router' {
       path: '/pos'
       fullPath: '/pos'
       preLoaderRoute: typeof AuthenticatedPosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/intelligence': {
+      id: '/_authenticated/intelligence'
+      path: '/intelligence'
+      fullPath: '/intelligence'
+      preLoaderRoute: typeof AuthenticatedIntelligenceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/import': {
@@ -659,6 +679,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
   AuthenticatedExpiryRoute: typeof AuthenticatedExpiryRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
+  AuthenticatedIntelligenceRoute: typeof AuthenticatedIntelligenceRoute
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRouteWithChildren
   AuthenticatedPurchaseReturnsRoute: typeof AuthenticatedPurchaseReturnsRoute
@@ -683,6 +704,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
   AuthenticatedExpiryRoute: AuthenticatedExpiryRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
+  AuthenticatedIntelligenceRoute: AuthenticatedIntelligenceRoute,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRouteWithChildren,
   AuthenticatedPurchaseReturnsRoute: AuthenticatedPurchaseReturnsRoute,
