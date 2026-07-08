@@ -189,9 +189,13 @@ function ProductsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
+            {isLoading && (
+              <TableRow><TableCell colSpan={7} className="py-4"><TableSkeleton rows={5} columns={6} /></TableCell></TableRow>
+            )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No products yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="py-8">
+                <EmptyState icon={Package} title="No products yet" description="Add a new product to start selling." />
+              </TableCell></TableRow>
             )}
             {filtered.map((p) => (
               <TableRow key={p.id}>
@@ -204,11 +208,12 @@ function ProductsPage() {
                   {(() => {
                     const s = Number(p.stock);
                     const t = Number(p.low_stock_threshold ?? 5);
-                    if (s <= 0) return <Badge variant="destructive">Out · {fmtQty(p.stock)} {p.unit}</Badge>;
-                    if (s <= t) return <Badge className="bg-amber-500 text-white hover:bg-amber-500">Low · {fmtQty(p.stock)} {p.unit}</Badge>;
-                    return <Badge variant="outline">{fmtQty(p.stock)} {p.unit}</Badge>;
+                    if (s <= 0) return <StatusBadge tone="danger">Out · {fmtQty(p.stock)} {p.unit}</StatusBadge>;
+                    if (s <= t) return <StatusBadge tone="warning">Low · {fmtQty(p.stock)} {p.unit}</StatusBadge>;
+                    return <StatusBadge tone="neutral">{fmtQty(p.stock)} {p.unit}</StatusBadge>;
                   })()}
                 </TableCell>
+
                 <TableCell className="text-right">
                   <Link to="/products/$id" params={{ id: p.id }}>
                     <Button variant="ghost" size="icon" title="Stock timeline"><History className="h-4 w-4" /></Button>
