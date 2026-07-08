@@ -25,7 +25,7 @@ import {
   completeSaleOfflineAware,
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
-import { getOfflineStatus } from "@/lib/offline/status";
+
 
 
 
