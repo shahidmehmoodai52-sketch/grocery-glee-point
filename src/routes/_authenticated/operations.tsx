@@ -73,9 +73,38 @@ function Page() {
 }
 
 
-/* ---------------- MORNING DASHBOARD ---------------- */
-function MorningDashboard() {
-  const { data, refetch, isFetching } = useQuery({
+/* ---------------- QUICK ACTIONS ---------------- */
+const QUICK_ACTIONS = [
+  { label: "Open POS", to: "/pos", icon: ShoppingCart },
+  { label: "New Purchase", to: "/purchases", icon: ClipboardList },
+  { label: "New Expense", to: "/expenses", icon: Wallet },
+  { label: "Products", to: "/products", icon: Package },
+  { label: "Stock Count", to: "/stock-count", icon: ClipboardCheck },
+  { label: "Intelligence", to: "/intelligence", icon: Brain },
+  { label: "Expiry", to: "/expiry", icon: CalendarClock },
+  { label: "Reports", to: "/reports", icon: BarChart3 },
+];
+
+function QuickActionsBar() {
+  return (
+    <Card className="p-3">
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+        {QUICK_ACTIONS.map((a) => (
+          <Link key={a.to} to={a.to as any} className="flex flex-col items-center gap-1 rounded-lg border p-3 hover:bg-accent transition-colors">
+            <a.icon className="h-5 w-5" />
+            <span className="text-xs text-center">{a.label}</span>
+          </Link>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/* ---------------- OWNER CONTROL CENTER ---------------- */
+function OwnerControlCenter({ settings }: { settings: any }) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: morning, refetch: refetchMorning } = useQuery({
     queryKey: ["morning-dashboard"],
     queryFn: async () => {
       const { data, error } = await sb.rpc("morning_dashboard");
@@ -83,34 +112,353 @@ function MorningDashboard() {
       return data as any;
     },
   });
-  const d = data || {};
-  const stats = [
-    { label: "Yesterday sales", value: fmtMoney(d.yesterday_sales_total || 0), sub: `${d.yesterday_sales_count || 0} receipts` },
-    { label: "Yesterday profit", value: fmtMoney(d.yesterday_profit || 0) },
-    { label: "Yesterday returns", value: fmtMoney(d.yesterday_returns_total || 0), sub: `${d.yesterday_returns || 0} returns` },
-    { label: "Yesterday expenses", value: fmtMoney(d.yesterday_expenses || 0) },
-    { label: "Held bills", value: d.held_bills || 0 },
-    { label: "Open tasks", value: d.open_tasks || 0 },
-    { label: "Low stock alerts", value: d.low_stock_products || 0 },
-  ];
+  const { data: today_sum, refetch: refetchToday } = useQuery({
+    queryKey: ["daily-summary", today],
+    queryFn: async () => {
+      const { data, error } = await sb.rpc("daily_summary", { _date: today });
+      if (error) throw error;
+      return data as any;
+    },
+  });
+  const { data: alerts } = useQuery({
+    queryKey: ["owner-alerts"],
+    queryFn: async () => {
+      const { data, error } = await sb.rpc("owner_alerts");
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+  const { data: recs } = useQuery({
+    queryKey: ["owner-recommendations"],
+    queryFn: async () => {
+      const { data, error } = await sb.rpc("owner_recommendations");
+      if (error) throw error;
+      return (data || {}) as any;
+    },
+  });
+  const { data: timeline } = useQuery({
+    queryKey: ["daily-timeline", today],
+    queryFn: async () => {
+      const { data, error } = await sb.rpc("daily_timeline", { _date: today });
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  const t = today_sum || {};
+  const y = morning || {};
+  const targetSales = Number(settings?.ops_target_sales || 0);
+  const targetProfit = Number(settings?.ops_target_profit || 0);
+  const targetInvoices = Number(settings?.ops_target_invoices || 0);
+  const yestSales = Number(y.yesterday_sales_total || 0);
+  const todaySales = Number(t.sales_total || 0);
+  const salesTrend = yestSales === 0 ? 0 : ((todaySales - yestSales) / yestSales) * 100;
+  const todayProfit = Number(t.profit || 0);
+  const yestProfit = Number(y.yesterday_profit || 0);
+  const profitTrend = yestProfit === 0 ? 0 : ((todayProfit - yestProfit) / yestProfit) * 100;
+
+  const refreshAll = () => { refetchMorning(); refetchToday(); };
+
   return (
-    <Card className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">A quick summary before you open shop</div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>Refresh</Button>
-      </div>
+    <div className="space-y-4">
+      {/* Quick actions */}
+      <QuickActionsBar />
+
+      {/* Health cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {stats.map((s) => (
-          <div key={s.label} className="rounded-lg border p-3">
-            <div className="text-xs text-muted-foreground">{s.label}</div>
-            <div className="text-lg font-semibold">{s.value}</div>
-            {s.sub && <div className="text-xs text-muted-foreground">{s.sub}</div>}
-          </div>
-        ))}
+        <HealthCard status={todaySales > 0 ? "ok" : "info"} title="Today's sales" value={fmtMoney(todaySales)} sub={`${t.sales_count || 0} receipts`} />
+        <HealthCard status={todayProfit >= 0 ? "ok" : "danger"} title="Today's profit" value={fmtMoney(todayProfit)} sub={profitTrend !== 0 ? `${profitTrend > 0 ? "▲" : "▼"} ${Math.abs(profitTrend).toFixed(1)}% vs yesterday` : undefined} />
+        <HealthCard status={salesTrend >= 0 ? "ok" : "warn"} title="Sales trend" value={`${salesTrend >= 0 ? "+" : ""}${salesTrend.toFixed(1)}%`} sub="vs yesterday" />
+        <HealthCard status={(y.low_stock_products || 0) > 0 ? "warn" : "ok"} title="Low stock" value={y.low_stock_products || 0} sub="products" />
       </div>
-    </Card>
+
+      {/* Daily targets */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold flex items-center gap-2"><Target className="h-4 w-4" />Daily targets</h3>
+          <TargetEditor settings={settings} />
+        </div>
+        <TargetBar label="Sales" value={todaySales} target={targetSales} formatValue={fmtMoney} />
+        <TargetBar label="Profit" value={todayProfit} target={targetProfit} formatValue={fmtMoney} />
+        <TargetBar label="Invoices" value={Number(t.sales_count || 0)} target={targetInvoices} formatValue={(v) => String(v)} />
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Alerts */}
+        <Card className="p-4">
+          <h3 className="font-semibold flex items-center gap-2 mb-3"><AlertTriangle className="h-4 w-4" />Alert center</h3>
+          <div className="space-y-2">
+            {(alerts || []).filter((a: any) => a.severity !== "ok").map((a: any) => (
+              <Link key={a.key} to={a.route as any} className="flex items-center justify-between border rounded-lg p-2 hover:bg-accent transition-colors">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${a.severity === "danger" ? "bg-red-500" : a.severity === "warn" ? "bg-amber-500" : "bg-blue-500"}`} />
+                  <span className="text-sm font-medium">{a.title}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {a.count !== undefined && a.count !== null ? `${a.count}` : ""}
+                  {a.amount ? ` · ${fmtMoney(a.amount)}` : ""}
+                </div>
+              </Link>
+            ))}
+            {(alerts || []).every((a: any) => a.severity === "ok") && (
+              <div className="text-sm text-emerald-600 flex items-center gap-2"><CheckCircle2 className="h-4 w-4" />All clear</div>
+            )}
+          </div>
+        </Card>
+
+        {/* Recommendations */}
+        <Card className="p-4">
+          <h3 className="font-semibold flex items-center gap-2 mb-3"><Sparkles className="h-4 w-4" />Owner action center</h3>
+          <div className="space-y-2 max-h-[280px] overflow-y-auto">
+            {["reorder", "expiry", "suppliers", "stock_counts", "cash_diff"].flatMap((k) => (recs?.[k] || []).map((r: any, i: number) => ({ ...r, _k: `${k}-${i}` }))).slice(0, 12).map((r: any) => (
+              <div key={r._k} className="flex items-start justify-between border rounded-lg p-2 gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{r.title}</div>
+                  <div className="text-xs text-muted-foreground truncate">{r.detail}</div>
+                </div>
+                <Badge variant={r.priority === "high" ? "destructive" : "outline"} className="shrink-0">{r.priority}</Badge>
+              </div>
+            ))}
+            {!Object.values(recs || {}).some((v: any) => Array.isArray(v) && v.length > 0) && (
+              <div className="text-sm text-muted-foreground">No recommendations right now</div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Timeline */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold flex items-center gap-2"><Activity className="h-4 w-4" />Today's timeline</h3>
+          <Button size="sm" variant="outline" onClick={refreshAll}>Refresh</Button>
+        </div>
+        <TimelineList events={timeline || []} />
+      </Card>
+    </div>
   );
 }
+
+function HealthCard({ status, title, value, sub }: { status: "ok" | "warn" | "danger" | "info"; title: string; value: any; sub?: string }) {
+  const cls = {
+    ok: "border-emerald-500/30 bg-emerald-500/5",
+    warn: "border-amber-500/30 bg-amber-500/5",
+    danger: "border-red-500/30 bg-red-500/5",
+    info: "border-blue-500/30 bg-blue-500/5",
+  }[status];
+  const dot = { ok: "bg-emerald-500", warn: "bg-amber-500", danger: "bg-red-500", info: "bg-blue-500" }[status];
+  return (
+    <div className={`rounded-lg border p-3 ${cls}`}>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className={`h-2 w-2 rounded-full ${dot}`} />
+        {title}
+      </div>
+      <div className="text-xl font-bold mt-1">{value}</div>
+      {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
+function TargetBar({ label, value, target, formatValue }: { label: string; value: number; target: number; formatValue: (v: number) => string }) {
+  const pct = target > 0 ? Math.min(100, (value / target) * 100) : 0;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium">{label}</span>
+        <span className="text-muted-foreground">
+          {formatValue(value)} {target > 0 && <>/ {formatValue(target)} · {pct.toFixed(0)}%</>}
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div className={`h-full ${pct >= 100 ? "bg-emerald-500" : pct >= 60 ? "bg-blue-500" : "bg-amber-500"} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+      {target === 0 && <div className="text-xs text-muted-foreground">No target set</div>}
+    </div>
+  );
+}
+
+function TargetEditor({ settings }: { settings: any }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [sales, setSales] = useState(String(settings?.ops_target_sales || ""));
+  const [profit, setProfit] = useState(String(settings?.ops_target_profit || ""));
+  const [invoices, setInvoices] = useState(String(settings?.ops_target_invoices || ""));
+
+  const save = async () => {
+    const { error } = await sb.from("store_settings").update({
+      ops_target_sales: Number(sales) || 0,
+      ops_target_profit: Number(profit) || 0,
+      ops_target_invoices: Number(invoices) || 0,
+    }).eq("id", settings?.id);
+    if (error) return toast.error(error.message);
+    toast.success("Targets saved");
+    setOpen(false);
+    qc.invalidateQueries({ queryKey: ["store_settings"] });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button size="sm" variant="outline"><Save className="h-3 w-3 mr-1" />Set targets</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Daily targets</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1"><Label>Sales target</Label><Input type="number" value={sales} onChange={(e) => setSales(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Profit target</Label><Input type="number" value={profit} onChange={(e) => setProfit(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Invoice count target</Label><Input type="number" value={invoices} onChange={(e) => setInvoices(e.target.value)} /></div>
+        </div>
+        <DialogFooter><Button onClick={save}>Save</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const KIND_META: Record<string, { color: string; icon: any; label: string }> = {
+  shift_open: { color: "text-emerald-600", icon: Play, label: "Shift opened" },
+  shift_close: { color: "text-amber-600", icon: PauseCircle, label: "Shift closed" },
+  sale: { color: "text-blue-600", icon: Receipt, label: "Sale" },
+  sale_return: { color: "text-orange-600", icon: ArrowUpCircle, label: "Sale return" },
+  purchase: { color: "text-purple-600", icon: ClipboardList, label: "Purchase" },
+  expense: { color: "text-red-600", icon: Wallet, label: "Expense" },
+  cash_paid_in: { color: "text-emerald-600", icon: ArrowDownCircle, label: "Paid in" },
+  cash_paid_out: { color: "text-red-600", icon: ArrowUpCircle, label: "Paid out" },
+  cash_safe_drop: { color: "text-indigo-600", icon: ShieldCheck, label: "Safe drop" },
+  cash_float_add: { color: "text-emerald-600", icon: ArrowDownCircle, label: "Float add" },
+  cash_float_remove: { color: "text-red-600", icon: ArrowUpCircle, label: "Float remove" },
+  void: { color: "text-red-600", icon: Ban, label: "Void" },
+  reprint: { color: "text-slate-600", icon: Printer, label: "Reprint" },
+  note: { color: "text-slate-600", icon: StickyNote, label: "Note" },
+};
+
+function TimelineList({ events }: { events: any[] }) {
+  const [limit, setLimit] = useState(30);
+  const visible = events.slice(0, limit);
+  if (!events.length) return <div className="text-sm text-muted-foreground">No activity yet today</div>;
+  return (
+    <div className="space-y-2">
+      {visible.map((e, i) => {
+        const meta = KIND_META[e.kind] || { color: "text-muted-foreground", icon: Activity, label: e.kind };
+        const Icon = meta.icon;
+        return (
+          <div key={i} className="flex items-start gap-3 border-l-2 border-muted pl-3 py-1">
+            <Icon className={`h-4 w-4 mt-0.5 ${meta.color}`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium truncate">{e.title || meta.label}</div>
+                <div className="text-xs text-muted-foreground whitespace-nowrap">{new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+              </div>
+              {e.detail && <div className="text-xs text-muted-foreground truncate">{e.detail}</div>}
+            </div>
+            {e.amount != null && <div className="text-sm font-mono">{fmtMoney(Number(e.amount))}</div>}
+          </div>
+        );
+      })}
+      {events.length > limit && (
+        <Button variant="ghost" size="sm" className="w-full" onClick={() => setLimit((l) => l + 30)}>
+          Load more ({events.length - limit} left)
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- BUSINESS CALENDAR ---------------- */
+function BusinessCalendar() {
+  const [month, setMonth] = useState(() => {
+    const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [selected, setSelected] = useState<string>(() => new Date().toISOString().slice(0, 10));
+
+  const days = useMemo(() => {
+    const first = new Date(month);
+    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    const pad = first.getDay();
+    const arr: (string | null)[] = Array(pad).fill(null);
+    for (let i = 1; i <= last.getDate(); i++) {
+      const d = new Date(month.getFullYear(), month.getMonth(), i);
+      arr.push(d.toISOString().slice(0, 10));
+    }
+    return arr;
+  }, [month]);
+
+  const { data: summary } = useQuery({
+    queryKey: ["daily-summary", selected],
+    queryFn: async () => {
+      const { data, error } = await sb.rpc("daily_summary", { _date: selected });
+      if (error) throw error;
+      return data as any;
+    },
+  });
+  const { data: timeline } = useQuery({
+    queryKey: ["daily-timeline", selected],
+    queryFn: async () => {
+      const { data, error } = await sb.rpc("daily_timeline", { _date: selected });
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  const s = summary || {};
+  const monthLabel = month.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <Button size="icon" variant="ghost" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft className="h-4 w-4" /></Button>
+          <div className="font-semibold">{monthLabel}</div>
+          <Button size="icon" variant="ghost" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight className="h-4 w-4" /></Button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground mb-1">
+          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i}>{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((d, i) => d === null ? <div key={i} /> : (
+            <button
+              key={d}
+              onClick={() => setSelected(d)}
+              className={`aspect-square rounded-md text-sm border transition-colors
+                ${selected === d ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}
+                ${d === today && selected !== d ? "border-blue-500" : ""}`}
+            >
+              {Number(d.slice(-2))}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <div className="font-semibold">{new Date(selected + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <Stat label="Sales" value={fmtMoney(s.sales_total || 0)} sub={`${s.sales_count || 0} receipts`} />
+          <Stat label="Profit" value={fmtMoney(s.profit || 0)} />
+          <Stat label="Purchases" value={fmtMoney(s.purchases_total || 0)} sub={`${s.purchases_count || 0}`} />
+          <Stat label="Expenses" value={fmtMoney(s.expenses_total || 0)} sub={`${s.expenses_count || 0}`} />
+          <Stat label="Returns" value={fmtMoney(s.returns_total || 0)} sub={`${s.returns_count || 0}`} />
+          <Stat label="Cash difference" value={fmtMoney(s.cash_difference || 0)} sub={`${s.shifts_count || 0} shifts`} />
+          <Stat label="Notes" value={s.notes_count || 0} />
+          <Stat label="Tasks created" value={s.tasks_count || 0} />
+        </div>
+        <div>
+          <div className="text-sm font-semibold mt-2 mb-1">Activity</div>
+          <div className="max-h-[300px] overflow-y-auto">
+            <TimelineList events={timeline || []} />
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function Stat({ label, value, sub }: { label: string; value: any; sub?: string }) {
+  return (
+    <div className="rounded-lg border p-2">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="font-semibold">{value}</div>
+      {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
 
 /* ---------------- CASH DRAWER ---------------- */
 function CashDrawer({ settings }: { settings: any }) {
