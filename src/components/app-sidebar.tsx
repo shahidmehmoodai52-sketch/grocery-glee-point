@@ -1,8 +1,9 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog,
+  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck,
 } from "lucide-react";
+
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarHeader, SidebarFooter, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -37,7 +38,9 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Customers", url: "/customers", icon: Users, perm: "customers" },
       { title: "Suppliers", url: "/suppliers", icon: Truck, perm: "suppliers" },
       { title: "Bulk import", url: "/import", icon: Upload, perm: "import" },
+      { title: "Stock count", url: "/stock-count", icon: ClipboardCheck, perm: "stock-count" },
     ],
+
   },
   {
     label: "Insights",

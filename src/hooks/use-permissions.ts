@@ -13,7 +13,9 @@ export const ALL_PERMS = [
   { key: "customers", label: "Customers" },
   { key: "suppliers", label: "Suppliers" },
   { key: "import", label: "Bulk import" },
+  { key: "stock-count", label: "Stock count" },
   { key: "reports", label: "Reports / P&L" },
+
   { key: "backup", label: "Auto backup" },
   { key: "settings", label: "Store settings" },
 ] as const;

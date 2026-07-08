@@ -1243,6 +1243,126 @@ export type Database = {
           },
         ]
       }
+      stock_count_items: {
+        Row: {
+          actual_qty: number
+          barcode: string | null
+          counted_at: string
+          counter_id: string | null
+          created_at: string
+          id: string
+          product_id: string
+          reason: string | null
+          session_id: string
+          system_qty: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_qty?: number
+          barcode?: string | null
+          counted_at?: string
+          counter_id?: string | null
+          created_at?: string
+          id?: string
+          product_id: string
+          reason?: string | null
+          session_id: string
+          system_qty?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_qty?: number
+          barcode?: string | null
+          counted_at?: string
+          counter_id?: string | null
+          created_at?: string
+          id?: string
+          product_id?: string
+          reason?: string | null
+          session_id?: string
+          system_qty?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_count_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_count_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "stock_count_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_count_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_count_sessions: {
+        Row: {
+          approved_by: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          started_at: string
+          started_by: string | null
+          status: Database["public"]["Enums"]["stock_count_status"]
+          tenant_id: string
+          total_variance_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          started_at?: string
+          started_by?: string | null
+          status?: Database["public"]["Enums"]["stock_count_status"]
+          tenant_id: string
+          total_variance_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          started_at?: string
+          started_by?: string | null
+          status?: Database["public"]["Enums"]["stock_count_status"]
+          tenant_id?: string
+          total_variance_value?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_count_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_settings: {
         Row: {
           address: string | null
@@ -1264,6 +1384,7 @@ export type Database = {
           show_phone: boolean
           show_tax_id: boolean
           show_tax_lines: boolean
+          stock_count_scan_mode: string
           store_name: string
           tax_id: string | null
           tax_rate: number
@@ -1291,6 +1412,7 @@ export type Database = {
           show_phone?: boolean
           show_tax_id?: boolean
           show_tax_lines?: boolean
+          stock_count_scan_mode?: string
           store_name?: string
           tax_id?: string | null
           tax_rate?: number
@@ -1318,6 +1440,7 @@ export type Database = {
           show_phone?: boolean
           show_tax_id?: boolean
           show_tax_lines?: boolean
+          stock_count_scan_mode?: string
           store_name?: string
           tax_id?: string | null
           tax_rate?: number
@@ -1811,6 +1934,10 @@ export type Database = {
         }
         Returns: string
       }
+      approve_stock_count_session: {
+        Args: { _session_id: string }
+        Returns: string
+      }
       can_add_product: { Args: { _tenant_id: string }; Returns: boolean }
       can_add_user: { Args: { _tenant_id: string }; Returns: boolean }
       complete_purchase: { Args: { payload: Json }; Returns: string }
@@ -1889,6 +2016,7 @@ export type Database = {
           show_phone: boolean
           show_tax_id: boolean
           show_tax_lines: boolean
+          stock_count_scan_mode: string
           store_name: string
           tax_id: string | null
           tax_rate: number
@@ -1969,6 +2097,7 @@ export type Database = {
         | "manual"
         | "transfer"
         | "stock_count"
+      stock_count_status: "draft" | "in_progress" | "completed" | "cancelled"
       tenant_role:
         | "owner"
         | "admin"
@@ -2130,6 +2259,7 @@ export const Constants = {
         "transfer",
         "stock_count",
       ],
+      stock_count_status: ["draft", "in_progress", "completed", "cancelled"],
       tenant_role: ["owner", "admin", "manager", "cashier", "viewer", "staff"],
     },
   },
