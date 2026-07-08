@@ -412,6 +412,68 @@ export type Database = {
           },
         ]
       }
+      global_products: {
+        Row: {
+          barcode: string | null
+          category: string | null
+          contributed_by_tenant: string | null
+          contributed_by_user: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          category?: string | null
+          contributed_by_tenant?: string | null
+          contributed_by_user?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          category?: string | null
+          contributed_by_tenant?: string | null
+          contributed_by_user?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_products_contributed_by_tenant_fkey"
+            columns: ["contributed_by_tenant"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       held_bills: {
         Row: {
           cashier_id: string
@@ -3235,6 +3297,15 @@ export type Database = {
           _label: string
           _payload: Json
           _total: number
+        }
+        Returns: string
+      }
+      import_from_global_library: {
+        Args: {
+          _cost_price?: number
+          _global_id: string
+          _sell_price?: number
+          _stock?: number
         }
         Returns: string
       }

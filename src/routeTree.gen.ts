@@ -25,6 +25,7 @@ import { Route as AuthenticatedPurchaseReturnsRouteImport } from './routes/_auth
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
 import { Route as AuthenticatedOperationsRouteImport } from './routes/_authenticated/operations'
+import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedIntelligenceRouteImport } from './routes/_authenticated/intelligence'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedExpiryRouteImport } from './routes/_authenticated/expiry'
@@ -123,6 +124,11 @@ const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
 const AuthenticatedOperationsRoute = AuthenticatedOperationsRouteImport.update({
   id: '/operations',
   path: '/operations',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedIntelligenceRoute =
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/expiry': typeof AuthenticatedExpiryRoute
   '/import': typeof AuthenticatedImportRoute
   '/intelligence': typeof AuthenticatedIntelligenceRoute
+  '/library': typeof AuthenticatedLibraryRoute
   '/operations': typeof AuthenticatedOperationsRoute
   '/pos': typeof AuthenticatedPosRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/expiry': typeof AuthenticatedExpiryRoute
   '/import': typeof AuthenticatedImportRoute
   '/intelligence': typeof AuthenticatedIntelligenceRoute
+  '/library': typeof AuthenticatedLibraryRoute
   '/operations': typeof AuthenticatedOperationsRoute
   '/pos': typeof AuthenticatedPosRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
@@ -312,6 +320,7 @@ export interface FileRoutesById {
   '/_authenticated/expiry': typeof AuthenticatedExpiryRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/intelligence': typeof AuthenticatedIntelligenceRoute
+  '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/operations': typeof AuthenticatedOperationsRoute
   '/_authenticated/pos': typeof AuthenticatedPosRoute
   '/_authenticated/products': typeof AuthenticatedProductsRouteWithChildren
@@ -349,6 +358,7 @@ export interface FileRouteTypes {
     | '/expiry'
     | '/import'
     | '/intelligence'
+    | '/library'
     | '/operations'
     | '/pos'
     | '/products'
@@ -384,6 +394,7 @@ export interface FileRouteTypes {
     | '/expiry'
     | '/import'
     | '/intelligence'
+    | '/library'
     | '/operations'
     | '/pos'
     | '/products'
@@ -420,6 +431,7 @@ export interface FileRouteTypes {
     | '/_authenticated/expiry'
     | '/_authenticated/import'
     | '/_authenticated/intelligence'
+    | '/_authenticated/library'
     | '/_authenticated/operations'
     | '/_authenticated/pos'
     | '/_authenticated/products'
@@ -567,6 +579,13 @@ declare module '@tanstack/react-router' {
       path: '/operations'
       fullPath: '/operations'
       preLoaderRoute: typeof AuthenticatedOperationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/library': {
+      id: '/_authenticated/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/intelligence': {
@@ -718,6 +737,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExpiryRoute: typeof AuthenticatedExpiryRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedIntelligenceRoute: typeof AuthenticatedIntelligenceRoute
+  AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedOperationsRoute: typeof AuthenticatedOperationsRoute
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRouteWithChildren
@@ -745,6 +765,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedExpiryRoute: AuthenticatedExpiryRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedIntelligenceRoute: AuthenticatedIntelligenceRoute,
+  AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedOperationsRoute: AuthenticatedOperationsRoute,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRouteWithChildren,
