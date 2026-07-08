@@ -14,6 +14,11 @@ import {
   Store,
   Package,
   ShoppingCart,
+  ShieldAlert,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  Plus,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
