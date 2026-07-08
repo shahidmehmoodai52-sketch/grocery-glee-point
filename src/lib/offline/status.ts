@@ -71,11 +71,12 @@ export function bootOfflineStatus() {
   try {
     state = {
       ...state,
-      enabled: window.localStorage.getItem(LS_ENABLED) === "1",
+      enabled: true, // always on
       lastSyncedAt: window.localStorage.getItem(LS_LAST),
       online: navigator.onLine,
     };
   } catch {}
+
   window.addEventListener("online", () => { state = { ...state, online: true }; emit(); });
   window.addEventListener("offline", () => { state = { ...state, online: false }; emit(); });
   emit();
