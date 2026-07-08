@@ -1431,6 +1431,15 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
   );
 }
 
+function ShortcutHint({ k, label }: { k: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <kbd className="px-1.5 py-0.5 rounded bg-background border text-[10px] font-mono font-semibold text-foreground">{k}</kbd>
+      <span>{label}</span>
+    </span>
+  );
+}
+
 function Kbd({ label, hint }: { label: string; hint: string }) {
   return (
     <div className="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5">
