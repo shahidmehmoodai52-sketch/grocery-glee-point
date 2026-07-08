@@ -13,8 +13,9 @@ import {
 
 const PULL_TABLES: MirroredTable[] = [
   "products", "product_barcodes", "customers", "suppliers",
-  "store_settings", "user_roles",
+  "store_settings", "user_roles", "sales", "sale_items",
 ];
+
 
 async function getWatermark(table: string): Promise<string | null> {
   const row = await db()._sync_state.get(table);

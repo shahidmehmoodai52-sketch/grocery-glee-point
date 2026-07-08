@@ -20,6 +20,13 @@ import { fmtMoney, fmtQty } from "@/lib/format";
 import { Receipt } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
+import {
+  offlineFirst, cacheProducts, cacheCustomers, cacheProductBarcodes,
+  completeSaleOfflineAware,
+} from "@/lib/offline/pos";
+import { db as offlineDb } from "@/lib/offline/db";
+
+
 
 
 
@@ -249,17 +256,17 @@ function POSPage() {
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products", "active"],
-    queryFn: async () =>
-      fetchAll<any>((from, to) =>
-        supabase
-          .from("products")
-          .select(PRODUCT_COLUMNS)
-          .eq("is_active", true)
-          .order("name")
-          .range(from, to),
+    queryFn: () =>
+      offlineFirst(
+        () => fetchAll<any>((from, to) =>
+          supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name").range(from, to),
+        ),
+        async () => (await offlineDb().products.toArray()).filter((p: any) => p.is_active !== false).sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
+        (rows) => cacheProducts(rows),
       ),
     staleTime: 5 * 60 * 1000,
   });
+
 
   const { data: remoteProducts = [], isFetching: remoteProductsLoading } = useQuery({
     queryKey: ["products", "pos-search", searchTerm],
@@ -275,11 +282,16 @@ function POSPage() {
 
   const { data: extraBarcodes = [] } = useQuery({
     queryKey: ["product_barcodes"],
-    queryFn: async () =>
-      fetchAll<any>((from, to) =>
-        supabase.from("product_barcodes").select("product_id,barcode").range(from, to),
+    queryFn: () =>
+      offlineFirst(
+        () => fetchAll<any>((from, to) =>
+          supabase.from("product_barcodes").select("id,product_id,barcode").range(from, to),
+        ),
+        () => offlineDb().product_barcodes.toArray(),
+        (rows) => cacheProductBarcodes(rows),
       ),
   });
+
 
 
   // product_id -> array of all barcodes (primary + extras)
@@ -307,12 +319,18 @@ function POSPage() {
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("customers").select("id,name,balance").order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () =>
+      offlineFirst(
+        async () => {
+          const { data, error } = await supabase.from("customers").select("id,name,balance,phone,updated_at").order("name");
+          if (error) throw error;
+          return data ?? [];
+        },
+        async () => (await offlineDb().customers.toArray()).sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
+        (rows) => cacheCustomers(rows),
+      ),
   });
+
 
   const { data: persons = [] } = useQuery({
     queryKey: ["expense_persons", "active"],
@@ -589,13 +607,7 @@ function POSPage() {
         })),
       };
 
-      const { data, error } = await supabase.rpc("complete_sale", { payload });
-      if (error) throw error;
-      const { data: sale } = await supabase
-        .from("sales")
-        .select("*, sale_items(*), customers(name,phone)")
-        .eq("id", data as string)
-        .maybeSingle();
+      const { sale, offline } = await completeSaleOfflineAware(payload as any);
       setLastInvoice(sale);
       if (sale?.id) {
         setUndoCandidate({
@@ -607,10 +619,15 @@ function POSPage() {
         });
       }
 
-      toast.success(`Sale ${sale?.invoice_no} saved`, {
-        action: { label: "Print", onClick: () => setReprintView(sale) },
-        duration: 5000,
-      });
+      toast.success(
+        offline
+          ? `Sale ${sale?.invoice_no} saved offline — will sync when online`
+          : `Sale ${sale?.invoice_no} saved`,
+        {
+          action: { label: "Print", onClick: () => setReprintView(sale) },
+          duration: 5000,
+        },
+      );
       closeTab(active);
       // restored badge is cleared implicitly since tab is closed
       void 0;
@@ -620,6 +637,7 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["expense_persons"] });
+
     } catch (err: any) {
       toast.error(err.message ?? "Failed to complete sale");
     } finally {
