@@ -771,6 +771,7 @@ function FileSlot({ label, file, map, required, inputRef, onPick, onClear }: {
 // ---------------- Single-entity importer (now supports xlsx) ----------------
 
 function Importer({ entity }: { entity: EntityKey }) {
+  const qc = useQueryClient();
   const schema = SCHEMAS[entity];
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<Record<string, any>[]>([]);
