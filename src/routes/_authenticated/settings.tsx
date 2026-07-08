@@ -107,8 +107,23 @@ function Page() {
                   onChange={(e) => set({ undo_window_minutes: Math.max(1, Number(e.target.value) || 5) })}
                 />
               </div>
+              <div>
+                <Label>Stock count scan mode</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.stock_count_scan_mode ?? "prompt"}
+                  onChange={(e) => set({ stock_count_scan_mode: e.target.value })}
+                >
+                  <option value="prompt">Prompt for quantity after each scan</option>
+                  <option value="increment">Increment by +1 on every scan</option>
+                </select>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Prompt is safer; increment is faster when counting one unit at a time.
+                </div>
+              </div>
             </div>
           </Card>
+
 
           <Card className="p-5 space-y-4">
             <div className="font-medium">Receipt layout</div>
