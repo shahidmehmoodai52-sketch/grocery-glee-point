@@ -856,6 +856,7 @@ function Importer({ entity }: { entity: EntityKey }) {
       failed,
     });
     notifyBatchChanged();
+    invalidateAfterImport(qc);
     setBusy(false);
     if (failed === 0) toast.success(`Imported ${ok} rows`); else toast.error(`${ok} imported, ${failed} failed`);
   };
