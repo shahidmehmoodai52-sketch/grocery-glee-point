@@ -1009,10 +1009,10 @@ function POSPage() {
       <aside className="w-[280px] md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-l bg-card flex flex-col min-h-0 overflow-hidden no-print">
 
         {/* Party + payment */}
-        <div className="p-3 border-b space-y-2.5 shrink-0">
+        <div className="p-4 border-b space-y-3 shrink-0">
           <div>
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">Customer</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</Label>
               {tab.customer_id && (
                 <Link
                   to="/customers/$id"
@@ -1023,28 +1023,56 @@ function POSPage() {
                 </Link>
               )}
             </div>
-            <Select
-              value={tab.customer_id ?? "walkin"}
-              onValueChange={(v) => {
-                const isWalkin = v === "walkin";
-                setTab({
-                  customer_id: isWalkin ? null : v,
-                  // Auto-switch: named customer → credit, walk-in → cash
-                  payment_method: isWalkin ? "cash" : "credit",
-                });
-                setTimeout(() => searchRef.current?.focus(), 0);
-              }}
-            >
-              <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="walkin">Walk-in customer</SelectItem>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1.5 mt-1">
+              <Select
+                value={tab.customer_id ?? "walkin"}
+                onValueChange={(v) => {
+                  const isWalkin = v === "walkin";
+                  setTab({
+                    customer_id: isWalkin ? null : v,
+                    payment_method: isWalkin ? "cash" : "credit",
+                  });
+                  setTimeout(() => searchRef.current?.focus(), 0);
+                }}
+              >
+                <SelectTrigger className="h-11 flex-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="walkin">Walk-in customer</SelectItem>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-11 w-11 shrink-0"
+                title="Quick add customer"
+                onClick={() => setQuickAddCustomerOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {(() => {
+              const c = tab.customer_id ? customers.find((x: any) => x.id === tab.customer_id) : null;
+              const bal = c ? Number(c.balance ?? 0) : 0;
+              if (!c) return null;
+              return (
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  {tab.payment_method === "credit" && (
+                    <Badge className="bg-warning text-warning-foreground text-[10px] rounded-full px-2">CREDIT</Badge>
+                  )}
+                  {bal > 0 && (
+                    <Badge variant="outline" className="border-warning text-warning text-[11px]">
+                      Previous balance: {fmtMoney(bal, sym)}
+                    </Badge>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {(showStaff || tab.expense_person_id) && (
@@ -1060,7 +1088,7 @@ function POSPage() {
                   setTimeout(() => searchRef.current?.focus(), 0);
                 }}
               >
-                <SelectTrigger className={`h-9 mt-1 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
+                <SelectTrigger className={`h-10 mt-1 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1075,43 +1103,57 @@ function POSPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
-            <div>
-              <Label className="text-xs text-muted-foreground">Payment</Label>
-              <Select value={tab.payment_method} onValueChange={(v) => { setTab({ payment_method: v }); setTimeout(() => searchRef.current?.focus(), 0); }}>
-                <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="bank">Bank transfer</SelectItem>
-                  <SelectItem value="credit">Credit (later)</SelectItem>
-                </SelectContent>
-              </Select>
+          <div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant={showStaff || tab.expense_person_id ? "secondary" : "ghost"}
+                className="h-6 text-[11px] px-2"
+                title="Charge this bill to a staff/owner expense ledger"
+                onClick={() => {
+                  if (tab.expense_person_id) setTab({ expense_person_id: null });
+                  setShowStaff((v) => !v);
+                  setTimeout(() => searchRef.current?.focus(), 0);
+                }}
+              >
+                <UserCog className="h-3.5 w-3.5 mr-1" /> Staff
+              </Button>
             </div>
-            <Button
-              type="button"
-              size="sm"
-              variant={showStaff || tab.expense_person_id ? "secondary" : "outline"}
-              className="h-9"
-              title="Charge this bill to a staff/owner expense ledger"
-              onClick={() => {
-                if (tab.expense_person_id) setTab({ expense_person_id: null });
-                setShowStaff((v) => !v);
-                setTimeout(() => searchRef.current?.focus(), 0);
-              }}
-            >
-              <UserCog className="h-4 w-4" />
-            </Button>
+            <div className="grid grid-cols-4 gap-1.5 mt-1.5">
+              {[
+                { v: "cash", label: "Cash" },
+                { v: "card", label: "Card" },
+                { v: "bank", label: "Bank" },
+                { v: "credit", label: "Credit" },
+              ].map((p) => {
+                const active = tab.payment_method === p.v;
+                return (
+                  <button
+                    key={p.v}
+                    type="button"
+                    onClick={() => { setTab({ payment_method: p.v }); setTimeout(() => searchRef.current?.focus(), 0); }}
+                    className={`h-11 rounded-lg text-sm font-medium transition-all ${
+                      active
+                        ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+                        : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
         {/* Totals + discount + paid + note */}
-        <div className="flex-1 min-h-0 overflow-hidden p-3 space-y-2 bg-muted/20">
-          <Row label="Gross" value={fmtMoney(subtotal + lineDiscountTotal, sym)} muted />
+        <div className="flex-1 min-h-0 overflow-auto p-4 space-y-2.5 bg-muted/10">
+          <Row label="Subtotal" value={fmtMoney(subtotal, sym)} muted />
           {lineDiscountTotal > 0 && (
             <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
           )}
-          <Row label="Subtotal" value={fmtMoney(subtotal, sym)} />
 
           <div className="flex items-center justify-between text-sm gap-2">
             <span className="text-muted-foreground">Discount</span>
@@ -1123,7 +1165,7 @@ function POSPage() {
                   value={tab.discount_pct}
                   onChange={(e) => applyDiscountPct(e.target.value)}
                   placeholder="0"
-                  className="h-8 w-16 text-right text-sm pr-5"
+                  className="h-9 w-16 text-right text-sm pr-5"
                 />
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
               </div>
@@ -1132,18 +1174,18 @@ function POSPage() {
                 step="0.01"
                 value={tab.discount}
                 onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
-                className="h-8 w-24 text-right text-sm"
+                className="h-9 w-24 text-right text-sm"
               />
             </div>
           </div>
 
-          <div className="flex justify-between items-center border-t-2 border-foreground/20 pt-2 mt-1">
-            <span className="text-base font-semibold">Grand Total</span>
-            <span className="text-xl font-bold text-primary">{fmtMoney(total, sym)}</span>
+          <div className="rounded-xl bg-primary/5 border border-primary/20 px-4 py-3 mt-2">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Grand Total</div>
+            <div className="text-3xl font-bold text-primary tabular-nums leading-tight mt-0.5">{fmtMoney(total, sym)}</div>
           </div>
 
           <div className="pt-1">
-            <Label className="text-xs text-muted-foreground">Paid</Label>
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Paid</Label>
             <div className="flex items-center gap-2 mt-1">
               <Input
                 ref={paidRef}
@@ -1155,19 +1197,19 @@ function POSPage() {
                   if (e.key === "Enter") { e.preventDefault(); handleSale(); }
                 }}
                 placeholder={total.toFixed(2)}
-                className="h-9 flex-1 text-sm"
+                className="h-12 flex-1 text-lg font-semibold tabular-nums"
               />
               <button
                 onClick={() => setTab({ paid: total.toFixed(2) })}
-                className="text-xs text-primary hover:underline shrink-0"
+                className="text-xs text-primary hover:underline shrink-0 font-medium"
               >
                 Exact
               </button>
             </div>
-            <div className="text-xs mt-1">
+            <div className="mt-2">
               {due > 0
-                ? <span className="text-destructive font-medium">Due: {fmtMoney(due, sym)}</span>
-                : <span className="text-success font-medium">Change: {fmtMoney(change, sym)}</span>}
+                ? <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive font-semibold">Due: {fmtMoney(due, sym)}</div>
+                : <div className="rounded-lg bg-success/10 border border-success/20 px-3 py-2 text-lg text-success font-bold tabular-nums">Change: {fmtMoney(change, sym)}</div>}
             </div>
           </div>
 
@@ -1175,7 +1217,7 @@ function POSPage() {
             value={tab.note}
             onChange={(e) => setTab({ note: e.target.value })}
             placeholder="Note / House #, street…"
-            className="h-8 text-xs"
+            className="h-9 text-xs"
           />
 
           {tab.items.length > 0 && (() => {
@@ -1184,11 +1226,23 @@ function POSPage() {
             const net = subtotal - discount;
             const pct = net > 0 ? (cartProfit / net) * 100 : 0;
             return (
-              <div className="rounded-md border border-dashed bg-background/60 px-2 py-1 text-[11px] flex items-center justify-between">
-                <span className="text-muted-foreground">Cost <span className="font-mono">{fmtMoney(cartCost, sym)}</span></span>
-                <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
-                  Profit {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
-                </span>
+              <div className="rounded-md border border-dashed bg-background/60 px-2 py-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setShowProfit((v) => !v)}
+                  className="flex items-center justify-between w-full text-muted-foreground hover:text-foreground"
+                >
+                  <span>{showProfit ? "Hide" : "Show"} profit</span>
+                  {showProfit ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                </button>
+                {showProfit && (
+                  <div className="flex items-center justify-between pt-1.5 mt-1.5 border-t">
+                    <span className="text-muted-foreground">Cost <span className="font-mono">{fmtMoney(cartCost, sym)}</span></span>
+                    <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
+                      {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -1196,8 +1250,15 @@ function POSPage() {
 
         {/* Footer — Complete sale */}
         <div className="p-3 border-t bg-card shrink-0">
-          <Button className="w-full h-11 text-sm font-semibold" onClick={handleSale} disabled={submitting}>
+          <Button
+            className="w-full h-14 text-base font-bold rounded-xl shadow-md hover:shadow-lg transition-shadow"
+            onClick={handleSale}
+            disabled={submitting}
+          >
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Complete Sale · F4
+          </Button>
+        </div>
             Complete Sale (F4)
           </Button>
         </div>
