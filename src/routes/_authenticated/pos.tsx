@@ -678,6 +678,7 @@ function POSPage() {
         if (exact) {
           addProduct(exact);
           setSearch("");
+          triggerScanFlash();
           searchRef.current?.focus();
           return;
         }
