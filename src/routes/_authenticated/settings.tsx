@@ -104,6 +104,7 @@ function Page() {
                 />
               </div>
             </div>
+          </Card>
 
           <Card className="p-5 space-y-4">
             <div className="font-medium">Receipt layout</div>
