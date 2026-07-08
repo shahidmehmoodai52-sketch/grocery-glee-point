@@ -129,7 +129,7 @@ function TenantsTab() {
 
   const setStatus = async (id: string, status: string, reason?: string) => {
     const { error } = await supabase.rpc("admin_set_tenant_status", {
-      _tenant_id: id, _status: status, _reason: reason ?? null,
+      _tenant_id: id, _status: status, _reason: reason ?? undefined,
     });
     if (error) return toast.error(error.message);
     toast.success(`Tenant ${status}`);
@@ -279,7 +279,7 @@ function TenantDetailDialog({ tenantId, onClose }: { tenantId: string | null; on
     queryKey: ["admin-tenant-detail", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_tenant_detail", { _tenant_id: tenantId });
+      const { data, error } = await supabase.rpc("admin_tenant_detail", { _tenant_id: tenantId! });
       if (error) throw error;
       return data as unknown as TenantDetail;
     },
