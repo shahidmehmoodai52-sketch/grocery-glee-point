@@ -1802,6 +1802,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      adjust_product_stock: {
+        Args: {
+          _new_stock: number
+          _note?: string
+          _product_id: string
+          _reason?: string
+        }
+        Returns: string
+      }
       can_add_product: { Args: { _tenant_id: string }; Returns: boolean }
       can_add_user: { Args: { _tenant_id: string }; Returns: boolean }
       complete_purchase: { Args: { payload: Json }; Returns: string }
