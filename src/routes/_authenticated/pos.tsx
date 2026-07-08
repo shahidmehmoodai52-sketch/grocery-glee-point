@@ -446,6 +446,15 @@ function POSPage() {
         .eq("id", data as string)
         .maybeSingle();
       setLastInvoice(sale);
+      if (sale?.id) {
+        setUndoCandidate({
+          sale_id: sale.id,
+          invoice_no: sale.invoice_no,
+          total: Number(sale.total ?? 0),
+          item_count: (sale.sale_items ?? []).length,
+          created_at: sale.created_at,
+        });
+      }
 
       toast.success(`Sale ${sale?.invoice_no} saved`, {
         action: { label: "Print", onClick: () => setReprintView(sale) },
