@@ -3477,7 +3477,7 @@ export type Database = {
       void_sale: { Args: { _reason: string; _sale_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "admin" | "cashier"
+      app_role: "admin" | "cashier" | "super_admin"
       inventory_movement_type:
         | "purchase"
         | "sale"
@@ -3643,7 +3643,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "cashier"],
+      app_role: ["admin", "cashier", "super_admin"],
       inventory_movement_type: [
         "purchase",
         "sale",
