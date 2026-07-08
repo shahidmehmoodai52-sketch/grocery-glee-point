@@ -84,9 +84,11 @@ function AdminPanelPage() {
       <Tabs defaultValue="tenants">
         <TabsList>
           <TabsTrigger value="tenants"><Store className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
+          <TabsTrigger value="security"><ShieldAlert className="h-4 w-4 mr-1" />Security</TabsTrigger>
           <TabsTrigger value="errors"><Bug className="h-4 w-4 mr-1" />Errors</TabsTrigger>
         </TabsList>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
+        <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
       </Tabs>
     </div>
