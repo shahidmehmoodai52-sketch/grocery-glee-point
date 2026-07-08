@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck,
+  BarChart3, Settings, LogOut, Store, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock,
 } from "lucide-react";
 
 import {
@@ -39,6 +39,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Suppliers", url: "/suppliers", icon: Truck, perm: "suppliers" },
       { title: "Bulk import", url: "/import", icon: Upload, perm: "import" },
       { title: "Stock count", url: "/stock-count", icon: ClipboardCheck, perm: "stock-count" },
+      { title: "Expiry & waste", url: "/expiry", icon: CalendarClock, perm: "expiry" },
     ],
 
   },

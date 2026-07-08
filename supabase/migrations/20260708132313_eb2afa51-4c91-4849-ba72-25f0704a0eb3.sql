@@ -1,0 +1,1 @@
+ALTER VIEW public.product_batch_status SET (security_invoker = on);

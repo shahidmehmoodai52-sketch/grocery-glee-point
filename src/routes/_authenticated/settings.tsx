@@ -24,6 +24,8 @@ const FIELDS = [
   "payment_qr_url", "payment_qr_label", "show_payment_qr",
   "undo_window_minutes",
   "stock_count_scan_mode",
+  "expiring_soon_days",
+  "critical_days",
 ] as const;
 
 
@@ -47,6 +49,8 @@ function Page() {
     payment_qr_url: "", payment_qr_label: "", show_payment_qr: true,
     undo_window_minutes: 5,
     stock_count_scan_mode: "prompt",
+    expiring_soon_days: 30,
+    critical_days: 7,
   });
 
   useEffect(() => { if (data) setForm({ ...form, ...data }); /* eslint-disable-next-line */ }, [data]);
@@ -120,6 +124,26 @@ function Page() {
                 <div className="text-xs text-muted-foreground mt-1">
                   Prompt is safer; increment is faster when counting one unit at a time.
                 </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Expiring soon (days)</Label>
+                <Input
+                  type="number" min={1} max={365} step={1}
+                  value={form.expiring_soon_days ?? 30}
+                  onChange={(e) => set({ expiring_soon_days: Math.max(1, Number(e.target.value) || 30) })}
+                />
+                <div className="text-xs text-muted-foreground mt-1">Batches within this many days are flagged "Expiring soon".</div>
+              </div>
+              <div>
+                <Label>Critical (days)</Label>
+                <Input
+                  type="number" min={1} max={365} step={1}
+                  value={form.critical_days ?? 7}
+                  onChange={(e) => set({ critical_days: Math.max(1, Number(e.target.value) || 7) })}
+                />
+                <div className="text-xs text-muted-foreground mt-1">Batches within this many days show a critical alert.</div>
               </div>
             </div>
           </Card>

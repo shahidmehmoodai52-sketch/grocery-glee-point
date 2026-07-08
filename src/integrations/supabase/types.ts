@@ -411,6 +411,80 @@ export type Database = {
           },
         ]
       }
+      inventory_damages: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          damage_type: string
+          id: string
+          note: string | null
+          product_id: string
+          qty: number
+          reason: string | null
+          tenant_id: string
+          total_value: number | null
+          unit_cost: number | null
+          user_id: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          damage_type: string
+          id?: string
+          note?: string | null
+          product_id: string
+          qty: number
+          reason?: string | null
+          tenant_id: string
+          total_value?: number | null
+          unit_cost?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          damage_type?: string
+          id?: string
+          note?: string | null
+          product_id?: string
+          qty?: number
+          reason?: string | null
+          tenant_id?: string
+          total_value?: number | null
+          unit_cost?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_damages_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batch_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_damages_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_damages_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_damages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_movements: {
         Row: {
           created_at: string
@@ -482,6 +556,80 @@ export type Database = {
           },
           {
             foreignKeyName: "inventory_movements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_waste: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          id: string
+          note: string | null
+          product_id: string
+          qty: number
+          reason: string | null
+          tenant_id: string
+          total_value: number | null
+          unit_cost: number | null
+          user_id: string | null
+          waste_type: string
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          product_id: string
+          qty: number
+          reason?: string | null
+          tenant_id: string
+          total_value?: number | null
+          unit_cost?: number | null
+          user_id?: string | null
+          waste_type: string
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          product_id?: string
+          qty?: number
+          reason?: string | null
+          tenant_id?: string
+          total_value?: number | null
+          unit_cost?: number | null
+          user_id?: string | null
+          waste_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_waste_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batch_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_waste_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_waste_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_waste_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -645,6 +793,92 @@ export type Database = {
           },
         ]
       }
+      product_batches: {
+        Row: {
+          batch_no: string | null
+          created_at: string
+          expiry_date: string | null
+          id: string
+          mfg_date: string | null
+          note: string | null
+          product_id: string
+          purchase_date: string | null
+          purchase_id: string | null
+          qty_initial: number
+          qty_remaining: number
+          status: string
+          supplier_id: string | null
+          tenant_id: string
+          unit_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          batch_no?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          mfg_date?: string | null
+          note?: string | null
+          product_id: string
+          purchase_date?: string | null
+          purchase_id?: string | null
+          qty_initial?: number
+          qty_remaining?: number
+          status?: string
+          supplier_id?: string | null
+          tenant_id: string
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          batch_no?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          mfg_date?: string | null
+          note?: string | null
+          product_id?: string
+          purchase_date?: string | null
+          purchase_id?: string | null
+          qty_initial?: number
+          qty_remaining?: number
+          status?: string
+          supplier_id?: string | null
+          tenant_id?: string
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           barcode: string | null
@@ -657,10 +891,12 @@ export type Database = {
           low_stock_threshold: number
           name: string
           sell_price: number
+          shelf_life_days: number | null
           sku: string | null
           stock: number
           tax_rate: number
           tenant_id: string
+          track_batches: boolean
           unit: string | null
           updated_at: string
         }
@@ -675,10 +911,12 @@ export type Database = {
           low_stock_threshold?: number
           name: string
           sell_price?: number
+          shelf_life_days?: number | null
           sku?: string | null
           stock?: number
           tax_rate?: number
           tenant_id?: string
+          track_batches?: boolean
           unit?: string | null
           updated_at?: string
         }
@@ -693,10 +931,12 @@ export type Database = {
           low_stock_threshold?: number
           name?: string
           sell_price?: number
+          shelf_life_days?: number | null
           sku?: string | null
           stock?: number
           tax_rate?: number
           tenant_id?: string
+          track_batches?: boolean
           unit?: string | null
           updated_at?: string
         }
@@ -737,9 +977,12 @@ export type Database = {
       }
       purchase_items: {
         Row: {
+          batch_no: string | null
           cost: number
+          expiry_date: string | null
           id: string
           line_total: number
+          mfg_date: string | null
           name: string
           product_id: string | null
           purchase_id: string
@@ -747,9 +990,12 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          batch_no?: string | null
           cost: number
+          expiry_date?: string | null
           id?: string
           line_total: number
+          mfg_date?: string | null
           name: string
           product_id?: string | null
           purchase_id: string
@@ -757,9 +1003,12 @@ export type Database = {
           tenant_id?: string
         }
         Update: {
+          batch_no?: string | null
           cost?: number
+          expiry_date?: string | null
           id?: string
           line_total?: number
+          mfg_date?: string | null
           name?: string
           product_id?: string | null
           purchase_id?: string
@@ -1366,8 +1615,10 @@ export type Database = {
       store_settings: {
         Row: {
           address: string | null
+          critical_days: number
           currency: string
           currency_symbol: string
+          expiring_soon_days: number
           id: number
           logo_url: string | null
           low_stock_threshold: number
@@ -1394,8 +1645,10 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          critical_days?: number
           currency?: string
           currency_symbol?: string
+          expiring_soon_days?: number
           id?: number
           logo_url?: string | null
           low_stock_threshold?: number
@@ -1422,8 +1675,10 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          critical_days?: number
           currency?: string
           currency_symbol?: string
+          expiring_soon_days?: number
           id?: number
           logo_url?: string | null
           low_stock_threshold?: number
@@ -1902,7 +2157,50 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      product_batch_status: {
+        Row: {
+          batch_no: string | null
+          days_remaining: number | null
+          expiry_date: string | null
+          expiry_status: string | null
+          id: string | null
+          product_id: string | null
+          product_name: string | null
+          purchase_date: string | null
+          qty_initial: number | null
+          qty_remaining: number | null
+          sku: string | null
+          status: string | null
+          supplier_id: string | null
+          tenant_id: string | null
+          unit: string | null
+          unit_cost: number | null
+          value_remaining: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       active_plan_for_tenant: {
@@ -1944,6 +2242,23 @@ export type Database = {
       complete_purchase_return: { Args: { payload: Json }; Returns: string }
       complete_sale: { Args: { payload: Json }; Returns: string }
       complete_sale_return: { Args: { payload: Json }; Returns: string }
+      consume_batches_fefo: {
+        Args: { _product_id: string; _qty: number }
+        Returns: undefined
+      }
+      create_product_batch: {
+        Args: {
+          _batch_no: string
+          _expiry_date: string
+          _mfg_date: string
+          _note: string
+          _product_id: string
+          _qty: number
+          _supplier_id: string
+          _unit_cost: number
+        }
+        Returns: string
+      }
       current_tenant_id: { Args: never; Returns: string }
       delete_party_payment: { Args: { _id: string }; Returns: undefined }
       has_active_subscription: {
@@ -1998,8 +2313,10 @@ export type Database = {
         Args: never
         Returns: {
           address: string | null
+          critical_days: number
           currency: string
           currency_symbol: string
+          expiring_soon_days: number
           id: number
           logo_url: string | null
           low_stock_threshold: number
@@ -2031,6 +2348,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      record_damage: {
+        Args: {
+          _batch_id: string
+          _damage_type: string
+          _note: string
+          _product_id: string
+          _qty: number
+          _reason: string
+        }
+        Returns: string
+      }
       record_inventory_movement: {
         Args: {
           _customer_id: string
@@ -2056,6 +2384,17 @@ export type Database = {
           p_note: string
           p_party_id: string
           p_party_type: string
+        }
+        Returns: string
+      }
+      record_waste: {
+        Args: {
+          _batch_id: string
+          _note: string
+          _product_id: string
+          _qty: number
+          _reason: string
+          _waste_type: string
         }
         Returns: string
       }
@@ -2086,6 +2425,9 @@ export type Database = {
         | "expired"
         | "damaged"
         | "lost"
+        | "waste"
+        | "donation"
+        | "internal_use"
       inventory_reference_type:
         | "sale"
         | "purchase"
@@ -2097,6 +2439,9 @@ export type Database = {
         | "manual"
         | "transfer"
         | "stock_count"
+        | "damage"
+        | "waste"
+        | "batch"
       stock_count_status: "draft" | "in_progress" | "completed" | "cancelled"
       tenant_role:
         | "owner"
@@ -2246,6 +2591,9 @@ export const Constants = {
         "expired",
         "damaged",
         "lost",
+        "waste",
+        "donation",
+        "internal_use",
       ],
       inventory_reference_type: [
         "sale",
@@ -2258,6 +2606,9 @@ export const Constants = {
         "manual",
         "transfer",
         "stock_count",
+        "damage",
+        "waste",
+        "batch",
       ],
       stock_count_status: ["draft", "in_progress", "completed", "cancelled"],
       tenant_role: ["owner", "admin", "manager", "cashier", "viewer", "staff"],
