@@ -283,8 +283,11 @@ function Page() {
             )}
           </Card>
 
+          <OfflineModeCard />
+
           <Button onClick={save}><Save className="h-4 w-4 mr-2" />Save settings</Button>
         </div>
+
 
         <div className="space-y-2">
           <div className="text-sm font-medium">Live receipt preview</div>
