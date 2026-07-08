@@ -448,6 +448,119 @@ function POSPage() {
     });
   };
 
+  // ---- Held bills ----
+  const holdBillsEnabled = !!(settings as any)?.ops_hold_bills_enabled;
+  const { data: heldBills = [], refetch: refetchHeld } = useQuery({
+    queryKey: ["held_bills", "pos"],
+    enabled: holdBillsEnabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("held_bills")
+        .select("id,label,total,item_count,created_at,customer_id,payload,customers(name)")
+        .eq("status", "held")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+    staleTime: 30_000,
+  });
+
+  const restorePayloadIntoNewTab = (payload: any, labelPrefix = "↺") => {
+    if (!payload || !Array.isArray(payload.items)) return;
+    const restoredItems: CartItem[] = payload.items.map((i: any) => {
+      const qty = Number(i.qty ?? 1);
+      const price = Number(i.price ?? 0);
+      return {
+        product_id: i.product_id ?? null,
+        code: i.code ?? "",
+        name: String(i.name ?? "Item"),
+        qty, price,
+        mrp: Number(i.mrp ?? price),
+        cost: Number(i.cost ?? 0),
+        disc_pct: Number(i.disc_pct ?? 0),
+        tax_pct: Number(i.tax_pct ?? 0),
+        disc: Number(i.disc ?? 0),
+      };
+    });
+    const restored: Tab = {
+      id: crypto.randomUUID(),
+      name: `${labelPrefix} ${payload.label ?? "Bill"}`,
+      items: restoredItems,
+      customer_id: payload.customer_id ?? null,
+      expense_person_id: payload.expense_person_id ?? null,
+      payment_method: payload.payment_method ?? "cash",
+      discount: Number(payload.discount ?? 0),
+      discount_pct: "",
+      paid: String(payload.paid ?? ""),
+      note: payload.note ?? "",
+      restored: true,
+    };
+    setTabs((ts) => [...ts, restored]);
+    setActive(restored.id);
+  };
+
+  const resumeHeld = async (id: string) => {
+    const { data, error } = await supabase.rpc("resume_bill", { _id: id });
+    if (error) return toast.error(error.message);
+    restorePayloadIntoNewTab(data as any, "↺");
+    setHeldOpen(false);
+    refetchHeld();
+    toast.success("Bill resumed");
+  };
+
+  const discardHeld = async (id: string) => {
+    if (!confirm("Discard this held bill?")) return;
+    const { error } = await (supabase.rpc as any)("discard_held_bill", { _id: id, _reason: null });
+    if (error) return toast.error(error.message);
+    refetchHeld();
+    toast.success("Discarded");
+  };
+
+  const holdCurrent = async () => {
+    if (!tab.items.length) return toast.error("Cart is empty");
+    if (!holdBillsEnabled) return toast.error("Hold bills is disabled in Settings");
+    setHolding(true);
+    try {
+      const payload = {
+        items: tab.items,
+        customer_id: tab.customer_id,
+        expense_person_id: tab.expense_person_id,
+        payment_method: tab.payment_method,
+        discount: Number(tab.discount || 0),
+        paid: tab.paid,
+        note: tab.note,
+        label: tab.name,
+      };
+      const { error } = await supabase.rpc("hold_bill", {
+        _customer: tab.customer_id as any,
+        _item_count: tab.items.length,
+        _label: tab.name,
+        _payload: payload as any,
+        _total: total,
+      });
+      if (error) throw error;
+      toast.success("Bill held");
+      closeTab(active);
+      refetchHeld();
+    } catch (err: any) {
+      toast.error(err.message ?? "Could not hold bill");
+    } finally {
+      setHolding(false);
+    }
+  };
+
+  // Pick up a resumed payload handed off from Operations page
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("pos:resume_payload");
+      if (!raw) return;
+      localStorage.removeItem("pos:resume_payload");
+      restorePayloadIntoNewTab(JSON.parse(raw), "↺");
+      toast.success("Bill resumed");
+    } catch {/* noop */}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSale = async () => {
     if (!tab.items.length) return toast.error("Cart is empty");
     const isCredit = due > 0;
