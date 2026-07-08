@@ -1,15 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Search, History } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, History, Package } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
@@ -126,47 +129,47 @@ function ProductsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Products</h1>
-          <p className="text-sm text-muted-foreground">{products.length} items in catalog</p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />New product</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>{form.id ? "Edit" : "New"} product</DialogTitle></DialogHeader>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
-              <div><Label>Primary barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
-              <div className="col-span-2">
-                <Label>Additional barcodes (one per line — for different versions/packs of the same item)</Label>
-                <textarea
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={form.barcodes_text}
-                  onChange={(e) => setForm({ ...form, barcodes_text: e.target.value })}
-                  placeholder={"8964000000001\n8964000000002"}
-                />
+      <PageHeader
+        title="Products"
+        description={`${products.length} items in catalog`}
+        icon={<Package className="h-5 w-5" />}
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" />New product</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader><DialogTitle>{form.id ? "Edit" : "New"} product</DialogTitle></DialogHeader>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
+                <div><Label>Primary barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
+                <div className="col-span-2">
+                  <Label>Additional barcodes (one per line — for different versions/packs of the same item)</Label>
+                  <textarea
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={form.barcodes_text}
+                    onChange={(e) => setForm({ ...form, barcodes_text: e.target.value })}
+                    placeholder={"8964000000001\n8964000000002"}
+                  />
+                </div>
+                <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
+                <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
+                <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
+                <div><Label>Price</Label><Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} /></div>
+                <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
+                <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
+                <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
               </div>
-              <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
-              <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
-              <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
-              <div><Label>Price</Label><Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} /></div>
-              <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
-              <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
-              <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
-              <Button variant="outline" onClick={() => { clearOpen(); clearForm(); }}>Discard</Button>
-              <Button onClick={save}>Save</Button>
-            </DialogFooter>
-
-          </DialogContent>
-        </Dialog>
-      </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+                <Button variant="outline" onClick={() => { clearOpen(); clearForm(); }}>Discard</Button>
+                <Button onClick={save}>Save</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <Card className="p-3">
         <div className="relative mb-3">
@@ -186,9 +189,13 @@ function ProductsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
+            {isLoading && (
+              <TableRow><TableCell colSpan={7} className="py-4"><TableSkeleton rows={5} columns={6} /></TableCell></TableRow>
+            )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No products yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="py-8">
+                <EmptyState icon={Package} title="No products yet" description="Add a new product to start selling." />
+              </TableCell></TableRow>
             )}
             {filtered.map((p) => (
               <TableRow key={p.id}>
@@ -201,11 +208,12 @@ function ProductsPage() {
                   {(() => {
                     const s = Number(p.stock);
                     const t = Number(p.low_stock_threshold ?? 5);
-                    if (s <= 0) return <Badge variant="destructive">Out · {fmtQty(p.stock)} {p.unit}</Badge>;
-                    if (s <= t) return <Badge className="bg-amber-500 text-white hover:bg-amber-500">Low · {fmtQty(p.stock)} {p.unit}</Badge>;
-                    return <Badge variant="outline">{fmtQty(p.stock)} {p.unit}</Badge>;
+                    if (s <= 0) return <StatusBadge tone="danger">Out · {fmtQty(p.stock)} {p.unit}</StatusBadge>;
+                    if (s <= t) return <StatusBadge tone="warning">Low · {fmtQty(p.stock)} {p.unit}</StatusBadge>;
+                    return <StatusBadge tone="neutral">{fmtQty(p.stock)} {p.unit}</StatusBadge>;
                   })()}
                 </TableCell>
+
                 <TableCell className="text-right">
                   <Link to="/products/$id" params={{ id: p.id }}>
                     <Button variant="ghost" size="icon" title="Stock timeline"><History className="h-4 w-4" /></Button>
