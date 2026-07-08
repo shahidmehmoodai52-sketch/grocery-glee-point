@@ -72,7 +72,7 @@ function ProductsPage() {
           _product_id: form.id,
           _new_stock: Number(newStock),
           _reason: "Manual adjustment",
-          _note: null,
+          _note: undefined,
         });
         if (adjErr) return toast.error(adjErr.message);
       }
