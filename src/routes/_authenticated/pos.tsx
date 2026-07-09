@@ -609,23 +609,33 @@ function POSPage() {
       };
 
       const { sale, offline } = await completeSaleOfflineAware(payload as any);
-      setLastInvoice(sale);
-      if (sale?.id) {
+      // Override server sale_items with the cashier's edited prices so the
+      // printed receipt reflects any rate changes made in the cart.
+      const localItems = tab.items.map((i, idx) => ({
+        id: `local-${idx}`,
+        name: i.name,
+        qty: i.qty,
+        price: i.price,
+        line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
+      }));
+      const patchedSale = sale ? { ...sale, sale_items: localItems } : sale;
+      setLastInvoice(patchedSale);
+      if (patchedSale?.id) {
         setUndoCandidate({
-          sale_id: sale.id,
-          invoice_no: sale.invoice_no,
-          total: Number(sale.total ?? 0),
-          item_count: (sale.sale_items ?? []).length,
-          created_at: sale.created_at,
+          sale_id: patchedSale.id,
+          invoice_no: patchedSale.invoice_no,
+          total: Number(patchedSale.total ?? 0),
+          item_count: localItems.length,
+          created_at: patchedSale.created_at,
         });
       }
 
       toast.success(
         offline
-          ? `Sale ${sale?.invoice_no} saved offline — will sync when online`
-          : `Sale ${sale?.invoice_no} saved`,
+          ? `Sale ${patchedSale?.invoice_no} saved offline — will sync when online`
+          : `Sale ${patchedSale?.invoice_no} saved`,
         {
-          action: { label: "Print", onClick: () => setReprintView(sale) },
+          action: { label: "Print", onClick: () => setReprintView(patchedSale) },
           duration: 5000,
         },
       );
