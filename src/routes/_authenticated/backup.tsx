@@ -4,17 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { FolderOpen, HardDriveDownload, ShieldCheck, AlertTriangle, RefreshCw } from "lucide-react";
+import { FolderOpen, HardDriveDownload, ShieldCheck, AlertTriangle, RefreshCw, Clock } from "lucide-react";
 import {
   getStatus, pickBackupFolder, clearBackupFolder, runBackup,
-  setAutoEnabled, isSupported, type BackupStatus,
+  setAutoEnabled, setBackupTime, isSupported, type BackupStatus,
 } from "@/lib/backup";
 
 export const Route = createFileRoute("/_authenticated/backup")({
   component: BackupPage,
 });
+
 
 function BackupPage() {
   const [status, setStatus] = useState<BackupStatus | null>(null);
@@ -41,11 +43,15 @@ function BackupPage() {
       if (r.ok) toast.success(`Backup saved: ${r.file}`);
       else toast.error(r.error ?? "Backup failed");
       await refresh();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Backup failed");
     } finally { setBusy(false); }
   };
 
   const toggle = async (v: boolean) => { await setAutoEnabled(v); await refresh(); };
   const unlink = async () => { await clearBackupFolder(); toast.message("Folder unlinked"); await refresh(); };
+  const onTimeChange = async (v: string) => { await setBackupTime(v); await refresh(); };
+
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -97,10 +103,34 @@ function BackupPage() {
           <div className="flex items-center justify-between border-t pt-4">
             <div className="space-y-0.5">
               <Label className="text-sm">Daily auto-backup</Label>
-              <p className="text-xs text-muted-foreground">Runs once per 24 hours when you open the app.</p>
+              <p className="text-xs text-muted-foreground">Runs automatically at the scheduled time — as long as the app is open.</p>
             </div>
             <Switch checked={!!status?.autoEnabled} onCheckedChange={toggle} disabled={!status?.hasHandle} />
           </div>
+
+          <div className="flex items-center justify-between border-t pt-4 gap-4">
+            <div className="space-y-0.5">
+              <Label className="text-sm flex items-center gap-1.5"><Clock className="h-4 w-4" />Backup time (daily)</Label>
+              <p className="text-xs text-muted-foreground">Local time on this PC. Runs when the app is open at or after this time each day.</p>
+            </div>
+            <Input
+              type="time"
+              value={status?.backupTime ?? "22:00"}
+              onChange={(e) => onTimeChange(e.target.value)}
+              disabled={!status?.hasHandle}
+              className="w-32"
+            />
+          </div>
+
+          {status?.hasHandle && status.permission !== "granted" && (
+            <div className="flex items-start gap-2 border-t pt-4 text-xs text-warning">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                Browser lost write permission for the folder (this happens after a restart). Click <b>Backup now</b> once so Windows grants access again — after that daily backup will run silently.
+              </div>
+            </div>
+          )}
+
 
           <div className="flex items-center justify-between border-t pt-4">
             <div className="text-sm">

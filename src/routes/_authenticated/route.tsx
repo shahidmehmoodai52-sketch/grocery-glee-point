@@ -25,7 +25,13 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function Layout() {
-  useEffect(() => { maybeRunDaily(); }, []);
+  useEffect(() => {
+    maybeRunDaily();
+    // Poll every minute so the scheduled time triggers when the app is left open.
+    const t = setInterval(() => { maybeRunDaily(); }, 60_000);
+    return () => clearInterval(t);
+  }, []);
+
   useRealtimeSync();
   return (
     <SidebarProvider>

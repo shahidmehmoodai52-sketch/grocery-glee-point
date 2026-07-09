@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 const DIR_KEY = "backup_dir_handle";
 const LAST_KEY = "backup_last_run";
 const ENABLED_KEY = "backup_auto_enabled";
+const TIME_KEY = "backup_time"; // "HH:MM" 24h, local time
 
 const TABLES = [
   "store_settings", "products", "product_barcodes", "customers", "suppliers",
@@ -18,19 +19,36 @@ export type BackupStatus = {
   dirName: string | null;
   lastRun: string | null;
   autoEnabled: boolean;
+  backupTime: string; // "HH:MM"
+  permission: "granted" | "prompt" | "denied" | "unknown";
 };
 
 export async function getStatus(): Promise<BackupStatus> {
   const handle = await get<FileSystemDirectoryHandle>(DIR_KEY);
   const lastRun = (await get<string>(LAST_KEY)) ?? null;
   const autoEnabled = (await get<boolean>(ENABLED_KEY)) ?? false;
+  const backupTime = (await get<string>(TIME_KEY)) ?? "22:00";
+  let permission: BackupStatus["permission"] = "unknown";
+  if (handle) {
+    try {
+      // @ts-ignore
+      permission = (await handle.queryPermission({ mode: "readwrite" })) ?? "unknown";
+    } catch { permission = "unknown"; }
+  }
   return {
     hasHandle: !!handle,
     dirName: handle?.name ?? null,
     lastRun,
     autoEnabled,
+    backupTime,
+    permission,
   };
 }
+
+export async function setBackupTime(hhmm: string) {
+  await set(TIME_KEY, hhmm);
+}
+
 
 export function isSupported() {
   return typeof window !== "undefined" && "showDirectoryPicker" in window;
@@ -134,11 +152,22 @@ export async function maybeRunDaily(): Promise<void> {
     if (!enabled) return;
     const handle = await get<FileSystemDirectoryHandle>(DIR_KEY);
     if (!handle) return;
+    const hhmm = (await get<string>(TIME_KEY)) ?? "22:00";
+    const [hh, mm] = hhmm.split(":").map((n) => parseInt(n, 10));
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return;
+
+    const now = new Date();
+    const scheduled = new Date(now);
+    scheduled.setHours(hh, mm, 0, 0);
+    // Not yet reached today's scheduled time.
+    if (now.getTime() < scheduled.getTime()) return;
+
     const last = await get<string>(LAST_KEY);
     if (last) {
-      const diff = Date.now() - new Date(last).getTime();
-      if (diff < 24 * 60 * 60 * 1000) return;
+      // Already ran after today's scheduled time — skip.
+      if (new Date(last).getTime() >= scheduled.getTime()) return;
     }
+
     // @ts-ignore
     const perm = await handle.queryPermission({ mode: "readwrite" });
     if (perm !== "granted") return; // don't prompt silently; user must visit page
@@ -147,3 +176,4 @@ export async function maybeRunDaily(): Promise<void> {
     // swallow
   }
 }
+
