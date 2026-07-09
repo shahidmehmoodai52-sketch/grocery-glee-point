@@ -51,6 +51,8 @@ function Page() {
   const setPaid = (v: number) => setDraft((d) => ({ ...d, paid: v }));
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
+  const [search, setSearch] = useState("");
+
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
