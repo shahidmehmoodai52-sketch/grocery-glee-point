@@ -177,6 +177,12 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       <div className="my-2 border-t border-dashed border-black" />
 
       <div className="space-y-0.5">
+        {invoice.sale_items && invoice.sale_items.length > 0 && (
+          <Row
+            label="Items"
+            value={`${invoice.sale_items.length} line${invoice.sale_items.length === 1 ? "" : "s"} · ${invoice.sale_items.reduce((s, i) => s + Number(i.qty || 0), 0)} qty`}
+          />
+        )}
         <Row label="Subtotal" value={fmtMoney(invoice.subtotal, sym)} />
         {settings?.show_tax_lines !== false && (
           <Row
