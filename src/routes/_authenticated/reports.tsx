@@ -134,14 +134,50 @@ function Page() {
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Reports</h1>
-          <p className="text-sm text-muted-foreground">Sales, profit, invoice &amp; product breakdowns</p>
+          <p className="text-sm text-muted-foreground">Sales, profit, invoice &amp; product breakdowns · {presetLabel}</p>
         </div>
-        <div className="flex items-end gap-2 no-print">
-          <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+        <div className="flex flex-wrap items-center gap-2 no-print">
+          {PRESETS.map(p => (
+            <Button
+              key={p.key}
+              variant={preset === p.key ? "default" : "outline"}
+              size="sm"
+              onClick={() => applyPreset(p.key)}
+            >
+              {p.label}
+            </Button>
+          ))}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={preset === "custom" ? "default" : "outline"}
+                size="sm"
+                className={cn("gap-2")}
+              >
+                <CalendarIcon className="h-4 w-4" />
+                {fromDate && toDate
+                  ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
+                  : "Custom range"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="range"
+                selected={{ from: fromDate, to: toDate }}
+                onSelect={(r) => {
+                  setPreset("custom");
+                  setFromDate(r?.from);
+                  setToDate(r?.to);
+                }}
+                numberOfMonths={2}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
         </div>
       </div>
+
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
