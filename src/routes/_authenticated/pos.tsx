@@ -1468,7 +1468,16 @@ function POSPage() {
         sym={sym}
         reprintAuditEnabled={!!(settings as any)?.ops_reprint_audit_enabled}
         onView={(s: any) => setReprintView(s)}
+        onEdit={(s: any) => setEditingInvoice(s)}
       />
+
+      {/* Editable invoice */}
+      <EditInvoiceDialog
+        invoice={editingInvoice}
+        sym={sym}
+        onClose={() => setEditingInvoice(null)}
+      />
+
 
       {/* Held bills tray */}
       <Dialog open={heldOpen} onOpenChange={setHeldOpen}>
