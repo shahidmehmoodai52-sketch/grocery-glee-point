@@ -3318,9 +3318,42 @@ export type Database = {
         }
       }
       admin_security_summary: { Args: never; Returns: Json }
+      admin_set_tenant_plan: {
+        Args: {
+          _expires_at?: string
+          _plan_id: string
+          _status?: string
+          _tenant_id: string
+        }
+        Returns: undefined
+      }
       admin_set_tenant_status: {
         Args: { _reason?: string; _status: string; _tenant_id: string }
         Returns: string
+      }
+      admin_shop_analytics: {
+        Args: { _from?: string; _tenant_id: string; _to?: string }
+        Returns: Json
+      }
+      admin_tenant_audit: {
+        Args: { _limit?: number; _tenant_id: string }
+        Returns: {
+          action: string
+          created_at: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string | null
+          table_name: string
+          tenant_id: string
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "audit_logs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       admin_tenant_detail: { Args: { _tenant_id: string }; Returns: Json }
       admin_unblock_identifier: { Args: { _id: string }; Returns: undefined }
