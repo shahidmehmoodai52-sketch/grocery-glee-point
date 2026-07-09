@@ -63,8 +63,8 @@ function Page() {
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: async () => offlineFirst<any[]>(
-      async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,cost_price,stock").order("name").range(from, to)),
-      async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, cost_price: p.cost_price, stock: p.stock })),
+      async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,barcode,cost_price,stock").order("name").range(from, to)),
+      async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, barcode: p.barcode, cost_price: p.cost_price, stock: p.stock })),
       cacheProducts,
     ),
   });
