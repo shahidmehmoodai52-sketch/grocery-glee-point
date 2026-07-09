@@ -242,10 +242,10 @@ function Page() {
                     <TableHead>Name</TableHead>
                     <TableHead className="w-[150px]">Cost</TableHead>
                     <TableHead className="w-[140px]">Qty</TableHead>
-                    <TableHead className="hidden lg:table-cell w-28 text-right">Old Avg</TableHead>
-                    <TableHead className="hidden lg:table-cell w-28 text-right">New Avg</TableHead>
-                    <TableHead className="hidden lg:table-cell w-20 text-right">Δ%</TableHead>
-                    <TableHead className="text-right w-[130px]">Total</TableHead><TableHead className="w-11"></TableHead>
+                    <TableHead className="w-24 text-right">Old Avg</TableHead>
+                    <TableHead className="w-24 text-right">New Avg</TableHead>
+                    <TableHead className="w-16 text-right">Δ%</TableHead>
+                    <TableHead className="text-right w-[120px]">Total</TableHead><TableHead className="w-11"></TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {lines.map((l, i) => {
