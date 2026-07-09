@@ -88,25 +88,67 @@ function Page() {
 
   return (
     <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Sales history</h1>
-        <p className="text-sm text-muted-foreground">{sales.length} recent invoices</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Sales history</h1>
+          <p className="text-sm text-muted-foreground">{sales.length} invoices · {presetLabel}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {PRESETS.map(p => (
+            <Button
+              key={p.key}
+              variant={preset === p.key ? "default" : "outline"}
+              size="sm"
+              onClick={() => applyPreset(p.key)}
+            >
+              {p.label}
+            </Button>
+          ))}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={preset === "custom" ? "default" : "outline"}
+                size="sm"
+                className={cn("gap-2")}
+              >
+                <CalendarIcon className="h-4 w-4" />
+                {fromDate && toDate
+                  ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
+                  : "Custom range"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="range"
+                selected={{ from: fromDate, to: toDate }}
+                onSelect={(r) => {
+                  setPreset("custom");
+                  setFromDate(r?.from);
+                  setToDate(r?.to);
+                }}
+                numberOfMonths={2}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Today's sales</div>
-          <div className="text-2xl font-semibold mt-1">{todaySales.length}</div>
+          <div className="text-xs text-muted-foreground">{presetLabel} · sales</div>
+          <div className="text-2xl font-semibold mt-1">{sales.length}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Today's revenue</div>
-          <div className="text-2xl font-semibold mt-1 text-primary">{fmtMoney(todayTotal, sym)}</div>
+          <div className="text-xs text-muted-foreground">{presetLabel} · revenue</div>
+          <div className="text-2xl font-semibold mt-1 text-primary">{fmtMoney(rangeTotal, sym)}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Today's profit</div>
-          <div className="text-2xl font-semibold mt-1 text-success">{fmtMoney(todayProfit, sym)}</div>
+          <div className="text-xs text-muted-foreground">{presetLabel} · profit</div>
+          <div className="text-2xl font-semibold mt-1 text-success">{fmtMoney(rangeProfit, sym)}</div>
         </Card>
       </div>
+
 
       <Card className="p-3">
         <Table>
