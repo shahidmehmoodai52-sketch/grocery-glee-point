@@ -208,6 +208,7 @@ function Page() {
             <TabsTrigger value="profit">Sale &amp; profit</TabsTrigger>
             <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
             <TabsTrigger value="product">Product-wise</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
           </TabsList>
           {(tab === "invoice" || tab === "product") && (
             <Input
