@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { offlineFirst, cacheExpenses, insertOfflineAware } from "@/lib/offline/pos";
+import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/expenses")({ component: Page });
 
