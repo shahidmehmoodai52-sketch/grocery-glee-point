@@ -59,6 +59,14 @@ type TenantRow = {
   created_at: string;
 };
 
+type SecuritySummary = {
+  failed_logins_24h: number;
+  critical_24h: number;
+  total_24h: number;
+  active_blocks: number;
+  unique_ips_24h: number;
+};
+
 function AdminPanelPage() {
   const navigate = useNavigate();
   const { isSuperAdmin, loading } = useSuperAdmin();
@@ -69,10 +77,42 @@ function AdminPanelPage() {
     }
   }, [loading, isSuperAdmin, navigate]);
 
+  const { data: errorCount = 0 } = useQuery({
+    queryKey: ["admin-errors-count"],
+    enabled: isSuperAdmin,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_recent_errors", { _limit: 100 });
+      if (error) throw error;
+      return ((data as any[]) ?? []).length;
+    },
+  });
+
+  const { data: securitySummary } = useQuery({
+    queryKey: ["admin-security-summary"],
+    enabled: isSuperAdmin,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_security_summary");
+      if (error) throw error;
+      return (data as unknown as SecuritySummary) ?? null;
+    },
+  });
+
+  const securityAlert =
+    (securitySummary?.critical_24h ?? 0) > 0 ||
+    (securitySummary?.active_blocks ?? 0) > 0 ||
+    (securitySummary?.failed_logins_24h ?? 0) >= 5;
+
   if (loading) {
     return <div className="p-6"><TableSkeleton rows={6} columns={5} /></div>;
   }
   if (!isSuperAdmin) return null;
+
+  const alertTabClass =
+    "data-[state=inactive]:bg-destructive/15 data-[state=inactive]:text-destructive data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground";
+  const okTabClass =
+    "data-[state=inactive]:bg-emerald-500/10 data-[state=inactive]:text-emerald-600 dark:data-[state=inactive]:text-emerald-400";
 
   return (
     <div className="p-6 space-y-4">
@@ -84,8 +124,24 @@ function AdminPanelPage() {
       <Tabs defaultValue="tenants">
         <TabsList>
           <TabsTrigger value="tenants"><Store className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
-          <TabsTrigger value="security"><ShieldAlert className="h-4 w-4 mr-1" />Security</TabsTrigger>
-          <TabsTrigger value="errors"><Bug className="h-4 w-4 mr-1" />Errors</TabsTrigger>
+          <TabsTrigger value="security" className={securityAlert ? alertTabClass : okTabClass}>
+            <ShieldAlert className="h-4 w-4 mr-1" />
+            Security
+            {securityAlert ? (
+              <span className="ml-2 inline-flex items-center rounded-full bg-destructive-foreground/20 px-1.5 text-[10px] font-semibold">!</span>
+            ) : (
+              <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="errors" className={errorCount > 0 ? alertTabClass : okTabClass}>
+            <Bug className="h-4 w-4 mr-1" />
+            Errors
+            {errorCount > 0 ? (
+              <span className="ml-2 inline-flex items-center rounded-full bg-destructive-foreground/20 px-1.5 text-[10px] font-semibold">{errorCount}</span>
+            ) : (
+              <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            )}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
         <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
@@ -359,40 +415,102 @@ function ErrorsTab() {
       if (error) throw error;
       return (data as any[]) ?? [];
     },
+    refetchInterval: 30_000,
   });
+  const { data: tenants = [] } = useQuery({
+    queryKey: ["admin-tenants"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_tenants");
+      if (error) throw error;
+      return (data as TenantRow[]) ?? [];
+    },
+  });
+  const tenantMap = useMemo(() => {
+    const m = new Map<string, TenantRow>();
+    for (const t of tenants) m.set(t.id, t);
+    return m;
+  }, [tenants]);
+
+  const byShop = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const key = r.tenant_id ?? "unknown";
+      m.set(key, (m.get(key) ?? 0) + 1);
+    }
+    return Array.from(m.entries())
+      .map(([tid, count]) => ({ tid, count, name: tenantMap.get(tid)?.name ?? "Unknown shop" }))
+      .sort((a, b) => b.count - a.count);
+  }, [rows, tenantMap]);
+
   return (
-    <Card className="p-3">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>When</TableHead>
-            <TableHead>Tenant</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Message</TableHead>
-            <TableHead>Where</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading && (
-            <TableRow><TableCell colSpan={5} className="py-4"><TableSkeleton rows={5} columns={5} /></TableCell></TableRow>
-          )}
-          {!isLoading && rows.length === 0 && (
-            <TableRow><TableCell colSpan={5} className="py-8">
-              <EmptyState icon={Bug} title="No errors" description="No recent errors logged." />
-            </TableCell></TableRow>
-          )}
-          {rows.map((e) => (
-            <TableRow key={e.id}>
-              <TableCell className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{e.tenant_id?.slice(0, 8) ?? "—"}</TableCell>
-              <TableCell><StatusBadge tone="danger">{e.error_type}</StatusBadge></TableCell>
-              <TableCell className="max-w-md truncate" title={e.error_message}>{e.error_message}</TableCell>
-              <TableCell className="text-muted-foreground">{e.page_or_module ?? "—"}</TableCell>
+    <div className="space-y-3">
+      {byShop.length > 0 && (
+        <Card className="p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <div className="font-medium text-sm">Affected shops</div>
+            <span className="text-xs text-muted-foreground">Which shop has which issue count</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {byShop.map((s) => (
+              <Link
+                key={s.tid}
+                to="/admin/shops/$id"
+                params={{ id: s.tid }}
+                className="inline-flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs hover:bg-destructive/20"
+              >
+                <span className="font-medium">{s.name}</span>
+                <span className="rounded-full bg-destructive px-1.5 text-destructive-foreground">{s.count}</span>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-3">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Shop</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Message</TableHead>
+              <TableHead>Where</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
+          </TableHeader>
+          <TableBody>
+            {isLoading && (
+              <TableRow><TableCell colSpan={5} className="py-4"><TableSkeleton rows={5} columns={5} /></TableCell></TableRow>
+            )}
+            {!isLoading && rows.length === 0 && (
+              <TableRow><TableCell colSpan={5} className="py-8">
+                <EmptyState icon={CheckCircle2} title="All clear" description="No recent errors — everything is running smoothly." />
+              </TableCell></TableRow>
+            )}
+            {rows.map((e) => {
+              const shop = e.tenant_id ? tenantMap.get(e.tenant_id) : null;
+              return (
+                <TableRow key={e.id}>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</TableCell>
+                  <TableCell className="text-xs">
+                    {shop ? (
+                      <Link to="/admin/shops/$id" params={{ id: shop.id }} className="font-medium hover:underline">
+                        {shop.name}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">{e.tenant_id ? "Unknown" : "—"}</span>
+                    )}
+                  </TableCell>
+                  <TableCell><StatusBadge tone="danger">{e.error_type}</StatusBadge></TableCell>
+                  <TableCell className="max-w-md truncate" title={e.error_message}>{e.error_message}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{e.page_or_module ?? "—"}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
   );
 }
 
@@ -418,13 +536,6 @@ type BlocklistRow = {
   created_at: string;
 };
 
-type SecuritySummary = {
-  failed_logins_24h: number;
-  critical_24h: number;
-  total_24h: number;
-  active_blocks: number;
-  unique_ips_24h: number;
-};
 
 function SecurityTab() {
   const qc = useQueryClient();
