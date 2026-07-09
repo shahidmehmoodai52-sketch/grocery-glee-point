@@ -849,7 +849,7 @@ function POSPage() {
   });
 
   return (
-      <div className="h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden">
       <ShiftBanner />
       {/* Top strip — open bills + clock + reprint (jahaan se sidebar khulti hai us patti ke saath) */}
         <div className="flex items-center gap-2 px-2 py-1 border-b bg-card/60 no-print shrink-0">
@@ -990,7 +990,7 @@ function POSPage() {
         {/* Item-wise detailed table — FAST SALES style spreadsheet */}
         <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-background">
           <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
-            <thead className="sticky top-0 z-10 bg-[hsl(var(--muted))] text-[11px] uppercase tracking-wide">
+            <thead className="sticky top-0 z-10 bg-primary text-primary-foreground text-[11px] uppercase tracking-wide">
               <tr>
                 <th className="px-2 py-2 text-left w-16">Item No</th>
                 <th className="px-2 py-2 text-left">Item Name</th>
