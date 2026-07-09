@@ -22,9 +22,11 @@ function BackupPage() {
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const supported = isSupported();
+  const inIframe = typeof window !== "undefined" && window.self !== window.top;
 
   const refresh = async () => setStatus(await getStatus());
   useEffect(() => { refresh(); }, []);
+
 
   const pick = async () => {
     try {
@@ -72,6 +74,23 @@ function BackupPage() {
           </CardContent>
         </Card>
       )}
+
+      {supported && inIframe && (
+        <Card className="border-warning/50 bg-warning/5">
+          <CardContent className="flex items-start gap-3 pt-6">
+            <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
+            <div className="text-sm flex-1 space-y-2">
+              <div>
+                <b>Folder picker preview me kaam nahi karega.</b> Browser security wajah se iframe ke andar folder select nahi ho sakta. App ko naye tab me kholiye — wahan folder select karke daily auto-backup enable ho jayega.
+              </div>
+              <Button size="sm" variant="outline" onClick={() => window.open(window.location.href, "_blank", "noopener")}>
+                Open backup in new tab
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       <Card>
         <CardHeader>
