@@ -19,6 +19,30 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+// Strong-password rule: 8+ chars, at least 1 uppercase, 1 lowercase, 1 digit.
+function checkStrongPassword(pw: string): string | null {
+  if (pw.length < 8) return "Password must be at least 8 characters.";
+  if (!/[A-Z]/.test(pw)) return "Add at least one UPPERCASE letter.";
+  if (!/[a-z]/.test(pw)) return "Add at least one lowercase letter.";
+  if (!/[0-9]/.test(pw)) return "Add at least one number.";
+  return null;
+}
+
+async function ensureShopRegistered(shop: {
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+}) {
+  const { error } = await supabase.rpc("register_shop" as any, {
+    _name: shop.name,
+    _phone: shop.phone || null,
+    _address: shop.address || null,
+    _city: shop.city || null,
+  } as any);
+  if (error) throw error;
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const { next } = Route.useSearch();
@@ -27,6 +51,10 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [shopName, setShopName] = useState("");
+  const [shopPhone, setShopPhone] = useState("");
+  const [shopAddress, setShopAddress] = useState("");
+  const [shopCity, setShopCity] = useState("");
   const [busy, setBusy] = useState(false);
 
   const goToApp = useCallback(async () => {
@@ -58,6 +86,16 @@ function AuthPage() {
         return;
       }
       if (mode === "signup") {
+        // Strong password enforced on signup.
+        const pwErr = checkStrongPassword(password);
+        if (pwErr) { toast.error(pwErr); return; }
+        // Shop details mandatory on signup.
+        if (shopName.trim().length < 2) { toast.error("Shop name is required."); return; }
+        if (!shopPhone.trim() || !shopAddress.trim() || !shopCity.trim()) {
+          toast.error("Please enter shop phone, address and city.");
+          return;
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
           password,
@@ -74,11 +112,32 @@ function AuthPage() {
           }
           return;
         }
+        // If email-confirmation is off we now have a session — register shop right away.
         if (data.session) {
-          toast.info("Account banaya gaya. Shop ab admin approval ka intezaar kar rahi hai.");
+          try {
+            await ensureShopRegistered({
+              name: shopName.trim(),
+              phone: shopPhone.trim(),
+              address: shopAddress.trim(),
+              city: shopCity.trim(),
+            });
+            toast.success("Shop registered. Awaiting admin approval — you have limited access until approved.");
+          } catch (err: any) {
+            toast.error(err?.message ?? "Could not register shop. Please contact support.");
+          }
           await goToApp();
         } else {
-          toast.success("Account ban gaya. Sign in karne ke baad shop admin approval par activate hogi.");
+          // Stash shop details so we can register the shop after email confirmation / first sign-in.
+          window.sessionStorage.setItem(
+            "pendingShopDetails",
+            JSON.stringify({
+              name: shopName.trim(),
+              phone: shopPhone.trim(),
+              address: shopAddress.trim(),
+              city: shopCity.trim(),
+            }),
+          );
+          toast.success("Account created. Sign in to finish shop registration.");
           setMode("signin");
         }
       } else {
@@ -89,6 +148,15 @@ function AuthPage() {
           return;
         }
         void logSecurityEvent("successful_login", { severity: "info", email: cleanEmail });
+        // If we stashed pending shop details during signup, register now.
+        try {
+          const raw = window.sessionStorage.getItem("pendingShopDetails");
+          if (raw) {
+            const shop = JSON.parse(raw);
+            await ensureShopRegistered(shop);
+            window.sessionStorage.removeItem("pendingShopDetails");
+          }
+        } catch { /* non-fatal */ }
         await goToApp();
       }
     } finally {
@@ -130,7 +198,7 @@ function AuthPage() {
             <Store className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-semibold">Grocery POS</h1>
-          <p className="text-sm text-muted-foreground mt-1">Create an account, then sign in</p>
+          <p className="text-sm text-muted-foreground mt-1">Create an account & register your shop</p>
         </div>
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")}>
@@ -142,8 +210,29 @@ function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-4 mt-6">
             <TabsContent value="signup" className="space-y-4 mt-0">
               <div className="space-y-1.5">
-                <Label htmlFor="full_name">Full name</Label>
+                <Label htmlFor="full_name">Your full name</Label>
                 <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} required={mode === "signup"} />
+              </div>
+              <div className="rounded-md border p-3 space-y-3 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shop details (required)</p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="shop_name">Shop name</Label>
+                  <Input id="shop_name" value={shopName} onChange={(e) => setShopName(e.target.value)} required={mode === "signup"} placeholder="e.g. Ali General Store" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="shop_phone">Phone</Label>
+                    <Input id="shop_phone" value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} required={mode === "signup"} placeholder="03xx-xxxxxxx" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="shop_city">City</Label>
+                    <Input id="shop_city" value={shopCity} onChange={(e) => setShopCity(e.target.value)} required={mode === "signup"} placeholder="Lahore" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="shop_address">Address</Label>
+                  <Input id="shop_address" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} required={mode === "signup"} placeholder="Shop # / Street / Area" />
+                </div>
               </div>
             </TabsContent>
             <div className="space-y-1.5">
@@ -164,11 +253,14 @@ function AuthPage() {
                   </button>
                 )}
               </div>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={mode === "signup" ? 8 : 6} autoComplete={mode === "signin" ? "current-password" : "new-password"} />
+              {mode === "signup" && (
+                <p className="text-[11px] text-muted-foreground">Use 8+ chars with an uppercase letter, a lowercase letter, and a number.</p>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {mode === "signin" ? "Sign in" : "Create account"}
+              {mode === "signin" ? "Sign in" : "Create account & register shop"}
             </Button>
           </form>
         </Tabs>
@@ -185,7 +277,7 @@ function AuthPage() {
         </Button>
 
         <p className="text-xs text-muted-foreground text-center mt-6">
-          The first account created becomes the admin.
+          New shops start as <strong>pending</strong>. You'll have limited access until the developer approves your shop.
         </p>
       </Card>
     </div>
