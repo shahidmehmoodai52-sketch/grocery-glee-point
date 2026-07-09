@@ -1,26 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Printer, Undo2, Ban } from "lucide-react";
+import { Eye, Printer, Undo2, Ban, CalendarIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { Receipt } from "@/components/receipt";
+import { cn } from "@/lib/utils";
+import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: Page });
 
 function Page() {
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs.";
   const qc = useQueryClient();
   const [viewing, setViewing] = useState<any>(null);
   const [voidTarget, setVoidTarget] = useState<any>(null);
@@ -28,11 +33,38 @@ function Page() {
   const [voiding, setVoiding] = useState(false);
   const voidRequireReason = !!(settings as any)?.ops_void_requires_reason;
 
-  const { data: sales = [] } = useQuery({
+  const [preset, setPreset] = useState<DatePreset | "custom">("today");
+  const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
+  const [toDate, setToDate] = useState<Date | undefined>(new Date());
+
+  const applyPreset = (p: DatePreset) => {
+    setPreset(p);
+    const { from, to } = rangeFor(p);
+    setFromDate(from ? new Date(from) : undefined);
+    setToDate(to ? new Date(to) : undefined);
+  };
+
+  const { data: allSales = [] } = useQuery({
     queryKey: ["sales"],
     queryFn: async () =>
-      (await supabase.from("sales").select("*, customers(name), sale_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+      (await supabase.from("sales").select("*, customers(name), sale_items(*)").order("created_at", { ascending: false }).limit(1000)).data ?? [],
   });
+
+  const sales = useMemo(() => {
+    return allSales.filter((s: any) => {
+      const d = new Date(s.created_at);
+      if (fromDate) {
+        const f = new Date(fromDate); f.setHours(0, 0, 0, 0);
+        if (d < f) return false;
+      }
+      if (toDate) {
+        const t = new Date(toDate); t.setHours(23, 59, 59, 999);
+        if (d > t) return false;
+      }
+      return true;
+    });
+  }, [allSales, fromDate, toDate]);
+
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const todaySales = sales.filter((s: any) => new Date(s.created_at) >= today);
