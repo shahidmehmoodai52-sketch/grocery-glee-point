@@ -1686,6 +1686,104 @@ function POSPage() {
 
 
 
+const ONLINE_METHODS_KEY = "pos:online_pay_methods";
+const DEFAULT_ONLINE_METHODS: { v: string; label: string }[] = [
+  { v: "bank", label: "Bank" },
+  { v: "jazzcash", label: "JazzCash" },
+  { v: "easypaisa", label: "EasyPaisa" },
+];
+
+function loadOnlineMethods(): { v: string; label: string }[] {
+  try {
+    const raw = localStorage.getItem(ONLINE_METHODS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr;
+    }
+  } catch {/* noop */}
+  return DEFAULT_ONLINE_METHODS;
+}
+
+function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [online, setOnline] = useState<{ v: string; label: string }[]>(() => loadOnlineMethods());
+
+  const saveOnline = (list: { v: string; label: string }[]) => {
+    setOnline(list);
+    try { localStorage.setItem(ONLINE_METHODS_KEY, JSON.stringify(list)); } catch {/* noop */}
+  };
+
+  const isOnline = online.some((o) => o.v === value);
+  const activeOnline = online.find((o) => o.v === value);
+
+  const addHead = () => {
+    const name = window.prompt("New online payment head (e.g. NayaPay)");
+    if (!name) return;
+    const label = name.trim();
+    if (!label) return;
+    const v = label.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    if (!v) return;
+    if (online.some((o) => o.v === v)) { onChange(v); return; }
+    const next = [...online, { v, label }];
+    saveOnline(next);
+    onChange(v);
+  };
+
+  const removeHead = (v: string) => {
+    const next = online.filter((o) => o.v !== v);
+    if (!next.length) return;
+    saveOnline(next);
+    if (value === v) onChange(next[0].v);
+  };
+
+  const btn = (active: boolean) =>
+    `h-9 rounded-lg text-sm font-medium transition-all ${
+      active
+        ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+        : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
+    }`;
+
+  return (
+    <div className="grid grid-cols-4 gap-1.5 mt-1.5">
+      <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>Cash</button>
+      <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>Card</button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className={`${btn(isOnline)} flex items-center justify-center gap-1 px-1`}>
+            <span className="truncate">{isOnline ? activeOnline!.label : "Online"}</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          {online.map((o) => (
+            <DropdownMenuItem
+              key={o.v}
+              onSelect={() => onChange(o.v)}
+              className="flex items-center justify-between"
+            >
+              <span className={value === o.v ? "font-semibold" : ""}>{o.label}</span>
+              {online.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeHead(o.v); }}
+                  className="ml-2 opacity-40 hover:opacity-100"
+                  title="Remove"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); addHead(); }}>
+            <Plus className="h-3.5 w-3.5 mr-2" /> Add new head
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>Credit</button>
+    </div>
+  );
+}
+
 function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className={`flex justify-between text-sm ${muted ? "text-muted-foreground" : ""}`}>
