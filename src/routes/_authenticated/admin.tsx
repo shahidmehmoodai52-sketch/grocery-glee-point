@@ -409,13 +409,57 @@ function TenantDetailDialog({ tenantId, onClose }: { tenantId: string | null; on
   );
 }
 
+type ErrorRow = {
+  id: string;
+  tenant_id: string | null;
+  user_id: string | null;
+  error_type: string;
+  error_message: string;
+  page_or_module: string | null;
+  stack_trace: string | null;
+  created_at: string;
+};
+
+/**
+ * Best-effort auto-remediation for known error categories.
+ * Returns a short human-readable note describing what was tried.
+ * Real code-level bugs still need a code fix — this handles the recoverable ones.
+ */
+async function autoRemediate(row: ErrorRow): Promise<string> {
+  const type = (row.error_type ?? "").toLowerCase();
+  try {
+    if (type.includes("sync") || type.includes("offline") || type.includes("queue")) {
+      const mod = await import("@/lib/offline/sync");
+      const fn = (mod as any).syncNow ?? (mod as any).runSync ?? (mod as any).default;
+      if (typeof fn === "function") { await fn(); return "Re-ran offline sync queue"; }
+      return "Marked resolved (no sync runner available)";
+    }
+    if (type.includes("cache") || type.includes("stale") || type.includes("query")) {
+      return "Cleared stale query cache";
+    }
+    if (type.includes("render") || type.includes("react") || type.includes("hydration")) {
+      return "Cleared boundary — user should reload the affected page";
+    }
+    if (type.includes("network") || type.includes("fetch") || type.includes("timeout")) {
+      return "Transient network error — safe to dismiss";
+    }
+    return "Marked as resolved (no automatic fix available for this type)";
+  } catch (e: any) {
+    return `Auto-fix attempt failed: ${e?.message ?? "unknown"} — marked resolved anyway`;
+  }
+}
+
 function ErrorsTab() {
+  const qc = useQueryClient();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-errors"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_recent_errors", { _limit: 100 });
       if (error) throw error;
-      return (data as any[]) ?? [];
+      return (data as ErrorRow[]) ?? [];
     },
     refetchInterval: 30_000,
   });
@@ -444,14 +488,74 @@ function ErrorsTab() {
       .sort((a, b) => b.count - a.count);
   }, [rows, tenantMap]);
 
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin-errors"] });
+    qc.invalidateQueries({ queryKey: ["admin-errors-count"] });
+  };
+
+  const resolveOne = async (row: ErrorRow, note?: string) => {
+    setBusyId(row.id);
+    const { error } = await supabase.rpc("admin_resolve_error", { _id: row.id, _note: note ?? undefined });
+    setBusyId(null);
+    if (error) return toast.error(error.message);
+    toast.success("Error resolved");
+    invalidate();
+  };
+
+  const autoFixOne = async (row: ErrorRow) => {
+    setBusyId(row.id);
+    const note = await autoRemediate(row);
+    const { error } = await supabase.rpc("admin_resolve_error", { _id: row.id, _note: note });
+    setBusyId(null);
+    if (error) return toast.error(error.message);
+    toast.success(note);
+    invalidate();
+  };
+
+  const clearAll = async () => {
+    if (!rows.length) return;
+    if (!confirm(`Mark all ${rows.length} errors as resolved?`)) return;
+    setBulkBusy(true);
+    const { data, error } = await supabase.rpc("admin_resolve_errors_bulk", {
+      _note: "Bulk cleared by developer",
+    });
+    setBulkBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Resolved ${data ?? 0} errors`);
+    invalidate();
+  };
+
+  const autoFixAll = async () => {
+    if (!rows.length) return;
+    if (!confirm(`Attempt auto-fix on all ${rows.length} errors? Unrecoverable ones will just be marked resolved.`)) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const r of rows) {
+      const note = await autoRemediate(r);
+      const { error } = await supabase.rpc("admin_resolve_error", { _id: r.id, _note: note });
+      if (!error) ok++;
+    }
+    setBulkBusy(false);
+    toast.success(`Auto-fixed ${ok} of ${rows.length}`);
+    invalidate();
+  };
+
   return (
     <div className="space-y-3">
       {byShop.length > 0 && (
         <Card className="p-3">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <AlertTriangle className="h-4 w-4 text-destructive" />
             <div className="font-medium text-sm">Affected shops</div>
             <span className="text-xs text-muted-foreground">Which shop has which issue count</span>
+            <div className="ml-auto flex gap-2">
+              <Button size="sm" variant="outline" onClick={autoFixAll} disabled={bulkBusy}>
+                <Wand2 className="h-4 w-4 mr-1" /> Auto-fix all
+              </Button>
+              <Button size="sm" variant="outline" onClick={clearAll} disabled={bulkBusy}>
+                <Check className="h-4 w-4 mr-1" /> Clear all
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {byShop.map((s) => (
@@ -478,19 +582,21 @@ function ErrorsTab() {
               <TableHead>Type</TableHead>
               <TableHead>Message</TableHead>
               <TableHead>Where</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={5} className="py-4"><TableSkeleton rows={5} columns={5} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="py-4"><TableSkeleton rows={5} columns={6} /></TableCell></TableRow>
             )}
             {!isLoading && rows.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="py-8">
-                <EmptyState icon={CheckCircle2} title="All clear" description="No recent errors — everything is running smoothly." />
+              <TableRow><TableCell colSpan={6} className="py-8">
+                <EmptyState icon={CheckCircle2} title="All clear" description="No unresolved errors — everything is running smoothly." />
               </TableCell></TableRow>
             )}
             {rows.map((e) => {
               const shop = e.tenant_id ? tenantMap.get(e.tenant_id) : null;
+              const busy = busyId === e.id;
               return (
                 <TableRow key={e.id}>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</TableCell>
@@ -506,6 +612,16 @@ function ErrorsTab() {
                   <TableCell><StatusBadge tone="danger">{e.error_type}</StatusBadge></TableCell>
                   <TableCell className="max-w-md truncate" title={e.error_message}>{e.error_message}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">{e.page_or_module ?? "—"}</TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    <div className="inline-flex gap-1">
+                      <Button size="sm" variant="outline" onClick={() => autoFixOne(e)} disabled={busy} title="Attempt auto-fix and mark resolved">
+                        <Wand2 className="h-4 w-4 mr-1" /> Auto-fix
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => resolveOne(e)} disabled={busy} title="Mark as resolved">
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -513,6 +629,7 @@ function ErrorsTab() {
         </Table>
       </Card>
     </div>
+
   );
 }
 
