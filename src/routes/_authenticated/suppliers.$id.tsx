@@ -45,7 +45,11 @@ function Page() {
   const [payDefault, setPayDefault] = useState(0);
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
+  const [obValue, setObValue] = useState<string>("");
+  const [obSaving, setObSaving] = useState(false);
+  const qc = useQueryClient();
   const toggle = (pid: string) => setExpanded((s) => { const n = new Set(s); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
+
 
   const { data: purchaseItems = [] } = useQuery({
     queryKey: ["supplier-purchase-items", id],
@@ -111,10 +115,25 @@ function Page() {
     return true;
   });
 
-  // Single source of truth: ledger drives every number.
-  const opening = entries
+  // Single source of truth: ledger + a manually-entered opening balance drive every number.
+  const initialOB = Number(supplier?.opening_balance ?? 0);
+  useEffect(() => { if (supplier) setObValue(String(Number(supplier.opening_balance ?? 0))); }, [supplier?.id, supplier?.opening_balance]);
+
+  const opening = initialOB + entries
     .filter((x) => from && x.date < from)
     .reduce((s, x) => s + x.debit - x.credit, 0);
+
+  const saveOpeningBalance = async () => {
+    const v = Number(obValue);
+    if (!Number.isFinite(v)) return toast.error("Enter a valid number");
+    setObSaving(true);
+    const { error } = await supabase.from("suppliers").update({ opening_balance: v }).eq("id", id);
+    setObSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Opening balance saved");
+    qc.invalidateQueries({ queryKey: ["supplier", id] });
+  };
+
 
   let running = opening;
   const rows = filtered.map((x) => {
