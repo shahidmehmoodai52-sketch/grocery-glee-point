@@ -43,11 +43,15 @@ function BackupPage() {
       if (r.ok) toast.success(`Backup saved: ${r.file}`);
       else toast.error(r.error ?? "Backup failed");
       await refresh();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Backup failed");
     } finally { setBusy(false); }
   };
 
   const toggle = async (v: boolean) => { await setAutoEnabled(v); await refresh(); };
   const unlink = async () => { await clearBackupFolder(); toast.message("Folder unlinked"); await refresh(); };
+  const onTimeChange = async (v: string) => { await setBackupTime(v); await refresh(); };
+
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
