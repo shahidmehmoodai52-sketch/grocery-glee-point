@@ -66,10 +66,10 @@ function Page() {
   }, [allSales, fromDate, toDate]);
 
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const todaySales = sales.filter((s: any) => new Date(s.created_at) >= today);
-  const todayTotal = todaySales.reduce((s: number, x: any) => s + Number(x.total), 0);
-  const todayProfit = todaySales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+  const rangeTotal = sales.reduce((s: number, x: any) => s + Number(x.total), 0);
+  const rangeProfit = sales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+  const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
+
 
   const confirmVoid = async () => {
     if (!voidTarget) return;
