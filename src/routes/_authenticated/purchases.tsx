@@ -246,9 +246,9 @@ function Page() {
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
               </TableRow>
             ))}
-            {purchases.length > 0 && (() => {
-              const allTotal = (purchases as any[]).reduce((s, p) => s + Number(p.total), 0);
-              const allPaid = (purchases as any[]).reduce((s, p) => s + Number(p.paid), 0);
+            {filtered.length > 0 && (() => {
+              const allTotal = filtered.reduce((s: number, p: any) => s + Number(p.total), 0);
+              const allPaid = filtered.reduce((s: number, p: any) => s + Number(p.paid), 0);
               const due = allTotal - allPaid;
               return (
                 <>
@@ -267,6 +267,8 @@ function Page() {
             })()}
           </TableBody>
         </Table>
+          );
+        })()}
         {(() => {
           const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
           const todayTotal = (purchases as any[]).filter((p) => new Date(p.created_at) >= startOfToday).reduce((s, p) => s + Number(p.total), 0);
@@ -282,3 +284,54 @@ function Page() {
     </div>
   );
 }
+
+type PickerProduct = { id: string; name: string; barcode?: string | null; cost_price?: number | null; stock?: number | null };
+
+function ProductPicker({ products, value, onPick }: { products: PickerProduct[]; value: string | null; onPick: (p: PickerProduct | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const selected = value ? products.find((p) => p.id === value) : null;
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return products.slice(0, 50);
+    return products.filter((p) =>
+      (p.name ?? "").toLowerCase().includes(term) ||
+      (p.barcode ?? "").toLowerCase().includes(term)
+    ).slice(0, 50);
+  }, [products, q]);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" role="combobox" className="h-8 w-full justify-between font-normal">
+          <span className="truncate">{selected ? selected.name : "Pick / ad-hoc"}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[320px]" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Search name or barcode…" value={q} onValueChange={setQ} />
+          <CommandList>
+            <CommandEmpty>No product found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="__new" onSelect={() => { onPick(null); setOpen(false); setQ(""); }}>
+                <Check className={cn("mr-2 h-4 w-4", !value ? "opacity-100" : "opacity-0")} />
+                — New / ad-hoc —
+              </CommandItem>
+              {filtered.map((p) => (
+                <CommandItem key={p.id} value={p.id} onSelect={() => { onPick(p); setOpen(false); setQ(""); }}>
+                  <Check className={cn("mr-2 h-4 w-4", value === p.id ? "opacity-100" : "opacity-0")} />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate">{p.name}</div>
+                    {p.barcode && <div className="text-[10px] text-muted-foreground truncate">{p.barcode}</div>}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground ml-2">stk {Number(p.stock ?? 0)}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
