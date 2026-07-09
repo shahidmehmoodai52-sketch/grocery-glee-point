@@ -132,7 +132,31 @@ function Page() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
+                <div>
+                  <Label>Search &amp; add product</Label>
+                  <ProductPicker
+                    products={products}
+                    value={null}
+                    placeholder="Search name or barcode to add…"
+                    onPick={(p) => {
+                      if (!p) {
+                        setLines((ls) => [...ls, { product_id: null, name: "", qty: 1, cost: 0 }]);
+                        return;
+                      }
+                      setLines((ls) => [
+                        ...ls,
+                        {
+                          product_id: p.id,
+                          name: p.name ?? "",
+                          qty: 1,
+                          cost: Number(p.cost_price ?? 0),
+                          old_stock: Number(p.stock ?? 0),
+                          old_cost: Number(p.cost_price ?? 0),
+                        },
+                      ]);
+                    }}
+                  />
+                </div>
               </div>
 
               <div className="border rounded-md">
