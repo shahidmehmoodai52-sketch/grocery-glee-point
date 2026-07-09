@@ -1861,6 +1861,7 @@ function ReprintDialog({
   sym,
   reprintAuditEnabled,
   onView,
+  onEdit,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -1868,6 +1869,7 @@ function ReprintDialog({
   sym: string;
   reprintAuditEnabled?: boolean;
   onView: (s: any) => void;
+  onEdit: (s: any) => void;
 }) {
   const [q, setQ] = useState("");
 
