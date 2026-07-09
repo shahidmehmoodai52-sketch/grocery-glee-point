@@ -1,26 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Printer, Undo2, Ban } from "lucide-react";
+import { Eye, Printer, Undo2, Ban, CalendarIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { Receipt } from "@/components/receipt";
+import { cn } from "@/lib/utils";
+import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: Page });
 
 function Page() {
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs.";
   const qc = useQueryClient();
   const [viewing, setViewing] = useState<any>(null);
   const [voidTarget, setVoidTarget] = useState<any>(null);
@@ -28,16 +33,43 @@ function Page() {
   const [voiding, setVoiding] = useState(false);
   const voidRequireReason = !!(settings as any)?.ops_void_requires_reason;
 
-  const { data: sales = [] } = useQuery({
+  const [preset, setPreset] = useState<DatePreset | "custom">("today");
+  const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
+  const [toDate, setToDate] = useState<Date | undefined>(new Date());
+
+  const applyPreset = (p: DatePreset) => {
+    setPreset(p);
+    const { from, to } = rangeFor(p);
+    setFromDate(from ? new Date(from) : undefined);
+    setToDate(to ? new Date(to) : undefined);
+  };
+
+  const { data: allSales = [] } = useQuery({
     queryKey: ["sales"],
     queryFn: async () =>
-      (await supabase.from("sales").select("*, customers(name), sale_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+      (await supabase.from("sales").select("*, customers(name), sale_items(*)").order("created_at", { ascending: false }).limit(1000)).data ?? [],
   });
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const todaySales = sales.filter((s: any) => new Date(s.created_at) >= today);
-  const todayTotal = todaySales.reduce((s: number, x: any) => s + Number(x.total), 0);
-  const todayProfit = todaySales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+  const sales = useMemo(() => {
+    return allSales.filter((s: any) => {
+      const d = new Date(s.created_at);
+      if (fromDate) {
+        const f = new Date(fromDate); f.setHours(0, 0, 0, 0);
+        if (d < f) return false;
+      }
+      if (toDate) {
+        const t = new Date(toDate); t.setHours(23, 59, 59, 999);
+        if (d > t) return false;
+      }
+      return true;
+    });
+  }, [allSales, fromDate, toDate]);
+
+
+  const rangeTotal = sales.reduce((s: number, x: any) => s + Number(x.total), 0);
+  const rangeProfit = sales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+  const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
+
 
   const confirmVoid = async () => {
     if (!voidTarget) return;
@@ -56,25 +88,67 @@ function Page() {
 
   return (
     <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Sales history</h1>
-        <p className="text-sm text-muted-foreground">{sales.length} recent invoices</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Sales history</h1>
+          <p className="text-sm text-muted-foreground">{sales.length} invoices · {presetLabel}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {PRESETS.map(p => (
+            <Button
+              key={p.key}
+              variant={preset === p.key ? "default" : "outline"}
+              size="sm"
+              onClick={() => applyPreset(p.key)}
+            >
+              {p.label}
+            </Button>
+          ))}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={preset === "custom" ? "default" : "outline"}
+                size="sm"
+                className={cn("gap-2")}
+              >
+                <CalendarIcon className="h-4 w-4" />
+                {fromDate && toDate
+                  ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
+                  : "Custom range"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="range"
+                selected={{ from: fromDate, to: toDate }}
+                onSelect={(r) => {
+                  setPreset("custom");
+                  setFromDate(r?.from);
+                  setToDate(r?.to);
+                }}
+                numberOfMonths={2}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Today's sales</div>
-          <div className="text-2xl font-semibold mt-1">{todaySales.length}</div>
+          <div className="text-xs text-muted-foreground">{presetLabel} · sales</div>
+          <div className="text-2xl font-semibold mt-1">{sales.length}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Today's revenue</div>
-          <div className="text-2xl font-semibold mt-1 text-primary">{fmtMoney(todayTotal, sym)}</div>
+          <div className="text-xs text-muted-foreground">{presetLabel} · revenue</div>
+          <div className="text-2xl font-semibold mt-1 text-primary">{fmtMoney(rangeTotal, sym)}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Today's profit</div>
-          <div className="text-2xl font-semibold mt-1 text-success">{fmtMoney(todayProfit, sym)}</div>
+          <div className="text-xs text-muted-foreground">{presetLabel} · profit</div>
+          <div className="text-2xl font-semibold mt-1 text-success">{fmtMoney(rangeProfit, sym)}</div>
         </Card>
       </div>
+
 
       <Card className="p-3">
         <Table>
