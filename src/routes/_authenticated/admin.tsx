@@ -78,7 +78,7 @@ function AdminPanelPage() {
     <div className="p-6 space-y-4">
       <PageHeader
         title="Developer control panel"
-        description="Cross-tenant administration for all registered shops."
+        description="Managed by Shahid Mehmood (Developer) · shahidmehmoodai52@gmail.com"
         icon={<ShieldCheck className="h-5 w-5" />}
       />
       <Tabs defaultValue="tenants">
