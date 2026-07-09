@@ -294,13 +294,13 @@ function Page() {
                             className="h-10 text-right text-base"
                           />
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-right text-xs text-muted-foreground">
+                        <TableCell className="text-right text-xs text-muted-foreground">
                           {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-right text-xs font-medium">
+                        <TableCell className="text-right text-xs font-medium">
                           {hasProduct ? fmtMoney(newAvg, sym) : "—"}
                         </TableCell>
-                        <TableCell className={`hidden lg:table-cell text-right text-xs font-semibold ${deltaClass}`}>
+                        <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
                           {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}%` : "—"}
                         </TableCell>
                         <TableCell className="text-right font-medium">{fmtMoney(qty * cost, sym)}</TableCell>
