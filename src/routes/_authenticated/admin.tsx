@@ -474,13 +474,6 @@ type BlocklistRow = {
   created_at: string;
 };
 
-type SecuritySummary = {
-  failed_logins_24h: number;
-  critical_24h: number;
-  total_24h: number;
-  active_blocks: number;
-  unique_ips_24h: number;
-};
 
 function SecurityTab() {
   const qc = useQueryClient();
