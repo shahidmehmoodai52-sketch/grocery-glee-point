@@ -194,7 +194,14 @@ function Page() {
                           />
                         </TableCell>
                         <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8" /></TableCell>
-                        <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} className="h-8" /></TableCell>
+                        <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setLines((ls) => {
+                            const next = ls.map((row, idx) => idx === i ? { ...row, qty: v } : row);
+                            if (v > 0 && i === ls.length - 1) next.push({ product_id: null, name: "", qty: 1, cost: 0 });
+                            return next;
+                          });
+                        }} className="h-8" /></TableCell>
                         <TableCell><Input type="number" step="0.01" value={l.cost} onChange={(e) => setLine(i, { cost: Number(e.target.value) })} className="h-8" /></TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground">
                           {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
