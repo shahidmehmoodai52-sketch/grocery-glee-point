@@ -1947,7 +1947,7 @@ function ReprintDialog({
                     <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(s.total, sym)}</td>
                     <td className="px-2 py-1 text-right whitespace-nowrap">
-                      <Button size="sm" variant="ghost" onClick={() => { onView(s); onOpenChange(false); }} title="Review invoice (no reprint log)">
+                      <Button size="sm" variant="ghost" onClick={() => { onEdit(s); onOpenChange(false); }} title="Review & edit invoice">
                         <Eye className="h-3.5 w-3.5 mr-1" /> Review
                       </Button>
                       <Button size="sm" variant="ghost" onClick={async () => {
