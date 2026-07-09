@@ -4,17 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { FolderOpen, HardDriveDownload, ShieldCheck, AlertTriangle, RefreshCw } from "lucide-react";
+import { FolderOpen, HardDriveDownload, ShieldCheck, AlertTriangle, RefreshCw, Clock } from "lucide-react";
 import {
   getStatus, pickBackupFolder, clearBackupFolder, runBackup,
-  setAutoEnabled, isSupported, type BackupStatus,
+  setAutoEnabled, setBackupTime, isSupported, type BackupStatus,
 } from "@/lib/backup";
 
 export const Route = createFileRoute("/_authenticated/backup")({
   component: BackupPage,
 });
+
 
 function BackupPage() {
   const [status, setStatus] = useState<BackupStatus | null>(null);
