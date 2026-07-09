@@ -69,11 +69,14 @@ export async function insertOfflineAware<T extends Record<string, any>>(
   const enabled = getOfflineStatus().enabled;
   const offline = isOffline() && enabled;
   const now = new Date().toISOString();
+  // Only `expenses` has updated_at; suppliers/customers don't — sending it triggers
+  // a PostgREST "schema cache" error on insert.
+  const hasUpdatedAt = table === "expenses";
   const withId: any = {
     ...values,
     id: (values as any).id ?? ((typeof crypto !== "undefined" && "randomUUID" in crypto) ? crypto.randomUUID() : `local-${Date.now()}`),
     created_at: (values as any).created_at ?? now,
-    updated_at: now,
+    ...(hasUpdatedAt ? { updated_at: now } : {}),
   };
 
   if (!offline) {
