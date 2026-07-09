@@ -919,7 +919,7 @@ function POSPage() {
         {/* LEFT: items area (maximised) */}
         <main className="flex-1 flex flex-col min-h-0 bg-background">
 
-        <div className="flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
+        <div className="relative flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
           {/* Search / scan */}
           <div className="relative flex-1 min-w-0 max-w-[560px]">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
