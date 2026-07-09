@@ -849,7 +849,7 @@ function POSPage() {
   });
 
   return (
-      <div className="h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden">
       <ShiftBanner />
       {/* Top strip — open bills + clock + reprint (jahaan se sidebar khulti hai us patti ke saath) */}
         <div className="flex items-center gap-2 px-2 py-1 border-b bg-card/60 no-print shrink-0">
