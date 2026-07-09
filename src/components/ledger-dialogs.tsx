@@ -58,7 +58,7 @@ export function AddPaymentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Add payment{party_name ? ` — ${party_name}` : ""}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(Number(e.target.value))} /></div>
+          <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div><Label>Method</Label><Input value={method} onChange={(e) => setMethod(e.target.value)} /></div>
           <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
@@ -128,7 +128,7 @@ export function EditPaymentDialog({
         <DialogHeader><DialogTitle>Edit payment</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <div><Label>Date & time</Label><Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(Number(e.target.value))} /></div>
+          <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div><Label>Method</Label><Input value={method} onChange={(e) => setMethod(e.target.value)} /></div>
           <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>

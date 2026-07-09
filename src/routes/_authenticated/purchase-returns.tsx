@@ -180,8 +180,8 @@ function Page() {
               </div>
 
               <div className="grid grid-cols-4 gap-3">
-                <div><Label>Tax</Label><Input type="number" step="0.01" value={tax} onChange={(e) => setTax(Number(e.target.value))} /></div>
-                <div><Label>Refund received</Label><Input type="number" step="0.01" value={refund} onChange={(e) => setRefund(Number(e.target.value))} /></div>
+                <div><Label>Tax</Label><Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} /></div>
+                <div><Label>Refund received</Label><Input type="number" step="0.01" value={refund || ""} onChange={(e) => setRefund(Number(e.target.value))} /></div>
                 <div>
                   <Label>Method</Label>
                   <Select value={method} onValueChange={setMethod}>
