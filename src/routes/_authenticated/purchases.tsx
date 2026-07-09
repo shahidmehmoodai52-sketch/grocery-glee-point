@@ -219,12 +219,13 @@ function Page() {
                     })}
                   </TableBody>
                 </Table>
-                <div className="p-2"><Button variant="outline" size="sm" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" />Add row</Button></div>
+                <div className="p-2"></div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <div><Label>Tax</Label><Input type="number" step="0.01" value={tax} onChange={(e) => setTax(Number(e.target.value))} /></div>
                 <div><Label>Paid</Label><Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(Number(e.target.value))} /></div>
+                <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
                 <div className="flex flex-col justify-end">
                   <div className="text-sm text-muted-foreground">Total</div>
                   <div className="text-2xl font-semibold text-primary">{fmtMoney(total, sym)}</div>
