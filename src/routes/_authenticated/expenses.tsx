@@ -47,12 +47,23 @@ function Page() {
 
   const { data: rows = [] } = useQuery({
     queryKey: ["expenses", from, to],
-    queryFn: async () =>
-      (await supabase.from("expenses")
-        .select("*, expense_persons(name,role)")
-        .gte("expense_date", from).lte("expense_date", to)
-        .order("expense_date", { ascending: false }).order("created_at", { ascending: false })
-      ).data ?? [],
+    queryFn: async () => offlineFirst<any[]>(
+      async () =>
+        (await supabase.from("expenses")
+          .select("*, expense_persons(name,role)")
+          .gte("expense_date", from).lte("expense_date", to)
+          .order("expense_date", { ascending: false }).order("created_at", { ascending: false })
+        ).data ?? [],
+      async () => {
+        const all = await db().expenses.toArray();
+        const inRange = all.filter((r: any) => r.expense_date >= from && r.expense_date <= to);
+        inRange.sort((a: any, b: any) =>
+          (b.expense_date ?? "").localeCompare(a.expense_date ?? "") ||
+          (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+        return inRange.map((r: any) => ({ ...r, expense_persons: r.expense_persons ?? null }));
+      },
+      cacheExpenses,
+    ),
   });
 
   const totals = useMemo(() => {
