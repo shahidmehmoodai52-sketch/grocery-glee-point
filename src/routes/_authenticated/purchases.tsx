@@ -158,20 +158,14 @@ function Page() {
                       return (
                       <TableRow key={i}>
                         <TableCell>
-                          <Select
-                            value={l.product_id ?? "new"}
-                            onValueChange={(v) => {
-                              if (v === "new") { setLine(i, { product_id: null, old_stock: 0, old_cost: 0 }); return; }
-                              const p = products.find((p) => p.id === v);
-                              setLine(i, { product_id: v, name: p?.name ?? "", cost: Number(p?.cost_price ?? 0), old_stock: Number(p?.stock ?? 0), old_cost: Number(p?.cost_price ?? 0) });
+                          <ProductPicker
+                            products={products}
+                            value={l.product_id}
+                            onPick={(p) => {
+                              if (!p) { setLine(i, { product_id: null, old_stock: 0, old_cost: 0 }); return; }
+                              setLine(i, { product_id: p.id, name: p.name ?? "", cost: Number(p.cost_price ?? 0), old_stock: Number(p.stock ?? 0), old_cost: Number(p.cost_price ?? 0) });
                             }}
-                          >
-                            <SelectTrigger className="h-8"><SelectValue placeholder="Pick…" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="new">— New / ad-hoc —</SelectItem>
-                              {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                          />
                         </TableCell>
                         <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8" /></TableCell>
                         <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} className="h-8" /></TableCell>
