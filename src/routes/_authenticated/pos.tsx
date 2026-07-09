@@ -972,7 +972,7 @@ function POSPage() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm font-semibold truncate">{tab.name}</span>
             <Badge variant="secondary" className="h-5 px-1.5 text-[11px] shrink-0">
-              {tab.items.length} line{tab.items.length === 1 ? "" : "s"} · {fmtQty(tab.items.reduce((s, i) => s + Number(i.qty || 0), 0))} qty
+              {tab.items.length} item{tab.items.length === 1 ? "" : "s"}
             </Badge>
             {tab.restored && (
               <Badge className="bg-warning text-warning-foreground text-[11px] shrink-0 rounded-full">
