@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,9 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandItem, CommandEmpty, CommandGroup } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
@@ -47,6 +51,8 @@ function Page() {
   const setPaid = (v: number) => setDraft((d) => ({ ...d, paid: v }));
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
+  const [search, setSearch] = useState("");
+
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
@@ -59,8 +65,8 @@ function Page() {
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: async () => offlineFirst<any[]>(
-      async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,cost_price,stock").order("name").range(from, to)),
-      async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, cost_price: p.cost_price, stock: p.stock })),
+      async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,barcode,cost_price,stock").order("name").range(from, to)),
+      async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, barcode: p.barcode, cost_price: p.cost_price, stock: p.stock })),
       cacheProducts,
     ),
   });
@@ -154,20 +160,14 @@ function Page() {
                       return (
                       <TableRow key={i}>
                         <TableCell>
-                          <Select
-                            value={l.product_id ?? "new"}
-                            onValueChange={(v) => {
-                              if (v === "new") { setLine(i, { product_id: null, old_stock: 0, old_cost: 0 }); return; }
-                              const p = products.find((p) => p.id === v);
-                              setLine(i, { product_id: v, name: p?.name ?? "", cost: Number(p?.cost_price ?? 0), old_stock: Number(p?.stock ?? 0), old_cost: Number(p?.cost_price ?? 0) });
+                          <ProductPicker
+                            products={products}
+                            value={l.product_id}
+                            onPick={(p) => {
+                              if (!p) { setLine(i, { product_id: null, old_stock: 0, old_cost: 0 }); return; }
+                              setLine(i, { product_id: p.id, name: p.name ?? "", cost: Number(p.cost_price ?? 0), old_stock: Number(p.stock ?? 0), old_cost: Number(p.cost_price ?? 0) });
                             }}
-                          >
-                            <SelectTrigger className="h-8"><SelectValue placeholder="Pick…" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="new">— New / ad-hoc —</SelectItem>
-                              {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                          />
                         </TableCell>
                         <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8" /></TableCell>
                         <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} className="h-8" /></TableCell>
@@ -210,15 +210,33 @@ function Page() {
         </Dialog>
       </div>
 
-      <Card className="p-3">
+      <Card className="p-3 space-y-3">
+        <div className="relative max-w-sm">
+          <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search invoice, supplier, or note…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+        {(() => {
+          const q = search.trim().toLowerCase();
+          const filtered = q
+            ? (purchases as any[]).filter((p) =>
+                (p.invoice_no ?? "").toLowerCase().includes(q) ||
+                (p.suppliers?.name ?? "").toLowerCase().includes(q) ||
+                (p.note ?? "").toLowerCase().includes(q))
+            : (purchases as any[]);
+          return (
         <Table>
           <TableHeader><TableRow>
             <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
             <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {purchases.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No purchases yet</TableCell></TableRow>}
-            {purchases.map((p: any) => (
+            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{q ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
+            {filtered.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
                 <TableCell className="text-sm">{new Date(p.created_at).toLocaleString()}</TableCell>
@@ -228,9 +246,9 @@ function Page() {
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
               </TableRow>
             ))}
-            {purchases.length > 0 && (() => {
-              const allTotal = (purchases as any[]).reduce((s, p) => s + Number(p.total), 0);
-              const allPaid = (purchases as any[]).reduce((s, p) => s + Number(p.paid), 0);
+            {filtered.length > 0 && (() => {
+              const allTotal = filtered.reduce((s: number, p: any) => s + Number(p.total), 0);
+              const allPaid = filtered.reduce((s: number, p: any) => s + Number(p.paid), 0);
               const due = allTotal - allPaid;
               return (
                 <>
@@ -249,6 +267,8 @@ function Page() {
             })()}
           </TableBody>
         </Table>
+          );
+        })()}
         {(() => {
           const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
           const todayTotal = (purchases as any[]).filter((p) => new Date(p.created_at) >= startOfToday).reduce((s, p) => s + Number(p.total), 0);
@@ -264,3 +284,54 @@ function Page() {
     </div>
   );
 }
+
+type PickerProduct = { id: string; name: string; barcode?: string | null; cost_price?: number | null; stock?: number | null };
+
+function ProductPicker({ products, value, onPick }: { products: PickerProduct[]; value: string | null; onPick: (p: PickerProduct | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const selected = value ? products.find((p) => p.id === value) : null;
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return products.slice(0, 50);
+    return products.filter((p) =>
+      (p.name ?? "").toLowerCase().includes(term) ||
+      (p.barcode ?? "").toLowerCase().includes(term)
+    ).slice(0, 50);
+  }, [products, q]);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" role="combobox" className="h-8 w-full justify-between font-normal">
+          <span className="truncate">{selected ? selected.name : "Pick / ad-hoc"}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[320px]" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Search name or barcode…" value={q} onValueChange={setQ} />
+          <CommandList>
+            <CommandEmpty>No product found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="__new" onSelect={() => { onPick(null); setOpen(false); setQ(""); }}>
+                <Check className={cn("mr-2 h-4 w-4", !value ? "opacity-100" : "opacity-0")} />
+                — New / ad-hoc —
+              </CommandItem>
+              {filtered.map((p) => (
+                <CommandItem key={p.id} value={p.id} onSelect={() => { onPick(p); setOpen(false); setQ(""); }}>
+                  <Check className={cn("mr-2 h-4 w-4", value === p.id ? "opacity-100" : "opacity-0")} />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate">{p.name}</div>
+                    {p.barcode && <div className="text-[10px] text-muted-foreground truncate">{p.barcode}</div>}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground ml-2">stk {Number(p.stock ?? 0)}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
