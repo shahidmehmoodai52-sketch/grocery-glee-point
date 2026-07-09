@@ -3406,6 +3406,7 @@ export type Database = {
         Args: { _id: string; _reason: string }
         Returns: undefined
       }
+      edit_sale: { Args: { _items: Json; _sale_id: string }; Returns: string }
       emergency_close_shift: {
         Args: { _reason: string; _shift_id: string }
         Returns: string
