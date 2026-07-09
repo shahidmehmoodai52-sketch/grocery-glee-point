@@ -68,6 +68,14 @@ function Page() {
     queryFn: async () =>
       (await supabase.from("expenses").select("amount,category,expense_date").gte("expense_date", from).lte("expense_date", to)).data ?? [],
   });
+  const { data: partyPayments = [] } = useQuery({
+    queryKey: ["report-party-payments", from, to],
+    queryFn: async () =>
+      (await supabase.from("party_payments")
+        .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
+        .gte("created_at", range.from).lte("created_at", range.to)
+        .order("created_at", { ascending: false })).data ?? [],
+  });
 
   // ---- aggregates
   const revenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
@@ -125,6 +133,26 @@ function Page() {
     }
     return Array.from(map.values()).sort((a, b) => b.paid - a.paid);
   }, [sales]);
+
+  // Combined method cash-flow: money IN (sales + customer party-payments) vs money OUT (supplier party-payments)
+  const methodFlow = useMemo(() => {
+    const map = new Map<string, { method: string; in_sales: number; in_customer: number; out_supplier: number; net: number }>();
+    const get = (m: string) => {
+      const cur = map.get(m) ?? { method: m, in_sales: 0, in_customer: 0, out_supplier: 0, net: 0 };
+      map.set(m, cur); return cur;
+    };
+    for (const s of sales as any[]) {
+      const cur = get((s.payment_method || "unknown").toLowerCase());
+      cur.in_sales += Number(s.paid);
+    }
+    for (const p of partyPayments as any[]) {
+      const cur = get((p.method || "unknown").toLowerCase());
+      if (p.party_type === "customer") cur.in_customer += Number(p.amount);
+      else cur.out_supplier += Number(p.amount);
+    }
+    for (const v of map.values()) v.net = v.in_sales + v.in_customer - v.out_supplier;
+    return Array.from(map.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  }, [sales, partyPayments]);
 
   const q = search.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
@@ -432,6 +460,76 @@ function Page() {
                     <TableCell className="text-right">100.0%</TableCell>
                   </TableRow>
                 )}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <Card className="p-3 mt-4">
+            <div className="mb-2">
+              <div className="text-sm font-semibold">Money flow by payment channel</div>
+              <div className="text-xs text-muted-foreground">Tracks each channel (cash, card, JazzCash, EasyPaisa…) — money received via sales & customer payments vs money paid out to suppliers.</div>
+            </div>
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Channel</TableHead>
+                <TableHead className="text-right">In · Sales</TableHead>
+                <TableHead className="text-right">In · Customer payments</TableHead>
+                <TableHead className="text-right">Out · Supplier payments</TableHead>
+                <TableHead className="text-right">Net (In − Out)</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {methodFlow.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No activity</TableCell></TableRow>}
+                {methodFlow.map((m) => (
+                  <TableRow key={m.method}>
+                    <TableCell className="capitalize font-medium">{m.method}</TableCell>
+                    <TableCell className="text-right text-success">{m.in_sales ? fmtMoney(m.in_sales, sym) : "—"}</TableCell>
+                    <TableCell className="text-right text-success">{m.in_customer ? fmtMoney(m.in_customer, sym) : "—"}</TableCell>
+                    <TableCell className="text-right text-destructive">{m.out_supplier ? fmtMoney(m.out_supplier, sym) : "—"}</TableCell>
+                    <TableCell className={`text-right font-semibold ${m.net > 0 ? "text-success" : m.net < 0 ? "text-destructive" : ""}`}>{fmtMoney(m.net, sym)}</TableCell>
+                  </TableRow>
+                ))}
+                {methodFlow.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(methodFlow.reduce((a, b) => a + b.in_sales, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(methodFlow.reduce((a, b) => a + b.in_customer, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-destructive">{fmtMoney(methodFlow.reduce((a, b) => a + b.out_supplier, 0), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(methodFlow.reduce((a, b) => a + b.net, 0), sym)}</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <Card className="p-3 mt-4">
+            <div className="mb-2 text-sm font-semibold">Party payment log</div>
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Direction</TableHead>
+                <TableHead>Party</TableHead>
+                <TableHead>Channel</TableHead>
+                <TableHead>Note</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {(partyPayments as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No party payments</TableCell></TableRow>}
+                {(partyPayments as any[]).map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="whitespace-nowrap text-xs">{new Date(p.created_at).toLocaleString()}</TableCell>
+                    <TableCell>
+                      {p.party_type === "customer"
+                        ? <span className="text-success font-medium">In · from customer</span>
+                        : <span className="text-destructive font-medium">Out · to supplier</span>}
+                    </TableCell>
+                    <TableCell>{p.customers?.name ?? p.suppliers?.name ?? "—"}</TableCell>
+                    <TableCell className="capitalize">{p.method || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{p.note || "—"}</TableCell>
+                    <TableCell className={`text-right font-medium ${p.party_type === "customer" ? "text-success" : "text-destructive"}`}>
+                      {p.party_type === "customer" ? "+" : "−"}{fmtMoney(Number(p.amount), sym)}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </Card>
