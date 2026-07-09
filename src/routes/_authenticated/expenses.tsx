@@ -89,9 +89,10 @@ function Page() {
     if (!exp.amount || exp.amount <= 0) return toast.error("Amount required");
     const payload: any = { ...exp };
     if (!payload.person_id) delete payload.person_id;
-    const { error } = await supabase.from("expenses").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success("Expense recorded");
+    try {
+      const row = await insertOfflineAware("expenses", payload);
+      toast.success(row._offline_pending ? "Expense saved offline — will sync" : "Expense recorded");
+    } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
     setExpOpen(false);
     setExp({ person_id: "", category: "general", amount: 0, description: "", method: "cash", expense_date: today() });
     qc.invalidateQueries({ queryKey: ["expenses"] });
