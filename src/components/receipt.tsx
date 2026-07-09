@@ -180,7 +180,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         {invoice.sale_items && invoice.sale_items.length > 0 && (
           <Row
             label="Items"
-            value={`${invoice.sale_items.length} line${invoice.sale_items.length === 1 ? "" : "s"} · ${invoice.sale_items.reduce((s, i) => s + Number(i.qty || 0), 0)} qty`}
+            value={`${invoice.sale_items.length} item${invoice.sale_items.length === 1 ? "" : "s"}`}
           />
         )}
         <Row label="Subtotal" value={fmtMoney(invoice.subtotal, sym)} />
