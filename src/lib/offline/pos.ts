@@ -47,6 +47,48 @@ export async function cacheCustomers(rows: any[]) {
   if (!rows?.length) return;
   await db().customers.bulkPut(rows);
 }
+export async function cacheSuppliers(rows: any[]) {
+  if (!rows?.length) return;
+  await db().suppliers.bulkPut(rows);
+}
+export async function cachePurchases(rows: any[]) {
+  if (!rows?.length) return;
+  await db().purchases.bulkPut(rows);
+}
+export async function cacheExpenses(rows: any[]) {
+  if (!rows?.length) return;
+  await db().expenses.bulkPut(rows);
+}
+
+/** Insert a row online, or queue it for sync when offline.
+ *  Assigns a client UUID so the row can be shown immediately and reconciled later. */
+export async function insertOfflineAware<T extends Record<string, any>>(
+  table: "customers" | "suppliers" | "expenses",
+  values: T,
+): Promise<T & { id: string; _offline_pending?: boolean }> {
+  const enabled = getOfflineStatus().enabled;
+  const offline = isOffline() && enabled;
+  const now = new Date().toISOString();
+  const withId: any = {
+    ...values,
+    id: (values as any).id ?? ((typeof crypto !== "undefined" && "randomUUID" in crypto) ? crypto.randomUUID() : `local-${Date.now()}`),
+    created_at: (values as any).created_at ?? now,
+    updated_at: now,
+  };
+
+  if (!offline) {
+    const { data, error } = await supabase.from(table as any).insert(withId).select("*").maybeSingle();
+    if (error) throw error;
+    const row = (data ?? withId) as any;
+    if (enabled) { try { await (db() as any)[table]?.put(row); } catch {} }
+    return row;
+  }
+
+  const marked = { ...withId, _offline_pending: true };
+  try { await (db() as any)[table]?.put(marked); } catch {}
+  await enqueueWrite({ op: "insert", table, payload: withId });
+  return marked;
+}
 export async function cacheProductBarcodes(rows: any[]) {
   if (!rows?.length) return;
   // product_barcodes primary key in cloud is `id`, but our sparse rows here
