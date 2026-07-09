@@ -415,40 +415,102 @@ function ErrorsTab() {
       if (error) throw error;
       return (data as any[]) ?? [];
     },
+    refetchInterval: 30_000,
   });
+  const { data: tenants = [] } = useQuery({
+    queryKey: ["admin-tenants"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_tenants");
+      if (error) throw error;
+      return (data as TenantRow[]) ?? [];
+    },
+  });
+  const tenantMap = useMemo(() => {
+    const m = new Map<string, TenantRow>();
+    for (const t of tenants) m.set(t.id, t);
+    return m;
+  }, [tenants]);
+
+  const byShop = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const key = r.tenant_id ?? "unknown";
+      m.set(key, (m.get(key) ?? 0) + 1);
+    }
+    return Array.from(m.entries())
+      .map(([tid, count]) => ({ tid, count, name: tenantMap.get(tid)?.name ?? "Unknown shop" }))
+      .sort((a, b) => b.count - a.count);
+  }, [rows, tenantMap]);
+
   return (
-    <Card className="p-3">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>When</TableHead>
-            <TableHead>Tenant</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Message</TableHead>
-            <TableHead>Where</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading && (
-            <TableRow><TableCell colSpan={5} className="py-4"><TableSkeleton rows={5} columns={5} /></TableCell></TableRow>
-          )}
-          {!isLoading && rows.length === 0 && (
-            <TableRow><TableCell colSpan={5} className="py-8">
-              <EmptyState icon={Bug} title="No errors" description="No recent errors logged." />
-            </TableCell></TableRow>
-          )}
-          {rows.map((e) => (
-            <TableRow key={e.id}>
-              <TableCell className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{e.tenant_id?.slice(0, 8) ?? "—"}</TableCell>
-              <TableCell><StatusBadge tone="danger">{e.error_type}</StatusBadge></TableCell>
-              <TableCell className="max-w-md truncate" title={e.error_message}>{e.error_message}</TableCell>
-              <TableCell className="text-muted-foreground">{e.page_or_module ?? "—"}</TableCell>
+    <div className="space-y-3">
+      {byShop.length > 0 && (
+        <Card className="p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <div className="font-medium text-sm">Affected shops</div>
+            <span className="text-xs text-muted-foreground">Which shop has which issue count</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {byShop.map((s) => (
+              <Link
+                key={s.tid}
+                to="/admin/shops/$id"
+                params={{ id: s.tid }}
+                className="inline-flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs hover:bg-destructive/20"
+              >
+                <span className="font-medium">{s.name}</span>
+                <span className="rounded-full bg-destructive px-1.5 text-destructive-foreground">{s.count}</span>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-3">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Shop</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Message</TableHead>
+              <TableHead>Where</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
+          </TableHeader>
+          <TableBody>
+            {isLoading && (
+              <TableRow><TableCell colSpan={5} className="py-4"><TableSkeleton rows={5} columns={5} /></TableCell></TableRow>
+            )}
+            {!isLoading && rows.length === 0 && (
+              <TableRow><TableCell colSpan={5} className="py-8">
+                <EmptyState icon={CheckCircle2} title="All clear" description="No recent errors — everything is running smoothly." />
+              </TableCell></TableRow>
+            )}
+            {rows.map((e) => {
+              const shop = e.tenant_id ? tenantMap.get(e.tenant_id) : null;
+              return (
+                <TableRow key={e.id}>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</TableCell>
+                  <TableCell className="text-xs">
+                    {shop ? (
+                      <Link to="/admin/shops/$id" params={{ id: shop.id }} className="font-medium hover:underline">
+                        {shop.name}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">{e.tenant_id ? "Unknown" : "—"}</span>
+                    )}
+                  </TableCell>
+                  <TableCell><StatusBadge tone="danger">{e.error_type}</StatusBadge></TableCell>
+                  <TableCell className="max-w-md truncate" title={e.error_message}>{e.error_message}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{e.page_or_module ?? "—"}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
   );
 }
 
