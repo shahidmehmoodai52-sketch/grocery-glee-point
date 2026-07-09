@@ -463,6 +463,76 @@ function Page() {
               </TableBody>
             </Table>
           </Card>
+
+          <Card className="p-3 mt-4">
+            <div className="mb-2">
+              <div className="text-sm font-semibold">Money flow by payment channel</div>
+              <div className="text-xs text-muted-foreground">Tracks each channel (cash, card, JazzCash, EasyPaisa…) — money received via sales & customer payments vs money paid out to suppliers.</div>
+            </div>
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Channel</TableHead>
+                <TableHead className="text-right">In · Sales</TableHead>
+                <TableHead className="text-right">In · Customer payments</TableHead>
+                <TableHead className="text-right">Out · Supplier payments</TableHead>
+                <TableHead className="text-right">Net (In − Out)</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {methodFlow.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No activity</TableCell></TableRow>}
+                {methodFlow.map((m) => (
+                  <TableRow key={m.method}>
+                    <TableCell className="capitalize font-medium">{m.method}</TableCell>
+                    <TableCell className="text-right text-success">{m.in_sales ? fmtMoney(m.in_sales, sym) : "—"}</TableCell>
+                    <TableCell className="text-right text-success">{m.in_customer ? fmtMoney(m.in_customer, sym) : "—"}</TableCell>
+                    <TableCell className="text-right text-destructive">{m.out_supplier ? fmtMoney(m.out_supplier, sym) : "—"}</TableCell>
+                    <TableCell className={`text-right font-semibold ${m.net > 0 ? "text-success" : m.net < 0 ? "text-destructive" : ""}`}>{fmtMoney(m.net, sym)}</TableCell>
+                  </TableRow>
+                ))}
+                {methodFlow.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(methodFlow.reduce((a, b) => a + b.in_sales, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(methodFlow.reduce((a, b) => a + b.in_customer, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-destructive">{fmtMoney(methodFlow.reduce((a, b) => a + b.out_supplier, 0), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(methodFlow.reduce((a, b) => a + b.net, 0), sym)}</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <Card className="p-3 mt-4">
+            <div className="mb-2 text-sm font-semibold">Party payment log</div>
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Direction</TableHead>
+                <TableHead>Party</TableHead>
+                <TableHead>Channel</TableHead>
+                <TableHead>Note</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {(partyPayments as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No party payments</TableCell></TableRow>}
+                {(partyPayments as any[]).map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="whitespace-nowrap text-xs">{new Date(p.created_at).toLocaleString()}</TableCell>
+                    <TableCell>
+                      {p.party_type === "customer"
+                        ? <span className="text-success font-medium">In · from customer</span>
+                        : <span className="text-destructive font-medium">Out · to supplier</span>}
+                    </TableCell>
+                    <TableCell>{p.customers?.name ?? p.suppliers?.name ?? "—"}</TableCell>
+                    <TableCell className="capitalize">{p.method || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{p.note || "—"}</TableCell>
+                    <TableCell className={`text-right font-medium ${p.party_type === "customer" ? "text-success" : "text-destructive"}`}>
+                      {p.party_type === "customer" ? "+" : "−"}{fmtMoney(Number(p.amount), sym)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
