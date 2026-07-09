@@ -15,6 +15,8 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fetchAll } from "@/lib/supabase-page";
+import { offlineFirst, cacheProducts, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
+import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
