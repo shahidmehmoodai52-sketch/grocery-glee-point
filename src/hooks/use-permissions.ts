@@ -20,12 +20,12 @@ export const ALL_PERMS = [
   { key: "reports", label: "Reports / P&L" },
   { key: "shifts", label: "Shifts & cash drawer" },
   { key: "operations", label: "Business operations" },
-
-
-
   { key: "backup", label: "Auto backup" },
   { key: "settings", label: "Store settings" },
 ] as const;
+
+// While a shop is pending approval, restrict the owner to bare essentials only.
+const PENDING_PERMS = new Set(["pos", "sales", "dashboard", "library"]);
 
 export function usePermissions() {
   const { user, loading: authLoading } = useAuth();
@@ -33,23 +33,33 @@ export function usePermissions() {
     queryKey: ["my-access", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const [{ data: roles, error: rolesError }, { data: perms, error: permsError }] = await Promise.all([
+      const [rolesRes, permsRes, statusRes] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", user!.id),
         supabase.from("user_permissions").select("perm").eq("user_id", user!.id),
+        supabase.rpc("my_tenant_status"),
       ]);
-      if (rolesError) throw rolesError;
-      if (permsError) throw permsError;
-      const isAdmin = (roles ?? []).some((r) => r.role === "admin");
-      const granted = new Set((perms ?? []).map((p) => p.perm));
-      return { isAdmin, perms: granted };
+      if (rolesRes.error) throw rolesRes.error;
+      if (permsRes.error) throw permsRes.error;
+      const isAdmin = (rolesRes.data ?? []).some((r) => r.role === "admin");
+      const isSuperAdmin = (rolesRes.data ?? []).some((r) => r.role === "super_admin");
+      const granted = new Set((permsRes.data ?? []).map((p) => p.perm));
+      const tenantStatus = (statusRes.data as string | null) ?? null;
+      return { isAdmin, isSuperAdmin, perms: granted, tenantStatus };
     },
   });
   const isAdmin = q.data?.isAdmin ?? false;
-  // POS + Sales are always allowed; everything else requires admin or grant
+  const isSuperAdmin = q.data?.isSuperAdmin ?? false;
+  const tenantStatus = q.data?.tenantStatus ?? null;
+  const isPending = tenantStatus === "pending";
+
   const can = (perm: string) => {
+    // Developer / super-admin always sees everything.
+    if (isSuperAdmin) return true;
+    // Pending shops: only basic modules are usable until approved.
+    if (isPending) return PENDING_PERMS.has(perm);
     if (isAdmin) return true;
     if (perm === "pos" || perm === "sales" || perm === "library") return true;
     return q.data?.perms.has(perm) ?? false;
   };
-  return { isAdmin, can, loading: authLoading || q.isLoading };
+  return { isAdmin, isSuperAdmin, isPending, tenantStatus, can, loading: authLoading || q.isLoading };
 }

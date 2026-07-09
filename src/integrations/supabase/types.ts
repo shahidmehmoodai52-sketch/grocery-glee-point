@@ -3668,6 +3668,15 @@ export type Database = {
         }
         Returns: string
       }
+      register_shop: {
+        Args: {
+          _address?: string
+          _city?: string
+          _name: string
+          _phone?: string
+        }
+        Returns: string
+      }
       resume_bill: { Args: { _id: string }; Returns: Json }
       set_checklist_item: {
         Args: {
