@@ -112,6 +112,20 @@ function Page() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [sales]);
 
+  // Payment method breakdown
+  const paymentBreakdown = useMemo(() => {
+    const map = new Map<string, { method: string; invoices: number; total: number; paid: number }>();
+    for (const s of sales as any[]) {
+      const method = s.payment_method || "unknown";
+      const cur = map.get(method) ?? { method, invoices: 0, total: 0, paid: 0 };
+      cur.invoices += 1;
+      cur.total += Number(s.total);
+      cur.paid += Number(s.paid);
+      map.set(method, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => b.paid - a.paid);
+  }, [sales]);
+
   const q = search.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
     if (!q) return sales as any[];
