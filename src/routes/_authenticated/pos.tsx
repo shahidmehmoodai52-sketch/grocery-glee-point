@@ -1312,35 +1312,16 @@ function POSPage() {
                 <UserCog className="h-3.5 w-3.5 mr-1" /> Staff
               </Button>
             </div>
-            <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-              {[
-                { v: "cash", label: "Cash" },
-                { v: "card", label: "Card" },
-                { v: "bank", label: "Bank" },
-                { v: "credit", label: "Credit" },
-              ].map((p) => {
-                const active = tab.payment_method === p.v;
-                return (
-                  <button
-                    key={p.v}
-                    type="button"
-                    onClick={() => { setTab({ payment_method: p.v }); setTimeout(() => searchRef.current?.focus(), 0); }}
-                    className={`h-9 rounded-lg text-sm font-medium transition-all ${
-                      active
-                        ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
-                        : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
+            <PaymentMethodGrid
+              value={tab.payment_method}
+              onChange={(v) => { setTab({ payment_method: v }); setTimeout(() => searchRef.current?.focus(), 0); }}
+            />
           </div>
         </div>
 
         {/* Totals + discount + paid + note */}
-        <div className="flex-1 min-h-0 overflow-hidden p-2 space-y-1 bg-muted/10 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto p-2 space-y-1 bg-muted/10 flex flex-col">
+{/* SPACER */}
           <Row label="Subtotal" value={fmtMoney(subtotal, sym)} muted />
           {lineDiscountTotal > 0 && (
             <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
