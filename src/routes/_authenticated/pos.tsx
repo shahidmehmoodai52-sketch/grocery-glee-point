@@ -1351,14 +1351,14 @@ function POSPage() {
             </div>
           </div>
 
-          <div className="rounded-xl bg-primary/5 border border-primary/20 px-3 py-2 mt-1">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Grand Total</div>
-            <div className="text-2xl font-bold text-primary tabular-nums leading-tight mt-0.5">{fmtMoney(total, sym)}</div>
+          <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-1 mt-0.5 flex items-baseline justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Grand Total</span>
+            <span className="text-xl font-bold text-primary tabular-nums leading-tight">{fmtMoney(total, sym)}</span>
           </div>
 
-          <div className="pt-0.5">
-            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Paid</Label>
-            <div className="flex items-center gap-2 mt-1">
+          <div>
+            <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Paid</Label>
+            <div className="flex items-center gap-2 mt-0.5">
               <Input
                 ref={paidRef}
                 type="number"
@@ -1369,7 +1369,7 @@ function POSPage() {
                   if (e.key === "Enter") { e.preventDefault(); handleSale(); }
                 }}
                 placeholder={total.toFixed(2)}
-                className="h-10 flex-1 text-base font-semibold tabular-nums"
+                className="h-9 flex-1 text-sm font-semibold tabular-nums"
               />
               <button
                 onClick={() => setTab({ paid: total.toFixed(2) })}
@@ -1378,10 +1378,10 @@ function POSPage() {
                 Exact
               </button>
             </div>
-            <div className="mt-1.5">
+            <div className="mt-1">
               {due > 0
-                ? <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-1.5 text-sm text-destructive font-semibold">Due: {fmtMoney(due, sym)}</div>
-                : <div className="rounded-lg bg-success/10 border border-success/20 px-3 py-1.5 text-base text-success font-bold tabular-nums">Change: {fmtMoney(change, sym)}</div>}
+                ? <div className="rounded bg-destructive/10 border border-destructive/20 px-2 py-1 text-xs text-destructive font-semibold">Due: {fmtMoney(due, sym)}</div>
+                : <div className="rounded bg-success/10 border border-success/20 px-2 py-1 text-sm text-success font-bold tabular-nums">Change: {fmtMoney(change, sym)}</div>}
             </div>
           </div>
 
@@ -1389,8 +1389,9 @@ function POSPage() {
             value={tab.note}
             onChange={(e) => setTab({ note: e.target.value })}
             placeholder="Note / House #, street…"
-            className="h-8 text-xs"
+            className="h-7 text-xs"
           />
+
 
           {tab.items.length > 0 && (() => {
             const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
