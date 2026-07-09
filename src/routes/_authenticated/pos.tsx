@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog, PauseCircle, Play } from "lucide-react";
+import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog, PauseCircle, Play, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -608,23 +609,33 @@ function POSPage() {
       };
 
       const { sale, offline } = await completeSaleOfflineAware(payload as any);
-      setLastInvoice(sale);
-      if (sale?.id) {
+      // Override server sale_items with the cashier's edited prices so the
+      // printed receipt reflects any rate changes made in the cart.
+      const localItems = tab.items.map((i, idx) => ({
+        id: `local-${idx}`,
+        name: i.name,
+        qty: i.qty,
+        price: i.price,
+        line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
+      }));
+      const patchedSale = sale ? { ...sale, sale_items: localItems } : sale;
+      setLastInvoice(patchedSale);
+      if (patchedSale?.id) {
         setUndoCandidate({
-          sale_id: sale.id,
-          invoice_no: sale.invoice_no,
-          total: Number(sale.total ?? 0),
-          item_count: (sale.sale_items ?? []).length,
-          created_at: sale.created_at,
+          sale_id: patchedSale.id,
+          invoice_no: patchedSale.invoice_no,
+          total: Number(patchedSale.total ?? 0),
+          item_count: localItems.length,
+          created_at: patchedSale.created_at,
         });
       }
 
       toast.success(
         offline
-          ? `Sale ${sale?.invoice_no} saved offline — will sync when online`
-          : `Sale ${sale?.invoice_no} saved`,
+          ? `Sale ${patchedSale?.invoice_no} saved offline — will sync when online`
+          : `Sale ${patchedSale?.invoice_no} saved`,
         {
-          action: { label: "Print", onClick: () => setReprintView(sale) },
+          action: { label: "Print", onClick: () => setReprintView(patchedSale) },
           duration: 5000,
         },
       );
@@ -1311,35 +1322,16 @@ function POSPage() {
                 <UserCog className="h-3.5 w-3.5 mr-1" /> Staff
               </Button>
             </div>
-            <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-              {[
-                { v: "cash", label: "Cash" },
-                { v: "card", label: "Card" },
-                { v: "bank", label: "Bank" },
-                { v: "credit", label: "Credit" },
-              ].map((p) => {
-                const active = tab.payment_method === p.v;
-                return (
-                  <button
-                    key={p.v}
-                    type="button"
-                    onClick={() => { setTab({ payment_method: p.v }); setTimeout(() => searchRef.current?.focus(), 0); }}
-                    className={`h-9 rounded-lg text-sm font-medium transition-all ${
-                      active
-                        ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
-                        : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
+            <PaymentMethodGrid
+              value={tab.payment_method}
+              onChange={(v) => { setTab({ payment_method: v }); setTimeout(() => searchRef.current?.focus(), 0); }}
+            />
           </div>
         </div>
 
         {/* Totals + discount + paid + note */}
-        <div className="flex-1 min-h-0 overflow-hidden p-2 space-y-1 bg-muted/10 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto p-2 space-y-1 bg-muted/10 flex flex-col">
+
           <Row label="Subtotal" value={fmtMoney(subtotal, sym)} muted />
           {lineDiscountTotal > 0 && (
             <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
@@ -1369,14 +1361,14 @@ function POSPage() {
             </div>
           </div>
 
-          <div className="rounded-xl bg-primary/5 border border-primary/20 px-3 py-2 mt-1">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Grand Total</div>
-            <div className="text-2xl font-bold text-primary tabular-nums leading-tight mt-0.5">{fmtMoney(total, sym)}</div>
+          <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-1 mt-0.5 flex items-baseline justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Grand Total</span>
+            <span className="text-xl font-bold text-primary tabular-nums leading-tight">{fmtMoney(total, sym)}</span>
           </div>
 
-          <div className="pt-0.5">
-            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Paid</Label>
-            <div className="flex items-center gap-2 mt-1">
+          <div>
+            <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Paid</Label>
+            <div className="flex items-center gap-2 mt-0.5">
               <Input
                 ref={paidRef}
                 type="number"
@@ -1387,7 +1379,7 @@ function POSPage() {
                   if (e.key === "Enter") { e.preventDefault(); handleSale(); }
                 }}
                 placeholder={total.toFixed(2)}
-                className="h-10 flex-1 text-base font-semibold tabular-nums"
+                className="h-9 flex-1 text-sm font-semibold tabular-nums"
               />
               <button
                 onClick={() => setTab({ paid: total.toFixed(2) })}
@@ -1396,10 +1388,10 @@ function POSPage() {
                 Exact
               </button>
             </div>
-            <div className="mt-1.5">
+            <div className="mt-1">
               {due > 0
-                ? <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-1.5 text-sm text-destructive font-semibold">Due: {fmtMoney(due, sym)}</div>
-                : <div className="rounded-lg bg-success/10 border border-success/20 px-3 py-1.5 text-base text-success font-bold tabular-nums">Change: {fmtMoney(change, sym)}</div>}
+                ? <div className="rounded bg-destructive/10 border border-destructive/20 px-2 py-1 text-xs text-destructive font-semibold">Due: {fmtMoney(due, sym)}</div>
+                : <div className="rounded bg-success/10 border border-success/20 px-2 py-1 text-sm text-success font-bold tabular-nums">Change: {fmtMoney(change, sym)}</div>}
             </div>
           </div>
 
@@ -1407,8 +1399,9 @@ function POSPage() {
             value={tab.note}
             onChange={(e) => setTab({ note: e.target.value })}
             placeholder="Note / House #, street…"
-            className="h-8 text-xs"
+            className="h-7 text-xs"
           />
+
 
           {tab.items.length > 0 && (() => {
             const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
@@ -1703,6 +1696,104 @@ function POSPage() {
 }
 
 
+
+const ONLINE_METHODS_KEY = "pos:online_pay_methods";
+const DEFAULT_ONLINE_METHODS: { v: string; label: string }[] = [
+  { v: "bank", label: "Bank" },
+  { v: "jazzcash", label: "JazzCash" },
+  { v: "easypaisa", label: "EasyPaisa" },
+];
+
+function loadOnlineMethods(): { v: string; label: string }[] {
+  try {
+    const raw = localStorage.getItem(ONLINE_METHODS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr;
+    }
+  } catch {/* noop */}
+  return DEFAULT_ONLINE_METHODS;
+}
+
+function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [online, setOnline] = useState<{ v: string; label: string }[]>(() => loadOnlineMethods());
+
+  const saveOnline = (list: { v: string; label: string }[]) => {
+    setOnline(list);
+    try { localStorage.setItem(ONLINE_METHODS_KEY, JSON.stringify(list)); } catch {/* noop */}
+  };
+
+  const isOnline = online.some((o) => o.v === value);
+  const activeOnline = online.find((o) => o.v === value);
+
+  const addHead = () => {
+    const name = window.prompt("New online payment head (e.g. NayaPay)");
+    if (!name) return;
+    const label = name.trim();
+    if (!label) return;
+    const v = label.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    if (!v) return;
+    if (online.some((o) => o.v === v)) { onChange(v); return; }
+    const next = [...online, { v, label }];
+    saveOnline(next);
+    onChange(v);
+  };
+
+  const removeHead = (v: string) => {
+    const next = online.filter((o) => o.v !== v);
+    if (!next.length) return;
+    saveOnline(next);
+    if (value === v) onChange(next[0].v);
+  };
+
+  const btn = (active: boolean) =>
+    `h-9 rounded-lg text-sm font-medium transition-all ${
+      active
+        ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+        : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
+    }`;
+
+  return (
+    <div className="grid grid-cols-4 gap-1.5 mt-1.5">
+      <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>Cash</button>
+      <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>Card</button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className={`${btn(isOnline)} flex items-center justify-center gap-1 px-1`}>
+            <span className="truncate">{isOnline ? activeOnline!.label : "Online"}</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          {online.map((o) => (
+            <DropdownMenuItem
+              key={o.v}
+              onSelect={() => onChange(o.v)}
+              className="flex items-center justify-between"
+            >
+              <span className={value === o.v ? "font-semibold" : ""}>{o.label}</span>
+              {online.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeHead(o.v); }}
+                  className="ml-2 opacity-40 hover:opacity-100"
+                  title="Remove"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); addHead(); }}>
+            <Plus className="h-3.5 w-3.5 mr-2" /> Add new head
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>Credit</button>
+    </div>
+  );
+}
 
 function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
