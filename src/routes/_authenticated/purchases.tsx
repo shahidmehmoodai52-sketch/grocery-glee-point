@@ -242,10 +242,10 @@ function Page() {
                     <TableHead>Name</TableHead>
                     <TableHead className="w-[150px]">Cost</TableHead>
                     <TableHead className="w-[140px]">Qty</TableHead>
-                    <TableHead className="hidden lg:table-cell w-28 text-right">Old Avg</TableHead>
-                    <TableHead className="hidden lg:table-cell w-28 text-right">New Avg</TableHead>
-                    <TableHead className="hidden lg:table-cell w-20 text-right">Δ%</TableHead>
-                    <TableHead className="text-right w-[130px]">Total</TableHead><TableHead className="w-11"></TableHead>
+                    <TableHead className="w-24 text-right">Old Avg</TableHead>
+                    <TableHead className="w-24 text-right">New Avg</TableHead>
+                    <TableHead className="w-16 text-right">Δ%</TableHead>
+                    <TableHead className="text-right w-[120px]">Total</TableHead><TableHead className="w-11"></TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {lines.map((l, i) => {
@@ -294,13 +294,13 @@ function Page() {
                             className="h-10 text-right text-base"
                           />
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-right text-xs text-muted-foreground">
+                        <TableCell className="text-right text-xs text-muted-foreground">
                           {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-right text-xs font-medium">
+                        <TableCell className="text-right text-xs font-medium">
                           {hasProduct ? fmtMoney(newAvg, sym) : "—"}
                         </TableCell>
-                        <TableCell className={`hidden lg:table-cell text-right text-xs font-semibold ${deltaClass}`}>
+                        <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
                           {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}%` : "—"}
                         </TableCell>
                         <TableCell className="text-right font-medium">{fmtMoney(qty * cost, sym)}</TableCell>
