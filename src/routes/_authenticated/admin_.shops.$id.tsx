@@ -26,7 +26,7 @@ import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { fmtMoney } from "@/lib/format";
 import { resetTenantOwnerPassword } from "@/lib/admin.functions";
 
-export const Route = createFileRoute("/_authenticated/admin/shops/$id")({
+export const Route = createFileRoute("/_authenticated/admin_/shops/$id")({
   component: ShopDetailPage,
 });
 
