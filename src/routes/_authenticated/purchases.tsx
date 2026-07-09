@@ -132,7 +132,31 @@ function Page() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
+                <div>
+                  <Label>Search &amp; add product</Label>
+                  <ProductPicker
+                    products={products}
+                    value={null}
+                    placeholder="Search name or barcode to add…"
+                    onPick={(p) => {
+                      if (!p) {
+                        setLines((ls) => [...ls, { product_id: null, name: "", qty: 1, cost: 0 }]);
+                        return;
+                      }
+                      setLines((ls) => [
+                        ...ls,
+                        {
+                          product_id: p.id,
+                          name: p.name ?? "",
+                          qty: 1,
+                          cost: Number(p.cost_price ?? 0),
+                          old_stock: Number(p.stock ?? 0),
+                          old_cost: Number(p.cost_price ?? 0),
+                        },
+                      ]);
+                    }}
+                  />
+                </div>
               </div>
 
               <div className="border rounded-md">
@@ -170,7 +194,14 @@ function Page() {
                           />
                         </TableCell>
                         <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8" /></TableCell>
-                        <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} className="h-8" /></TableCell>
+                        <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setLines((ls) => {
+                            const next = ls.map((row, idx) => idx === i ? { ...row, qty: v } : row);
+                            if (v > 0 && i === ls.length - 1) next.push({ product_id: null, name: "", qty: 1, cost: 0 });
+                            return next;
+                          });
+                        }} className="h-8" /></TableCell>
                         <TableCell><Input type="number" step="0.01" value={l.cost} onChange={(e) => setLine(i, { cost: Number(e.target.value) })} className="h-8" /></TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground">
                           {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
@@ -188,12 +219,13 @@ function Page() {
                     })}
                   </TableBody>
                 </Table>
-                <div className="p-2"><Button variant="outline" size="sm" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" />Add row</Button></div>
+                <div className="p-2"></div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <div><Label>Tax</Label><Input type="number" step="0.01" value={tax} onChange={(e) => setTax(Number(e.target.value))} /></div>
                 <div><Label>Paid</Label><Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(Number(e.target.value))} /></div>
+                <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
                 <div className="flex flex-col justify-end">
                   <div className="text-sm text-muted-foreground">Total</div>
                   <div className="text-2xl font-semibold text-primary">{fmtMoney(total, sym)}</div>
@@ -287,7 +319,7 @@ function Page() {
 
 type PickerProduct = { id: string; name: string; barcode?: string | null; cost_price?: number | null; stock?: number | null };
 
-function ProductPicker({ products, value, onPick }: { products: PickerProduct[]; value: string | null; onPick: (p: PickerProduct | null) => void }) {
+function ProductPicker({ products, value, onPick, placeholder }: { products: PickerProduct[]; value: string | null; onPick: (p: PickerProduct | null) => void; placeholder?: string }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const selected = value ? products.find((p) => p.id === value) : null;
@@ -302,8 +334,8 @@ function ProductPicker({ products, value, onPick }: { products: PickerProduct[];
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" role="combobox" className="h-8 w-full justify-between font-normal">
-          <span className="truncate">{selected ? selected.name : "Pick / ad-hoc"}</span>
+        <Button variant="outline" size="sm" role="combobox" className="h-9 w-full justify-between font-normal">
+          <span className="truncate">{selected ? selected.name : (placeholder ?? "Pick / ad-hoc")}</span>
           <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
         </Button>
       </PopoverTrigger>
