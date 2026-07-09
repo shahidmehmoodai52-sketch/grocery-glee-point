@@ -144,6 +144,7 @@ function POSPage() {
   const [lastInvoice, setLastInvoice] = useState<any>(null);
   const [reprintOpen, setReprintOpen] = useState(false);
   const [reprintView, setReprintView] = useState<any>(null);
+  const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const [heldOpen, setHeldOpen] = useState(false);
   const [holding, setHolding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
