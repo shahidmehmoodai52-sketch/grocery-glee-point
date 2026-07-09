@@ -917,9 +917,9 @@ function POSPage() {
       {/* Two-column layout */}
       <div className="flex-1 min-h-0 flex">
         {/* LEFT: items area (maximised) */}
-        <main className="flex-1 flex flex-col min-h-0 bg-background">
+        <main className="relative flex-1 flex flex-col min-h-0 bg-background">
 
-        <div className="flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
+        <div className="relative flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
           {/* Search / scan */}
           <div className="relative flex-1 min-w-0 max-w-[560px]">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -1113,77 +1113,86 @@ function POSPage() {
                 );
               })}
 
-              {search.trim() && filtered.length > 0 && filtered.map((p, i) => {
-                const rate = Number(p.sell_price ?? 0);
-                const pRate = Number(p.cost_price ?? 0);
-                const code = p.sku || p.barcode || "—";
-                const bcs = barcodesByProduct[p.id] ?? [];
-                const subline = [
-                  p.sku ? `SKU ${p.sku}` : null,
-                  bcs[0] ? `BC ${bcs[0]}` : null,
-                  p.category || null,
-                ].filter(Boolean).join(" · ");
-                const stockNum = Number(p.stock ?? 0);
-                const isHi = i === highlight;
-                return (
-                  <tr
-                    key={`search-${p.id}`}
-                    onMouseEnter={() => setHighlight(i)}
-                    onClick={() => { const idx = addProduct(p); setSearch(""); setTimeout(() => setEditing({ idx, field: "qty" }), 0); }}
-                    className={`cursor-pointer ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
-                  >
-                    <td className="px-2 py-1 font-mono text-xs">{code}</td>
-                    <td className="px-2 py-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="font-medium text-sm truncate min-w-0 flex-1">{p.name}</div>
-                      </div>
-                      {subline && (
-                        <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
-                      )}
-                    </td>
-                    <td className="px-2 py-1 text-right tabular-nums">
-                      <span className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}>
-                        {fmtQty(stockNum)}
-                        {p.unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{p.unit}</span> : null}
-                      </span>
-                    </td>
-                    {showCost && (
-                      <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
-                        {fmtMoney(pRate, sym)}
-                      </td>
-                    )}
-                    <td className="px-2 py-1 text-right tabular-nums text-sm">{fmtMoney(rate, sym)}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-sm">1</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-sm">{fmtMoney(0, sym)}</td>
-                    <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(rate, sym)}</td>
-                    <td className="px-1 py-1 text-center no-print border-0">
-                      <Plus className="h-3.5 w-3.5 mx-auto text-primary" />
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {search.trim() && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={showCost ? 9 : 8} className="text-center py-6 border-0">
-                    {productsLoading || remoteProductsLoading ? (
-                      <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-3 text-sm">
-                        <span className="text-muted-foreground">No match for "{search}".</span>
-                        <Button size="sm" onClick={() => openQuickAdd(search)}>
-                          <Plus className="h-4 w-4 mr-1" /> Add
-                        </Button>
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
+
+        {/* Floating search results — popup under the search header, fit to header */}
+        {search.trim() && (
+          <div className="absolute left-4 right-4 top-[64px] z-40 rounded-xl border border-primary/30 bg-card shadow-2xl overflow-hidden">
+            <div className="max-h-[60vh] overflow-auto">
+              {filtered.length > 0 ? (
+                <table className="w-full text-sm border-collapse">
+                  <thead className="sticky top-0 z-10 bg-primary text-primary-foreground text-[11px] uppercase tracking-wide">
+                    <tr>
+                      <th className="px-2 py-2 text-left w-24">Code</th>
+                      <th className="px-2 py-2 text-left">Item Name</th>
+                      <th className="px-2 py-2 text-right w-20">Stock</th>
+                      {showCost && <th className="px-2 py-2 text-right w-24">P.Rate</th>}
+                      <th className="px-2 py-2 text-right w-28">Rate</th>
+                      <th className="px-2 py-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((p, i) => {
+                      const rate = Number(p.sell_price ?? 0);
+                      const pRate = Number(p.cost_price ?? 0);
+                      const code = p.sku || p.barcode || "—";
+                      const bcs = barcodesByProduct[p.id] ?? [];
+                      const subline = [
+                        p.sku ? `SKU ${p.sku}` : null,
+                        bcs[0] ? `BC ${bcs[0]}` : null,
+                        p.category || null,
+                      ].filter(Boolean).join(" · ");
+                      const stockNum = Number(p.stock ?? 0);
+                      const isHi = i === highlight;
+                      return (
+                        <tr
+                          key={`search-${p.id}`}
+                          onMouseEnter={() => setHighlight(i)}
+                          onClick={() => { const idx = addProduct(p); setSearch(""); setTimeout(() => setEditing({ idx, field: "qty" }), 0); }}
+                          className={`cursor-pointer border-b border-border ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
+                        >
+                          <td className="px-2 py-1.5 font-mono text-xs">{code}</td>
+                          <td className="px-2 py-1.5">
+                            <div className="font-medium text-sm truncate">{p.name}</div>
+                            {subline && <div className="text-[11px] text-muted-foreground truncate">{subline}</div>}
+                          </td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">
+                            <span className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}>
+                              {fmtQty(stockNum)}
+                              {p.unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{p.unit}</span> : null}
+                            </span>
+                          </td>
+                          {showCost && (
+                            <td className="px-2 py-1.5 text-right font-mono text-muted-foreground">{fmtMoney(pRate, sym)}</td>
+                          )}
+                          <td className="px-2 py-1.5 text-right tabular-nums text-sm font-semibold">{fmtMoney(rate, sym)}</td>
+                          <td className="px-1 py-1 text-center"><Plus className="h-3.5 w-3.5 mx-auto text-primary" /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-center py-6">
+                  {productsLoading || remoteProductsLoading ? (
+                    <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-3 text-sm">
+                      <span className="text-muted-foreground">No match for "{search}".</span>
+                      <Button size="sm" onClick={() => openQuickAdd(search)}>
+                        <Plus className="h-4 w-4 mr-1" /> Add
+                      </Button>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* RIGHT: side panel — open bills, party, payment, totals */}
@@ -1330,7 +1339,7 @@ function POSPage() {
         </div>
 
         {/* Totals + discount + paid + note */}
-        <div className="flex-1 min-h-0 overflow-auto p-2.5 space-y-1.5 bg-muted/10">
+        <div className="flex-1 min-h-0 overflow-hidden p-2 space-y-1 bg-muted/10 flex flex-col">
           <Row label="Subtotal" value={fmtMoney(subtotal, sym)} muted />
           {lineDiscountTotal > 0 && (
             <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
