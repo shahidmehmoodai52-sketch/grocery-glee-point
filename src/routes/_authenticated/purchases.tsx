@@ -52,6 +52,43 @@ function Page() {
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
   const [search, setSearch] = useState("");
+  const [entrySearch, setEntrySearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const focusCell = (kind: "cost" | "qty", i: number) => {
+    setTimeout(() => {
+      const el = document.getElementById(`purchase-${kind}-${i}`) as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+    }, 0);
+  };
+  const focusSearch = () => setTimeout(() => searchRef.current?.focus(), 0);
+  const addFromSearch = () => {
+    const term = entrySearch.trim();
+    if (!term) return;
+    const t = term.toLowerCase();
+    const match =
+      (products as any[]).find((p) => (p.barcode ?? "").toLowerCase() === t) ||
+      (products as any[]).find((p) =>
+        (p.name ?? "").toLowerCase().includes(t) || (p.barcode ?? "").toLowerCase().includes(t)
+      );
+    let newIndex = 0;
+    setLines((ls) => {
+      newIndex = ls.length;
+      if (match) {
+        return [...ls, {
+          product_id: match.id, name: match.name ?? "", qty: 1,
+          cost: Number(match.cost_price ?? 0),
+          old_stock: Number(match.stock ?? 0),
+          old_cost: Number(match.cost_price ?? 0),
+        }];
+      }
+      return [...ls, { product_id: null, name: term, qty: 1, cost: 0 }];
+    });
+    setEntrySearch("");
+    focusCell("cost", newIndex);
+  };
+
+
 
 
   const { data: suppliers = [] } = useQuery({
