@@ -210,15 +210,33 @@ function Page() {
         </Dialog>
       </div>
 
-      <Card className="p-3">
+      <Card className="p-3 space-y-3">
+        <div className="relative max-w-sm">
+          <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search invoice, supplier, or note…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+        {(() => {
+          const q = search.trim().toLowerCase();
+          const filtered = q
+            ? (purchases as any[]).filter((p) =>
+                (p.invoice_no ?? "").toLowerCase().includes(q) ||
+                (p.suppliers?.name ?? "").toLowerCase().includes(q) ||
+                (p.note ?? "").toLowerCase().includes(q))
+            : (purchases as any[]);
+          return (
         <Table>
           <TableHeader><TableRow>
             <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
             <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {purchases.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No purchases yet</TableCell></TableRow>}
-            {purchases.map((p: any) => (
+            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{q ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
+            {filtered.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
                 <TableCell className="text-sm">{new Date(p.created_at).toLocaleString()}</TableCell>
