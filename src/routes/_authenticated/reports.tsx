@@ -68,6 +68,14 @@ function Page() {
     queryFn: async () =>
       (await supabase.from("expenses").select("amount,category,expense_date").gte("expense_date", from).lte("expense_date", to)).data ?? [],
   });
+  const { data: partyPayments = [] } = useQuery({
+    queryKey: ["report-party-payments", from, to],
+    queryFn: async () =>
+      (await supabase.from("party_payments")
+        .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
+        .gte("created_at", range.from).lte("created_at", range.to)
+        .order("created_at", { ascending: false })).data ?? [],
+  });
 
   // ---- aggregates
   const revenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
