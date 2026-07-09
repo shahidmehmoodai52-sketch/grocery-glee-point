@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Check, ChevronsUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,43 @@ function Page() {
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
   const [search, setSearch] = useState("");
+  const [entrySearch, setEntrySearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const focusCell = (kind: "cost" | "qty", i: number) => {
+    setTimeout(() => {
+      const el = document.getElementById(`purchase-${kind}-${i}`) as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+    }, 0);
+  };
+  const focusSearch = () => setTimeout(() => searchRef.current?.focus(), 0);
+  const addFromSearch = () => {
+    const term = entrySearch.trim();
+    if (!term) return;
+    const t = term.toLowerCase();
+    const match =
+      (products as any[]).find((p) => (p.barcode ?? "").toLowerCase() === t) ||
+      (products as any[]).find((p) =>
+        (p.name ?? "").toLowerCase().includes(t) || (p.barcode ?? "").toLowerCase().includes(t)
+      );
+    let newIndex = 0;
+    setLines((ls) => {
+      newIndex = ls.length;
+      if (match) {
+        return [...ls, {
+          product_id: match.id, name: match.name ?? "", qty: 1,
+          cost: Number(match.cost_price ?? 0),
+          old_stock: Number(match.stock ?? 0),
+          old_cost: Number(match.cost_price ?? 0),
+        }];
+      }
+      return [...ls, { product_id: null, name: term, qty: 1, cost: 0 }];
+    });
+    setEntrySearch("");
+    focusCell("cost", newIndex);
+  };
+
+
 
 
   const { data: suppliers = [] } = useQuery({
@@ -134,36 +171,30 @@ function Page() {
                 </div>
                 <div>
                   <Label>Search &amp; add product</Label>
-                  <ProductPicker
-                    products={products}
-                    value={null}
-                    placeholder="Search name or barcode to add…"
-                    onPick={(p) => {
-                      if (!p) {
-                        setLines((ls) => [...ls, { product_id: null, name: "", qty: 1, cost: 0 }]);
-                        return;
-                      }
-                      setLines((ls) => [
-                        ...ls,
-                        {
-                          product_id: p.id,
-                          name: p.name ?? "",
-                          qty: 1,
-                          cost: Number(p.cost_price ?? 0),
-                          old_stock: Number(p.stock ?? 0),
-                          old_cost: Number(p.cost_price ?? 0),
-                        },
-                      ]);
-                    }}
-                  />
+                  <div className="relative">
+                    <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Input
+                      ref={searchRef}
+                      value={entrySearch}
+                      onChange={(e) => setEntrySearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); addFromSearch(); }
+                      }}
+                      placeholder="Scan barcode or type name, press Enter…"
+                      className="pl-8 h-9"
+                      autoFocus
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="border rounded-md">
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead>Product</TableHead><TableHead>Name</TableHead>
-                    <TableHead className="w-24">Qty</TableHead><TableHead className="w-28">Cost</TableHead>
+                    <TableHead className="w-[200px]">Product</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="w-32">Cost</TableHead>
+                    <TableHead className="w-28">Qty</TableHead>
                     <TableHead className="w-28 text-right">Old Avg</TableHead>
                     <TableHead className="w-28 text-right">New Avg</TableHead>
                     <TableHead className="w-20 text-right">Δ%</TableHead>
@@ -193,16 +224,33 @@ function Page() {
                             }}
                           />
                         </TableCell>
-                        <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8" /></TableCell>
-                        <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => {
-                          const v = Number(e.target.value);
-                          setLines((ls) => {
-                            const next = ls.map((row, idx) => idx === i ? { ...row, qty: v } : row);
-                            if (v > 0 && i === ls.length - 1) next.push({ product_id: null, name: "", qty: 1, cost: 0 });
-                            return next;
-                          });
-                        }} className="h-8" /></TableCell>
-                        <TableCell><Input type="number" step="0.01" value={l.cost} onChange={(e) => setLine(i, { cost: Number(e.target.value) })} className="h-8" /></TableCell>
+                        <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-9" /></TableCell>
+                        <TableCell>
+                          <Input
+                            id={`purchase-cost-${i}`}
+                            type="number"
+                            step="0.01"
+                            value={l.cost}
+                            onChange={(e) => setLine(i, { cost: Number(e.target.value) })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); focusCell("qty", i); }
+                            }}
+                            className="h-9 text-right"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            id={`purchase-qty-${i}`}
+                            type="number"
+                            step="0.001"
+                            value={l.qty}
+                            onChange={(e) => setLine(i, { qty: Number(e.target.value) })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); focusSearch(); }
+                            }}
+                            className="h-9 text-right"
+                          />
+                        </TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground">
                           {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
                         </TableCell>
@@ -218,6 +266,7 @@ function Page() {
                       );
                     })}
                   </TableBody>
+
                 </Table>
                 <div className="p-2"></div>
               </div>
