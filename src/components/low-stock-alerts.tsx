@@ -181,16 +181,15 @@ export function LowStockAlerts() {
   const primary = activeOOS.length > 0;
 
   return (
-    <div className={`no-print border-b ${primary ? "bg-destructive/10 border-destructive/30" : "bg-amber-500/10 border-amber-500/30"}`}>
-      <div className="px-4 py-2 flex items-center gap-3 flex-wrap">
+    <div className={`no-print relative rounded-md ${primary ? "bg-destructive/10" : "bg-amber-500/10"}`}>
+      <div className="px-2 py-1 flex items-center gap-2 flex-wrap">
         {primary
           ? <XCircle className="h-4 w-4 text-destructive shrink-0" />
           : <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />}
-        <div className="text-sm flex-1 min-w-0">
+        <div className="text-xs flex-1 min-w-0 truncate">
           {activeOOS.length > 0 && <span className="font-medium text-destructive">{activeOOS.length} out of stock</span>}
           {activeOOS.length > 0 && activeLow.length > 0 && <span className="mx-2 text-muted-foreground">·</span>}
           {activeLow.length > 0 && <span className="text-amber-700 dark:text-amber-400 font-medium">{activeLow.length} low stock</span>}
-          <span className="text-muted-foreground ml-2 text-xs">(click View to add stock)</span>
         </div>
         <Button size="sm" variant="ghost" onClick={() => setExpanded((v) => !v)} className="h-7">
           {expanded ? <><ChevronUp className="h-3 w-3 mr-1" /> Hide</> : <><ChevronDown className="h-3 w-3 mr-1" /> View</>}
@@ -208,7 +207,8 @@ export function LowStockAlerts() {
       </div>
 
       {expanded && (
-        <div className="px-4 pb-3 max-h-80 overflow-auto space-y-1">
+        <div className={`absolute left-0 right-0 top-full mt-1 z-40 rounded-md border shadow-lg ${primary ? "bg-destructive/10 border-destructive/30" : "bg-amber-500/10 border-amber-500/30"} px-3 pb-3 pt-2 max-h-80 overflow-auto space-y-1`}>
+
           {activeOOS.map((p) => (
             <AlertRow key={p.id} p={p} kind="oos" sym={sym} onDismiss={() => dismissOne(p)} />
           ))}
