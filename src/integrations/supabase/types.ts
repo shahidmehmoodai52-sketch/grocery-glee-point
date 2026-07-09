@@ -22,6 +22,9 @@ export type Database = {
           id: string
           metadata: Json | null
           page_or_module: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
           stack_trace: string | null
           tenant_id: string | null
           user_id: string | null
@@ -33,6 +36,9 @@ export type Database = {
           id?: string
           metadata?: Json | null
           page_or_module?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           stack_trace?: string | null
           tenant_id?: string | null
           user_id?: string | null
@@ -44,6 +50,9 @@ export type Database = {
           id?: string
           metadata?: Json | null
           page_or_module?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           stack_trace?: string | null
           tenant_id?: string | null
           user_id?: string | null
@@ -3304,18 +3313,19 @@ export type Database = {
           error_message: string
           error_type: string
           id: string
-          metadata: Json | null
-          page_or_module: string | null
-          stack_trace: string | null
-          tenant_id: string | null
-          user_id: string | null
+          page_or_module: string
+          stack_trace: string
+          tenant_id: string
+          user_id: string
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "application_errors"
-          isOneToOne: false
-          isSetofReturn: true
-        }
+      }
+      admin_resolve_error: {
+        Args: { _id: string; _note?: string }
+        Returns: undefined
+      }
+      admin_resolve_errors_bulk: {
+        Args: { _error_type?: string; _note?: string; _tenant_id?: string }
+        Returns: number
       }
       admin_security_summary: { Args: never; Returns: Json }
       admin_set_tenant_plan: {
