@@ -269,7 +269,7 @@ function TenantsTab() {
         </Table>
       </Card>
 
-      <TenantDetailDialog tenantId={selectedId} onClose={() => setSelectedId(null)} />
+      
     </div>
   );
 }
