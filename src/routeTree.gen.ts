@@ -45,6 +45,7 @@ import { Route as AuthenticatedExpensePersonsIdRouteImport } from './routes/_aut
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as AuthenticatedAdminShopsIdRouteImport } from './routes/_authenticated/admin.shops.$id'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -238,6 +239,12 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminShopsIdRoute =
+  AuthenticatedAdminShopsIdRouteImport.update({
+    id: '/shops/$id',
+    path: '/shops/$id',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -246,7 +253,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/backup': typeof AuthenticatedBackupRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/expenses': typeof AuthenticatedExpensesRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/suppliers/': typeof AuthenticatedSuppliersIndexRoute
+  '/admin/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -283,7 +291,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/backup': typeof AuthenticatedBackupRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/expenses': typeof AuthenticatedExpensesRoute
@@ -312,6 +320,7 @@ export interface FileRoutesByTo {
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/stock-count': typeof AuthenticatedStockCountIndexRoute
   '/suppliers': typeof AuthenticatedSuppliersIndexRoute
+  '/admin/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -322,7 +331,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/backup': typeof AuthenticatedBackupRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
@@ -351,6 +360,7 @@ export interface FileRoutesById {
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/_authenticated/suppliers/': typeof AuthenticatedSuppliersIndexRoute
+  '/_authenticated/admin/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -390,6 +400,7 @@ export interface FileRouteTypes {
     | '/customers/'
     | '/stock-count/'
     | '/suppliers/'
+    | '/admin/shops/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -427,6 +438,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/stock-count'
     | '/suppliers'
+    | '/admin/shops/$id'
   id:
     | '__root__'
     | '/'
@@ -465,6 +477,7 @@ export interface FileRouteTypes {
     | '/_authenticated/customers/'
     | '/_authenticated/stock-count/'
     | '/_authenticated/suppliers/'
+    | '/_authenticated/admin/shops/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -733,8 +746,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/shops/$id': {
+      id: '/_authenticated/admin/shops/$id'
+      path: '/shops/$id'
+      fullPath: '/admin/shops/$id'
+      preLoaderRoute: typeof AuthenticatedAdminShopsIdRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
+
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminShopsIdRoute: typeof AuthenticatedAdminShopsIdRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminShopsIdRoute: AuthenticatedAdminShopsIdRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedProductsRouteChildren {
   AuthenticatedProductsIdRoute: typeof AuthenticatedProductsIdRoute
@@ -750,7 +781,7 @@ const AuthenticatedProductsRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedBackupRoute: typeof AuthenticatedBackupRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
@@ -779,7 +810,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedBackupRoute: AuthenticatedBackupRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,

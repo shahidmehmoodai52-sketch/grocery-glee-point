@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -99,7 +99,6 @@ function TenantsTab() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "suspended" | "archived">("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: tenants = [], isLoading } = useQuery({
     queryKey: ["admin-tenants"],
@@ -209,7 +208,9 @@ function TenantsTab() {
             {filtered.map((t) => (
               <TableRow key={t.id}>
                 <TableCell>
-                  <div className="font-medium">{t.name}</div>
+                  <Link to="/admin/shops/$id" params={{ id: t.id }} className="font-medium hover:underline">
+                    {t.name}
+                  </Link>
                   <div className="text-xs text-muted-foreground">
                     {new Date(t.created_at).toLocaleDateString()} · {t.slug ?? "—"}
                   </div>
@@ -238,8 +239,10 @@ function TenantsTab() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="inline-flex gap-1">
-                    <Button size="icon" variant="ghost" title="View" onClick={() => setSelectedId(t.id)}>
-                      <Eye className="h-4 w-4" />
+                    <Button size="icon" variant="ghost" title="Open shop folder" asChild>
+                      <Link to="/admin/shops/$id" params={{ id: t.id }}>
+                        <Eye className="h-4 w-4" />
+                      </Link>
                     </Button>
                     {t.status !== "active" && (
                       <Button size="sm" variant="outline" onClick={() => setStatus(t.id, "active")}>
@@ -266,7 +269,7 @@ function TenantsTab() {
         </Table>
       </Card>
 
-      <TenantDetailDialog tenantId={selectedId} onClose={() => setSelectedId(null)} />
+      
     </div>
   );
 }

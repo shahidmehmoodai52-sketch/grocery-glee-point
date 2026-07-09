@@ -75,9 +75,10 @@ function AuthPage() {
           return;
         }
         if (data.session) {
+          toast.info("Account banaya gaya. Shop ab admin approval ka intezaar kar rahi hai.");
           await goToApp();
         } else {
-          toast.success("Account created. You can sign in now.");
+          toast.success("Account ban gaya. Sign in karne ke baad shop admin approval par activate hogi.");
           setMode("signin");
         }
       } else {
