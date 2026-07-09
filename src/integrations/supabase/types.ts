@@ -256,6 +256,7 @@ export type Database = {
           id: string
           import_batch_id: string | null
           name: string
+          opening_balance: number
           phone: string | null
           tenant_id: string
         }
@@ -267,6 +268,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           name: string
+          opening_balance?: number
           phone?: string | null
           tenant_id?: string
         }
@@ -278,6 +280,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           name?: string
+          opening_balance?: number
           phone?: string | null
           tenant_id?: string
         }
@@ -2651,6 +2654,7 @@ export type Database = {
           id: string
           import_batch_id: string | null
           name: string
+          opening_balance: number
           phone: string | null
           tenant_id: string
         }
@@ -2662,6 +2666,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           name: string
+          opening_balance?: number
           phone?: string | null
           tenant_id?: string
         }
@@ -2673,6 +2678,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           name?: string
+          opening_balance?: number
           phone?: string | null
           tenant_id?: string
         }

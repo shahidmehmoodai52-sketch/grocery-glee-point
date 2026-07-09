@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Fragment, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, FileDown, ChevronDown, ChevronRight, Pencil, DollarSign, Plus } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, FileDown, ChevronDown, ChevronRight, Pencil, DollarSign, Plus, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import { fmtMoney } from "@/lib/format";
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
+
 
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
 
@@ -43,7 +45,11 @@ function Page() {
   const [payDefault, setPayDefault] = useState(0);
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
+  const [obValue, setObValue] = useState<string>("");
+  const [obSaving, setObSaving] = useState(false);
+  const qc = useQueryClient();
   const toggle = (pid: string) => setExpanded((s) => { const n = new Set(s); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
+
 
   const { data: purchaseItems = [] } = useQuery({
     queryKey: ["supplier-purchase-items", id],
@@ -109,10 +115,25 @@ function Page() {
     return true;
   });
 
-  // Single source of truth: ledger drives every number.
-  const opening = entries
+  // Single source of truth: ledger + a manually-entered opening balance drive every number.
+  const initialOB = Number(supplier?.opening_balance ?? 0);
+  useEffect(() => { if (supplier) setObValue(String(Number(supplier.opening_balance ?? 0))); }, [supplier?.id, supplier?.opening_balance]);
+
+  const opening = initialOB + entries
     .filter((x) => from && x.date < from)
     .reduce((s, x) => s + x.debit - x.credit, 0);
+
+  const saveOpeningBalance = async () => {
+    const v = Number(obValue);
+    if (!Number.isFinite(v)) return toast.error("Enter a valid number");
+    setObSaving(true);
+    const { error } = await supabase.from("suppliers").update({ opening_balance: v }).eq("id", id);
+    setObSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Opening balance saved");
+    qc.invalidateQueries({ queryKey: ["supplier", id] });
+  };
+
 
   let running = opening;
   const rows = filtered.map((x) => {
@@ -180,6 +201,28 @@ function Page() {
         </select>
       </div>
 
+      <Card className="p-3 no-print">
+        <div className="flex items-end gap-2 flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <Label className="text-xs">Opening balance <span className="text-muted-foreground">(+ they owe us / − advance paid)</span></Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={obValue}
+              onChange={(e) => setObValue(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+          <Button onClick={saveOpeningBalance} disabled={obSaving}>
+            <Save className="h-4 w-4 mr-1" />{obSaving ? "Saving…" : "Save opening"}
+          </Button>
+          <div className="text-xs text-muted-foreground">
+            Current: <span className="font-medium text-foreground">{fmtMoney(initialOB, sym)}</span>
+          </div>
+        </div>
+      </Card>
+
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
         <Stat icon={Receipt} label="Total In (+)" value={fmtMoney(totalIn, sym)} tone="primary" />
@@ -240,8 +283,8 @@ function Page() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {x.note || "—"}
-                      {isPurchase && due > 0 && <Badge variant="destructive" className="ml-2 text-[10px]">Unpaid {fmtMoney(due, sym)}</Badge>}
                       {isPurchase && due <= 0 && Number(x.paid || 0) > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">Paid</Badge>}
+
                     </TableCell>
                     <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
                     <TableCell className="text-right text-success">{x.credit > 0 ? fmtMoney(x.credit, sym) : "—"}</TableCell>
