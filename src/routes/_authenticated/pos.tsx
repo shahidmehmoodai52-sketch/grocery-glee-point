@@ -917,7 +917,7 @@ function POSPage() {
       {/* Two-column layout */}
       <div className="flex-1 min-h-0 flex">
         {/* LEFT: items area (maximised) */}
-        <main className="flex-1 flex flex-col min-h-0 bg-background">
+        <main className="relative flex-1 flex flex-col min-h-0 bg-background">
 
         <div className="relative flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
           {/* Search / scan */}
