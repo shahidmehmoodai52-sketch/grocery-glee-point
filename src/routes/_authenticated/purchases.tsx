@@ -311,7 +311,7 @@ function Page() {
 
 type PickerProduct = { id: string; name: string; barcode?: string | null; cost_price?: number | null; stock?: number | null };
 
-function ProductPicker({ products, value, onPick }: { products: PickerProduct[]; value: string | null; onPick: (p: PickerProduct | null) => void }) {
+function ProductPicker({ products, value, onPick, placeholder }: { products: PickerProduct[]; value: string | null; onPick: (p: PickerProduct | null) => void; placeholder?: string }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const selected = value ? products.find((p) => p.id === value) : null;
@@ -326,8 +326,8 @@ function ProductPicker({ products, value, onPick }: { products: PickerProduct[];
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" role="combobox" className="h-8 w-full justify-between font-normal">
-          <span className="truncate">{selected ? selected.name : "Pick / ad-hoc"}</span>
+        <Button variant="outline" size="sm" role="combobox" className="h-9 w-full justify-between font-normal">
+          <span className="truncate">{selected ? selected.name : (placeholder ?? "Pick / ad-hoc")}</span>
           <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
         </Button>
       </PopoverTrigger>
