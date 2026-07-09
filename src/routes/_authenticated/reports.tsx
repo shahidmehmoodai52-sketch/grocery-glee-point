@@ -1,32 +1,52 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Printer, TrendingUp, TrendingDown, Wallet, Eye } from "lucide-react";
+import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: Page });
 
-function startOfMonth() { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString().slice(0, 10); }
 function today() { return new Date().toISOString().slice(0, 10); }
+const toISO = (d: Date) => {
+  const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${da}`;
+};
 
 function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "$";
-  const [from, setFrom] = useState(startOfMonth());
-  const [to, setTo] = useState(today());
+  const [preset, setPreset] = useState<DatePreset | "custom">("today");
+  const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
+  const [toDate, setToDate] = useState<Date | undefined>(new Date());
+  const from = fromDate ? toISO(fromDate) : "1970-01-01";
+  const to = toDate ? toISO(toDate) : today();
   const [tab, setTab] = useState("pnl");
   const [search, setSearch] = useState("");
 
+  const applyPreset = (p: DatePreset) => {
+    setPreset(p);
+    const { from: f, to: t } = rangeFor(p);
+    setFromDate(f ? new Date(f) : undefined);
+    setToDate(t ? new Date(t) : undefined);
+  };
+  const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
+
   const range = { from: new Date(from + "T00:00:00").toISOString(), to: new Date(to + "T23:59:59").toISOString() };
+
 
   const { data: sales = [] } = useQuery({
     queryKey: ["report-sales-full", from, to],
@@ -114,14 +134,50 @@ function Page() {
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Reports</h1>
-          <p className="text-sm text-muted-foreground">Sales, profit, invoice &amp; product breakdowns</p>
+          <p className="text-sm text-muted-foreground">Sales, profit, invoice &amp; product breakdowns · {presetLabel}</p>
         </div>
-        <div className="flex items-end gap-2 no-print">
-          <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+        <div className="flex flex-wrap items-center gap-2 no-print">
+          {PRESETS.map(p => (
+            <Button
+              key={p.key}
+              variant={preset === p.key ? "default" : "outline"}
+              size="sm"
+              onClick={() => applyPreset(p.key)}
+            >
+              {p.label}
+            </Button>
+          ))}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={preset === "custom" ? "default" : "outline"}
+                size="sm"
+                className={cn("gap-2")}
+              >
+                <CalendarIcon className="h-4 w-4" />
+                {fromDate && toDate
+                  ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
+                  : "Custom range"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="range"
+                selected={{ from: fromDate, to: toDate }}
+                onSelect={(r) => {
+                  setPreset("custom");
+                  setFromDate(r?.from);
+                  setToDate(r?.to);
+                }}
+                numberOfMonths={2}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
         </div>
       </div>
+
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
