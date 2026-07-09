@@ -1,6 +1,7 @@
 export function fmtMoney(n: number | string | null | undefined, symbol = "$") {
   const v = Number(n ?? 0);
-  return `${symbol}${v.toFixed(2)}`;
+  const sym = /^[A-Za-z]+$/.test(symbol) ? `${symbol}. ` : symbol;
+  return `${sym}${v.toFixed(2)}`;
 }
 
 export function fmtQty(n: number | string | null | undefined) {

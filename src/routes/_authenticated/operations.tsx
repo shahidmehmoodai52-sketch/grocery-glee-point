@@ -525,7 +525,7 @@ function CashDrawer({ settings }: { settings: any }) {
         </div>
         <div className="space-y-2">
           <Label>Amount</Label>
-          <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label>Reason</Label>

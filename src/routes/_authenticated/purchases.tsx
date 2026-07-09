@@ -315,8 +315,8 @@ function Page() {
               </div>
 
               <div className="grid grid-cols-4 gap-3">
-                <div><Label>Tax</Label><Input type="number" step="0.01" value={tax} onChange={(e) => setTax(Number(e.target.value))} /></div>
-                <div><Label>Paid</Label><Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(Number(e.target.value))} /></div>
+                <div><Label>Tax</Label><Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} /></div>
+                <div><Label>Paid</Label><Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} /></div>
                 <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
                 <div className="flex flex-col justify-end">
                   <div className="text-sm text-muted-foreground">Total</div>
