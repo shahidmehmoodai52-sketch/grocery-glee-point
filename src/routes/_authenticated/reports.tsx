@@ -112,6 +112,20 @@ function Page() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [sales]);
 
+  // Payment method breakdown
+  const paymentBreakdown = useMemo(() => {
+    const map = new Map<string, { method: string; invoices: number; total: number; paid: number }>();
+    for (const s of sales as any[]) {
+      const method = s.payment_method || "unknown";
+      const cur = map.get(method) ?? { method, invoices: 0, total: 0, paid: 0 };
+      cur.invoices += 1;
+      cur.total += Number(s.total);
+      cur.paid += Number(s.paid);
+      map.set(method, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => b.paid - a.paid);
+  }, [sales]);
+
   const q = search.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
     if (!q) return sales as any[];
@@ -194,6 +208,7 @@ function Page() {
             <TabsTrigger value="profit">Sale &amp; profit</TabsTrigger>
             <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
             <TabsTrigger value="product">Product-wise</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
           </TabsList>
           {(tab === "invoice" || tab === "product") && (
             <Input
@@ -373,6 +388,48 @@ function Page() {
                     <TableCell className="text-right">{fmtMoney(filteredProducts.reduce((a, b) => a + b.cost, 0), sym)}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(filteredProducts.reduce((a, b) => a + b.profit, 0), sym)}</TableCell>
                     <TableCell />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <Card className="p-3">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Payment method</TableHead>
+                <TableHead className="text-right">Invoices</TableHead>
+                <TableHead className="text-right">Total billed</TableHead>
+                <TableHead className="text-right">Received</TableHead>
+                <TableHead className="text-right">Outstanding</TableHead>
+                <TableHead className="text-right">Share %</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {paymentBreakdown.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No payments</TableCell></TableRow>}
+                {paymentBreakdown.map((p) => {
+                  const totalPaid = paymentBreakdown.reduce((a, b) => a + b.paid, 0);
+                  const share = totalPaid ? (p.paid / totalPaid) * 100 : 0;
+                  return (
+                    <TableRow key={p.method}>
+                      <TableCell className="capitalize font-medium">{p.method}</TableCell>
+                      <TableCell className="text-right">{p.invoices}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(p.total, sym)}</TableCell>
+                      <TableCell className="text-right text-success font-medium">{fmtMoney(p.paid, sym)}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(p.total - p.paid, sym)}</TableCell>
+                      <TableCell className="text-right">{share.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+                {paymentBreakdown.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right">{paymentBreakdown.reduce((a, b) => a + b.invoices, 0)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(paymentBreakdown.reduce((a, b) => a + b.total, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(paymentBreakdown.reduce((a, b) => a + b.paid, 0), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(paymentBreakdown.reduce((a, b) => a + (b.total - b.paid), 0), sym)}</TableCell>
+                    <TableCell className="text-right">100.0%</TableCell>
                   </TableRow>
                 )}
               </TableBody>
