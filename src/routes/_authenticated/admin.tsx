@@ -59,6 +59,14 @@ type TenantRow = {
   created_at: string;
 };
 
+type SecuritySummary = {
+  failed_logins_24h: number;
+  critical_24h: number;
+  total_24h: number;
+  active_blocks: number;
+  unique_ips_24h: number;
+};
+
 function AdminPanelPage() {
   const navigate = useNavigate();
   const { isSuperAdmin, loading } = useSuperAdmin();
@@ -69,10 +77,42 @@ function AdminPanelPage() {
     }
   }, [loading, isSuperAdmin, navigate]);
 
+  const { data: errorCount = 0 } = useQuery({
+    queryKey: ["admin-errors-count"],
+    enabled: isSuperAdmin,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_recent_errors", { _limit: 100 });
+      if (error) throw error;
+      return ((data as any[]) ?? []).length;
+    },
+  });
+
+  const { data: securitySummary } = useQuery({
+    queryKey: ["admin-security-summary"],
+    enabled: isSuperAdmin,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_security_summary");
+      if (error) throw error;
+      return (data as unknown as SecuritySummary) ?? null;
+    },
+  });
+
+  const securityAlert =
+    (securitySummary?.critical_24h ?? 0) > 0 ||
+    (securitySummary?.active_blocks ?? 0) > 0 ||
+    (securitySummary?.failed_logins_24h ?? 0) >= 5;
+
   if (loading) {
     return <div className="p-6"><TableSkeleton rows={6} columns={5} /></div>;
   }
   if (!isSuperAdmin) return null;
+
+  const alertTabClass =
+    "data-[state=inactive]:bg-destructive/15 data-[state=inactive]:text-destructive data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground";
+  const okTabClass =
+    "data-[state=inactive]:bg-emerald-500/10 data-[state=inactive]:text-emerald-600 dark:data-[state=inactive]:text-emerald-400";
 
   return (
     <div className="p-6 space-y-4">
@@ -84,8 +124,24 @@ function AdminPanelPage() {
       <Tabs defaultValue="tenants">
         <TabsList>
           <TabsTrigger value="tenants"><Store className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
-          <TabsTrigger value="security"><ShieldAlert className="h-4 w-4 mr-1" />Security</TabsTrigger>
-          <TabsTrigger value="errors"><Bug className="h-4 w-4 mr-1" />Errors</TabsTrigger>
+          <TabsTrigger value="security" className={securityAlert ? alertTabClass : okTabClass}>
+            <ShieldAlert className="h-4 w-4 mr-1" />
+            Security
+            {securityAlert ? (
+              <span className="ml-2 inline-flex items-center rounded-full bg-destructive-foreground/20 px-1.5 text-[10px] font-semibold">!</span>
+            ) : (
+              <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="errors" className={errorCount > 0 ? alertTabClass : okTabClass}>
+            <Bug className="h-4 w-4 mr-1" />
+            Errors
+            {errorCount > 0 ? (
+              <span className="ml-2 inline-flex items-center rounded-full bg-destructive-foreground/20 px-1.5 text-[10px] font-semibold">{errorCount}</span>
+            ) : (
+              <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            )}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
         <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
