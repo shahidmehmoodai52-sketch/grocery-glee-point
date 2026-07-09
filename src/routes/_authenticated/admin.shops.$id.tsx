@@ -214,7 +214,7 @@ function SalesTab({ tenantId }: { tenantId: string }) {
         <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} />
         <StatCard label="Orders (30d)" value={totalOrders} icon={ShoppingCart} />
         <StatCard label="Est. profit" value={fmtMoney(totalRevenue - totalCost, "")} icon={Wallet} tone="success" />
-        <StatCard label="Low stock" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock > 0 ? "warning" : "neutral"} />
+        <StatCard label="Low stock" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock > 0 ? "warning" : "default"} />
       </div>
 
       <Card className="p-4">
@@ -389,7 +389,7 @@ function PlanTab({ detail, tenantId }: { detail: TenantDetail; tenantId: string 
       const { error } = await supabase.rpc("admin_set_tenant_plan", {
         _tenant_id: tenantId,
         _plan_id: planId,
-        _expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+        _expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
         _status: status,
       });
       if (error) throw error;
