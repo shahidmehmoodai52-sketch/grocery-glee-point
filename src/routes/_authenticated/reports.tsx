@@ -134,6 +134,26 @@ function Page() {
     return Array.from(map.values()).sort((a, b) => b.paid - a.paid);
   }, [sales]);
 
+  // Combined method cash-flow: money IN (sales + customer party-payments) vs money OUT (supplier party-payments)
+  const methodFlow = useMemo(() => {
+    const map = new Map<string, { method: string; in_sales: number; in_customer: number; out_supplier: number; net: number }>();
+    const get = (m: string) => {
+      const cur = map.get(m) ?? { method: m, in_sales: 0, in_customer: 0, out_supplier: 0, net: 0 };
+      map.set(m, cur); return cur;
+    };
+    for (const s of sales as any[]) {
+      const cur = get((s.payment_method || "unknown").toLowerCase());
+      cur.in_sales += Number(s.paid);
+    }
+    for (const p of partyPayments as any[]) {
+      const cur = get((p.method || "unknown").toLowerCase());
+      if (p.party_type === "customer") cur.in_customer += Number(p.amount);
+      else cur.out_supplier += Number(p.amount);
+    }
+    for (const v of map.values()) v.net = v.in_sales + v.in_customer - v.out_supplier;
+    return Array.from(map.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  }, [sales, partyPayments]);
+
   const q = search.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
     if (!q) return sales as any[];
