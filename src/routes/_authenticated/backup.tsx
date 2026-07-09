@@ -22,9 +22,11 @@ function BackupPage() {
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const supported = isSupported();
+  const inIframe = typeof window !== "undefined" && window.self !== window.top;
 
   const refresh = async () => setStatus(await getStatus());
   useEffect(() => { refresh(); }, []);
+
 
   const pick = async () => {
     try {
