@@ -14,6 +14,7 @@ import {
 const PULL_TABLES: MirroredTable[] = [
   "products", "product_barcodes", "customers", "suppliers",
   "store_settings", "user_roles", "sales", "sale_items",
+  "purchases", "purchase_items", "expenses",
 ];
 
 

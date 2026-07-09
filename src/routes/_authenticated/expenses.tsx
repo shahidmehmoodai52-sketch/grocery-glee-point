@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { offlineFirst, cacheExpenses, insertOfflineAware } from "@/lib/offline/pos";
+import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/expenses")({ component: Page });
 
@@ -45,12 +47,23 @@ function Page() {
 
   const { data: rows = [] } = useQuery({
     queryKey: ["expenses", from, to],
-    queryFn: async () =>
-      (await supabase.from("expenses")
-        .select("*, expense_persons(name,role)")
-        .gte("expense_date", from).lte("expense_date", to)
-        .order("expense_date", { ascending: false }).order("created_at", { ascending: false })
-      ).data ?? [],
+    queryFn: async () => offlineFirst<any[]>(
+      async () =>
+        (await supabase.from("expenses")
+          .select("*, expense_persons(name,role)")
+          .gte("expense_date", from).lte("expense_date", to)
+          .order("expense_date", { ascending: false }).order("created_at", { ascending: false })
+        ).data ?? [],
+      async () => {
+        const all = await db().expenses.toArray();
+        const inRange = all.filter((r: any) => r.expense_date >= from && r.expense_date <= to);
+        inRange.sort((a: any, b: any) =>
+          (b.expense_date ?? "").localeCompare(a.expense_date ?? "") ||
+          (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+        return inRange.map((r: any) => ({ ...r, expense_persons: r.expense_persons ?? null }));
+      },
+      cacheExpenses,
+    ),
   });
 
   const totals = useMemo(() => {
@@ -76,9 +89,10 @@ function Page() {
     if (!exp.amount || exp.amount <= 0) return toast.error("Amount required");
     const payload: any = { ...exp };
     if (!payload.person_id) delete payload.person_id;
-    const { error } = await supabase.from("expenses").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success("Expense recorded");
+    try {
+      const row = await insertOfflineAware("expenses", payload);
+      toast.success(row._offline_pending ? "Expense saved offline — will sync" : "Expense recorded");
+    } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
     setExpOpen(false);
     setExp({ person_id: "", category: "general", amount: 0, description: "", method: "cash", expense_date: today() });
     qc.invalidateQueries({ queryKey: ["expenses"] });

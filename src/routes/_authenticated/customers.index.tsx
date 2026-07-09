@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { offlineFirst, cacheCustomers, insertOfflineAware } from "@/lib/offline/pos";
+import { db } from "@/lib/offline/db";
 
 
 export const Route = createFileRoute("/_authenticated/customers/")({ component: Page });
@@ -27,14 +29,19 @@ function Page() {
 
   const { data: rows = [] } = useQuery({
     queryKey: ["customers"],
-    queryFn: async () => (await supabase.from("customers").select("*").order("name")).data ?? [],
+    queryFn: async () => offlineFirst<any[]>(
+      async () => (await supabase.from("customers").select("*").order("name")).data ?? [],
+      async () => (await db().customers.orderBy("name").toArray()) as any[],
+      cacheCustomers,
+    ),
   });
 
   const save = async () => {
     if (!form.name) return toast.error("Name required");
-    const { error } = await supabase.from("customers").insert(form);
-    if (error) return toast.error(error.message);
-    toast.success("Customer added");
+    try {
+      const row = await insertOfflineAware("customers", form);
+      toast.success(row._offline_pending ? "Customer saved offline — will sync" : "Customer added");
+    } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
     setOpen(false);
     setForm({ name: "", phone: "", email: "", address: "", balance: 0 });
     qc.invalidateQueries({ queryKey: ["customers"] });

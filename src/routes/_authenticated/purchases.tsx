@@ -15,6 +15,8 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fetchAll } from "@/lib/supabase-page";
+import { offlineFirst, cacheProducts, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
+import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
@@ -48,15 +50,31 @@ function Page() {
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
-    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+    queryFn: async () => offlineFirst<any[]>(
+      async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+      async () => (await db().suppliers.orderBy("name").toArray()).map((s: any) => ({ id: s.id, name: s.name })),
+      cacheSuppliers,
+    ),
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,cost_price,stock").order("name").range(from, to)),
+    queryFn: async () => offlineFirst<any[]>(
+      async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,cost_price,stock").order("name").range(from, to)),
+      async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, cost_price: p.cost_price, stock: p.stock })),
+      cacheProducts,
+    ),
   });
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases"],
-    queryFn: async () => (await supabase.from("purchases").select("*, suppliers(name)").order("created_at", { ascending: false }).limit(100)).data ?? [],
+    queryFn: async () => offlineFirst<any[]>(
+      async () => (await supabase.from("purchases").select("*, suppliers(name)").order("created_at", { ascending: false }).limit(100)).data ?? [],
+      async () => {
+        const rows = await db().purchases.orderBy("created_at").reverse().limit(100).toArray();
+        const supMap = new Map((await db().suppliers.toArray()).map((s: any) => [s.id, s.name]));
+        return rows.map((r: any) => ({ ...r, suppliers: r.supplier_id ? { name: supMap.get(r.supplier_id) ?? null } : null }));
+      },
+      cachePurchases,
+    ),
   });
 
   const subtotal = lines.reduce((s, l) => s + l.qty * l.cost, 0);
