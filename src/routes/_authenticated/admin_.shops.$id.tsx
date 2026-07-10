@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
-  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy,
+  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ function ShopDetailPage() {
 type TenantDetail = {
   tenant: {
     id: string; name: string; slug: string | null; status: string; plan: string | null;
-    owner_id: string | null; created_at: string;
+    owner_id: string | null; created_at: string; library_approved?: boolean;
   };
   members: Array<{ user_id: string; role: string; joined_at: string; full_name: string | null; email: string | null }>;
   subscription: {
@@ -116,6 +116,23 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
                 <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
               </Button>
             )}
+            <Button
+              size="sm"
+              variant={t.library_approved ? "outline" : "default"}
+              onClick={async () => {
+                const next = !t.library_approved;
+                const { error } = await supabase
+                  .from("tenants")
+                  .update({ library_approved: next })
+                  .eq("id", t.id);
+                if (error) return toast.error(error.message);
+                toast.success(next ? "Global library access granted" : "Global library access revoked");
+                qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
+              }}
+            >
+              <Library className="h-4 w-4 mr-1" />
+              {t.library_approved ? "Revoke library access" : "Grant library access"}
+            </Button>
             {t.status !== "archived" && (
               <Button size="sm" variant="ghost" onClick={() => {
                 if (confirm(`Archive "${t.name}"? Owner loses access.`)) setStatus("archived");
