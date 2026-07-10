@@ -56,6 +56,7 @@ function AuthPage() {
   const [shopAddress, setShopAddress] = useState("");
   const [shopCity, setShopCity] = useState("");
   const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const goToApp = useCallback(async () => {
     await navigate({ to: target, replace: true });
