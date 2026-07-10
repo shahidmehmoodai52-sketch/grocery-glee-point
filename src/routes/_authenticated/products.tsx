@@ -60,6 +60,7 @@ function ProductsPage() {
     if (!form.name) return toast.error("Name is required");
     const allBarcodes = parseBarcodes(form.barcodes_text);
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
+    if (!primary) return toast.error("Barcode is required");
     const { barcodes_text: _bt, stock: newStock, ...rest } = form;
     const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null };
     let productId = form.id;
