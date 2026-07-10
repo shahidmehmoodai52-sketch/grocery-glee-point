@@ -832,17 +832,9 @@ function Importer({ entity }: { entity: EntityKey }) {
     const tag = (r: any) => (batchId ? { ...r, import_batch_id: batchId } : r);
     for (let i = 0; i < mapped.length; i += chunkSize) {
       const chunk = mapped.slice(i, i + chunkSize).map(tag);
-      if (entity === "products" && schema.onConflict) {
-        const withKey = chunk.filter((r) => r.sku);
-        const withoutKey = chunk.filter((r) => !r.sku);
-        if (withKey.length) {
-          const { error } = await supabase.from("products").upsert(withKey as any, { onConflict: "sku" });
-          if (error) { failed += withKey.length; errors.push(error.message); } else ok += withKey.length;
-        }
-        if (withoutKey.length) {
-          const { error } = await supabase.from("products").insert(withoutKey as any);
-          if (error) { failed += withoutKey.length; errors.push(error.message); } else ok += withoutKey.length;
-        }
+      if (entity === "products") {
+        const { error } = await supabase.from("products").insert(chunk as any);
+        if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
       } else {
         const { error } = await supabase.from(entity).insert(chunk as any);
         if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
