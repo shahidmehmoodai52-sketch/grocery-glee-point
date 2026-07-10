@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { ALL_PERMS } from "@/hooks/use-permissions";
 import { listStaff, createStaff, resetStaffPassword, setStaffPermissions, deleteStaff } from "@/lib/users.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { Monitor } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/users")({ component: Page });
 
@@ -25,6 +27,23 @@ function Page() {
   const del = useServerFn(deleteStaff);
 
   const { data: users = [], isLoading } = useQuery({ queryKey: ["staff"], queryFn: () => (list as any)() });
+
+  // Active devices per user (heartbeat within last 90s)
+  const { data: activeSessions = {} } = useQuery({
+    queryKey: ["active-sessions"],
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 90_000).toISOString();
+      const { data, error } = await supabase
+        .from("user_sessions")
+        .select("user_id")
+        .gte("last_seen", since);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const r of data ?? []) map[r.user_id] = (map[r.user_id] ?? 0) + 1;
+      return map;
+    },
+  });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["staff"] });
 
@@ -97,11 +116,11 @@ function Page() {
       <Card className="p-3">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Actions</TableHead>
+            <TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Active devices</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
-            {users.map((u: any) => <UserRow key={u.id} u={u} reset={reset} del={del} refresh={refresh} />)}
+            {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
+            {users.map((u: any) => <UserRow key={u.id} u={u} activeCount={activeSessions[u.id] ?? 0} reset={reset} del={del} refresh={refresh} />)}
           </TableBody>
         </Table>
       </Card>
@@ -109,7 +128,7 @@ function Page() {
   );
 }
 
-function UserRow({ u, reset, del, refresh }: any) {
+function UserRow({ u, activeCount, reset, del, refresh }: any) {
   const [editOpen, setEditOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
@@ -139,6 +158,12 @@ function UserRow({ u, reset, del, refresh }: any) {
     <TableRow>
       <TableCell className="font-medium">{u.email}</TableCell>
       <TableCell><Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge></TableCell>
+      <TableCell>
+        <Badge variant={activeCount > 0 ? "default" : "outline"} className="gap-1">
+          <Monitor className="h-3 w-3" />
+          {activeCount} {activeCount === 1 ? "device" : "devices"}
+        </Badge>
+      </TableCell>
       <TableCell className="max-w-md">
         {u.role === "admin" ? <span className="text-xs text-muted-foreground">Full access</span> : (
           <div className="flex flex-wrap gap-1">
