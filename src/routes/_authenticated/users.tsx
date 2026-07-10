@@ -158,6 +158,12 @@ function UserRow({ u, activeCount, reset, del, refresh }: any) {
     <TableRow>
       <TableCell className="font-medium">{u.email}</TableCell>
       <TableCell><Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge></TableCell>
+      <TableCell>
+        <Badge variant={activeCount > 0 ? "default" : "outline"} className="gap-1">
+          <Monitor className="h-3 w-3" />
+          {activeCount} {activeCount === 1 ? "device" : "devices"}
+        </Badge>
+      </TableCell>
       <TableCell className="max-w-md">
         {u.role === "admin" ? <span className="text-xs text-muted-foreground">Full access</span> : (
           <div className="flex flex-wrap gap-1">
