@@ -62,19 +62,29 @@ function Page() {
                   <Button type="button" variant={role === "admin" ? "default" : "outline"} size="sm" onClick={() => setRole("admin")}>Owner (Admin)</Button>
                 </div>
               </div>
-              {role === "cashier" && (
-                <div>
-                  <Label className="text-sm">Allowed sections (POS & Sales always allowed)</Label>
-                  <div className="grid grid-cols-2 gap-2 mt-2 p-3 rounded border max-h-64 overflow-auto">
-                    {ALL_PERMS.filter((p) => p.key !== "sales").map((p) => (
-                      <label key={p.key} className="flex items-center gap-2 text-sm">
-                        <Checkbox checked={perms.includes(p.key)} onCheckedChange={() => togglePerm(p.key)} />
-                        {p.label}
-                      </label>
-                    ))}
+              {role === "cashier" && (() => {
+                const selectable = ALL_PERMS.filter((p) => p.key !== "sales");
+                const allOn = selectable.every((p) => perms.includes(p.key));
+                const toggleAll = () => setPermsState(allOn ? [] : selectable.map((p) => p.key));
+                return (
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Allowed sections (POS & Sales always allowed)</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={toggleAll}>
+                        {allOn ? "Clear all" : "Access all"}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2 p-3 rounded border max-h-64 overflow-auto">
+                      {selectable.map((p) => (
+                        <label key={p.key} className="flex items-center gap-2 text-sm">
+                          <Checkbox checked={perms.includes(p.key)} onCheckedChange={() => togglePerm(p.key)} />
+                          {p.label}
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setNewOpen(false)}>Cancel</Button>
