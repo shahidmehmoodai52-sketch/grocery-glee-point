@@ -104,7 +104,7 @@ function LibraryPage() {
         title="Global product library"
         description="Shared catalog metadata contributed by all shops. Prices and stock stay private to your shop."
         icon={<Library className="h-5 w-5" />}
-        actions={<ContributeDialog onDone={invalidate} />}
+        actions={<div className="flex gap-2"><BulkUploadDialog onDone={invalidate} /><ContributeDialog onDone={invalidate} /></div>}
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
