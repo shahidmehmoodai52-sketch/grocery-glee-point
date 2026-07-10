@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
-  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy,
+  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
