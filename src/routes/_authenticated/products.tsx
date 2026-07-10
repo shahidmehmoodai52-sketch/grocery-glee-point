@@ -144,7 +144,7 @@ function ProductsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
-                <div><Label>Primary barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
+                <div><Label>Primary barcode <span className="text-destructive">*</span></Label><Input required value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
                 <div className="col-span-2">
                   <Label>Additional barcodes (one per line — for different versions/packs of the same item)</Label>
                   <textarea
