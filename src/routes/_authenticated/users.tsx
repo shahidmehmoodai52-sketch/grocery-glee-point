@@ -116,11 +116,11 @@ function Page() {
       <Card className="p-3">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Actions</TableHead>
+            <TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Active devices</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
-            {users.map((u: any) => <UserRow key={u.id} u={u} reset={reset} del={del} refresh={refresh} />)}
+            {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
+            {users.map((u: any) => <UserRow key={u.id} u={u} activeCount={activeSessions[u.id] ?? 0} reset={reset} del={del} refresh={refresh} />)}
           </TableBody>
         </Table>
       </Card>
@@ -128,7 +128,7 @@ function Page() {
   );
 }
 
-function UserRow({ u, reset, del, refresh }: any) {
+function UserRow({ u, activeCount, reset, del, refresh }: any) {
   const [editOpen, setEditOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
