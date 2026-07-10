@@ -108,7 +108,7 @@ function AuthPage() {
             setPassword("");
           } else {
             void logSecurityEvent("signup_error", { severity: "info", email: cleanEmail, metadata: { message: error.message } });
-            toast.error("Could not create account. Please try again.");
+            toast.error(error.message || "Could not create account. Please try again.");
           }
           return;
         }
