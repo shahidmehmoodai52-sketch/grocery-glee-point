@@ -601,7 +601,7 @@ function SmartMerge() {
     const noSku = merged.filter((p) => !p.sku).map(tag);
     for (let i = 0; i < withSku.length; i += chunkSize) {
       const chunk = withSku.slice(i, i + chunkSize);
-      const { error } = await supabase.from("products").upsert(chunk as any, { onConflict: "sku" });
+      const { error } = await supabase.from("products").insert(chunk as any);
       if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
     }
     for (let i = 0; i < noSku.length; i += chunkSize) {
