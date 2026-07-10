@@ -1101,7 +1101,7 @@ function SingleMergedFile() {
     // 1) Upsert products with SKU (grouped so no dupes in one batch)
     for (let i = 0; i < withSku.length; i += chunkSize) {
       const chunk = withSku.slice(i, i + chunkSize).map(toProduct);
-      const { error } = await supabase.from("products").upsert(chunk as any, { onConflict: "sku" });
+      const { error } = await supabase.from("products").insert(chunk as any);
       if (error) { prodFail += chunk.length; errors.push(error.message); } else prodOk += chunk.length;
       setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
     }
