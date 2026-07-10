@@ -1146,7 +1146,7 @@ function SingleMergedFile() {
     const uniqueBC = bcRows.filter((r) => (seen.has(r.barcode) ? false : (seen.add(r.barcode), true)));
     for (let i = 0; i < uniqueBC.length; i += chunkSize) {
       const chunk = uniqueBC.slice(i, i + chunkSize);
-      const { error } = await supabase.from("product_barcodes").upsert(chunk as any, { onConflict: "barcode", ignoreDuplicates: false });
+      const { error } = await supabase.from("product_barcodes").insert(chunk as any);
       if (error) errors.push(`barcodes: ${error.message}`); else bcOk += chunk.length;
       setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
     }
