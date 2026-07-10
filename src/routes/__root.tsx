@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { logAppError } from "../lib/log-app-error";
 import { AppErrorBoundary } from "../components/error-boundary";
 import { SuspendedGate } from "../components/suspended-gate";
+import { useEnterAsClick } from "../hooks/use-enter-as-click";
 
 function NotFoundComponent() {
   return (
