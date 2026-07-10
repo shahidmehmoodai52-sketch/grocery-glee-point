@@ -25,12 +25,15 @@ export const Route = createFileRoute("/_authenticated/import")({ component: Page
 type BatchSource = "single_merged" | "smart_merge" | "products" | "customers" | "suppliers";
 
 async function createImportBatch(filename: string, source: BatchSource): Promise<string | null> {
+  const { data: userRes } = await supabase.auth.getUser();
+  const uid = userRes.user?.id;
+  if (!uid) { console.error("createImportBatch: no auth user"); return null; }
   const { data, error } = await supabase
     .from("import_batches")
-    .insert({ filename, source })
+    .insert({ filename, source, user_id: uid })
     .select("id")
     .single();
-  if (error) { console.error(error); return null; }
+  if (error) { console.error(error); toast.error(`Upload log failed: ${error.message}`); return null; }
   return data?.id ?? null;
 }
 
