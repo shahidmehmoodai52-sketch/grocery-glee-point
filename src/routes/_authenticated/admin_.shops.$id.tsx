@@ -116,6 +116,23 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
                 <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
               </Button>
             )}
+            <Button
+              size="sm"
+              variant={t.library_approved ? "outline" : "default"}
+              onClick={async () => {
+                const next = !t.library_approved;
+                const { error } = await supabase
+                  .from("tenants")
+                  .update({ library_approved: next })
+                  .eq("id", t.id);
+                if (error) return toast.error(error.message);
+                toast.success(next ? "Global library access granted" : "Global library access revoked");
+                qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
+              }}
+            >
+              <Library className="h-4 w-4 mr-1" />
+              {t.library_approved ? "Revoke library access" : "Grant library access"}
+            </Button>
             {t.status !== "archived" && (
               <Button size="sm" variant="ghost" onClick={() => {
                 if (confirm(`Archive "${t.name}"? Owner loses access.`)) setStatus("archived");
