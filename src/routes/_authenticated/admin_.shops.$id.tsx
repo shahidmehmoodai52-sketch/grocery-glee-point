@@ -48,7 +48,7 @@ function ShopDetailPage() {
 type TenantDetail = {
   tenant: {
     id: string; name: string; slug: string | null; status: string; plan: string | null;
-    owner_id: string | null; created_at: string;
+    owner_id: string | null; created_at: string; library_approved?: boolean;
   };
   members: Array<{ user_id: string; role: string; joined_at: string; full_name: string | null; email: string | null }>;
   subscription: {
