@@ -56,6 +56,7 @@ function AuthPage() {
   const [shopAddress, setShopAddress] = useState("");
   const [shopCity, setShopCity] = useState("");
   const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const goToApp = useCallback(async () => {
     await navigate({ to: target, replace: true });
@@ -77,22 +78,24 @@ function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
+    setFormError(null);
     const cleanEmail = email.trim().toLowerCase();
+    const showErr = (msg: string) => { setFormError(msg); toast.error(msg); };
     try {
       // Firewall check: is this IP or email blocked?
       if (await isBlocked(cleanEmail)) {
         await logSecurityEvent("blocked_attempt", { severity: "warning", email: cleanEmail });
-        toast.error("Access blocked. Contact support if this is a mistake.");
+        showErr("Access blocked. Contact support if this is a mistake.");
         return;
       }
       if (mode === "signup") {
         // Strong password enforced on signup.
         const pwErr = checkStrongPassword(password);
-        if (pwErr) { toast.error(pwErr); return; }
+        if (pwErr) { showErr(pwErr); return; }
         // Shop details mandatory on signup.
-        if (shopName.trim().length < 2) { toast.error("Shop name is required."); return; }
+        if (shopName.trim().length < 2) { showErr("Shop name is required."); return; }
         if (!shopPhone.trim() || !shopAddress.trim() || !shopCity.trim()) {
-          toast.error("Please enter shop phone, address and city.");
+          showErr("Please enter shop phone, address and city.");
           return;
         }
 
@@ -102,13 +105,14 @@ function AuthPage() {
           options: { data: { full_name: fullName } },
         });
         if (error) {
+          console.error("[signup] supabase error:", error);
           if (/already registered|already exists|user_already_exists/i.test(error.message)) {
             toast.info("Account already exists. Please sign in.");
             setMode("signin");
             setPassword("");
           } else {
             void logSecurityEvent("signup_error", { severity: "info", email: cleanEmail, metadata: { message: error.message } });
-            toast.error(error.message || "Could not create account. Please try again.");
+            showErr(`Signup failed: ${error.message}`);
           }
           return;
         }
@@ -123,7 +127,9 @@ function AuthPage() {
             });
             toast.success("Shop registered. Awaiting admin approval — you have limited access until approved.");
           } catch (err: any) {
-            toast.error(err?.message ?? "Could not register shop. Please contact support.");
+            console.error("[signup] shop registration error:", err);
+            showErr(`Shop registration failed: ${err?.message ?? "unknown error"}`);
+            return;
           }
           await goToApp();
         } else {
@@ -143,8 +149,9 @@ function AuthPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) {
+          console.error("[signin] supabase error:", error);
           void logSecurityEvent("failed_login", { severity: "warning", email: cleanEmail });
-          toast.error("Invalid username or password");
+          showErr(error.message || "Invalid username or password");
           return;
         }
         void logSecurityEvent("successful_login", { severity: "info", email: cleanEmail });
@@ -156,9 +163,14 @@ function AuthPage() {
             await ensureShopRegistered(shop);
             window.sessionStorage.removeItem("pendingShopDetails");
           }
-        } catch { /* non-fatal */ }
+        } catch (err) {
+          console.error("[signin] pending shop registration error:", err);
+        }
         await goToApp();
       }
+    } catch (err: any) {
+      console.error("[auth] unexpected error:", err);
+      showErr(err?.message ?? "Unexpected error. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -258,6 +270,11 @@ function AuthPage() {
                 <p className="text-[11px] text-muted-foreground">Use 8+ chars with an uppercase letter, a lowercase letter, and a number.</p>
               )}
             </div>
+            {formError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive whitespace-pre-wrap">
+                <strong className="font-semibold">Error:</strong> {formError}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={busy}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === "signin" ? "Sign in" : "Create account & register shop"}
