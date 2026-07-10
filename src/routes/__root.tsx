@@ -129,6 +129,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEnterAsClick();
 
   useEffect(() => {
     // Boot offline layer (safe no-op if disabled / unsupported).
