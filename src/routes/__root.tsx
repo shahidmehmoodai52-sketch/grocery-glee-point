@@ -15,6 +15,7 @@ import { logAppError } from "../lib/log-app-error";
 import { AppErrorBoundary } from "../components/error-boundary";
 import { SuspendedGate } from "../components/suspended-gate";
 import { useEnterAsClick } from "../hooks/use-enter-as-click";
+import { useSessionHeartbeat } from "../hooks/use-session-heartbeat";
 
 function NotFoundComponent() {
   return (
@@ -130,6 +131,7 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useEnterAsClick();
+  useSessionHeartbeat();
 
   useEffect(() => {
     // Boot offline layer (safe no-op if disabled / unsupported).
