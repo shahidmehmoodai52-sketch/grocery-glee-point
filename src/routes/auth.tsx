@@ -270,6 +270,11 @@ function AuthPage() {
                 <p className="text-[11px] text-muted-foreground">Use 8+ chars with an uppercase letter, a lowercase letter, and a number.</p>
               )}
             </div>
+            {formError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive whitespace-pre-wrap">
+                <strong className="font-semibold">Error:</strong> {formError}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={busy}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === "signin" ? "Sign in" : "Create account & register shop"}
