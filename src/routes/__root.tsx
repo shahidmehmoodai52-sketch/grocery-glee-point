@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { logAppError } from "../lib/log-app-error";
 import { AppErrorBoundary } from "../components/error-boundary";
 import { SuspendedGate } from "../components/suspended-gate";
+import { useEnterAsClick } from "../hooks/use-enter-as-click";
 
 function NotFoundComponent() {
   return (
@@ -128,6 +129,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEnterAsClick();
 
   useEffect(() => {
     // Boot offline layer (safe no-op if disabled / unsupported).
