@@ -28,6 +28,23 @@ function Page() {
 
   const { data: users = [], isLoading } = useQuery({ queryKey: ["staff"], queryFn: () => (list as any)() });
 
+  // Active devices per user (heartbeat within last 90s)
+  const { data: activeSessions = {} } = useQuery({
+    queryKey: ["active-sessions"],
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 90_000).toISOString();
+      const { data, error } = await supabase
+        .from("user_sessions")
+        .select("user_id")
+        .gte("last_seen", since);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const r of data ?? []) map[r.user_id] = (map[r.user_id] ?? 0) + 1;
+      return map;
+    },
+  });
+
   const refresh = () => qc.invalidateQueries({ queryKey: ["staff"] });
 
   const [newOpen, setNewOpen] = useState(false);
