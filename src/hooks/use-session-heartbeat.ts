@@ -4,11 +4,10 @@ import { useAuth } from "./use-auth";
 
 function getDeviceId(): string {
   try {
-    let id = localStorage.getItem("device_id");
-    if (!id) {
-      id = (crypto as any).randomUUID?.() ?? `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      localStorage.setItem("device_id", id);
-    }
+    const existing = localStorage.getItem("device_id");
+    if (existing) return existing;
+    const id: string = (crypto as any).randomUUID?.() ?? `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem("device_id", id);
     return id;
   } catch {
     return `dev-${Date.now()}`;
