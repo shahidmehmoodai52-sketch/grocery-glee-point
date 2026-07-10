@@ -1,0 +1,2 @@
+ALTER TABLE public.audit_logs DROP CONSTRAINT IF EXISTS audit_logs_action_check;
+ALTER TABLE public.audit_logs ADD CONSTRAINT audit_logs_action_check CHECK (action = ANY (ARRAY['INSERT','UPDATE','DELETE','ADMIN_SET_STATUS','ADMIN_SET_PLAN','ADMIN_RESET_PASSWORD','ADMIN_ACTION']));
