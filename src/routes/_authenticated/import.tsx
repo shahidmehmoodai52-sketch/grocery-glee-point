@@ -872,9 +872,32 @@ function Importer({ entity }: { entity: EntityKey }) {
           <div className="flex gap-2">
             <Button variant="outline" onClick={downloadSample}><FileDown className="h-4 w-4 mr-2" />Sample Excel</Button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files?.[0] && parseFile(e.target.files[0])} />
-            <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />Choose file</Button>
+            <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />{filename ? "Change file" : "Choose file"}</Button>
           </div>
         </div>
+        {filename && (
+          <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileSpreadsheet className="h-4 w-4 text-primary shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate" title={filename}>{filename}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {rows.length} rows · {headers.length} columns{mapped.length !== rows.length ? ` · ${mapped.length} ready` : ""}
+                </div>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setFilename(""); setHeaders([]); setRows([]); setMapping({}); setResult(null);
+                if (fileRef.current) fileRef.current.value = "";
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+            </Button>
+          </div>
+        )}
       </Card>
 
       {headers.length > 0 && (
