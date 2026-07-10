@@ -461,12 +461,16 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
     setProgress(null);
     try {
       const rows = await parseFile(file);
-      const cleaned: Array<{ name: string; barcode: string | null; category: string | null; unit: string }> = [];
+      const cleaned: Array<{ name: string; barcode: string; category: string | null; unit: string }> = [];
+      const seen = new Set<string>();
       let skipped = 0;
+      let dupInFile = 0;
       for (const r of rows) {
         const nm = pickField(r, ["name", "product name", "item", "item name", "title"]);
         const bc = pickField(r, ["barcode", "ean", "upc", "code", "sku"]);
         if (!nm || !bc) { skipped++; continue; }
+        if (seen.has(bc)) { dupInFile++; continue; }
+        seen.add(bc);
         cleaned.push({
           name: nm,
           barcode: bc,
@@ -479,15 +483,35 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
         setBusy(false);
         return;
       }
-      // Insert in chunks
+
+      // Filter out barcodes already in global_products (unique constraint on barcode)
+      let alreadyExists = 0;
+      const barcodes = cleaned.map((c) => c.barcode);
+      const existing = new Set<string>();
+      const lookupChunk = 500;
+      for (let i = 0; i < barcodes.length; i += lookupChunk) {
+        const slice = barcodes.slice(i, i + lookupChunk);
+        const { data, error } = await supabase
+          .from("global_products")
+          .select("barcode")
+          .in("barcode", slice);
+        if (!error && data) for (const row of data) if (row.barcode) existing.add(row.barcode);
+        setProgress({ ok: 0, skipped: skipped + dupInFile, failed: 0 });
+      }
+      const toInsert = cleaned.filter((c) => {
+        if (existing.has(c.barcode)) { alreadyExists++; return false; }
+        return true;
+      });
+
       let ok = 0;
       let failed = 0;
-      const chunk = 200;
-      for (let i = 0; i < cleaned.length; i += chunk) {
-        const slice = cleaned.slice(i, i + chunk);
-        const { error, count } = await supabase.from("global_products").insert(slice, { count: "exact" });
+      const chunk = 500;
+      for (let i = 0; i < toInsert.length; i += chunk) {
+        const slice = toInsert.slice(i, i + chunk);
+        const { error, count } = await supabase
+          .from("global_products")
+          .insert(slice, { count: "exact" });
         if (error) {
-          // fallback: try row by row so a few bad rows don't kill the batch
           for (const row of slice) {
             const { error: e2 } = await supabase.from("global_products").insert(row);
             if (e2) failed++; else ok++;
@@ -495,9 +519,11 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
         } else {
           ok += count ?? slice.length;
         }
-        setProgress({ ok, skipped, failed });
+        setProgress({ ok, skipped: skipped + dupInFile + alreadyExists, failed });
       }
-      toast.success(`Uploaded ${ok} items · ${skipped} skipped (missing name/barcode) · ${failed} failed`);
+      toast.success(
+        `Uploaded ${ok} · Skipped ${skipped + dupInFile + alreadyExists} (${skipped} missing, ${dupInFile} dup in file, ${alreadyExists} already in library) · Failed ${failed}`,
+      );
       onDone();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to parse file");
