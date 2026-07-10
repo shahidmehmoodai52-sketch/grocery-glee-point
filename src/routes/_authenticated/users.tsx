@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { ALL_PERMS } from "@/hooks/use-permissions";
 import { listStaff, createStaff, resetStaffPassword, setStaffPermissions, deleteStaff } from "@/lib/users.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { Monitor } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/users")({ component: Page });
 
