@@ -276,6 +276,28 @@ function AuthPage() {
           Continue with Google
         </Button>
 
+        <Button
+          variant="ghost"
+          className="w-full mt-2"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const { error } = await supabase.auth.signInAnonymously();
+              if (error) {
+                toast.error(error.message ?? "Guest sign-in failed");
+                return;
+              }
+              toast.success("Signed in as guest. Register your shop to continue.");
+              await goToApp();
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Continue as guest
+        </Button>
+
         <p className="text-xs text-muted-foreground text-center mt-6">
           New shops start as <strong>pending</strong>. You'll have limited access until the developer approves your shop.
         </p>
