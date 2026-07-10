@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Library, Search, Download, Check, X, Clock, ShieldCheck, Plus } from "lucide-react";
+import { Library, Search, Download, Check, X, Clock, ShieldCheck, Plus, Upload } from "lucide-react";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,7 +104,7 @@ function LibraryPage() {
         title="Global product library"
         description="Shared catalog metadata contributed by all shops. Prices and stock stay private to your shop."
         icon={<Library className="h-5 w-5" />}
-        actions={<ContributeDialog onDone={invalidate} />}
+        actions={<div className="flex gap-2"><BulkUploadDialog onDone={invalidate} /><ContributeDialog onDone={invalidate} /></div>}
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
@@ -413,6 +415,131 @@ function ContributeDialog({ onDone }: { onDone: () => void }) {
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
           <Button disabled={busy} onClick={submit}>{busy ? "Submitting…" : "Submit for approval"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Map various header names -> our canonical fields
+function pickField(row: Record<string, any>, keys: string[]): string | null {
+  const lowered: Record<string, any> = {};
+  for (const k of Object.keys(row)) lowered[k.trim().toLowerCase()] = row[k];
+  for (const k of keys) {
+    const v = lowered[k.toLowerCase()];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+  }
+  return null;
+}
+
+async function parseFile(file: File): Promise<Record<string, any>[]> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".csv") || name.endsWith(".txt")) {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (res) => resolve(res.data as any[]),
+        error: reject,
+      });
+    });
+  }
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+}
+
+function BulkUploadDialog({ onDone }: { onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ ok: number; skipped: number; failed: number } | null>(null);
+
+  const handleFile = async (file: File | null) => {
+    if (!file) return;
+    setBusy(true);
+    setProgress(null);
+    try {
+      const rows = await parseFile(file);
+      const cleaned: Array<{ name: string; barcode: string | null; category: string | null; unit: string }> = [];
+      let skipped = 0;
+      for (const r of rows) {
+        const nm = pickField(r, ["name", "product name", "item", "item name", "title"]);
+        const bc = pickField(r, ["barcode", "ean", "upc", "code", "sku"]);
+        if (!nm || !bc) { skipped++; continue; }
+        cleaned.push({
+          name: nm,
+          barcode: bc,
+          category: pickField(r, ["category", "cat", "group"]),
+          unit: pickField(r, ["unit", "uom", "unit type"]) ?? "pcs",
+        });
+      }
+      if (cleaned.length === 0) {
+        toast.error(`No valid rows found. Required: name + barcode. Skipped: ${skipped}`);
+        setBusy(false);
+        return;
+      }
+      // Insert in chunks
+      let ok = 0;
+      let failed = 0;
+      const chunk = 200;
+      for (let i = 0; i < cleaned.length; i += chunk) {
+        const slice = cleaned.slice(i, i + chunk);
+        const { error, count } = await supabase.from("global_products").insert(slice, { count: "exact" });
+        if (error) {
+          // fallback: try row by row so a few bad rows don't kill the batch
+          for (const row of slice) {
+            const { error: e2 } = await supabase.from("global_products").insert(row);
+            if (e2) failed++; else ok++;
+          }
+        } else {
+          ok += count ?? slice.length;
+        }
+        setProgress({ ok, skipped, failed });
+      }
+      toast.success(`Uploaded ${ok} items · ${skipped} skipped (missing name/barcode) · ${failed} failed`);
+      onDone();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to parse file");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline"><Upload className="h-4 w-4 mr-2" />Upload file</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Bulk upload to global library</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Upload a CSV or Excel file. Only these columns are read — everything else is ignored:
+          <br />
+          <strong>name</strong> (required), <strong>barcode</strong> (required), <strong>category</strong>, <strong>unit</strong>.
+          <br />
+          Rows without a name or barcode are skipped. Items are submitted as <em>pending</em> and need admin approval.
+        </p>
+        <div>
+          <Label>Choose file (.csv, .xlsx, .xls)</Label>
+          <Input
+            type="file"
+            accept=".csv,.txt,.xlsx,.xls"
+            disabled={busy}
+            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        {progress && (
+          <div className="text-sm text-muted-foreground">
+            Uploaded: {progress.ok} · Skipped: {progress.skipped} · Failed: {progress.failed}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
+            {busy ? "Uploading…" : "Close"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
