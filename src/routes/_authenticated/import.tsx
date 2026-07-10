@@ -625,7 +625,7 @@ function SmartMerge() {
         .filter((x) => x.product_id);
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
-        const { error } = await supabase.from("product_barcodes").upsert(chunk as any, { onConflict: "barcode" });
+        const { error } = await supabase.from("product_barcodes").insert(chunk as any);
         if (error) errors.push(error.message); else bcOk += chunk.length;
       }
     }
