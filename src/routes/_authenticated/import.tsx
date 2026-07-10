@@ -601,7 +601,7 @@ function SmartMerge() {
     const noSku = merged.filter((p) => !p.sku).map(tag);
     for (let i = 0; i < withSku.length; i += chunkSize) {
       const chunk = withSku.slice(i, i + chunkSize);
-      const { error } = await supabase.from("products").upsert(chunk as any, { onConflict: "sku" });
+      const { error } = await supabase.from("products").insert(chunk as any);
       if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
     }
     for (let i = 0; i < noSku.length; i += chunkSize) {
@@ -625,7 +625,7 @@ function SmartMerge() {
         .filter((x) => x.product_id);
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
-        const { error } = await supabase.from("product_barcodes").upsert(chunk as any, { onConflict: "barcode" });
+        const { error } = await supabase.from("product_barcodes").insert(chunk as any);
         if (error) errors.push(error.message); else bcOk += chunk.length;
       }
     }
@@ -832,17 +832,9 @@ function Importer({ entity }: { entity: EntityKey }) {
     const tag = (r: any) => (batchId ? { ...r, import_batch_id: batchId } : r);
     for (let i = 0; i < mapped.length; i += chunkSize) {
       const chunk = mapped.slice(i, i + chunkSize).map(tag);
-      if (entity === "products" && schema.onConflict) {
-        const withKey = chunk.filter((r) => r.sku);
-        const withoutKey = chunk.filter((r) => !r.sku);
-        if (withKey.length) {
-          const { error } = await supabase.from("products").upsert(withKey as any, { onConflict: "sku" });
-          if (error) { failed += withKey.length; errors.push(error.message); } else ok += withKey.length;
-        }
-        if (withoutKey.length) {
-          const { error } = await supabase.from("products").insert(withoutKey as any);
-          if (error) { failed += withoutKey.length; errors.push(error.message); } else ok += withoutKey.length;
-        }
+      if (entity === "products") {
+        const { error } = await supabase.from("products").insert(chunk as any);
+        if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
       } else {
         const { error } = await supabase.from(entity).insert(chunk as any);
         if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
@@ -1109,7 +1101,7 @@ function SingleMergedFile() {
     // 1) Upsert products with SKU (grouped so no dupes in one batch)
     for (let i = 0; i < withSku.length; i += chunkSize) {
       const chunk = withSku.slice(i, i + chunkSize).map(toProduct);
-      const { error } = await supabase.from("products").upsert(chunk as any, { onConflict: "sku" });
+      const { error } = await supabase.from("products").insert(chunk as any);
       if (error) { prodFail += chunk.length; errors.push(error.message); } else prodOk += chunk.length;
       setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
     }
@@ -1154,7 +1146,7 @@ function SingleMergedFile() {
     const uniqueBC = bcRows.filter((r) => (seen.has(r.barcode) ? false : (seen.add(r.barcode), true)));
     for (let i = 0; i < uniqueBC.length; i += chunkSize) {
       const chunk = uniqueBC.slice(i, i + chunkSize);
-      const { error } = await supabase.from("product_barcodes").upsert(chunk as any, { onConflict: "barcode", ignoreDuplicates: false });
+      const { error } = await supabase.from("product_barcodes").insert(chunk as any);
       if (error) errors.push(`barcodes: ${error.message}`); else bcOk += chunk.length;
       setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
     }
