@@ -178,6 +178,8 @@ function LibraryPage() {
             setSearch={setSearch}
             mode="import"
             onDone={invalidate}
+            showSell={showSell}
+            showCost={showCost}
           />
         </TabsContent>
 
@@ -191,13 +193,15 @@ function LibraryPage() {
               mode="review"
               onApprove={approve}
               onReject={reject}
+              showSell={showSell}
+              showCost={showCost}
             />
           </TabsContent>
         )}
 
         {isSuperAdmin && (
           <TabsContent value="mine">
-            <MineTable search={search} setSearch={setSearch} />
+            <MineTable search={search} setSearch={setSearch} showSell={showSell} showCost={showCost} />
           </TabsContent>
         )}
       </Tabs>
