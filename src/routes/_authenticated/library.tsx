@@ -442,14 +442,18 @@ function ImportButton({ item, onDone, showSell = true, showCost = true }: { item
           private to your shop.
         </p>
         <div className="grid grid-cols-3 gap-3">
-          <div>
-            <Label>Cost</Label>
-            <Input type="number" step="0.01" value={cost} onChange={(e) => setCost(Number(e.target.value))} />
-          </div>
-          <div>
-            <Label>Sell price</Label>
-            <Input type="number" step="0.01" value={sell} onChange={(e) => setSell(Number(e.target.value))} />
-          </div>
+          {showCost && (
+            <div>
+              <Label>Cost</Label>
+              <Input type="number" step="0.01" value={cost} onChange={(e) => setCost(Number(e.target.value))} />
+            </div>
+          )}
+          {showSell && (
+            <div>
+              <Label>Sell price</Label>
+              <Input type="number" step="0.01" value={sell} onChange={(e) => setSell(Number(e.target.value))} />
+            </div>
+          )}
           <div>
             <Label>Opening stock</Label>
             <Input type="number" step="0.001" value={stock} onChange={(e) => setStock(Number(e.target.value))} />

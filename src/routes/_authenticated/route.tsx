@@ -9,6 +9,8 @@ import { maybeRunDaily } from "@/lib/backup";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { RouteGuard } from "@/components/route-guard";
 import { LowStockAlerts } from "@/components/low-stock-alerts";
+import { useSettings } from "@/hooks/use-settings";
+import { setDefaultCurrencySymbol } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -25,6 +27,11 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function Layout() {
+  const { data: settings } = useSettings();
+  useEffect(() => {
+    setDefaultCurrencySymbol((settings as any)?.currency_symbol ?? "Rs");
+  }, [settings]);
+
   useEffect(() => {
     maybeRunDaily();
     // Poll every minute so the scheduled time triggers when the app is left open.
