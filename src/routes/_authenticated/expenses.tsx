@@ -26,7 +26,7 @@ function startOfMonth() { const d = new Date(); d.setDate(1); return d.toISOStri
 function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
 
   const [from, setFrom] = useState(startOfMonth());
   const [to, setTo] = useState(today());

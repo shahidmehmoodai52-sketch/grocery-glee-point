@@ -37,7 +37,7 @@ type Entry = {
 function Page() {
   const { id } = Route.useParams();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [openInvoice, setOpenInvoice] = useState<any>(null);

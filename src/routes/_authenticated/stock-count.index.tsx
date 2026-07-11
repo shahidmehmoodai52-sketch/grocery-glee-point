@@ -38,7 +38,7 @@ const STATUS_META: Record<string, { label: string; classes: string }> = {
 function StockCountListPage() {
   const { user } = useAuth();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);

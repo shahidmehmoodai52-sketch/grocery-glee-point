@@ -28,7 +28,7 @@ const toISO = (d: Date) => {
 
 function Page() {
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const [preset, setPreset] = useState<DatePreset | "custom">("today");
   const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
   const [toDate, setToDate] = useState<Date | undefined>(new Date());

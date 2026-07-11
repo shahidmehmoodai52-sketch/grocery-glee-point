@@ -47,7 +47,7 @@ function Page() {
     },
   });
   const [form, setForm] = useState<any>({
-    store_name: "", currency: "USD", currency_symbol: "$", tax_rate: 0,
+    store_name: "", currency: "PKR", currency_symbol: "Rs", tax_rate: 0,
     address: "", phone: "", logo_url: "", tax_id: "",
     receipt_header: "", receipt_footer: "Thank you for shopping with us!",
     paper_width: "80mm",

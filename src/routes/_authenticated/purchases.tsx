@@ -36,7 +36,7 @@ const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, pa
 function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
   const { open, supplier, lines, tax, paid, note } = draft;

@@ -124,7 +124,7 @@ function AlertRow({
 
 export function LowStockAlerts() {
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState<Record<string, string>>(() =>
     typeof window !== "undefined" ? readDismissed() : {},
