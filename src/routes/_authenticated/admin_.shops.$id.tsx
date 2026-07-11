@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
-  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library,
+  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ type TenantDetail = {
 
 function ShopDetail({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
@@ -86,6 +87,20 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     const reason = window.prompt(`Suspend "${data?.tenant.name}"? Reason:`) ?? "";
     if (!reason) return;
     await setStatus("suspended", reason);
+  };
+
+  const removeShop = async () => {
+    if (!data) return;
+    const typed = window.prompt(
+      `PERMANENTLY delete "${data.tenant.name}" and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone. Type the shop name exactly to confirm:`,
+    );
+    if (typed === null) return;
+    if (typed !== data.tenant.name) return toast.error("Confirmation did not match — nothing deleted");
+    const { error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: typed });
+    if (error) return toast.error(error.message);
+    toast.success(`Deleted "${data.tenant.name}"`);
+    qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    navigate({ to: "/admin", replace: true });
   };
 
   if (isLoading || !data) return <div className="p-6"><TableSkeleton rows={6} columns={4} /></div>;
