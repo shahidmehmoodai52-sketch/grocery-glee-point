@@ -1,0 +1,1 @@
+UPDATE public.global_products SET status = 'approved' WHERE status = 'pending';

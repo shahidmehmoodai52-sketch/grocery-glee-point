@@ -630,7 +630,10 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
       await yieldToUI();
       // Upsert on barcode so re-uploads refresh item_code, sale rate and cost rate on existing rows
       for (let i = 0; i < cleaned.length; i += chunk) {
-        const slice = cleaned.slice(i, i + chunk);
+        const slice = cleaned.slice(i, i + chunk).map((r) => ({
+          ...r,
+          status: "approved" as const,
+        }));
         const { error } = await supabase
           .from("global_products")
           .upsert(slice, { onConflict: "barcode" });
