@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, sampleInvoice } from "@/components/receipt";
 import { OfflineModeCard } from "@/components/offline-mode-card";
+import { setDefaultCurrencySymbol } from "@/lib/format";
 
 
 export const Route = createFileRoute("/_authenticated/settings")({ component: Page });
@@ -88,8 +89,9 @@ function Page() {
     if (error) return toast.error("Couldn't save settings. Please try again.", { description: error.message });
     if (!saved) return toast.error("Settings were not saved. Please refresh and try again.");
     setForm((f: any) => ({ ...f, ...saved }));
+    setDefaultCurrencySymbol(saved.currency_symbol ?? "Rs");
     toast.success("Settings saved");
-    qc.invalidateQueries({ queryKey: ["store_settings"] });
+    await qc.invalidateQueries({ queryKey: ["store_settings"] });
   };
 
   return (
