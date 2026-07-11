@@ -453,38 +453,57 @@ async function parseFile(file: File): Promise<Record<string, any>[]> {
 function BulkUploadDialog({ onDone }: { onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<string>("");
   const [progress, setProgress] = useState<{ ok: number; skipped: number; failed: number } | null>(null);
+
+  const yieldToUI = () => new Promise<void>((r) => setTimeout(r, 0));
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
     setBusy(true);
     setProgress(null);
+    setStage("Reading file…");
     try {
+      // Let the UI paint before the heavy synchronous parse.
+      await yieldToUI();
       const rows = await parseFile(file);
+      setStage(`Processing ${rows.length} rows…`);
+      await yieldToUI();
+
       const cleaned: Array<{ name: string; barcode: string; category: string | null; unit: string }> = [];
       const seen = new Set<string>();
       let skipped = 0;
       let dupInFile = 0;
-      for (const r of rows) {
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
         const nm = pickField(r, ["name", "product name", "item", "item name", "title"]);
         const bc = pickField(r, ["barcode", "ean", "upc", "code", "sku"]);
-        if (!nm || !bc) { skipped++; continue; }
-        if (seen.has(bc)) { dupInFile++; continue; }
-        seen.add(bc);
-        cleaned.push({
-          name: nm,
-          barcode: bc,
-          category: pickField(r, ["category", "cat", "group"]),
-          unit: pickField(r, ["unit", "uom", "unit type"]) ?? "pcs",
-        });
+        if (!nm || !bc) { skipped++; }
+        else if (seen.has(bc)) { dupInFile++; }
+        else {
+          seen.add(bc);
+          cleaned.push({
+            name: nm,
+            barcode: bc,
+            category: pickField(r, ["category", "cat", "group"]),
+            unit: pickField(r, ["unit", "uom", "unit type"]) ?? "pcs",
+          });
+        }
+        // Yield periodically so the UI doesn't freeze on large files.
+        if (i % 2000 === 1999) {
+          setStage(`Processing rows… ${i + 1}/${rows.length}`);
+          await yieldToUI();
+        }
       }
       if (cleaned.length === 0) {
         toast.error(`No valid rows found. Required: name + barcode. Skipped: ${skipped}`);
         setBusy(false);
+        setStage("");
         return;
       }
 
-      // Filter out barcodes already in global_products (unique constraint on barcode)
+      setStage("Checking existing barcodes…");
+      await yieldToUI();
       let alreadyExists = 0;
       const barcodes = cleaned.map((c) => c.barcode);
       const existing = new Set<string>();
@@ -496,7 +515,9 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
           .select("barcode")
           .in("barcode", slice);
         if (!error && data) for (const row of data) if (row.barcode) existing.add(row.barcode);
+        setStage(`Checking existing… ${Math.min(i + lookupChunk, barcodes.length)}/${barcodes.length}`);
         setProgress({ ok: 0, skipped: skipped + dupInFile, failed: 0 });
+        await yieldToUI();
       }
       const toInsert = cleaned.filter((c) => {
         if (existing.has(c.barcode)) { alreadyExists++; return false; }
@@ -505,7 +526,9 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
 
       let ok = 0;
       let failed = 0;
-      const chunk = 500;
+      const chunk = 200;
+      setStage(`Uploading ${toInsert.length} items…`);
+      await yieldToUI();
       for (let i = 0; i < toInsert.length; i += chunk) {
         const slice = toInsert.slice(i, i + chunk);
         const { error, count } = await supabase
@@ -520,6 +543,8 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
           ok += count ?? slice.length;
         }
         setProgress({ ok, skipped: skipped + dupInFile + alreadyExists, failed });
+        setStage(`Uploading… ${Math.min(i + chunk, toInsert.length)}/${toInsert.length}`);
+        await yieldToUI();
       }
       toast.success(
         `Uploaded ${ok} · Skipped ${skipped + dupInFile + alreadyExists} (${skipped} missing, ${dupInFile} dup in file, ${alreadyExists} already in library) · Failed ${failed}`,
@@ -529,6 +554,7 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
       toast.error(e?.message ?? "Failed to parse file");
     } finally {
       setBusy(false);
+      setStage("");
     }
   };
 
