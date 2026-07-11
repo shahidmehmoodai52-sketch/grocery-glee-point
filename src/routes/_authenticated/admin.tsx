@@ -21,6 +21,7 @@ import {
   Plus,
   Check,
   Wand2,
+  Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -207,6 +208,19 @@ function TenantsTab() {
     await setStatus(id, "suspended", reason);
   };
 
+  const removeShop = async (id: string, name: string) => {
+    const typed = window.prompt(
+      `PERMANENTLY delete "${name}" and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone. Type the shop name exactly to confirm:`,
+    );
+    if (typed === null) return;
+    if (typed !== name) return toast.error("Confirmation did not match — nothing deleted");
+    const { error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: id, _confirm: typed });
+    if (error) return toast.error(error.message);
+    toast.success(`Deleted "${name}"`);
+    qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+  };
+
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -319,6 +333,14 @@ function TenantsTab() {
                         <Archive className="h-4 w-4" />
                       </Button>
                     )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Delete shop permanently"
+                      onClick={() => removeShop(t.id, t.name)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
