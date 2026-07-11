@@ -53,9 +53,7 @@ function AuthPage() {
   const [staffPwd, setStaffPwd] = useState("");
 
   // Register
-  const [regStep, setRegStep] = useState<RegStep>("email");
   const [regEmail, setRegEmail] = useState("");
-  const [otp, setOtp] = useState("");
   const [regPwd, setRegPwd] = useState("");
   const [fullName, setFullName] = useState("");
   const [shopName, setShopName] = useState("");
