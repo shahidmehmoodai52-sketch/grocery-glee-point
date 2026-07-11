@@ -426,11 +426,12 @@ function Page() {
                     <TableCell colSpan={3} className="text-right">Column totals</TableCell>
                     <TableCell className="text-right text-primary">{fmtMoney(allTotal, sym)}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(allPaid, sym)}</TableCell>
-                    <TableCell></TableCell>
+                    <TableCell colSpan={2}></TableCell>
                   </TableRow>
                   <TableRow className="bg-primary/5 font-bold">
                     <TableCell colSpan={5} className="text-right text-base">Grand Total (Outstanding due)</TableCell>
                     <TableCell className={`text-right text-base ${due > 0 ? "text-destructive" : "text-success"}`}>{fmtMoney(due, sym)}</TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
                 </>
               );
