@@ -27,10 +27,13 @@ type GlobalProduct = {
   id: string;
   name: string;
   barcode: string | null;
+  item_code: string | null;
   category: string | null;
   unit: string | null;
   image_url: string | null;
   description: string | null;
+  default_sell_price: number | null;
+  default_cost_price: number | null;
   status: string;
   contributed_by_tenant: string | null;
   contributed_by_user: string | null;
@@ -39,6 +42,7 @@ type GlobalProduct = {
   review_notes: string | null;
   created_at: string;
 };
+
 
 function LibraryPage() {
   const qc = useQueryClient();
