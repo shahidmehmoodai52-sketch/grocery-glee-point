@@ -44,20 +44,36 @@ type GlobalProduct = {
 
 function LibraryPage() {
   const qc = useQueryClient();
-  const { isAdmin } = usePermissions();
+  const { isSuperAdmin } = usePermissions();
   const [tab, setTab] = useState<"browse" | "queue" | "mine">("browse");
   const [search, setSearch] = useState("");
 
+  // Is this shop allowed to use the developer's library?
+  const { data: libraryAccess } = useQuery({
+    queryKey: ["library-access"],
+    queryFn: async () => {
+      if (isSuperAdmin) return true;
+      const { data } = await supabase.rpc("current_tenant_id");
+      const tid = data as string | null;
+      if (!tid) return false;
+      const { data: t } = await supabase
+        .from("tenants")
+        .select("library_approved")
+        .eq("id", tid)
+        .maybeSingle();
+      return !!t?.library_approved;
+    },
+  });
+  const hasAccess = !!libraryAccess;
+
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["global_products", tab],
+    enabled: hasAccess || isSuperAdmin,
     queryFn: async () => {
       const rows = await fetchAll<GlobalProduct>((from, to) => {
         let q = supabase.from("global_products").select("*").order("created_at", { ascending: false });
         if (tab === "browse") q = q.eq("status", "approved");
         else if (tab === "queue") q = q.eq("status", "pending");
-        else if (tab === "mine") {
-          // handled below
-        }
         return q.range(from, to);
       });
       return rows;
@@ -102,22 +118,46 @@ function LibraryPage() {
     <div className="p-6 space-y-4">
       <PageHeader
         title="Global product library"
-        description="Shared catalog metadata contributed by all shops. Prices and stock stay private to your shop."
+        description={
+          isSuperAdmin
+            ? "Developer-managed catalog. Items you upload become available to shops you grant access to."
+            : "Ready-made product list from the developer. Import items, set your own sale and purchase price, and start billing."
+        }
         icon={<Library className="h-5 w-5" />}
-        actions={<div className="flex gap-2"><BulkUploadDialog onDone={invalidate} /><ContributeDialog onDone={invalidate} /></div>}
+        actions={
+          isSuperAdmin ? (
+            <div className="flex gap-2">
+              <BulkUploadDialog onDone={invalidate} />
+              <ContributeDialog onDone={invalidate} />
+            </div>
+          ) : null
+        }
       />
 
+      {!isSuperAdmin && !hasAccess && (
+        <Card className="p-6">
+          <EmptyState
+            icon={Library}
+            title="Library access not enabled"
+            description="Your shop hasn't been granted access to the global product library yet. Please contact the developer to enable it for your shop."
+          />
+        </Card>
+      )}
+
+      {(isSuperAdmin || hasAccess) && (
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList>
           <TabsTrigger value="browse">
             <ShieldCheck className="h-4 w-4 mr-1" /> Approved
           </TabsTrigger>
-          {isAdmin && (
+          {isSuperAdmin && (
             <TabsTrigger value="queue">
               <Clock className="h-4 w-4 mr-1" /> Review queue
             </TabsTrigger>
           )}
-          <TabsTrigger value="mine">My contributions</TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="mine">My uploads</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="browse">
@@ -131,7 +171,7 @@ function LibraryPage() {
           />
         </TabsContent>
 
-        {isAdmin && (
+        {isSuperAdmin && (
           <TabsContent value="queue">
             <LibraryTable
               items={filtered}
@@ -145,10 +185,13 @@ function LibraryPage() {
           </TabsContent>
         )}
 
-        <TabsContent value="mine">
-          <MineTable search={search} setSearch={setSearch} />
-        </TabsContent>
+        {isSuperAdmin && (
+          <TabsContent value="mine">
+            <MineTable search={search} setSearch={setSearch} />
+          </TabsContent>
+        )}
       </Tabs>
+      )}
     </div>
   );
 }
