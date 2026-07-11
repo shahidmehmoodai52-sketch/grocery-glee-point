@@ -55,7 +55,25 @@ function Page() {
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
   const [editRow, setEditRow] = useState<any | null>(null);
+  const [editItems, setEditItems] = useState<any[]>([]);
+  const [editItemsOriginal, setEditItemsOriginal] = useState<any[]>([]);
+  const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  const openEdit = async (p: any) => {
+    setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" });
+    setEditItems([]);
+    setEditItemsOriginal([]);
+    setEditLoading(true);
+    const { data, error } = await supabase
+      .from("purchase_items")
+      .select("id,product_id,name,qty,cost,line_total")
+      .eq("purchase_id", p.id);
+    setEditLoading(false);
+    if (error) { toast.error(error.message); return; }
+    const rows = (data ?? []).map((r: any) => ({ ...r, qty: Number(r.qty), cost: Number(r.cost) }));
+    setEditItems(rows);
+    setEditItemsOriginal(rows.map((r) => ({ ...r })));
+  };
   const searchRef = useRef<HTMLInputElement>(null);
   const focusCell = (kind: "cost" | "qty", i: number) => {
     setTimeout(() => {
@@ -373,8 +391,8 @@ function Page() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={!!editRow} onOpenChange={(v) => { if (!editSaving && !v) setEditRow(null); }}>
-          <DialogContent className="max-w-lg">
+        <Dialog open={!!editRow} onOpenChange={(v) => { if (!editSaving && !v) { setEditRow(null); setEditItems([]); setEditItemsOriginal([]); } }}>
+          <DialogContent className="w-[96vw] max-w-5xl max-h-[92vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Edit purchase {editRow?.invoice_no}</DialogTitle></DialogHeader>
             {editRow && (
               <div className="space-y-3">
@@ -394,7 +412,37 @@ function Page() {
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+
+                <div className="border rounded-md overflow-x-auto">
+                  <Table className="min-w-[720px]">
+                    <TableHeader><TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="w-[150px]">Cost</TableHead>
+                      <TableHead className="w-[140px]">Qty</TableHead>
+                      <TableHead className="text-right w-[120px]">Total</TableHead>
+                      <TableHead className="w-11"></TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {editLoading && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground text-sm">Loading items…</TableCell></TableRow>}
+                      {!editLoading && editItems.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground text-sm">No items on this invoice</TableCell></TableRow>}
+                      {editItems.map((it, i) => (
+                        <TableRow key={it.id ?? `new-${i}`}>
+                          <TableCell><Input value={it.name ?? ""} onChange={(e) => setEditItems((xs) => xs.map((r, x) => x === i ? { ...r, name: e.target.value } : r))} className="h-9" /></TableCell>
+                          <TableCell><Input type="number" step="0.01" value={it.cost} onChange={(e) => setEditItems((xs) => xs.map((r, x) => x === i ? { ...r, cost: Number(e.target.value) } : r))} className="h-9 text-right" /></TableCell>
+                          <TableCell><Input type="number" step="0.001" value={it.qty} onChange={(e) => setEditItems((xs) => xs.map((r, x) => x === i ? { ...r, qty: Number(e.target.value) } : r))} className="h-9 text-right" /></TableCell>
+                          <TableCell className="text-right font-medium">{fmtMoney(Number(it.qty || 0) * Number(it.cost || 0), sym)}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" onClick={() => setEditItems((xs) => xs.filter((_, x) => x !== i))}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="grid grid-cols-4 gap-3">
                   <div><Label>Tax</Label><Input type="number" step="0.01" value={editRow.tax ?? 0} onChange={(e) => setEditRow({ ...editRow, tax: Number(e.target.value) })} /></div>
                   <div><Label>Paid</Label><Input type="number" step="0.01" value={editRow.paid ?? 0} onChange={(e) => setEditRow({ ...editRow, paid: Number(e.target.value) })} /></div>
                   <div>
@@ -408,43 +456,111 @@ function Page() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex flex-col justify-end">
+                    <div className="text-sm text-muted-foreground">Total</div>
+                    <div className="text-2xl font-semibold text-primary">
+                      {fmtMoney(editItems.reduce((s, it) => s + Number(it.qty || 0) * Number(it.cost || 0), 0) + Number(editRow.tax || 0), sym)}
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <Label>Note</Label>
                   <Input value={editRow.note ?? ""} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Item quantities and costs cannot be changed here — they've already updated stock and average costs. To fix items, delete the purchase and re-record it.
+                  Changing item quantity adjusts product stock by the difference. Deleting an item removes its qty from stock. Cost changes update this invoice only (product average cost is not recalculated).
                 </p>
               </div>
             )}
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setEditRow(null)} disabled={editSaving}>Cancel</Button>
+              <Button variant="outline" onClick={() => { setEditRow(null); setEditItems([]); setEditItemsOriginal([]); }} disabled={editSaving}>Cancel</Button>
               <Button
-                disabled={editSaving}
+                disabled={editSaving || editLoading}
                 onClick={async () => {
                   if (!editRow) return;
                   setEditSaving(true);
-                  const subtotal = Number(editRow.subtotal ?? 0);
-                  const newTax = Number(editRow.tax ?? 0);
-                  const newTotal = subtotal + newTax;
-                  const { error } = await supabase
-                    .from("purchases")
-                    .update({
-                      invoice_no: editRow.invoice_no,
-                      supplier_id: editRow.supplier_id === "none" ? null : editRow.supplier_id,
-                      tax: newTax,
-                      total: newTotal,
-                      paid: Number(editRow.paid ?? 0),
-                      note: editRow.note ?? null,
-                      status: editRow.status ?? "completed",
-                    })
-                    .eq("id", editRow.id);
-                  setEditSaving(false);
-                  if (error) return toast.error(error.message);
-                  toast.success("Purchase updated");
-                  setEditRow(null);
-                  qc.invalidateQueries({ queryKey: ["purchases"] });
+                  try {
+                    const origById = new Map(editItemsOriginal.map((r) => [r.id, r]));
+                    const keptIds = new Set(editItems.filter((r) => r.id).map((r) => r.id));
+
+                    // 1) Stock deltas: kept items (new - old) + deleted items (0 - old)
+                    const deltas = new Map<string, number>(); // product_id -> qty delta (positive = add stock)
+                    for (const it of editItems) {
+                      if (!it.product_id) continue;
+                      const orig = it.id ? origById.get(it.id) : null;
+                      const oldQty = orig ? Number(orig.qty) : 0;
+                      const delta = Number(it.qty || 0) - oldQty;
+                      if (delta !== 0) deltas.set(it.product_id, (deltas.get(it.product_id) ?? 0) + delta);
+                    }
+                    for (const orig of editItemsOriginal) {
+                      if (!orig.product_id) continue;
+                      if (keptIds.has(orig.id)) continue;
+                      const delta = -Number(orig.qty);
+                      if (delta !== 0) deltas.set(orig.product_id, (deltas.get(orig.product_id) ?? 0) + delta);
+                    }
+
+                    // Apply stock deltas
+                    if (deltas.size) {
+                      const ids = Array.from(deltas.keys());
+                      const { data: prods, error: pErr } = await supabase.from("products").select("id,stock").in("id", ids);
+                      if (pErr) throw pErr;
+                      for (const p of prods ?? []) {
+                        const newStock = Number(p.stock ?? 0) + (deltas.get(p.id) ?? 0);
+                        const { error: uErr } = await supabase.from("products").update({ stock: newStock }).eq("id", p.id);
+                        if (uErr) throw uErr;
+                      }
+                    }
+
+                    // 2) Delete removed items
+                    const removedIds = editItemsOriginal.filter((r) => !keptIds.has(r.id)).map((r) => r.id);
+                    if (removedIds.length) {
+                      const { error: dErr } = await supabase.from("purchase_items").delete().in("id", removedIds);
+                      if (dErr) throw dErr;
+                    }
+
+                    // 3) Update kept items where changed
+                    for (const it of editItems) {
+                      if (!it.id) continue;
+                      const orig = origById.get(it.id);
+                      if (!orig) continue;
+                      if (orig.name === it.name && Number(orig.qty) === Number(it.qty) && Number(orig.cost) === Number(it.cost)) continue;
+                      const line_total = Number(it.qty || 0) * Number(it.cost || 0);
+                      const { error: iErr } = await supabase.from("purchase_items")
+                        .update({ name: it.name, qty: Number(it.qty || 0), cost: Number(it.cost || 0), line_total })
+                        .eq("id", it.id);
+                      if (iErr) throw iErr;
+                    }
+
+                    // 4) Recompute purchase totals & update header
+                    const subtotal = editItems.reduce((s, it) => s + Number(it.qty || 0) * Number(it.cost || 0), 0);
+                    const newTax = Number(editRow.tax ?? 0);
+                    const newTotal = subtotal + newTax;
+                    const { error: hErr } = await supabase
+                      .from("purchases")
+                      .update({
+                        invoice_no: editRow.invoice_no,
+                        supplier_id: editRow.supplier_id === "none" ? null : editRow.supplier_id,
+                        subtotal,
+                        tax: newTax,
+                        total: newTotal,
+                        paid: Number(editRow.paid ?? 0),
+                        note: editRow.note ?? null,
+                        status: editRow.status ?? "completed",
+                      })
+                      .eq("id", editRow.id);
+                    if (hErr) throw hErr;
+
+                    toast.success("Purchase updated");
+                    setEditRow(null);
+                    setEditItems([]);
+                    setEditItemsOriginal([]);
+                    qc.invalidateQueries({ queryKey: ["purchases"] });
+                    qc.invalidateQueries({ queryKey: ["products"] });
+                  } catch (e: any) {
+                    toast.error(e?.message ?? "Failed to update purchase");
+                  } finally {
+                    setEditSaving(false);
+                  }
                 }}
               >
                 {editSaving ? "Saving…" : "Save changes"}
@@ -452,6 +568,7 @@ function Page() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
 
       </div>
 
@@ -490,7 +607,7 @@ function Page() {
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" })}>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                 </TableCell>
