@@ -521,15 +521,52 @@ async function parseFile(file: File): Promise<Record<string, any>[]> {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
+        worker: true,
         complete: (res) => resolve(res.data as any[]),
         error: reject,
       });
     });
   }
+  // Parse XLSX inside a Web Worker so the main thread (and UI) never freezes,
+  // even on very large spreadsheets. Falls back to main-thread parse if the
+  // worker fails to load for any reason.
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  try {
+    return await parseXlsxInWorker(buf);
+  } catch {
+    const wb = XLSX.read(buf, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  }
+}
+
+function parseXlsxInWorker(buf: ArrayBuffer): Promise<Record<string, any>[]> {
+  return new Promise((resolve, reject) => {
+    const code = `
+      self.importScripts('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+      self.onmessage = (e) => {
+        try {
+          const wb = self.XLSX.read(e.data, { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = self.XLSX.utils.sheet_to_json(sheet, { defval: '' });
+          self.postMessage({ ok: true, rows });
+        } catch (err) {
+          self.postMessage({ ok: false, error: String((err && err.message) || err) });
+        }
+      };
+    `;
+    const blob = new Blob([code], { type: "application/javascript" });
+    const url = URL.createObjectURL(blob);
+    const worker = new Worker(url);
+    const cleanup = () => { worker.terminate(); URL.revokeObjectURL(url); };
+    worker.onmessage = (e) => {
+      cleanup();
+      if (e.data?.ok) resolve(e.data.rows as Record<string, any>[]);
+      else reject(new Error(e.data?.error ?? "Worker parse failed"));
+    };
+    worker.onerror = (e) => { cleanup(); reject(new Error(e.message || "Worker error")); };
+    worker.postMessage(buf, [buf]);
+  });
 }
 
 function BulkUploadDialog({ onDone }: { onDone: () => void }) {
