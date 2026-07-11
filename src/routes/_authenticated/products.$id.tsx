@@ -39,6 +39,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
+import { usePriceVisibility } from "@/hooks/use-price-visibility";
 import { fmtMoney, fmtQty } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
@@ -135,7 +136,10 @@ function ProductDetailPage() {
   const { id } = useParams({ from: "/_authenticated/products/$id" });
   const { data: settings } = useSettings();
   const { isAdmin } = usePermissions();
+  const { data: priceVisibility } = usePriceVisibility();
   const sym = settings?.currency_symbol ?? "Rs";
+  const showCost = priceVisibility?.showCost ?? true;
+  const showSell = priceVisibility?.showSell ?? true;
 
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -300,13 +304,15 @@ function ProductDetailPage() {
       {/* Health panel */}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
         <HealthCard label="Current Stock" value={`${fmtQty(product?.stock ?? 0)} ${product?.unit ?? ""}`} />
-        <HealthCard
-          label="Inventory Value"
-          value={fmtMoney(
-            Number(product?.stock ?? 0) * Number(product?.cost_price ?? 0),
-            sym,
-          )}
-        />
+        {showCost && (
+          <HealthCard
+            label="Inventory Value"
+            value={fmtMoney(
+              Number(product?.stock ?? 0) * Number(product?.cost_price ?? 0),
+              sym,
+            )}
+          />
+        )}
         <HealthCard label="Last Purchase" value={health.lastPurchase ? format(new Date(health.lastPurchase), "PP") : "—"} />
         <HealthCard label="Last Sale" value={health.lastSale ? format(new Date(health.lastSale), "PP") : "—"} />
         <HealthCard label="30-day Sales" value={fmtQty(health.last30Sales)} />
@@ -435,13 +441,13 @@ function ProductDetailPage() {
               <Row label="Quantity" value={`${Number(selected.qty_change) > 0 ? "+" : ""}${fmtQty(selected.qty_change)} ${product?.unit ?? ""}`} />
               <Row label="Stock before" value={fmtQty(selected.stock_before)} />
               <Row label="Stock after" value={fmtQty(selected.stock_after)} />
-              {selected.unit_cost != null && (
+              {showCost && selected.unit_cost != null && (
                 <Row label="Unit cost" value={fmtMoney(selected.unit_cost, sym)} />
               )}
-              {selected.total_cost != null && (
+              {showCost && selected.total_cost != null && (
                 <Row label="Total cost" value={fmtMoney(selected.total_cost, sym)} />
               )}
-              {isAdmin && selected.movement_type === "sale" && selected.unit_cost != null && (
+              {isAdmin && showCost && showSell && selected.movement_type === "sale" && selected.unit_cost != null && (
                 <Row
                   label="Profit (est.)"
                   value={fmtMoney(

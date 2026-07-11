@@ -16,6 +16,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
+import { usePriceVisibility } from "@/hooks/use-price-visibility";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fetchAll } from "@/lib/supabase-page";
@@ -34,7 +35,11 @@ const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", 
 function ProductsPage() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
+  const { data: priceVisibility } = usePriceVisibility();
   const sym = settings?.currency_symbol ?? "Rs";
+  const showCost = priceVisibility?.showCost ?? true;
+  const showSell = priceVisibility?.showSell ?? true;
+  const tableColCount = 5 + (showCost ? 1 : 0) + (showSell ? 1 : 0);
   const [search, setSearch] = useState("");
   const [open, setOpen, clearOpen] = usePersistentState<boolean>("product-entry-open", false);
   const [form, setForm, clearForm] = usePersistentState<ProductForm>("product-entry-form", empty);
@@ -172,8 +177,8 @@ function ProductsPage() {
                 </div>
                 <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
                 <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
-                <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>
-                <div><Label>Price</Label><Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} /></div>
+                {showCost && <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>}
+                {showSell && <div><Label>Price</Label><Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} /></div>}
                 <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
                 <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
                 <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
@@ -199,18 +204,18 @@ function ProductsPage() {
               <TableHead>Name</TableHead>
               <TableHead>SKU</TableHead>
               <TableHead>Category</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
-              <TableHead className="text-right">Price</TableHead>
+              {showCost && <TableHead className="text-right">Cost</TableHead>}
+              {showSell && <TableHead className="text-right">Price</TableHead>}
               <TableHead className="text-right">Stock</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={7} className="py-4"><TableSkeleton rows={5} columns={6} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={tableColCount} className="py-4"><TableSkeleton rows={5} columns={tableColCount} /></TableCell></TableRow>
             )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="py-8">
+              <TableRow><TableCell colSpan={tableColCount} className="py-8">
                 <EmptyState icon={Package} title="No products yet" description="Add a new product to start selling." />
               </TableCell></TableRow>
             )}
@@ -219,8 +224,8 @@ function ProductsPage() {
                 <TableCell className="font-medium">{p.name}</TableCell>
                 <TableCell className="text-muted-foreground">{p.sku ?? "—"}</TableCell>
                 <TableCell>{p.category ?? "—"}</TableCell>
-                <TableCell className="text-right">{fmtMoney(p.cost_price, sym)}</TableCell>
-                <TableCell className="text-right font-medium">{fmtMoney(p.sell_price, sym)}</TableCell>
+                {showCost && <TableCell className="text-right">{fmtMoney(p.cost_price, sym)}</TableCell>}
+                {showSell && <TableCell className="text-right font-medium">{fmtMoney(p.sell_price, sym)}</TableCell>}
                 <TableCell className="text-right">
                   {(() => {
                     const s = Number(p.stock);
