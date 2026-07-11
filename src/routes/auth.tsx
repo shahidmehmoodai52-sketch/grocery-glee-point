@@ -9,8 +9,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { isBlocked, logSecurityEvent } from "@/lib/security-log";
+import { registerShopAccount } from "@/lib/register.functions";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -19,14 +19,6 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-function checkStrongPassword(pw: string): string | null {
-  if (pw.length < 8) return "Password must be at least 8 characters.";
-  if (!/[A-Z]/.test(pw)) return "Add at least one UPPERCASE letter.";
-  if (!/[a-z]/.test(pw)) return "Add at least one lowercase letter.";
-  if (!/[0-9]/.test(pw)) return "Add at least one number.";
-  return null;
-}
-
 function cleanCode(s: string) {
   return s.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
 }
@@ -34,36 +26,30 @@ function cleanUsername(s: string) {
   return s.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
 }
 
-async function ensureShopRegistered(shop: { name: string; phone: string; address: string; city: string }) {
-  const { error } = await supabase.rpc("register_shop" as any, {
-    _name: shop.name,
-    _phone: shop.phone || null,
-    _address: shop.address || null,
-    _city: shop.city || null,
-  } as any);
-  if (error) throw error;
-}
-
 function AuthPage() {
   const navigate = useNavigate();
   const { next } = Route.useSearch();
   const target = next ?? "/pos";
-  const [audience, setAudience] = useState<"staff" | "owner">("staff");
-  const [ownerMode, setOwnerMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
 
-  // Owner fields
-  const [email, setEmail] = useState("");
+  // Sign-in fields
+  const [shopCode, setShopCode] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+
+  // Register fields
   const [shopName, setShopName] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [regUser, setRegUser] = useState("");
+  const [regPwd, setRegPwd] = useState("");
   const [shopPhone, setShopPhone] = useState("");
   const [shopAddress, setShopAddress] = useState("");
   const [shopCity, setShopCity] = useState("");
 
-  // Staff fields
-  const [shopCode, setShopCode] = useState("");
-  const [staffUser, setStaffUser] = useState("");
-  const [staffPwd, setStaffPwd] = useState("");
+  // Legacy email login (for developer / pre-existing accounts)
+  const [showLegacy, setShowLegacy] = useState(false);
+  const [legacyEmail, setLegacyEmail] = useState("");
+  const [legacyPwd, setLegacyPwd] = useState("");
 
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -74,40 +60,34 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) return;
-      const savedNext = window.sessionStorage.getItem("postAuthNext");
-      if (savedNext?.startsWith("/") && !savedNext.startsWith("//")) {
-        window.sessionStorage.removeItem("postAuthNext");
-        void navigate({ to: savedNext, replace: true });
-        return;
-      }
-      void goToApp();
+      if (data.session) void goToApp();
     });
-  }, [goToApp, navigate]);
+  }, [goToApp]);
 
   const showErr = (msg: string) => { setFormError(msg); toast.error(msg); };
 
-  const handleStaffSubmit = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setFormError(null);
     try {
       const code = cleanCode(shopCode);
-      const user = cleanUsername(staffUser);
-      if (!code) { showErr("Enter your shop code (ask your owner)."); return; }
+      const user = cleanUsername(username);
+      if (!code) { showErr("Enter your shop code."); return; }
       if (!user) { showErr("Enter your username."); return; }
-      if (!staffPwd) { showErr("Enter your password."); return; }
-      const syntheticEmail = `${user}@shop-${code}.local`;
-      if (await isBlocked(syntheticEmail)) {
-        showErr("Access blocked. Contact your owner.");
+      if (!password) { showErr("Enter your password."); return; }
+
+      const email = `${user}@shop-${code}.local`;
+      if (await isBlocked(email)) {
+        showErr("Access blocked. Contact your shop owner.");
         return;
       }
-      const { error } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password: staffPwd });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        void logSecurityEvent("failed_login", { severity: "warning", email: syntheticEmail });
+        void logSecurityEvent("failed_login", { severity: "warning", email });
         showErr("Wrong shop code, username or password.");
         return;
       }
-      void logSecurityEvent("successful_login", { severity: "info", email: syntheticEmail });
+      void logSecurityEvent("successful_login", { severity: "info", email });
       await goToApp();
     } catch (err: any) {
       showErr(err?.message ?? "Unexpected error");
@@ -116,99 +96,67 @@ function AuthPage() {
     }
   };
 
-  const handleOwnerSubmit = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setFormError(null);
-    const cleanEmail = email.trim().toLowerCase();
     try {
-      if (await isBlocked(cleanEmail)) {
-        await logSecurityEvent("blocked_attempt", { severity: "warning", email: cleanEmail });
-        showErr("Access blocked. Contact support if this is a mistake.");
+      if (shopName.trim().length < 2) { showErr("Shop name is required."); return; }
+      if (!shopPhone.trim() || !shopAddress.trim() || !shopCity.trim()) {
+        showErr("Please enter shop phone, address and city."); return;
+      }
+      const user = cleanUsername(regUser);
+      if (user.length < 2) { showErr("Username must be 2+ characters."); return; }
+      if (regPwd.length < 6) { showErr("Password must be at least 6 characters."); return; }
+
+      const res = await (registerShopAccount as any)({
+        data: {
+          shop_name: shopName.trim(),
+          username: user,
+          password: regPwd,
+          full_name: fullName.trim() || undefined,
+          phone: shopPhone.trim(),
+          address: shopAddress.trim(),
+          city: shopCity.trim(),
+        },
+      });
+
+      // Sign in with the freshly-created internal credentials
+      const { error } = await supabase.auth.signInWithPassword({ email: res.email, password: regPwd });
+      if (error) {
+        toast.success(`Shop registered. Your shop code is "${res.slug}". Please sign in.`);
+        setMode("signin");
+        setShopCode(res.slug);
+        setUsername(user);
         return;
       }
-      if (ownerMode === "signup") {
-        const pwErr = checkStrongPassword(password);
-        if (pwErr) { showErr(pwErr); return; }
-        if (shopName.trim().length < 2) { showErr("Shop name is required."); return; }
-        if (!shopPhone.trim() || !shopAddress.trim() || !shopCity.trim()) {
-          showErr("Please enter shop phone, address and city."); return;
-        }
-        const { data, error } = await supabase.auth.signUp({
-          email: cleanEmail, password,
-          options: { data: { full_name: fullName } },
-        });
-        if (error) {
-          if (/already registered|already exists|user_already_exists/i.test(error.message)) {
-            toast.info("Account already exists. Please sign in.");
-            setOwnerMode("signin"); setPassword("");
-          } else {
-            void logSecurityEvent("signup_error", { severity: "info", email: cleanEmail, metadata: { message: error.message } });
-            showErr(`Signup failed: ${error.message}`);
-          }
-          return;
-        }
-        if (data.session) {
-          try {
-            await ensureShopRegistered({
-              name: shopName.trim(), phone: shopPhone.trim(),
-              address: shopAddress.trim(), city: shopCity.trim(),
-            });
-            toast.success("Shop registered. Awaiting admin approval — you have limited access until approved.");
-          } catch (err: any) {
-            showErr(`Shop registration failed: ${err?.message ?? "unknown error"}`); return;
-          }
-          await goToApp();
-        } else {
-          window.sessionStorage.setItem("pendingShopDetails", JSON.stringify({
-            name: shopName.trim(), phone: shopPhone.trim(),
-            address: shopAddress.trim(), city: shopCity.trim(),
-          }));
-          toast.success("Account created. Sign in to finish shop registration.");
-          setOwnerMode("signin");
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-        if (error) {
-          void logSecurityEvent("failed_login", { severity: "warning", email: cleanEmail });
-          showErr(error.message || "Invalid email or password");
-          return;
-        }
-        void logSecurityEvent("successful_login", { severity: "info", email: cleanEmail });
-        try {
-          const raw = window.sessionStorage.getItem("pendingShopDetails");
-          if (raw) {
-            await ensureShopRegistered(JSON.parse(raw));
-            window.sessionStorage.removeItem("pendingShopDetails");
-          }
-        } catch (err) { console.error("[signin] pending shop registration error:", err); }
-        await goToApp();
-      }
+      toast.success(`Shop registered! Your shop code is "${res.slug}". Share it with your staff.`);
+      await goToApp();
     } catch (err: any) {
-      showErr(err?.message ?? "Unexpected error. Please try again.");
+      showErr(err?.message ?? "Registration failed");
     } finally {
       setBusy(false);
     }
   };
 
-  const handleForgot = async () => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail) { toast.error("Please enter your email first."); return; }
-    setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: `${window.location.origin}/reset-password?next=${encodeURIComponent(target)}`,
-    });
-    setBusy(false);
-    if (error) toast.error("Could not send reset link. Please try again.");
-    else toast.success("Password reset link sent to your email.");
-  };
-
-  const handleGoogle = async () => {
-    setBusy(true);
-    window.sessionStorage.setItem("postAuthNext", target);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) { toast.error("Google sign-in failed"); setBusy(false); return; }
-    if (result.redirected) return;
-    await goToApp();
+  const handleLegacy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setFormError(null);
+    const cleanEmail = legacyEmail.trim().toLowerCase();
+    try {
+      if (await isBlocked(cleanEmail)) { showErr("Access blocked."); return; }
+      const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: legacyPwd });
+      if (error) {
+        void logSecurityEvent("failed_login", { severity: "warning", email: cleanEmail });
+        showErr(error.message || "Invalid email or password");
+        return;
+      }
+      void logSecurityEvent("successful_login", { severity: "info", email: cleanEmail });
+      await goToApp();
+    } catch (err: any) {
+      showErr(err?.message ?? "Unexpected error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -220,29 +168,29 @@ function AuthPage() {
             <Store className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-semibold">Grocery POS</h1>
-          <p className="text-sm text-muted-foreground mt-1">Sign in to your shop</p>
+          <p className="text-sm text-muted-foreground mt-1">Sign in or register your shop</p>
         </div>
 
-        <Tabs value={audience} onValueChange={(v) => { setAudience(v as "staff" | "owner"); setFormError(null); }}>
+        <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setFormError(null); }}>
           <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="staff">Shop Staff</TabsTrigger>
-            <TabsTrigger value="owner">Owner / Developer</TabsTrigger>
+            <TabsTrigger value="signin">Sign in</TabsTrigger>
+            <TabsTrigger value="signup">Register new shop</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="staff" className="mt-6">
-            <form onSubmit={handleStaffSubmit} className="space-y-4">
+          <TabsContent value="signin" className="mt-6">
+            <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="shop_code">Shop code</Label>
                 <Input id="shop_code" value={shopCode} onChange={(e) => setShopCode(e.target.value)} placeholder="e.g. ali-store" autoCapitalize="none" required />
-                <p className="text-[11px] text-muted-foreground">Ask your owner for the shop code.</p>
+                <p className="text-[11px] text-muted-foreground">Owners see their code in Shop admin. Staff: ask your owner.</p>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="staff_user">Username</Label>
-                <Input id="staff_user" value={staffUser} onChange={(e) => setStaffUser(e.target.value)} placeholder="e.g. raza" autoCapitalize="none" required autoComplete="username" />
+                <Label htmlFor="signin_user">Username</Label>
+                <Input id="signin_user" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. raza" autoCapitalize="none" required autoComplete="username" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="staff_pwd">Password</Label>
-                <Input id="staff_pwd" type="password" value={staffPwd} onChange={(e) => setStaffPwd(e.target.value)} required autoComplete="current-password" />
+                <Label htmlFor="signin_pwd">Password</Label>
+                <Input id="signin_pwd" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
               </div>
               {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
               <Button type="submit" className="w-full" disabled={busy}>
@@ -251,87 +199,75 @@ function AuthPage() {
             </form>
           </TabsContent>
 
-          <TabsContent value="owner" className="mt-6">
-            <Tabs value={ownerMode} onValueChange={(v) => setOwnerMode(v as "signin" | "signup")}>
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="signin">Sign in</TabsTrigger>
-                <TabsTrigger value="signup">Register new shop</TabsTrigger>
-              </TabsList>
-
-              <form onSubmit={handleOwnerSubmit} className="space-y-4 mt-6">
-                <TabsContent value="signup" className="space-y-4 mt-0">
+          <TabsContent value="signup" className="mt-6">
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="rounded-md border p-3 space-y-3 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shop details</p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="shop_name">Shop name</Label>
+                  <Input id="shop_name" value={shopName} onChange={(e) => setShopName(e.target.value)} required placeholder="e.g. Ali General Store" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="full_name">Your full name</Label>
-                    <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} required={ownerMode === "signup"} />
+                    <Label htmlFor="shop_phone">Phone</Label>
+                    <Input id="shop_phone" value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} required placeholder="03xx-xxxxxxx" />
                   </div>
-                  <div className="rounded-md border p-3 space-y-3 bg-muted/30">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shop details (required)</p>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="shop_name">Shop name</Label>
-                      <Input id="shop_name" value={shopName} onChange={(e) => setShopName(e.target.value)} required={ownerMode === "signup"} placeholder="e.g. Ali General Store" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="shop_phone">Phone</Label>
-                        <Input id="shop_phone" value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} required={ownerMode === "signup"} placeholder="03xx-xxxxxxx" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="shop_city">City</Label>
-                        <Input id="shop_city" value={shopCity} onChange={(e) => setShopCity(e.target.value)} required={ownerMode === "signup"} placeholder="Lahore" />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="shop_address">Address</Label>
-                      <Input id="shop_address" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} required={ownerMode === "signup"} placeholder="Shop # / Street / Area" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="shop_city">City</Label>
+                    <Input id="shop_city" value={shopCity} onChange={(e) => setShopCity(e.target.value)} required placeholder="Lahore" />
                   </div>
-                </TabsContent>
-                <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
                 </div>
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    {ownerMode === "signin" && (
-                      <button type="button" onClick={handleForgot} disabled={busy} className="text-xs text-muted-foreground hover:text-foreground">
-                        Forgot password?
-                      </button>
-                    )}
-                  </div>
-                  <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={ownerMode === "signup" ? 8 : 6} autoComplete={ownerMode === "signin" ? "current-password" : "new-password"} />
-                  {ownerMode === "signup" && (
-                    <p className="text-[11px] text-muted-foreground">Use 8+ chars with an uppercase letter, a lowercase letter, and a number.</p>
-                  )}
+                  <Label htmlFor="shop_address">Address</Label>
+                  <Input id="shop_address" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} required placeholder="Shop # / Street / Area" />
                 </div>
-                {formError && (
-                  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive whitespace-pre-wrap">
-                    <strong className="font-semibold">Error:</strong> {formError}
-                  </div>
-                )}
-                <Button type="submit" className="w-full" disabled={busy}>
-                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {ownerMode === "signin" ? "Sign in" : "Create account & register shop"}
-                </Button>
-              </form>
-            </Tabs>
-
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">or</span>
               </div>
-            </div>
 
-            <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={busy}>
-              Continue with Google
-            </Button>
+              <div className="space-y-1.5">
+                <Label htmlFor="full_name">Your full name (optional)</Label>
+                <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Owner name" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="reg_user">Owner username</Label>
+                <Input id="reg_user" value={regUser} onChange={(e) => setRegUser(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))} placeholder="e.g. ali" required autoCapitalize="none" autoComplete="username" />
+                <p className="text-[11px] text-muted-foreground">Lowercase letters, numbers, . _ - only. You will use this to sign in.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="reg_pwd">Password</Label>
+                <Input id="reg_pwd" type="password" value={regPwd} onChange={(e) => setRegPwd(e.target.value)} required minLength={6} autoComplete="new-password" />
+                <p className="text-[11px] text-muted-foreground">Minimum 6 characters.</p>
+              </div>
+
+              {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create account & register shop
+              </Button>
+              <p className="text-[11px] text-muted-foreground text-center">
+                New shops start as <strong>pending</strong> until approved by the developer.
+              </p>
+            </form>
           </TabsContent>
         </Tabs>
 
-        <p className="text-xs text-muted-foreground text-center mt-6">
-          Staff: use your shop code + username. Owners: use email. New shops start as <strong>pending</strong>.
-        </p>
+        <div className="mt-6 pt-4 border-t text-center">
+          {!showLegacy ? (
+            <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowLegacy(true)}>
+              Legacy sign-in with email
+            </button>
+          ) : (
+            <form onSubmit={handleLegacy} className="space-y-2 text-left">
+              <p className="text-xs font-medium text-muted-foreground">For accounts registered with email (developer / older shops).</p>
+              <Input type="email" value={legacyEmail} onChange={(e) => setLegacyEmail(e.target.value)} placeholder="Email" required autoComplete="email" />
+              <Input type="password" value={legacyPwd} onChange={(e) => setLegacyPwd(e.target.value)} placeholder="Password" required autoComplete="current-password" />
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" className="flex-1" disabled={busy}>
+                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Sign in with email
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setShowLegacy(false)}>Hide</Button>
+              </div>
+            </form>
+          )}
+        </div>
       </Card>
     </div>
   );
