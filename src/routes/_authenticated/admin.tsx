@@ -206,6 +206,8 @@ function TenantsTab() {
     const reason = window.prompt(`Suspend "${name}"? Enter reason (visible in audit log):`) ?? "";
     if (!reason) return;
     await setStatus(id, "suspended", reason);
+  };
+
   const removeShop = async (id: string, name: string) => {
     const typed = window.prompt(
       `PERMANENTLY delete "${name}" and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone. Type the shop name exactly to confirm:`,
