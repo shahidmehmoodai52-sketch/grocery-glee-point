@@ -284,84 +284,49 @@ function AuthPage() {
 
           {/* ---------- REGISTER ---------- */}
           <TabsContent value="signup" className="mt-6">
-            {regStep === "email" && (
-              <form onSubmit={handleSendOtp} className="space-y-4">
+            <form onSubmit={handleFinishRegister} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="reg_email">Email</Label>
+                <Input id="reg_email" type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required autoComplete="email" placeholder="you@example.com" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="full_name">Your full name</Label>
+                <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="reg_pwd">Password</Label>
+                <Input id="reg_pwd" type="password" value={regPwd} onChange={(e) => setRegPwd(e.target.value)} required minLength={8} autoComplete="new-password" />
+                <p className="text-[11px] text-muted-foreground">8+ chars with uppercase, lowercase, and a number.</p>
+              </div>
+              <div className="rounded-md border p-3 space-y-3 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shop details</p>
                 <div className="space-y-1.5">
-                  <Label htmlFor="reg_email">Your email (Gmail works best)</Label>
-                  <Input id="reg_email" type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required autoComplete="email" placeholder="you@gmail.com" />
-                  <p className="text-[11px] text-muted-foreground">We'll email a 6-digit code to verify you own this address.</p>
+                  <Label htmlFor="shop_name">Shop name</Label>
+                  <Input id="shop_name" value={shopName} onChange={(e) => setShopName(e.target.value)} required placeholder="e.g. Ali General Store" />
                 </div>
-                {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
-                <Button type="submit" className="w-full" disabled={busy}>
-                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Send verification code
-                </Button>
-              </form>
-            )}
-
-            {regStep === "otp" && (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <button type="button" onClick={() => setRegStep("email")} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-                  <ArrowLeft className="h-3 w-3" /> Change email
-                </button>
-                <div className="space-y-1.5">
-                  <Label>Enter the 6-digit code sent to</Label>
-                  <p className="text-sm font-medium">{regEmail}</p>
-                  <Input inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} className="text-center text-lg tracking-widest font-mono" placeholder="123456" required />
-                </div>
-                {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
-                <Button type="submit" className="w-full" disabled={busy || otp.length < 6}>
-                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify code
-                </Button>
-                <button type="button" onClick={handleResendOtp} disabled={busy} className="text-xs text-primary hover:underline w-full text-center">
-                  Didn't get it? Resend code
-                </button>
-              </form>
-            )}
-
-            {regStep === "details" && (
-              <form onSubmit={handleFinishRegister} className="space-y-4">
-                <div className="rounded-md bg-primary/10 text-primary p-2 text-xs text-center">
-                  ✓ {regEmail} verified
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="full_name">Your full name</Label>
-                  <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="reg_pwd">Set a password</Label>
-                  <Input id="reg_pwd" type="password" value={regPwd} onChange={(e) => setRegPwd(e.target.value)} required minLength={8} autoComplete="new-password" />
-                  <p className="text-[11px] text-muted-foreground">8+ chars with uppercase, lowercase, and a number.</p>
-                </div>
-                <div className="rounded-md border p-3 space-y-3 bg-muted/30">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shop details</p>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="shop_name">Shop name</Label>
-                    <Input id="shop_name" value={shopName} onChange={(e) => setShopName(e.target.value)} required placeholder="e.g. Ali General Store" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="shop_phone">Phone</Label>
-                      <Input id="shop_phone" value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} required placeholder="03xx-xxxxxxx" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="shop_city">City</Label>
-                      <Input id="shop_city" value={shopCity} onChange={(e) => setShopCity(e.target.value)} required placeholder="Lahore" />
-                    </div>
+                    <Label htmlFor="shop_phone">Phone</Label>
+                    <Input id="shop_phone" value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} required placeholder="03xx-xxxxxxx" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="shop_address">Address</Label>
-                    <Input id="shop_address" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} required placeholder="Shop # / Street / Area" />
+                    <Label htmlFor="shop_city">City</Label>
+                    <Input id="shop_city" value={shopCity} onChange={(e) => setShopCity(e.target.value)} required placeholder="Lahore" />
                   </div>
                 </div>
-                {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
-                <Button type="submit" className="w-full" disabled={busy}>
-                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create account & register shop
-                </Button>
-                <p className="text-[11px] text-muted-foreground text-center">
-                  New shops start as <strong>pending</strong> until approved by the developer.
-                </p>
-              </form>
-            )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="shop_address">Address</Label>
+                  <Input id="shop_address" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} required placeholder="Shop # / Street / Area" />
+                </div>
+              </div>
+              {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create account & register shop
+              </Button>
+              <p className="text-[11px] text-muted-foreground text-center">
+                New shops start as <strong>pending</strong> until approved by the developer.
+              </p>
+            </form>
           </TabsContent>
         </Tabs>
       </Card>
