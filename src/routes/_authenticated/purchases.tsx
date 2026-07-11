@@ -49,6 +49,8 @@ function Page() {
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
   const [search, setSearch] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [entrySearch, setEntrySearch] = useState("");
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
