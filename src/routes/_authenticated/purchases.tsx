@@ -397,10 +397,10 @@ function Page() {
         <Table>
           <TableHeader><TableRow>
             <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
-            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
+            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead><TableHead className="w-16 text-right">Edit</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{q ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{q ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
             {filtered.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
@@ -409,6 +409,11 @@ function Page() {
                 <TableCell className="text-right font-medium">{fmtMoney(p.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" onClick={() => setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" })}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
             {filtered.length > 0 && (() => {
