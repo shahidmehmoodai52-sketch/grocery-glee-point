@@ -723,8 +723,33 @@ function SecurityTab() {
     if (error) return toast.error(error.message);
     toast.success("Unblocked");
     qc.invalidateQueries({ queryKey: ["admin-security-blocks"] });
+  const clearEvents = async (severity?: "info" | "warning" | "critical", olderDays?: number) => {
+    const label = severity ? `${severity} events` : olderDays ? `events older than ${olderDays} days` : "ALL events";
+    if (!confirm(`Clear ${label} from the log? Blocklist entries are NOT affected.`)) return;
+    const { data, error } = await supabase.rpc("admin_clear_security_events", {
+      _severity: severity ?? undefined,
+      _older_than_days: olderDays ?? undefined,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(`Cleared ${data ?? 0} events`);
+    qc.invalidateQueries({ queryKey: ["admin-security-events"] });
     qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
   };
+
+  const blockFromEvent = async (e: SecurityEvent) => {
+    const kind = e.ip_address ? "ip" : e.email ? "email" : null;
+    const value = e.ip_address ?? e.email;
+    if (!kind || !value) return toast.error("This event has no IP or email to block");
+    const { error } = await supabase.rpc("admin_block_identifier", {
+      _kind: kind, _value: value, _reason: `Blocked from event: ${e.event_type}`, _hours: 24,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(`${kind === "ip" ? "IP" : "Email"} blocked for 24h`);
+    qc.invalidateQueries({ queryKey: ["admin-security-blocks"] });
+    qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
+  };
+
+
 
   return (
     <div className="space-y-4">
