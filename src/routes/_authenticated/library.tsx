@@ -514,11 +514,20 @@ function ContributeDialog({ onDone }: { onDone: () => void }) {
 }
 
 type ParsedUpload = {
-  cleaned: Array<{ name: string; barcode: string; category: string | null; unit: string }>;
+  cleaned: Array<{
+    name: string;
+    barcode: string;
+    item_code: string | null;
+    category: string | null;
+    unit: string;
+    default_sell_price: number;
+    default_cost_price: number;
+  }>;
   skipped: number;
   dupInFile: number;
   totalRows: number;
 };
+
 
 function parseAndCleanFile(file: File): Promise<ParsedUpload> {
   return new Promise((resolve, reject) => {
