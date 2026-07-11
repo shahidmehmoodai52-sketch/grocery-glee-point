@@ -235,6 +235,19 @@ function Page() {
                 </div>
               </div>
 
+              <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2">
+                <div className="text-sm">
+                  <span className="font-medium">{lines.length}</span>
+                  <span className="text-muted-foreground"> item{lines.length === 1 ? "" : "s"} added</span>
+                  {lines.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">— add all items, then press <b>Record purchase</b> to save</span>
+                  )}
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={() => { addProductLine(null, ""); }}>
+                  <Plus className="h-4 w-4 mr-1" /> Add empty row
+                </Button>
+              </div>
+
               <div className="border rounded-md overflow-x-auto">
                 <Table className="min-w-[860px] table-fixed">
                   <TableHeader><TableRow>
