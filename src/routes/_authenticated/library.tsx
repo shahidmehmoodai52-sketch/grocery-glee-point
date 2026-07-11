@@ -219,6 +219,8 @@ function LibraryTable({
   onApprove,
   onReject,
   onDone,
+  showSell = true,
+  showCost = true,
 }: {
   items: GlobalProduct[];
   isLoading: boolean;
@@ -228,7 +230,10 @@ function LibraryTable({
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
   onDone?: () => void;
+  showSell?: boolean;
+  showCost?: boolean;
 }) {
+  const colCount = 6 + (showCost ? 1 : 0) + (showSell ? 1 : 0) + 2;
   return (
     <Card className="p-3 mt-3">
       <div className="relative mb-3">
@@ -248,8 +253,8 @@ function LibraryTable({
             <TableHead>Barcode</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Unit</TableHead>
-            <TableHead className="text-right">Cost</TableHead>
-            <TableHead className="text-right">Sale</TableHead>
+            {showCost && <TableHead className="text-right">Cost</TableHead>}
+            {showSell && <TableHead className="text-right">Sale</TableHead>}
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -257,14 +262,14 @@ function LibraryTable({
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={10} className="py-4">
-                <TableSkeleton rows={5} columns={10} />
+              <TableCell colSpan={colCount} className="py-4">
+                <TableSkeleton rows={5} columns={colCount} />
               </TableCell>
             </TableRow>
           )}
           {!isLoading && items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={10} className="py-8">
+              <TableCell colSpan={colCount} className="py-8">
                 <EmptyState
                   icon={Library}
                   title="Nothing here yet"
@@ -284,15 +289,19 @@ function LibraryTable({
               <TableCell className="text-muted-foreground">{it.barcode ?? "—"}</TableCell>
               <TableCell>{it.category ?? "—"}</TableCell>
               <TableCell>{it.unit ?? "pcs"}</TableCell>
-              <TableCell className="text-right tabular-nums">{Number(it.default_cost_price ?? 0).toFixed(2)}</TableCell>
-              <TableCell className="text-right tabular-nums">{Number(it.default_sell_price ?? 0).toFixed(2)}</TableCell>
+              {showCost && (
+                <TableCell className="text-right tabular-nums">{Number(it.default_cost_price ?? 0).toFixed(2)}</TableCell>
+              )}
+              {showSell && (
+                <TableCell className="text-right tabular-nums">{Number(it.default_sell_price ?? 0).toFixed(2)}</TableCell>
+              )}
               <TableCell>
                 {it.status === "approved" && <StatusBadge tone="success">Approved</StatusBadge>}
                 {it.status === "pending" && <StatusBadge tone="warning">Pending</StatusBadge>}
                 {it.status === "rejected" && <StatusBadge tone="danger">Rejected</StatusBadge>}
               </TableCell>
               <TableCell className="text-right">
-                {mode === "import" && <ImportButton item={it} onDone={onDone} />}
+                {mode === "import" && <ImportButton item={it} onDone={onDone} showSell={showSell} showCost={showCost} />}
                 {mode === "review" && (
                   <div className="inline-flex gap-1">
                     <Button size="sm" variant="outline" onClick={() => onApprove?.(it.id)}>
@@ -313,7 +322,7 @@ function LibraryTable({
   );
 }
 
-function MineTable({ search, setSearch }: { search: string; setSearch: (v: string) => void }) {
+function MineTable({ search, setSearch, showSell = true, showCost = true }: { search: string; setSearch: (v: string) => void; showSell?: boolean; showCost?: boolean }) {
   const { data: uid } = useQuery({
     queryKey: ["auth-uid"],
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
