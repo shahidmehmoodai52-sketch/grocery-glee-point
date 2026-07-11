@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
+import { Route as AuthenticatedShopAdminRouteImport } from './routes/_authenticated/shop-admin'
 import { Route as AuthenticatedShiftsRouteImport } from './routes/_authenticated/shifts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
@@ -74,6 +75,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedShopAdminRoute = AuthenticatedShopAdminRouteImport.update({
+  id: '/shop-admin',
+  path: '/shop-admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedShiftsRoute = AuthenticatedShiftsRouteImport.update({
@@ -271,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shifts': typeof AuthenticatedShiftsRoute
+  '/shop-admin': typeof AuthenticatedShopAdminRoute
   '/users': typeof AuthenticatedUsersRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -309,6 +316,7 @@ export interface FileRoutesByTo {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shifts': typeof AuthenticatedShiftsRoute
+  '/shop-admin': typeof AuthenticatedShopAdminRoute
   '/users': typeof AuthenticatedUsersRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -349,6 +357,7 @@ export interface FileRoutesById {
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
+  '/_authenticated/shop-admin': typeof AuthenticatedShopAdminRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -389,6 +398,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/shifts'
+    | '/shop-admin'
     | '/users'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -427,6 +437,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/shifts'
+    | '/shop-admin'
     | '/users'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/settings'
     | '/_authenticated/shifts'
+    | '/_authenticated/shop-admin'
     | '/_authenticated/users'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -534,6 +546,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/shop-admin': {
+      id: '/_authenticated/shop-admin'
+      path: '/shop-admin'
+      fullPath: '/shop-admin'
+      preLoaderRoute: typeof AuthenticatedShopAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/shifts': {
@@ -788,6 +807,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedShiftsRoute: typeof AuthenticatedShiftsRoute
+  AuthenticatedShopAdminRoute: typeof AuthenticatedShopAdminRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedCustomersIdRoute: typeof AuthenticatedCustomersIdRoute
   AuthenticatedExpensePersonsIdRoute: typeof AuthenticatedExpensePersonsIdRoute
@@ -818,6 +838,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedShiftsRoute: AuthenticatedShiftsRoute,
+  AuthenticatedShopAdminRoute: AuthenticatedShopAdminRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedCustomersIdRoute: AuthenticatedCustomersIdRoute,
   AuthenticatedExpensePersonsIdRoute: AuthenticatedExpensePersonsIdRoute,

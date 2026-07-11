@@ -59,7 +59,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Reports", url: "/reports", icon: BarChart3, perm: "reports" },
       { title: "Auto backup", url: "/backup", icon: HardDriveDownload, perm: "backup" },
       { title: "Settings", url: "/settings", icon: Settings, perm: "settings" },
-      { title: "Staff & access", url: "/users", icon: UserCog, perm: "users", adminOnly: true },
+      { title: "Shop admin", url: "/shop-admin", icon: UserCog, perm: "shop-admin", adminOnly: true },
     ],
   },
 ];

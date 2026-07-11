@@ -3490,6 +3490,9 @@ export type Database = {
         Args: { _reason: string; _shift_id: string }
         Returns: string
       }
+      gen_tenant_slug: { Args: { _seed: string }; Returns: string }
+      get_my_shop_code: { Args: never; Returns: string }
+      get_tenant_id_by_code: { Args: { _code: string }; Returns: string }
       has_active_subscription: {
         Args: { _tenant_id: string }
         Returns: boolean
