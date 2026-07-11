@@ -230,10 +230,13 @@ function LibraryTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>Item code</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Barcode</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Unit</TableHead>
+            <TableHead className="text-right">Cost</TableHead>
+            <TableHead className="text-right">Sale</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -241,14 +244,14 @@ function LibraryTable({
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={6} className="py-4">
-                <TableSkeleton rows={5} columns={6} />
+              <TableCell colSpan={10} className="py-4">
+                <TableSkeleton rows={5} columns={10} />
               </TableCell>
             </TableRow>
           )}
           {!isLoading && items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="py-8">
+              <TableCell colSpan={10} className="py-8">
                 <EmptyState
                   icon={Library}
                   title="Nothing here yet"
@@ -263,10 +266,13 @@ function LibraryTable({
           )}
           {items.map((it) => (
             <TableRow key={it.id}>
+              <TableCell className="text-muted-foreground">{it.item_code ?? "—"}</TableCell>
               <TableCell className="font-medium">{it.name}</TableCell>
               <TableCell className="text-muted-foreground">{it.barcode ?? "—"}</TableCell>
               <TableCell>{it.category ?? "—"}</TableCell>
               <TableCell>{it.unit ?? "pcs"}</TableCell>
+              <TableCell className="text-right tabular-nums">{Number(it.default_cost_price ?? 0).toFixed(2)}</TableCell>
+              <TableCell className="text-right tabular-nums">{Number(it.default_sell_price ?? 0).toFixed(2)}</TableCell>
               <TableCell>
                 {it.status === "approved" && <StatusBadge tone="success">Approved</StatusBadge>}
                 {it.status === "pending" && <StatusBadge tone="warning">Pending</StatusBadge>}
@@ -289,6 +295,7 @@ function LibraryTable({
           ))}
         </TableBody>
       </Table>
+
     </Card>
   );
 }
