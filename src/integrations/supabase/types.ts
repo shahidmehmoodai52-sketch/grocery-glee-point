@@ -3294,6 +3294,10 @@ export type Database = {
         }
         Returns: string
       }
+      admin_clear_security_events: {
+        Args: { _older_than_days?: number; _severity?: string }
+        Returns: number
+      }
       admin_delete_tenant: {
         Args: { _confirm: string; _tenant_id: string }
         Returns: Json
