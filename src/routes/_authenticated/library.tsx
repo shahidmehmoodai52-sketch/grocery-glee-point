@@ -2,8 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Library, Search, Download, Check, X, Clock, ShieldCheck, Plus, Upload } from "lucide-react";
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -503,69 +501,32 @@ function ContributeDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
-// Map various header names -> our canonical fields
-function pickField(row: Record<string, any>, keys: string[]): string | null {
-  const lowered: Record<string, any> = {};
-  for (const k of Object.keys(row)) lowered[k.trim().toLowerCase()] = row[k];
-  for (const k of keys) {
-    const v = lowered[k.toLowerCase()];
-    if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
-  }
-  return null;
-}
+type ParsedUpload = {
+  cleaned: Array<{ name: string; barcode: string; category: string | null; unit: string }>;
+  skipped: number;
+  dupInFile: number;
+  totalRows: number;
+};
 
-async function parseFile(file: File): Promise<Record<string, any>[]> {
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".csv") || name.endsWith(".txt")) {
-    return new Promise((resolve, reject) => {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        worker: true,
-        complete: (res) => resolve(res.data as any[]),
-        error: reject,
-      });
-    });
-  }
-  // Parse XLSX inside a Web Worker so the main thread (and UI) never freezes,
-  // even on very large spreadsheets. Falls back to main-thread parse if the
-  // worker fails to load for any reason.
-  const buf = await file.arrayBuffer();
-  try {
-    return await parseXlsxInWorker(buf);
-  } catch {
-    const wb = XLSX.read(buf, { type: "array" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(sheet, { defval: "" });
-  }
-}
-
-function parseXlsxInWorker(buf: ArrayBuffer): Promise<Record<string, any>[]> {
+function parseAndCleanFile(file: File): Promise<ParsedUpload> {
   return new Promise((resolve, reject) => {
-    const code = `
-      self.importScripts('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
-      self.onmessage = (e) => {
-        try {
-          const wb = self.XLSX.read(e.data, { type: 'array' });
-          const sheet = wb.Sheets[wb.SheetNames[0]];
-          const rows = self.XLSX.utils.sheet_to_json(sheet, { defval: '' });
-          self.postMessage({ ok: true, rows });
-        } catch (err) {
-          self.postMessage({ ok: false, error: String((err && err.message) || err) });
-        }
-      };
-    `;
-    const blob = new Blob([code], { type: "application/javascript" });
-    const url = URL.createObjectURL(blob);
-    const worker = new Worker(url);
-    const cleanup = () => { worker.terminate(); URL.revokeObjectURL(url); };
+    const worker = new Worker(new URL("../../workers/library-upload.worker.ts", import.meta.url), { type: "module" });
+    const cleanup = () => worker.terminate();
     worker.onmessage = (e) => {
       cleanup();
-      if (e.data?.ok) resolve(e.data.rows as Record<string, any>[]);
-      else reject(new Error(e.data?.error ?? "Worker parse failed"));
+      if (e.data?.ok) {
+        resolve({
+          cleaned: e.data.cleaned,
+          skipped: e.data.skipped,
+          dupInFile: e.data.dupInFile,
+          totalRows: e.data.totalRows,
+        });
+      } else {
+        reject(new Error(e.data?.error ?? "File parse failed"));
+      }
     };
-    worker.onerror = (e) => { cleanup(); reject(new Error(e.message || "Worker error")); };
-    worker.postMessage(buf, [buf]);
+    worker.onerror = (e) => { cleanup(); reject(new Error(e.message || "File worker error")); };
+    worker.postMessage(file);
   });
 }
 
@@ -583,37 +544,10 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
     setProgress(null);
     setStage("Reading file…");
     try {
-      // Let the UI paint before the heavy synchronous parse.
       await yieldToUI();
-      const rows = await parseFile(file);
-      setStage(`Processing ${rows.length} rows…`);
+      const { cleaned, skipped, dupInFile, totalRows } = await parseAndCleanFile(file);
+      setStage(`Processing ${totalRows} rows…`);
       await yieldToUI();
-
-      const cleaned: Array<{ name: string; barcode: string; category: string | null; unit: string }> = [];
-      const seen = new Set<string>();
-      let skipped = 0;
-      let dupInFile = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        const nm = pickField(r, ["name", "product name", "item", "item name", "title"]);
-        const bc = pickField(r, ["barcode", "ean", "upc", "code", "sku"]);
-        if (!nm || !bc) { skipped++; }
-        else if (seen.has(bc)) { dupInFile++; }
-        else {
-          seen.add(bc);
-          cleaned.push({
-            name: nm,
-            barcode: bc,
-            category: pickField(r, ["category", "cat", "group"]),
-            unit: pickField(r, ["unit", "uom", "unit type"]) ?? "pcs",
-          });
-        }
-        // Yield periodically so the UI doesn't freeze on large files.
-        if (i % 2000 === 1999) {
-          setStage(`Processing rows… ${i + 1}/${rows.length}`);
-          await yieldToUI();
-        }
-      }
       if (cleaned.length === 0) {
         toast.error(`No valid rows found. Required: name + barcode. Skipped: ${skipped}`);
         setBusy(false);
