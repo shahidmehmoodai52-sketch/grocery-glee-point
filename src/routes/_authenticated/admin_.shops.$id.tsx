@@ -244,9 +244,155 @@ function OverviewTab({ detail }: { detail: TenantDetail }) {
           <Detail label="Suppliers" value={String(s.suppliers)} />
         </div>
       </Card>
+
+      <LibraryCategoryAccessCard tenantId={t.id} libraryApproved={!!t.library_approved} />
     </div>
   );
 }
+
+function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: string; libraryApproved: boolean }) {
+  const qc = useQueryClient();
+  const { data: cats = [], isLoading: catsLoading } = useQuery({
+    queryKey: ["library-categories-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("global_products")
+        .select("category")
+        .eq("status", "approved")
+        .not("category", "is", null);
+      if (error) throw error;
+      const set = new Set<string>();
+      for (const r of data ?? []) if (r.category) set.add(r.category);
+      return Array.from(set).sort((a, b) => a.localeCompare(b));
+    },
+  });
+  const { data: allowed = [], isLoading: allowedLoading } = useQuery({
+    queryKey: ["tenant-library-categories", tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tenant_library_categories")
+        .select("category")
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.category);
+    },
+  });
+
+  const allowedSet = useMemo(() => new Set(allowed), [allowed]);
+  const restricted = allowed.length > 0;
+
+  const toggle = async (cat: string, on: boolean) => {
+    if (on) {
+      const { error } = await supabase
+        .from("tenant_library_categories")
+        .insert({ tenant_id: tenantId, category: cat });
+      if (error) return toast.error(error.message);
+    } else {
+      const { error } = await supabase
+        .from("tenant_library_categories")
+        .delete()
+        .eq("tenant_id", tenantId)
+        .eq("category", cat);
+      if (error) return toast.error(error.message);
+    }
+    qc.invalidateQueries({ queryKey: ["tenant-library-categories", tenantId] });
+  };
+
+  const grantAll = async () => {
+    const { error } = await supabase
+      .from("tenant_library_categories")
+      .delete()
+      .eq("tenant_id", tenantId);
+    if (error) return toast.error(error.message);
+    toast.success("Shop can now see every library category");
+    qc.invalidateQueries({ queryKey: ["tenant-library-categories", tenantId] });
+  };
+
+  const blockAll = async () => {
+    const rows = cats.map((c) => ({ tenant_id: tenantId, category: c }));
+    if (rows.length === 0) return;
+    // First clear, then insert none-of-them-but-fake? Instead: insert a sentinel row that matches nothing.
+    // Simpler: leave restricted with zero rows means "all allowed" — so to block-all we insert a non-existent sentinel.
+    const { error: e1 } = await supabase
+      .from("tenant_library_categories")
+      .delete()
+      .eq("tenant_id", tenantId);
+    if (e1) return toast.error(e1.message);
+    const { error: e2 } = await supabase
+      .from("tenant_library_categories")
+      .insert({ tenant_id: tenantId, category: "__none__" });
+    if (e2) return toast.error(e2.message);
+    toast.success("Shop can no longer see any library items");
+    qc.invalidateQueries({ queryKey: ["tenant-library-categories", tenantId] });
+  };
+
+  if (!libraryApproved) {
+    return (
+      <Card className="p-4 text-sm text-muted-foreground">
+        <div className="font-medium text-foreground mb-1">Library category access</div>
+        Grant library access first (button in the header) to choose which categories this shop can see.
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm font-medium">Library category access</div>
+          <div className="text-xs text-muted-foreground">
+            {restricted
+              ? `Only ${allowed.length} selected categor${allowed.length === 1 ? "y" : "ies"} visible to this shop.`
+              : "All approved categories are visible (no restriction)."}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={grantAll}>Allow all</Button>
+          <Button size="sm" variant="ghost" onClick={blockAll}>Block all</Button>
+        </div>
+      </div>
+      {(catsLoading || allowedLoading) ? (
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : cats.length === 0 ? (
+        <div className="text-sm text-muted-foreground">No categories in the library yet.</div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-auto pr-1">
+          {cats.map((c) => {
+            const on = !restricted || allowedSet.has(c);
+            return (
+              <label key={c} className="flex items-center gap-2 text-sm cursor-pointer rounded px-2 py-1 hover:bg-muted">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(e) => {
+                    if (!restricted && !e.target.checked) {
+                      // User is switching from "all allowed" to a restricted list by unchecking one.
+                      // Seed with every other category, then apply this toggle.
+                      (async () => {
+                        const rows = cats
+                          .filter((x) => x !== c)
+                          .map((x) => ({ tenant_id: tenantId, category: x }));
+                        if (rows.length > 0) {
+                          const { error } = await supabase.from("tenant_library_categories").insert(rows);
+                          if (error) return toast.error(error.message);
+                        }
+                        qc.invalidateQueries({ queryKey: ["tenant-library-categories", tenantId] });
+                      })();
+                      return;
+                    }
+                    toggle(c, e.target.checked);
+                  }}
+                />
+                <span>{c}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 
 function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
