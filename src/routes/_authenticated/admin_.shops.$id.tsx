@@ -15,6 +15,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { ChevronDown } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatCard } from "@/components/ui/stat-card";
@@ -335,60 +338,128 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
     );
   }
 
+  const { data: flags } = useQuery({
+    queryKey: ["tenant-library-flags", tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("library_show_sell_price, library_show_cost_price")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (error) throw error;
+      return {
+        showSell: data?.library_show_sell_price ?? true,
+        showCost: data?.library_show_cost_price ?? true,
+      };
+    },
+  });
+
+  const setFlag = async (col: "library_show_sell_price" | "library_show_cost_price", val: boolean) => {
+    const patch = (col === "library_show_sell_price"
+      ? { library_show_sell_price: val }
+      : { library_show_cost_price: val });
+    const { error } = await supabase.from("tenants").update(patch).eq("id", tenantId);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["tenant-library-flags", tenantId] });
+  };
+
+  const summary = restricted
+    ? `${allowed.length} categor${allowed.length === 1 ? "y" : "ies"} selected`
+    : "All categories";
+
   return (
     <Card className="p-4 space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <div className="text-sm font-medium">Library category access</div>
+          <div className="text-sm font-medium">Library access</div>
           <div className="text-xs text-muted-foreground">
-            {restricted
-              ? `Only ${allowed.length} selected categor${allowed.length === 1 ? "y" : "ies"} visible to this shop.`
-              : "All approved categories are visible (no restriction)."}
+            Choose what this shop sees from the global library.
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={grantAll}>Allow all</Button>
-          <Button size="sm" variant="ghost" onClick={blockAll}>Block all</Button>
-        </div>
       </div>
-      {(catsLoading || allowedLoading) ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
-      ) : cats.length === 0 ? (
-        <div className="text-sm text-muted-foreground">No categories in the library yet.</div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-auto pr-1">
-          {cats.map((c) => {
-            const on = !restricted || allowedSet.has(c);
-            return (
-              <label key={c} className="flex items-center gap-2 text-sm cursor-pointer rounded px-2 py-1 hover:bg-muted">
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onChange={(e) => {
-                    if (!restricted && !e.target.checked) {
-                      // User is switching from "all allowed" to a restricted list by unchecking one.
-                      // Seed with every other category, then apply this toggle.
-                      (async () => {
-                        const rows = cats
-                          .filter((x) => x !== c)
-                          .map((x) => ({ tenant_id: tenantId, category: x }));
-                        if (rows.length > 0) {
-                          const { error } = await supabase.from("tenant_library_categories").insert(rows);
-                          if (error) return toast.error(error.message);
-                        }
-                        qc.invalidateQueries({ queryKey: ["tenant-library-categories", tenantId] });
-                      })();
-                      return;
-                    }
-                    toggle(c, e.target.checked);
-                  }}
-                />
-                <span>{c}</span>
-              </label>
-            );
-          })}
-        </div>
-      )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex items-center justify-between gap-3 rounded-md border p-3">
+          <div>
+            <div className="text-sm font-medium">Show sale rate</div>
+            <div className="text-xs text-muted-foreground">Library's default sale price visible to this shop.</div>
+          </div>
+          <Switch
+            checked={flags?.showSell ?? true}
+            onCheckedChange={(v) => setFlag("library_show_sell_price", v)}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3 rounded-md border p-3">
+          <div>
+            <div className="text-sm font-medium">Show purchase rate</div>
+            <div className="text-xs text-muted-foreground">Library's default purchase price visible to this shop.</div>
+          </div>
+          <Switch
+            checked={flags?.showCost ?? true}
+            onCheckedChange={(v) => setFlag("library_show_cost_price", v)}
+          />
+        </label>
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="text-sm font-medium">Categories</div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-full justify-between" disabled={catsLoading || allowedLoading}>
+              <span className="truncate">{catsLoading || allowedLoading ? "Loading…" : summary}</span>
+              <ChevronDown className="h-4 w-4 opacity-60" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-0">
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <div className="text-xs text-muted-foreground">
+                {restricted ? "Only ticked categories are visible" : "All categories are visible"}
+              </div>
+              <div className="flex gap-1">
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={grantAll}>Allow all</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={blockAll}>Block all</Button>
+              </div>
+            </div>
+            {cats.length === 0 ? (
+              <div className="p-3 text-sm text-muted-foreground">No categories in the library yet.</div>
+            ) : (
+              <div className="max-h-72 overflow-auto p-1">
+                {cats.map((c) => {
+                  const on = !restricted || allowedSet.has(c);
+                  return (
+                    <label
+                      key={c}
+                      className="flex items-center gap-2 text-sm cursor-pointer rounded px-2 py-1.5 hover:bg-muted"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={(e) => {
+                          if (!restricted && !e.target.checked) {
+                            (async () => {
+                              const rows = cats
+                                .filter((x) => x !== c)
+                                .map((x) => ({ tenant_id: tenantId, category: x }));
+                              if (rows.length > 0) {
+                                const { error } = await supabase.from("tenant_library_categories").insert(rows);
+                                if (error) return toast.error(error.message);
+                              }
+                              qc.invalidateQueries({ queryKey: ["tenant-library-categories", tenantId] });
+                            })();
+                            return;
+                          }
+                          toggle(c, e.target.checked);
+                        }}
+                      />
+                      <span className="truncate">{c}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+      </div>
     </Card>
   );
 }

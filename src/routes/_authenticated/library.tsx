@@ -44,29 +44,38 @@ type GlobalProduct = {
 };
 
 
+function useLibraryPrefs() {
+  const { isSuperAdmin } = usePermissions();
+  return useQuery({
+    queryKey: ["library-access-prefs"],
+    queryFn: async () => {
+      if (isSuperAdmin) return { hasAccess: true, showSell: true, showCost: true };
+      const { data: tid } = await supabase.rpc("current_tenant_id");
+      if (!tid) return { hasAccess: false, showSell: true, showCost: true };
+      const { data: t } = await supabase
+        .from("tenants")
+        .select("library_approved, library_show_sell_price, library_show_cost_price")
+        .eq("id", tid as string)
+        .maybeSingle();
+      return {
+        hasAccess: !!t?.library_approved,
+        showSell: t?.library_show_sell_price ?? true,
+        showCost: t?.library_show_cost_price ?? true,
+      };
+    },
+  });
+}
+
 function LibraryPage() {
   const qc = useQueryClient();
   const { isSuperAdmin } = usePermissions();
   const [tab, setTab] = useState<"browse" | "queue" | "mine">("browse");
   const [search, setSearch] = useState("");
 
-  // Is this shop allowed to use the developer's library?
-  const { data: libraryAccess } = useQuery({
-    queryKey: ["library-access"],
-    queryFn: async () => {
-      if (isSuperAdmin) return true;
-      const { data } = await supabase.rpc("current_tenant_id");
-      const tid = data as string | null;
-      if (!tid) return false;
-      const { data: t } = await supabase
-        .from("tenants")
-        .select("library_approved")
-        .eq("id", tid)
-        .maybeSingle();
-      return !!t?.library_approved;
-    },
-  });
-  const hasAccess = !!libraryAccess;
+  const { data: prefs } = useLibraryPrefs();
+  const hasAccess = !!prefs?.hasAccess;
+  const showSell = prefs?.showSell ?? true;
+  const showCost = prefs?.showCost ?? true;
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["global_products", tab],
@@ -169,6 +178,8 @@ function LibraryPage() {
             setSearch={setSearch}
             mode="import"
             onDone={invalidate}
+            showSell={showSell}
+            showCost={showCost}
           />
         </TabsContent>
 
@@ -182,13 +193,15 @@ function LibraryPage() {
               mode="review"
               onApprove={approve}
               onReject={reject}
+              showSell={showSell}
+              showCost={showCost}
             />
           </TabsContent>
         )}
 
         {isSuperAdmin && (
           <TabsContent value="mine">
-            <MineTable search={search} setSearch={setSearch} />
+            <MineTable search={search} setSearch={setSearch} showSell={showSell} showCost={showCost} />
           </TabsContent>
         )}
       </Tabs>
@@ -206,6 +219,8 @@ function LibraryTable({
   onApprove,
   onReject,
   onDone,
+  showSell = true,
+  showCost = true,
 }: {
   items: GlobalProduct[];
   isLoading: boolean;
@@ -215,7 +230,10 @@ function LibraryTable({
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
   onDone?: () => void;
+  showSell?: boolean;
+  showCost?: boolean;
 }) {
+  const colCount = 6 + (showCost ? 1 : 0) + (showSell ? 1 : 0) + 2;
   return (
     <Card className="p-3 mt-3">
       <div className="relative mb-3">
@@ -235,8 +253,8 @@ function LibraryTable({
             <TableHead>Barcode</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Unit</TableHead>
-            <TableHead className="text-right">Cost</TableHead>
-            <TableHead className="text-right">Sale</TableHead>
+            {showCost && <TableHead className="text-right">Cost</TableHead>}
+            {showSell && <TableHead className="text-right">Sale</TableHead>}
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -244,14 +262,14 @@ function LibraryTable({
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={10} className="py-4">
-                <TableSkeleton rows={5} columns={10} />
+              <TableCell colSpan={colCount} className="py-4">
+                <TableSkeleton rows={5} columns={colCount} />
               </TableCell>
             </TableRow>
           )}
           {!isLoading && items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={10} className="py-8">
+              <TableCell colSpan={colCount} className="py-8">
                 <EmptyState
                   icon={Library}
                   title="Nothing here yet"
@@ -271,15 +289,19 @@ function LibraryTable({
               <TableCell className="text-muted-foreground">{it.barcode ?? "—"}</TableCell>
               <TableCell>{it.category ?? "—"}</TableCell>
               <TableCell>{it.unit ?? "pcs"}</TableCell>
-              <TableCell className="text-right tabular-nums">{Number(it.default_cost_price ?? 0).toFixed(2)}</TableCell>
-              <TableCell className="text-right tabular-nums">{Number(it.default_sell_price ?? 0).toFixed(2)}</TableCell>
+              {showCost && (
+                <TableCell className="text-right tabular-nums">{Number(it.default_cost_price ?? 0).toFixed(2)}</TableCell>
+              )}
+              {showSell && (
+                <TableCell className="text-right tabular-nums">{Number(it.default_sell_price ?? 0).toFixed(2)}</TableCell>
+              )}
               <TableCell>
                 {it.status === "approved" && <StatusBadge tone="success">Approved</StatusBadge>}
                 {it.status === "pending" && <StatusBadge tone="warning">Pending</StatusBadge>}
                 {it.status === "rejected" && <StatusBadge tone="danger">Rejected</StatusBadge>}
               </TableCell>
               <TableCell className="text-right">
-                {mode === "import" && <ImportButton item={it} onDone={onDone} />}
+                {mode === "import" && <ImportButton item={it} onDone={onDone} showSell={showSell} showCost={showCost} />}
                 {mode === "review" && (
                   <div className="inline-flex gap-1">
                     <Button size="sm" variant="outline" onClick={() => onApprove?.(it.id)}>
@@ -300,7 +322,7 @@ function LibraryTable({
   );
 }
 
-function MineTable({ search, setSearch }: { search: string; setSearch: (v: string) => void }) {
+function MineTable({ search, setSearch, showSell = true, showCost = true }: { search: string; setSearch: (v: string) => void; showSell?: boolean; showCost?: boolean }) {
   const { data: uid } = useQuery({
     queryKey: ["auth-uid"],
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
@@ -336,6 +358,8 @@ function MineTable({ search, setSearch }: { search: string; setSearch: (v: strin
       search={search}
       setSearch={setSearch}
       mode="import"
+      showSell={showSell}
+      showCost={showCost}
     />
   );
 }
@@ -380,10 +404,10 @@ function ImportAllButton({ onDone }: { onDone: () => void }) {
   );
 }
 
-function ImportButton({ item, onDone }: { item: GlobalProduct; onDone?: () => void }) {
+function ImportButton({ item, onDone, showSell = true, showCost = true }: { item: GlobalProduct; onDone?: () => void; showSell?: boolean; showCost?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [sell, setSell] = useState(Number(item.default_sell_price ?? 0));
-  const [cost, setCost] = useState(Number(item.default_cost_price ?? 0));
+  const [sell, setSell] = useState(showSell ? Number(item.default_sell_price ?? 0) : 0);
+  const [cost, setCost] = useState(showCost ? Number(item.default_cost_price ?? 0) : 0);
   const [stock, setStock] = useState(0);
 
   const [busy, setBusy] = useState(false);
