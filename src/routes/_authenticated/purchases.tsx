@@ -55,7 +55,25 @@ function Page() {
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
   const [editRow, setEditRow] = useState<any | null>(null);
+  const [editItems, setEditItems] = useState<any[]>([]);
+  const [editItemsOriginal, setEditItemsOriginal] = useState<any[]>([]);
+  const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  const openEdit = async (p: any) => {
+    setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" });
+    setEditItems([]);
+    setEditItemsOriginal([]);
+    setEditLoading(true);
+    const { data, error } = await supabase
+      .from("purchase_items")
+      .select("id,product_id,name,qty,cost,line_total")
+      .eq("purchase_id", p.id);
+    setEditLoading(false);
+    if (error) { toast.error(error.message); return; }
+    const rows = (data ?? []).map((r: any) => ({ ...r, qty: Number(r.qty), cost: Number(r.cost) }));
+    setEditItems(rows);
+    setEditItemsOriginal(rows.map((r) => ({ ...r })));
+  };
   const searchRef = useRef<HTMLInputElement>(null);
   const focusCell = (kind: "cost" | "qty", i: number) => {
     setTimeout(() => {
