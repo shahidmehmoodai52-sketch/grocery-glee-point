@@ -355,7 +355,10 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
   });
 
   const setFlag = async (col: "library_show_sell_price" | "library_show_cost_price", val: boolean) => {
-    const { error } = await supabase.from("tenants").update({ [col]: val }).eq("id", tenantId);
+    const patch = (col === "library_show_sell_price"
+      ? { library_show_sell_price: val }
+      : { library_show_cost_price: val });
+    const { error } = await supabase.from("tenants").update(patch).eq("id", tenantId);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["tenant-library-flags", tenantId] });
   };
