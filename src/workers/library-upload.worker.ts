@@ -15,14 +15,32 @@ type WorkerResult = {
   totalRows: number;
 };
 
-function pickField(row: Record<string, unknown>, keys: string[]): string | null {
-  const lowered: Record<string, unknown> = {};
-  for (const k of Object.keys(row)) lowered[k.trim().toLowerCase()] = row[k];
-  for (const k of keys) {
-    const v = lowered[k.toLowerCase()];
-    if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const HINTS: Record<string, string[]> = {
+  name: ["name", "item name", "itemname", "description", "product", "product name", "particulars", "title", "desc"],
+  barcode: ["barcode", "bar code", "ean", "upc", "scan", "scancode", "scan code", "sku", "item code", "itemcode", "code", "item no", "item#", "item number", "itemno", "prod code", "product code"],
+  category: ["category", "cat", "group", "department"],
+  unit: ["unit", "uom", "unit type", "measure"],
+};
+
+function buildPicker(headers: string[]) {
+  const normed = headers.map((h) => ({ raw: h, n: norm(h) }));
+  const map: Record<string, string | null> = {};
+  for (const [key, hints] of Object.entries(HINTS)) {
+    const nh = hints.map(norm);
+    let hit = normed.find((h) => nh.includes(h.n));
+    if (!hit) hit = normed.find((h) => nh.some((x) => h.n.includes(x)));
+    map[key] = hit ? hit.raw : null;
   }
-  return null;
+  return (row: Record<string, unknown>, key: string): string | null => {
+    const h = map[key];
+    if (!h) return null;
+    const v = row[h];
+    if (v === undefined || v === null) return null;
+    const s = String(v).trim();
+    return s === "" ? null : s;
+  };
 }
 
 function cleanRows(rows: Record<string, unknown>[]): WorkerResult {
@@ -31,9 +49,15 @@ function cleanRows(rows: Record<string, unknown>[]): WorkerResult {
   let skipped = 0;
   let dupInFile = 0;
 
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  const pick = buildPicker(headers);
+
   for (const r of rows) {
-    const nm = pickField(r, ["name", "product name", "item", "item name", "title"]);
-    const bc = pickField(r, ["barcode", "ean", "upc", "code", "sku"]);
+    let nm = pick(r, "name");
+    let bc = pick(r, "barcode");
+    // If only one of name/barcode present, use it for the other so rows aren't lost
+    if (!bc && nm) bc = nm;
+    if (!nm && bc) nm = bc;
     if (!nm || !bc) {
       skipped++;
     } else if (seen.has(bc)) {
@@ -43,8 +67,8 @@ function cleanRows(rows: Record<string, unknown>[]): WorkerResult {
       cleaned.push({
         name: nm,
         barcode: bc,
-        category: pickField(r, ["category", "cat", "group"]),
-        unit: pickField(r, ["unit", "uom", "unit type"]) ?? "pcs",
+        category: pick(r, "category"),
+        unit: pick(r, "unit") ?? "pcs",
       });
     }
   }
