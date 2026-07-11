@@ -382,9 +382,10 @@ function ImportAllButton({ onDone }: { onDone: () => void }) {
 
 function ImportButton({ item, onDone }: { item: GlobalProduct; onDone?: () => void }) {
   const [open, setOpen] = useState(false);
-  const [sell, setSell] = useState(0);
-  const [cost, setCost] = useState(0);
+  const [sell, setSell] = useState(Number(item.default_sell_price ?? 0));
+  const [cost, setCost] = useState(Number(item.default_cost_price ?? 0));
   const [stock, setStock] = useState(0);
+
   const [busy, setBusy] = useState(false);
   const doImport = async () => {
     setBusy(true);
