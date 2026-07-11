@@ -91,14 +91,17 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
 
   const removeShop = async () => {
     if (!data) return;
+    const expected = data.tenant.name.trim();
     const typed = window.prompt(
-      `PERMANENTLY delete "${data.tenant.name}" and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone. Type the shop name exactly to confirm:`,
+      `PERMANENTLY delete this shop and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone.\n\nType exactly:  ${expected}`,
     );
     if (typed === null) return;
-    if (typed !== data.tenant.name) return toast.error("Confirmation did not match — nothing deleted");
-    const { error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: typed });
+    if (typed.trim().toLowerCase() !== expected.toLowerCase()) {
+      return toast.error(`Confirmation did not match. Expected: "${expected}"`);
+    }
+    const { error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: expected });
     if (error) return toast.error(error.message);
-    toast.success(`Deleted "${data.tenant.name}"`);
+    toast.success(`Deleted "${expected}"`);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
     navigate({ to: "/admin", replace: true });
   };
