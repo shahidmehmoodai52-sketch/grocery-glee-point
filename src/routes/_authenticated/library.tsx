@@ -580,9 +580,17 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
             type="file"
             accept=".csv,.txt,.xlsx,.xls"
             disabled={busy}
-            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              // Reset so selecting the same file again re-triggers onChange.
+              e.target.value = "";
+              handleFile(f);
+            }}
           />
         </div>
+        {busy && stage && (
+          <div className="text-sm text-muted-foreground">{stage}</div>
+        )}
         {progress && (
           <div className="text-sm text-muted-foreground">
             Uploaded: {progress.ok} · Skipped: {progress.skipped} · Failed: {progress.failed}
