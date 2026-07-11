@@ -32,7 +32,7 @@ function checkStrongPassword(pw: string): string | null {
   return null;
 }
 
-type RegStep = "email" | "otp" | "details";
+type RegStep = "details";
 
 function AuthPage() {
   const navigate = useNavigate();
