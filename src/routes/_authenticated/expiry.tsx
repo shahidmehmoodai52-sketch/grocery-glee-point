@@ -91,7 +91,7 @@ const WASTE_TYPES = ["expired", "damaged", "disposal", "donation", "internal_use
 function ExpiryPage() {
   const { data: settings } = useSettings();
   const { isAdmin, can } = usePermissions();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const canWrite = isAdmin || can("products");
 
   const batchesQ = useQuery({

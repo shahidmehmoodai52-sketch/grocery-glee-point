@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/customers/")({ component: 
 function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", balance: 0 });
   const [payOpen, setPayOpen] = useState<any>(null);

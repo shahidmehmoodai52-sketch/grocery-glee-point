@@ -56,7 +56,7 @@ type Props = {
 };
 
 export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Props) {
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const width = settings?.paper_width === "58mm" ? "58mm" : "80mm";
   const date = invoice.created_at ? new Date(invoice.created_at) : new Date();
   const isReturn = kind !== "sale";

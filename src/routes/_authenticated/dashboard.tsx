@@ -27,7 +27,7 @@ function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); 
 
 function Page() {
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const since = daysAgo(29).toISOString();
 
   const { data: sales = [] } = useQuery({

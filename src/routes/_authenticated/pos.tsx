@@ -132,7 +132,7 @@ async function searchProducts(term: string) {
 function POSPage() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const taxRate = Number(settings?.tax_rate ?? 0);
 
   const [tabs, setTabs] = useState<Tab[]>(() => [newTab(1)]);

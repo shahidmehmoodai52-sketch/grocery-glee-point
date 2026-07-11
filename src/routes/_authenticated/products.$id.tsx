@@ -135,7 +135,7 @@ function ProductDetailPage() {
   const { id } = useParams({ from: "/_authenticated/products/$id" });
   const { data: settings } = useSettings();
   const { isAdmin } = usePermissions();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
 
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");

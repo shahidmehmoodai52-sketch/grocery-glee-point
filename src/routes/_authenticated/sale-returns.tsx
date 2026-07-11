@@ -24,7 +24,7 @@ type Line = { product_id: string | null; name: string; qty: number; price: numbe
 function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
 
   const [open, setOpen] = useState(false);
   const [saleId, setSaleId] = useState<string>("none");

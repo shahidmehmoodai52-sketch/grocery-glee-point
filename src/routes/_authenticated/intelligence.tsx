@@ -104,7 +104,7 @@ const ABC_META: Record<string, string> = {
 function IntelligencePage() {
   const { data: settings } = useSettings();
   const { isAdmin, can } = usePermissions();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const canWrite = isAdmin || can("products");
 
   const intelQ = useQuery({

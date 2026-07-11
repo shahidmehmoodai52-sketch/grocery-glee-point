@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/expense-persons/$id")({ co
 function Page() {
   const { id } = Route.useParams();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
 
   const [preset, setPreset] = useState<DatePreset>("all");
   const [from, setFrom] = useState("");

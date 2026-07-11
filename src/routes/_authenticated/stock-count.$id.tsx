@@ -55,7 +55,7 @@ function StockCountDetailPage() {
   const { user } = useAuth();
   const { isAdmin } = usePermissions();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const scanMode: "prompt" | "increment" =
     (settings as any)?.stock_count_scan_mode === "increment" ? "increment" : "prompt";
   const qc = useQueryClient();
