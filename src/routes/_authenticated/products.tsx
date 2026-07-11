@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Search, History, Package } from "lucide-react";
 
@@ -48,10 +48,26 @@ function ProductsPage() {
       ),
   });
 
-  const filtered = products.filter((p) => {
-    const q = search.toLowerCase();
-    return !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q) || (p.barcode ?? "").toLowerCase().includes(q);
-  });
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.sku ?? "").toLowerCase().includes(q) ||
+        (p.barcode ?? "").toLowerCase().includes(q),
+    );
+  }, [products, search]);
+
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [search]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pageRows = useMemo(
+    () => filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE),
+    [filtered, pageSafe],
+  );
 
   const parseBarcodes = (text: string) =>
     Array.from(new Set(text.split(/[\s,;\n]+/).map((s) => s.trim()).filter(Boolean)));
@@ -198,7 +214,7 @@ function ProductsPage() {
                 <EmptyState icon={Package} title="No products yet" description="Add a new product to start selling." />
               </TableCell></TableRow>
             )}
-            {filtered.map((p) => (
+            {pageRows.map((p) => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.name}</TableCell>
                 <TableCell className="text-muted-foreground">{p.sku ?? "—"}</TableCell>
@@ -227,6 +243,18 @@ function ProductsPage() {
             ))}
           </TableBody>
         </Table>
+        {!isLoading && filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between mt-3 text-sm">
+            <div className="text-muted-foreground">
+              Showing {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage(pageSafe - 1)}>Prev</Button>
+              <span className="px-2 py-1">Page {pageSafe} / {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={pageSafe >= totalPages} onClick={() => setPage(pageSafe + 1)}>Next</Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
