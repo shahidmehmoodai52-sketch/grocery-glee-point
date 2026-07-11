@@ -235,6 +235,19 @@ function Page() {
                 </div>
               </div>
 
+              <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2">
+                <div className="text-sm">
+                  <span className="font-medium">{lines.length}</span>
+                  <span className="text-muted-foreground"> item{lines.length === 1 ? "" : "s"} added</span>
+                  {lines.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">— add all items, then press <b>Record purchase</b> to save</span>
+                  )}
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={() => { addProductLine(null, ""); }}>
+                  <Plus className="h-4 w-4 mr-1" /> Add empty row
+                </Button>
+              </div>
+
               <div className="border rounded-md overflow-x-auto">
                 <Table className="min-w-[860px] table-fixed">
                   <TableHeader><TableRow>
@@ -324,10 +337,15 @@ function Page() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
-              <Button variant="outline" onClick={clearDraft}>Discard</Button>
-              <Button onClick={submit}>Record purchase</Button>
+            <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 mt-2 border-t bg-background px-6 py-3 sm:flex-row sm:justify-between gap-2">
+              <div className="text-sm text-muted-foreground">
+                {lines.length} item{lines.length === 1 ? "" : "s"} • Total <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+                <Button variant="outline" onClick={clearDraft}>Discard</Button>
+                <Button onClick={submit} disabled={lines.length === 0} size="lg">Record purchase</Button>
+              </div>
             </DialogFooter>
 
           </DialogContent>
