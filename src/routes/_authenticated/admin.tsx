@@ -764,6 +764,39 @@ function SecurityTab() {
         <StatCard label="Unique IPs (24h)" value={summary?.unique_ips_24h ?? 0} icon={Users} />
       </div>
 
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <div className="font-medium text-sm">Yeh errors kya matlab rakhte hain — aur inka hal</div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-3 text-xs">
+          <div className="rounded-md border p-3">
+            <div className="font-medium mb-1">🔴 login_failed / login_rate_limited</div>
+            <div className="text-muted-foreground mb-2">Koi ghalat password bar bar try kar raha hai — brute force ki koshish.</div>
+            <div><b>Hal:</b> "Failed logins (24h)" 5 se zyada ho to us IP ya email ko event row ke <i>Block</i> button se 24 ghante ke liye block kar dein. Agar shop owner khud bhool gaya hai to <i>/admin → shop → Reset owner password</i> se naya password de dein.</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="font-medium mb-1">🟡 suspicious_activity / rate_limit_hit</div>
+            <div className="text-muted-foreground mb-2">Ek hi IP se buhat saari requests / unusual pattern.</div>
+            <div><b>Hal:</b> IP ko 24h ke liye block karo. Baar baar wahi IP aaye to permanent block (Block IP or email → hours khaali chhorein).</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="font-medium mb-1">🔴 unauthorized_access / forbidden</div>
+            <div className="text-muted-foreground mb-2">Koi cashier ya user aisi jaga pahunchne ki koshish kar raha hai jahan uski permission nahi.</div>
+            <div><b>Hal:</b> Us user ki permissions <i>/shop-admin</i> ya <i>/users</i> se check karein. Zaroorat ho to us shop ko suspend kar dein.</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="font-medium mb-1">⚪ session_started / password_changed / info events</div>
+            <div className="text-muted-foreground mb-2">Ye normal audit hain — koi khatra nahi.</div>
+            <div><b>Hal:</b> Kuch karne ki zaroorat nahi. Log saaf karna ho to niche "Clear info events" button use karein.</div>
+          </div>
+          <div className="rounded-md border p-3 md:col-span-2">
+            <div className="font-medium mb-1">🟢 Tab dobara green kab hoga?</div>
+            <div className="text-muted-foreground">Jab 24 ghante mein: Critical = 0, Active blocks = 0, aur Failed logins &lt; 5 ho jayen. Purane events "Clear old (7d+)" se hata dein — jo blocks lagaye hain wo blocklist mein alag rehte hain, kabhi nahi jaate.</div>
+          </div>
+        </div>
+      </Card>
+
       <Card className="p-3">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div className="flex items-center gap-2">
@@ -831,6 +864,15 @@ function SecurityTab() {
                 {s}
               </Button>
             ))}
+            <Button size="sm" variant="outline" onClick={() => clearEvents(undefined, 7)}>
+              Clear old (7d+)
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => clearEvents("info")}>
+              Clear info
+            </Button>
+            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => clearEvents()}>
+              Clear all
+            </Button>
           </div>
         </div>
         <Table>
