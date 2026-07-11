@@ -34,7 +34,7 @@ const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", 
 function ProductsPage() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "$";
+  const sym = settings?.currency_symbol ?? "Rs";
   const [search, setSearch] = useState("");
   const [open, setOpen, clearOpen] = usePersistentState<boolean>("product-entry-open", false);
   const [form, setForm, clearForm] = usePersistentState<ProductForm>("product-entry-form", empty);
