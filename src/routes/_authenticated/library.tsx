@@ -633,7 +633,6 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
         const slice = cleaned.slice(i, i + chunk).map((r) => ({
           ...r,
           status: "approved" as const,
-          approved_at: new Date().toISOString(),
         }));
         const { error } = await supabase
           .from("global_products")
