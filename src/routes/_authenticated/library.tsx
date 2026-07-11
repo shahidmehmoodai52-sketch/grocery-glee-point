@@ -358,6 +358,8 @@ function MineTable({ search, setSearch, showSell = true, showCost = true }: { se
       search={search}
       setSearch={setSearch}
       mode="import"
+      showSell={showSell}
+      showCost={showCost}
     />
   );
 }
