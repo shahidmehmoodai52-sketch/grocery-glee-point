@@ -54,6 +54,8 @@ function Page() {
   const [entrySearch, setEntrySearch] = useState("");
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
+  const [editRow, setEditRow] = useState<any | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const focusCell = (kind: "cost" | "qty", i: number) => {
     setTimeout(() => {
