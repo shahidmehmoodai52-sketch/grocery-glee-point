@@ -49,6 +49,8 @@ function Page() {
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
   const [search, setSearch] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [entrySearch, setEntrySearch] = useState("");
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
@@ -144,6 +146,7 @@ function Page() {
   const submit = async () => {
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
+    setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier === "none" ? null : supplier,
@@ -151,8 +154,10 @@ function Page() {
         items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
       },
     });
+    setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Purchase recorded, stock updated");
+    setConfirmOpen(false);
     clearDraft();
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
@@ -344,12 +349,28 @@ function Page() {
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
                 <Button variant="outline" onClick={clearDraft}>Discard</Button>
-                <Button onClick={submit} disabled={lines.length === 0} size="lg">Record purchase</Button>
+                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0} size="lg">Record purchase</Button>
               </div>
             </DialogFooter>
 
           </DialogContent>
         </Dialog>
+
+        <Dialog open={confirmOpen} onOpenChange={(v) => { if (!saving) setConfirmOpen(v); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Confirm purchase</DialogTitle></DialogHeader>
+            <div className="space-y-2 text-sm">
+              <p>Save this purchase with <b>{lines.length}</b> item{lines.length === 1 ? "" : "s"}?</p>
+              <p className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span></p>
+              <p className="text-xs text-muted-foreground">Stock and costs will be updated. This cannot be undone.</p>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
+              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : "Yes, save purchase"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
 
       <Card className="p-3 space-y-3">
