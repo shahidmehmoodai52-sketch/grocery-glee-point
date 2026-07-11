@@ -378,28 +378,37 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex items-center justify-between gap-3 rounded-md border p-3">
-          <div>
-            <div className="text-sm font-medium">Show sale rate</div>
-            <div className="text-xs text-muted-foreground">Library's default sale price visible to this shop.</div>
-          </div>
-          <Switch
-            checked={flags?.showSell ?? true}
-            onCheckedChange={(v) => setFlag("library_show_sell_price", v)}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-3 rounded-md border p-3">
-          <div>
-            <div className="text-sm font-medium">Show purchase rate</div>
-            <div className="text-xs text-muted-foreground">Library's default purchase price visible to this shop.</div>
-          </div>
-          <Switch
-            checked={flags?.showCost ?? true}
-            onCheckedChange={(v) => setFlag("library_show_cost_price", v)}
-          />
-        </label>
+      <div className="space-y-1.5">
+        <div className="text-sm font-medium">Price visibility</div>
+        <Select
+          value={
+            flags?.showSell && flags?.showCost ? "both"
+              : flags?.showSell ? "sell"
+              : flags?.showCost ? "cost"
+              : "none"
+          }
+          onValueChange={async (v) => {
+            const showSell = v === "sell" || v === "both";
+            const showCost = v === "cost" || v === "both";
+            const { error } = await supabase.from("tenants").update({
+              library_show_sell_price: showSell,
+              library_show_cost_price: showCost,
+            }).eq("id", tenantId);
+            if (error) return toast.error(error.message);
+            qc.invalidateQueries({ queryKey: ["tenant-library-flags", tenantId] });
+          }}
+        >
+          <SelectTrigger><SelectValue placeholder="Choose visibility" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sell">Show sale rate only</SelectItem>
+            <SelectItem value="cost">Show purchase rate only</SelectItem>
+            <SelectItem value="both">Show both</SelectItem>
+            <SelectItem value="none">Hide both</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="text-xs text-muted-foreground">Controls what prices this shop sees from the global library.</div>
       </div>
+
 
       <div className="space-y-1.5">
         <div className="text-sm font-medium">Categories</div>
