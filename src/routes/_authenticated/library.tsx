@@ -27,10 +27,13 @@ type GlobalProduct = {
   id: string;
   name: string;
   barcode: string | null;
+  item_code: string | null;
   category: string | null;
   unit: string | null;
   image_url: string | null;
   description: string | null;
+  default_sell_price: number | null;
+  default_cost_price: number | null;
   status: string;
   contributed_by_tenant: string | null;
   contributed_by_user: string | null;
@@ -39,6 +42,7 @@ type GlobalProduct = {
   review_notes: string | null;
   created_at: string;
 };
+
 
 function LibraryPage() {
   const qc = useQueryClient();
@@ -226,10 +230,13 @@ function LibraryTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>Item code</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Barcode</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Unit</TableHead>
+            <TableHead className="text-right">Cost</TableHead>
+            <TableHead className="text-right">Sale</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -237,14 +244,14 @@ function LibraryTable({
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={6} className="py-4">
-                <TableSkeleton rows={5} columns={6} />
+              <TableCell colSpan={10} className="py-4">
+                <TableSkeleton rows={5} columns={10} />
               </TableCell>
             </TableRow>
           )}
           {!isLoading && items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="py-8">
+              <TableCell colSpan={10} className="py-8">
                 <EmptyState
                   icon={Library}
                   title="Nothing here yet"
@@ -259,10 +266,13 @@ function LibraryTable({
           )}
           {items.map((it) => (
             <TableRow key={it.id}>
+              <TableCell className="text-muted-foreground">{it.item_code ?? "—"}</TableCell>
               <TableCell className="font-medium">{it.name}</TableCell>
               <TableCell className="text-muted-foreground">{it.barcode ?? "—"}</TableCell>
               <TableCell>{it.category ?? "—"}</TableCell>
               <TableCell>{it.unit ?? "pcs"}</TableCell>
+              <TableCell className="text-right tabular-nums">{Number(it.default_cost_price ?? 0).toFixed(2)}</TableCell>
+              <TableCell className="text-right tabular-nums">{Number(it.default_sell_price ?? 0).toFixed(2)}</TableCell>
               <TableCell>
                 {it.status === "approved" && <StatusBadge tone="success">Approved</StatusBadge>}
                 {it.status === "pending" && <StatusBadge tone="warning">Pending</StatusBadge>}
@@ -285,6 +295,7 @@ function LibraryTable({
           ))}
         </TableBody>
       </Table>
+
     </Card>
   );
 }
@@ -371,9 +382,10 @@ function ImportAllButton({ onDone }: { onDone: () => void }) {
 
 function ImportButton({ item, onDone }: { item: GlobalProduct; onDone?: () => void }) {
   const [open, setOpen] = useState(false);
-  const [sell, setSell] = useState(0);
-  const [cost, setCost] = useState(0);
+  const [sell, setSell] = useState(Number(item.default_sell_price ?? 0));
+  const [cost, setCost] = useState(Number(item.default_cost_price ?? 0));
   const [stock, setStock] = useState(0);
+
   const [busy, setBusy] = useState(false);
   const doImport = async () => {
     setBusy(true);
@@ -502,11 +514,20 @@ function ContributeDialog({ onDone }: { onDone: () => void }) {
 }
 
 type ParsedUpload = {
-  cleaned: Array<{ name: string; barcode: string; category: string | null; unit: string }>;
+  cleaned: Array<{
+    name: string;
+    barcode: string;
+    item_code: string | null;
+    category: string | null;
+    unit: string;
+    default_sell_price: number;
+    default_cost_price: number;
+  }>;
   skipped: number;
   dupInFile: number;
   totalRows: number;
 };
+
 
 function parseAndCleanFile(file: File): Promise<ParsedUpload> {
   return new Promise((resolve, reject) => {
@@ -627,12 +648,13 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
           <DialogTitle>Bulk upload to global library</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Upload a CSV or Excel file. Only these columns are read — everything else is ignored:
+          Upload a CSV or Excel file. Recognized columns (any of these names, case-insensitive):
           <br />
-          <strong>name</strong> (required), <strong>barcode</strong> (required), <strong>category</strong>, <strong>unit</strong>.
+          <strong>Item Name</strong>, <strong>Barcode</strong>, <strong>Item Code / SKU</strong>, <strong>Category</strong>, <strong>Unit</strong>, <strong>Sale Rate</strong>, <strong>Purchase Rate</strong>.
           <br />
-          Rows without a name or barcode are skipped. Items are submitted as <em>pending</em> and need admin approval.
+          Aik item ke multiple barcodes chahte ho to same name ki multiple rows daal do — har row ka barcode alag. Rows without a name or barcode are skipped. Items <em>pending</em> me jate hain admin approval ke liye.
         </p>
+
         <div
           className={`rounded-md border border-dashed p-4 transition-colors ${dragActive ? "border-primary bg-muted" : "border-input"}`}
           onDragEnter={(e) => {

@@ -431,9 +431,12 @@ export type Database = {
           contributed_by_tenant: string | null
           contributed_by_user: string | null
           created_at: string
+          default_cost_price: number
+          default_sell_price: number
           description: string | null
           id: string
           image_url: string | null
+          item_code: string | null
           name: string
           review_notes: string | null
           reviewed_at: string | null
@@ -448,9 +451,12 @@ export type Database = {
           contributed_by_tenant?: string | null
           contributed_by_user?: string | null
           created_at?: string
+          default_cost_price?: number
+          default_sell_price?: number
           description?: string | null
           id?: string
           image_url?: string | null
+          item_code?: string | null
           name: string
           review_notes?: string | null
           reviewed_at?: string | null
@@ -465,9 +471,12 @@ export type Database = {
           contributed_by_tenant?: string | null
           contributed_by_user?: string | null
           created_at?: string
+          default_cost_price?: number
+          default_sell_price?: number
           description?: string | null
           id?: string
           image_url?: string | null
+          item_code?: string | null
           name?: string
           review_notes?: string | null
           reviewed_at?: string | null
@@ -2811,6 +2820,35 @@ export type Database = {
           },
         ]
       }
+      tenant_library_categories: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_library_categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_members: {
         Row: {
           created_at: string
@@ -3731,6 +3769,10 @@ export type Database = {
         Returns: string
       }
       shift_report: { Args: { _shift_id: string }; Returns: Json }
+      tenant_category_allowed: {
+        Args: { _category: string; _tenant: string }
+        Returns: boolean
+      }
       undo_last_sale: { Args: { _sale_id: string }; Returns: Json }
       update_party_payment: {
         Args: {
