@@ -533,6 +533,7 @@ function parseAndCleanFile(file: File): Promise<ParsedUpload> {
 function BulkUploadDialog({ onDone }: { onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const [stage, setStage] = useState<string>("");
   const [progress, setProgress] = useState<{ ok: number; skipped: number; failed: number } | null>(null);
 
@@ -540,6 +541,11 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
+    const lowerName = file.name.toLowerCase();
+    if (![".csv", ".txt", ".xlsx", ".xls"].some((ext) => lowerName.endsWith(ext))) {
+      toast.error("Please upload a CSV or Excel file (.csv, .xlsx, .xls)");
+      return;
+    }
     setBusy(true);
     setProgress(null);
     setStage("Reading file…");
@@ -627,11 +633,29 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
           <br />
           Rows without a name or barcode are skipped. Items are submitted as <em>pending</em> and need admin approval.
         </p>
-        <div>
+        <div
+          className={`rounded-md border border-dashed p-4 transition-colors ${dragActive ? "border-primary bg-muted" : "border-input"}`}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            if (!busy) setDragActive(true);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!busy) setDragActive(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            setDragActive(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragActive(false);
+            if (!busy) handleFile(e.dataTransfer.files?.[0] ?? null);
+          }}
+        >
           <Label>Choose file (.csv, .xlsx, .xls)</Label>
           <Input
             type="file"
-            accept=".csv,.txt,.xlsx,.xls"
             disabled={busy}
             onChange={(e) => {
               const f = e.target.files?.[0] ?? null;
@@ -640,6 +664,9 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
               handleFile(f);
             }}
           />
+          <p className="mt-2 text-xs text-muted-foreground">
+            If Windows file picker hangs, drag and drop the file here instead. File type is checked after selection.
+          </p>
         </div>
         {busy && stage && (
           <div className="text-sm text-muted-foreground">{stage}</div>
