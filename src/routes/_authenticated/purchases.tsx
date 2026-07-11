@@ -607,7 +607,7 @@ function Page() {
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" })}>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                 </TableCell>
