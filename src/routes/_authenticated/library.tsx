@@ -608,50 +608,53 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
 
       setStage("Checking existing barcodes…");
       await yieldToUI();
-      let alreadyExists = 0;
       const barcodes = cleaned.map((c) => c.barcode);
       const existing = new Set<string>();
       const lookupChunk = 500;
       for (let i = 0; i < barcodes.length; i += lookupChunk) {
         const slice = barcodes.slice(i, i + lookupChunk);
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from("global_products")
           .select("barcode")
           .in("barcode", slice);
-        if (!error && data) for (const row of data) if (row.barcode) existing.add(row.barcode);
+        if (data) for (const row of data) if (row.barcode) existing.add(row.barcode);
         setStage(`Checking existing… ${Math.min(i + lookupChunk, barcodes.length)}/${barcodes.length}`);
-        setProgress({ ok: 0, skipped: skipped + dupInFile, failed: 0 });
         await yieldToUI();
       }
-      const toInsert = cleaned.filter((c) => {
-        if (existing.has(c.barcode)) { alreadyExists++; return false; }
-        return true;
-      });
 
       let ok = 0;
+      let updated = 0;
       let failed = 0;
       const chunk = 200;
-      setStage(`Uploading ${toInsert.length} items…`);
+      setStage(`Uploading ${cleaned.length} items…`);
       await yieldToUI();
-      for (let i = 0; i < toInsert.length; i += chunk) {
-        const slice = toInsert.slice(i, i + chunk);
-        const { error, count } = await supabase
+      // Upsert on barcode so re-uploads refresh item_code, sale rate and cost rate on existing rows
+      for (let i = 0; i < cleaned.length; i += chunk) {
+        const slice = cleaned.slice(i, i + chunk);
+        const { error } = await supabase
           .from("global_products")
-          .insert(slice, { count: "exact" });
+          .upsert(slice, { onConflict: "barcode" });
         if (error) {
           for (const row of slice) {
-            const { error: e2 } = await supabase.from("global_products").insert(row);
-            if (e2) failed++; else ok++;
+            const { error: e2 } = await supabase
+              .from("global_products")
+              .upsert(row, { onConflict: "barcode" });
+            if (e2) failed++;
+            else if (existing.has(row.barcode)) updated++;
+            else ok++;
           }
         } else {
-          ok += count ?? slice.length;
+          for (const row of slice) {
+            if (existing.has(row.barcode)) updated++;
+            else ok++;
+          }
         }
-        setProgress({ ok, skipped: skipped + dupInFile + alreadyExists, failed });
-        setStage(`Uploading… ${Math.min(i + chunk, toInsert.length)}/${toInsert.length}`);
+        setProgress({ ok: ok + updated, skipped: skipped + dupInFile, failed });
+        setStage(`Uploading… ${Math.min(i + chunk, cleaned.length)}/${cleaned.length}`);
         await yieldToUI();
       }
       toast.success(
-        `Uploaded ${ok} · Skipped ${skipped + dupInFile + alreadyExists} (${skipped} missing, ${dupInFile} dup in file, ${alreadyExists} already in library) · Failed ${failed}`,
+        `Added ${ok} · Updated ${updated} · Skipped ${skipped + dupInFile} (${skipped} missing, ${dupInFile} dup in file) · Failed ${failed}`,
       );
       onDone();
     } catch (e: any) {
