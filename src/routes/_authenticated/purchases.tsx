@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +54,8 @@ function Page() {
   const [entrySearch, setEntrySearch] = useState("");
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
+  const [editRow, setEditRow] = useState<any | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const focusCell = (kind: "cost" | "qty", i: number) => {
     setTimeout(() => {
@@ -371,6 +373,86 @@ function Page() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={!!editRow} onOpenChange={(v) => { if (!editSaving && !v) setEditRow(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Edit purchase {editRow?.invoice_no}</DialogTitle></DialogHeader>
+            {editRow && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Invoice #</Label>
+                    <Input value={editRow.invoice_no ?? ""} onChange={(e) => setEditRow({ ...editRow, invoice_no: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Supplier</Label>
+                    <Select value={editRow.supplier_id ?? "none"} onValueChange={(v) => setEditRow({ ...editRow, supplier_id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div><Label>Tax</Label><Input type="number" step="0.01" value={editRow.tax ?? 0} onChange={(e) => setEditRow({ ...editRow, tax: Number(e.target.value) })} /></div>
+                  <div><Label>Paid</Label><Input type="number" step="0.01" value={editRow.paid ?? 0} onChange={(e) => setEditRow({ ...editRow, paid: Number(e.target.value) })} /></div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select value={editRow.status ?? "completed"} onValueChange={(v) => setEditRow({ ...editRow, status: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="completed">completed</SelectItem>
+                        <SelectItem value="pending">pending</SelectItem>
+                        <SelectItem value="cancelled">cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label>Note</Label>
+                  <Input value={editRow.note ?? ""} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Item quantities and costs cannot be changed here — they've already updated stock and average costs. To fix items, delete the purchase and re-record it.
+                </p>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setEditRow(null)} disabled={editSaving}>Cancel</Button>
+              <Button
+                disabled={editSaving}
+                onClick={async () => {
+                  if (!editRow) return;
+                  setEditSaving(true);
+                  const subtotal = Number(editRow.subtotal ?? 0);
+                  const newTax = Number(editRow.tax ?? 0);
+                  const newTotal = subtotal + newTax;
+                  const { error } = await supabase
+                    .from("purchases")
+                    .update({
+                      invoice_no: editRow.invoice_no,
+                      supplier_id: editRow.supplier_id === "none" ? null : editRow.supplier_id,
+                      tax: newTax,
+                      total: newTotal,
+                      paid: Number(editRow.paid ?? 0),
+                      note: editRow.note ?? null,
+                      status: editRow.status ?? "completed",
+                    })
+                    .eq("id", editRow.id);
+                  setEditSaving(false);
+                  if (error) return toast.error(error.message);
+                  toast.success("Purchase updated");
+                  setEditRow(null);
+                  qc.invalidateQueries({ queryKey: ["purchases"] });
+                }}
+              >
+                {editSaving ? "Saving…" : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
 
       <Card className="p-3 space-y-3">
@@ -395,10 +477,10 @@ function Page() {
         <Table>
           <TableHeader><TableRow>
             <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
-            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
+            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead><TableHead className="w-16 text-right">Edit</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{q ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{q ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
             {filtered.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
@@ -407,6 +489,11 @@ function Page() {
                 <TableCell className="text-right font-medium">{fmtMoney(p.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" onClick={() => setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" })}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
             {filtered.length > 0 && (() => {
@@ -419,11 +506,12 @@ function Page() {
                     <TableCell colSpan={3} className="text-right">Column totals</TableCell>
                     <TableCell className="text-right text-primary">{fmtMoney(allTotal, sym)}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(allPaid, sym)}</TableCell>
-                    <TableCell></TableCell>
+                    <TableCell colSpan={2}></TableCell>
                   </TableRow>
                   <TableRow className="bg-primary/5 font-bold">
                     <TableCell colSpan={5} className="text-right text-base">Grand Total (Outstanding due)</TableCell>
                     <TableCell className={`text-right text-base ${due > 0 ? "text-destructive" : "text-success"}`}>{fmtMoney(due, sym)}</TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
                 </>
               );
