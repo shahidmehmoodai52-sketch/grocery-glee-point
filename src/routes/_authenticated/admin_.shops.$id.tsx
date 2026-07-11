@@ -200,6 +200,22 @@ function StatusIndicator({ status }: { status: string }) {
 
 function OverviewTab({ detail }: { detail: TenantDetail }) {
   const s = detail.stats;
+  const t = detail.tenant;
+  const owner = detail.members.find((m) => m.user_id === t.owner_id) ?? null;
+
+  const { data: settings } = useQuery({
+    queryKey: ["admin-shop-settings", t.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select("store_name, phone, address")
+        .eq("tenant_id", t.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -208,11 +224,32 @@ function OverviewTab({ detail }: { detail: TenantDetail }) {
         <StatCard label="Sales" value={s.sales_count} icon={ShoppingCart} />
         <StatCard label="Revenue" value={fmtMoney(s.sales_total, "")} icon={Wallet} />
       </div>
-      <Card className="p-4 text-sm space-y-1">
-        <div><span className="text-muted-foreground">Last sale:</span> {s.last_sale_at ? new Date(s.last_sale_at).toLocaleString() : "—"}</div>
-        <div><span className="text-muted-foreground">Suppliers:</span> {s.suppliers}</div>
-        <div><span className="text-muted-foreground">Plan:</span> {detail.tenant.plan ?? "—"}</div>
+
+      <Card className="p-4 space-y-3">
+        <div className="text-sm font-medium">Shop details</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <Detail label="Shop name" value={settings?.store_name || t.name} />
+          <Detail label="Shop code" value={t.slug ?? "—"} mono />
+          <Detail label="Owner name" value={owner?.full_name ?? "—"} />
+          <Detail label="Owner email" value={owner?.email ?? "—"} />
+          <Detail label="Phone" value={settings?.phone ?? "—"} />
+          <Detail label="City / Address" value={settings?.address ?? "—"} />
+          <Detail label="Status" value={t.status} />
+          <Detail label="Plan" value={t.plan ?? "—"} />
+          <Detail label="Registered" value={new Date(t.created_at).toLocaleString()} />
+          <Detail label="Last sale" value={s.last_sale_at ? new Date(s.last_sale_at).toLocaleString() : "—"} />
+          <Detail label="Suppliers" value={String(s.suppliers)} />
+        </div>
       </Card>
+    </div>
+  );
+}
+
+function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex justify-between gap-3 border-b border-border/50 pb-1.5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={mono ? "font-mono" : "font-medium"}>{value}</span>
     </div>
   );
 }
