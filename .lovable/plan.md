@@ -1,40 +1,48 @@
-
 ## Kya banega
 
-### 1. Public signup + admin approval flow
-- Naya shop signup karte hi tenant `status = 'pending'` me create hoga (abhi `active` me hota hai).
-- Pending shops ke owner/staff `SuspendedGate` se milta-julta ek "Awaiting approval" screen dekhenge (pehle se hai — bas default status change karna hai).
-- Admin panel me "Pending" filter me sab naye shops dikhenge — admin **Approve** kare to `active` ho jaye.
+Aap sirf developer/super-admin banoge. Har shop apna owner + cashiers khud manage karegi — cashier ke liye email nahi chahiye, sirf username + password.
 
-### 2. Har shop ka apna page (folder) admin panel me
-Naya route: `/admin/shops/$id` — Tenants table me shop name ya "View" click karne se yahan aayenge. URL bookmark ho sakta hai, back-forward chalta hai. Andar 5 tabs:
+### 1. Developer (aap) ke liye
+- Aap ka Gmail sirf `super_admin` role rakhega. `/admin` panel me sab shops ka full control (jo pehle se hai).
+- Baaki har jagah (dashboard, POS, products…) aap ko `super_admin` ke naate sab dikhta rahega — abhi bhi wahi behavior hai, koi change nahi.
 
-- **Overview** — shop info, owner, dates, quick stats (products, customers, sales count, revenue, last sale, low stock count)
-- **Sales & Revenue** — last 30 din ka daily sales chart, top 10 products, payment method breakdown
-- **Staff** — sab team members (name, email, role, joined), owner ke password reset ka button
-- **Subscription & Plan** — current plan, expiry, change plan dialog (plan + expiry date choose kare)
-- **Activity** — recent errors + audit log entries (last 50)
+### 2. Har shop ke owner ke liye — naya `/shop-admin` page
+Shop registration ke waqt owner (admin) apni email + password se signup karega, jaise abhi. Uske baad `/shop-admin` par 3 tabs:
 
-Sab **read-only** — sirf 3 actions allowed: approve/suspend/archive (already hai), plan change, password reset. Products/sales/expenses ko admin edit nahi karega.
+- **Staff** — apne cashiers add karo (username + password), permissions checkboxes se, reset password, remove.
+- **Shop settings** — shop ka naam, phone, address (jitna abhi `store_settings` me bunty hai — subset).
+- **Subscription** — current plan aur expiry read-only (details ke liye developer se contact).
 
-### 3. Owner password reset
-Server function `resetTenantOwnerPassword` — super_admin check karke `supabaseAdmin.auth.admin.updateUserById` se password set kare. Admin ek naya password type kare, use owner ko share kar de.
+Sidebar me ye link sirf shop admin ko dikhega (super_admin ko nahi, kyunki uska apna `/admin` hai).
 
-### 4. Plan/subscription change
-Naya RPC `admin_set_tenant_plan(_tenant_id, _plan_id, _expires_at)` — active subscription cancel karke naya banaye (ya update kare). Dialog me plan list + expiry picker.
+### 3. Cashier login — username + password (email nahi)
+- Owner cashier banate waqt sirf **username** (jaise `raza`) aur **password** likhega.
+- Backend me internal email banega: `<username>@shop-<tenantId8>.local` (user ko kabhi dikhega nahi).
+- Login screen (`/auth`) par naya toggle: **"Shop staff login"** vs **"Owner / developer login"**.
+  - Shop staff login: shop code (ya shop dropdown) + username + password. Frontend `<username>@shop-<code>.local` bana kar Supabase ko bhejega.
+  - Owner/developer: email + password (jaisa abhi).
+- Shop code: har tenant ka short slug (jaise `sm-electronics` ya first 8 chars of tenant id). Owner ko `/shop-admin` me apna code dikhega taake wo cashiers ko de sake.
+
+### 4. Existing shops ko chhor rahe hain
+- 4 existing shops jaise hain waise rahenge. Aap ke Gmail se super_admin role add hoga (agar nahi hai to). Baaki data untouched.
 
 ## Technical bits
 
-- **Migration:** `handle_new_user` / tenant-creation code me default status `'pending'`. Existing 4 tenants ko `active` chhorenge.
-- **RPCs added:**
-  - `admin_set_tenant_plan(_tenant_id uuid, _plan_id uuid, _expires_at timestamptz)`
-  - `admin_shop_analytics(_tenant_id uuid, _from date, _to date)` — returns jsonb with daily sales, top products, payment breakdown
-- **Server function:** `src/lib/admin.functions.ts` — `resetTenantOwnerPassword({ tenant_id, new_password })` with `requireSupabaseAuth` + super_admin check.
-- **Frontend files:**
-  - New: `src/routes/_authenticated/admin.shops.$id.tsx`
-  - Edit: `src/routes/_authenticated/admin.tsx` — Tenants row click navigates to detail page, remove modal
-  - Edit: `src/routes/auth.tsx` — signup ke baad "pending approval" message dikhaye
+- **Migration:**
+  - `tenants` me `code text unique` column add karenge (auto-fill: existing shops ke liye `substr(id::text,1,8)` se).
+  - `register_shop` RPC me shop create karte hi ek unique code generate hoga.
+  - Naya RPC `create_shop_staff(_username, _password, _perms, _role)` — sirf tenant admin call kar sake, wo internal email bana kar `auth.admin.createUser` ke bajaye ek server function me chalega.
+- **Server functions (naye — `src/lib/shop-admin.functions.ts`):**
+  - `createShopStaff({ username, password, role, perms })` — caller admin hona chahiye, uske tenant me hi cashier banega.
+  - `listShopStaff()`, `resetShopStaffPassword`, `setShopStaffPerms`, `deleteShopStaff` — sab tenant-scoped.
+  - Existing `src/lib/users.functions.ts` `super_admin` ke liye reserve — regular admin `/users` route se hata denge (ya `/shop-admin` par forward).
+- **Auth page changes (`src/routes/auth.tsx`):**
+  - Segmented control: "Shop Staff" | "Owner / Developer".
+  - Staff mode: shop code + username + password fields. Submit karte hi `email = username@shop-<code>.local` bana ke `signInWithPassword`.
+- **Naya route:** `src/routes/_authenticated/shop-admin.tsx` — Staff / Settings / Subscription tabs.
+- **Sidebar:** shop admin ko `/shop-admin` link dikhe, `/users` hata denge normal admin ke liye. Super_admin ko `/admin` (already hai).
 
 ## Jo change NAHI hoga
-- Products, sales, expenses, customers, suppliers ka data admin edit nahi kar sakega (aap ne "Data edit/delete" select nahi kiya).
-- Existing shops (4) `active` hi rahenge — sirf naye signup pending honge.
+- Existing 4 shops ka data, memberships, ya products — kuch nahi chhedenge.
+- Products/sales/expenses ki UI same rahegi.
+- Cashier ke email jo already banae ja chuke hain wo bhi kaam karte rahenge (purani migration ke).
