@@ -207,7 +207,7 @@ function Page() {
                           e.preventDefault();
                           setEntryIndex((n) => Math.max(n - 1, 0));
                         }
-                        if (e.key === "Enter") { e.preventDefault(); addFromSearch(); }
+                        if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
                       }}
                       placeholder="Scan barcode or type name, press Enter…"
                       className="pl-8 h-10"
@@ -294,7 +294,7 @@ function Page() {
                             value={l.cost}
                             onChange={(e) => setLine(i, { cost: Number(e.target.value) })}
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") { e.preventDefault(); focusCell("qty", i); }
+                              if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); }
                             }}
                             className="h-10 text-right text-base"
                           />
@@ -307,7 +307,7 @@ function Page() {
                             value={l.qty}
                             onChange={(e) => setLine(i, { qty: Number(e.target.value) })}
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") { e.preventDefault(); focusSearch(); }
+                              if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusSearch(); }
                             }}
                             className="h-10 text-right text-base"
                           />
