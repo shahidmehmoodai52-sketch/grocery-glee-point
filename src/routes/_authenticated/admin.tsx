@@ -884,31 +884,42 @@ function SecurityTab() {
               <TableHead>IP</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Path</TableHead>
+              <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {eventsLoading && (
-              <TableRow><TableCell colSpan={6} className="py-4"><TableSkeleton rows={5} columns={6} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="py-4"><TableSkeleton rows={5} columns={7} /></TableCell></TableRow>
             )}
             {!eventsLoading && events.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="py-8">
+              <TableRow><TableCell colSpan={7} className="py-8">
                 <EmptyState icon={ShieldCheck} title="No events" description="No security events recorded yet." />
               </TableCell></TableRow>
             )}
-            {events.map((e) => (
-              <TableRow key={e.id}>
-                <TableCell className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()}</TableCell>
-                <TableCell>
-                  {e.severity === "critical" && <StatusBadge tone="danger">Critical</StatusBadge>}
-                  {e.severity === "warning" && <StatusBadge tone="warning">Warning</StatusBadge>}
-                  {e.severity === "info" && <StatusBadge tone="neutral">Info</StatusBadge>}
-                </TableCell>
-                <TableCell className="text-sm font-medium">{e.event_type}</TableCell>
-                <TableCell className="font-mono text-xs">{e.ip_address ?? "—"}</TableCell>
-                <TableCell className="text-xs">{e.email ?? "—"}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{e.path ?? "—"}</TableCell>
-              </TableRow>
-            ))}
+            {events.map((e) => {
+              const canBlock = !!(e.ip_address || e.email);
+              return (
+                <TableRow key={e.id}>
+                  <TableCell className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()}</TableCell>
+                  <TableCell>
+                    {e.severity === "critical" && <StatusBadge tone="danger">Critical</StatusBadge>}
+                    {e.severity === "warning" && <StatusBadge tone="warning">Warning</StatusBadge>}
+                    {e.severity === "info" && <StatusBadge tone="neutral">Info</StatusBadge>}
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">{e.event_type}</TableCell>
+                  <TableCell className="font-mono text-xs">{e.ip_address ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{e.email ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{e.path ?? "—"}</TableCell>
+                  <TableCell className="text-right">
+                    {canBlock && (
+                      <Button size="sm" variant="outline" onClick={() => blockFromEvent(e)} title="Block this IP/email for 24h">
+                        <Lock className="h-4 w-4 mr-1" /> Block
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </Card>
