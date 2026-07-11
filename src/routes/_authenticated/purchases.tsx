@@ -146,6 +146,7 @@ function Page() {
   const submit = async () => {
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
+    setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier === "none" ? null : supplier,
@@ -153,8 +154,10 @@ function Page() {
         items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
       },
     });
+    setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Purchase recorded, stock updated");
+    setConfirmOpen(false);
     clearDraft();
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
