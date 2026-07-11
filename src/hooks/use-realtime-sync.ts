@@ -22,6 +22,7 @@ const MAP: Record<string, string[][]> = {
   product_batches: [["batches-status"]],
   inventory_damages: [["damage-log"], ["expiry-reports"]],
   inventory_waste: [["waste-log"], ["expiry-reports"]],
+  tenants: [["library-access-prefs"], ["tenant-price-visibility"], ["my-access"]],
 };
 
 

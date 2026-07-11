@@ -354,15 +354,6 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
     },
   });
 
-  const setFlag = async (col: "library_show_sell_price" | "library_show_cost_price", val: boolean) => {
-    const patch = (col === "library_show_sell_price"
-      ? { library_show_sell_price: val }
-      : { library_show_cost_price: val });
-    const { error } = await supabase.from("tenants").update(patch).eq("id", tenantId);
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["tenant-library-flags", tenantId] });
-  };
-
   const summary = restricted
     ? `${allowed.length} categor${allowed.length === 1 ? "y" : "ies"} selected`
     : "All categories";
@@ -390,11 +381,13 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
           onValueChange={async (v) => {
             const showSell = v === "sell" || v === "both";
             const showCost = v === "cost" || v === "both";
-            const { error } = await supabase.from("tenants").update({
+            const { data, error } = await supabase.from("tenants").update({
               library_show_sell_price: showSell,
               library_show_cost_price: showCost,
-            }).eq("id", tenantId);
+            }).eq("id", tenantId).select("library_show_sell_price, library_show_cost_price").maybeSingle();
             if (error) return toast.error(error.message);
+            if (!data) return toast.error("Price visibility was not saved");
+            toast.success("Price visibility updated");
             qc.invalidateQueries({ queryKey: ["tenant-library-flags", tenantId] });
           }}
         >

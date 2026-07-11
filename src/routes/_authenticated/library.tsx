@@ -17,6 +17,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/use-permissions";
+import { usePriceVisibility } from "@/hooks/use-price-visibility";
 import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/library")({
@@ -43,36 +44,13 @@ type GlobalProduct = {
   created_at: string;
 };
 
-
-function useLibraryPrefs() {
-  const { isSuperAdmin } = usePermissions();
-  return useQuery({
-    queryKey: ["library-access-prefs"],
-    queryFn: async () => {
-      if (isSuperAdmin) return { hasAccess: true, showSell: true, showCost: true };
-      const { data: tid } = await supabase.rpc("current_tenant_id");
-      if (!tid) return { hasAccess: false, showSell: true, showCost: true };
-      const { data: t } = await supabase
-        .from("tenants")
-        .select("library_approved, library_show_sell_price, library_show_cost_price")
-        .eq("id", tid as string)
-        .maybeSingle();
-      return {
-        hasAccess: !!t?.library_approved,
-        showSell: t?.library_show_sell_price ?? true,
-        showCost: t?.library_show_cost_price ?? true,
-      };
-    },
-  });
-}
-
 function LibraryPage() {
   const qc = useQueryClient();
   const { isSuperAdmin } = usePermissions();
   const [tab, setTab] = useState<"browse" | "queue" | "mine">("browse");
   const [search, setSearch] = useState("");
 
-  const { data: prefs } = useLibraryPrefs();
+  const { data: prefs } = usePriceVisibility();
   const hasAccess = !!prefs?.hasAccess;
   const showSell = prefs?.showSell ?? true;
   const showCost = prefs?.showCost ?? true;
