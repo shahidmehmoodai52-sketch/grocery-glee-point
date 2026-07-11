@@ -34,6 +34,16 @@ const FIELDS = [
   "ops_receipt_reprint_enabled",
 ] as const;
 
+const CURRENCY_CODES = [
+  { code: "PKR", symbol: "Rs", label: "PKR — Pakistani Rupee" },
+  { code: "USD", symbol: "$", label: "USD — US Dollar" },
+  { code: "EUR", symbol: "€", label: "EUR — Euro" },
+  { code: "GBP", symbol: "£", label: "GBP — British Pound" },
+  { code: "AED", symbol: "AED", label: "AED — UAE Dirham" },
+] as const;
+
+const CURRENCY_SYMBOLS = ["Rs", "$", "€", "£", "AED", "₹"] as const;
+
 
 
 function Page() {
@@ -69,8 +79,15 @@ function Page() {
     const payload: any = {};
     for (const k of FIELDS) payload[k] = form[k];
     // RLS ensures we can only update our own tenant's row; scope by id for safety.
-    const { error } = await supabase.from("store_settings").update(payload).eq("id", data.id);
+    const { data: saved, error } = await supabase
+      .from("store_settings")
+      .update(payload)
+      .eq("id", data.id)
+      .select("*")
+      .maybeSingle();
     if (error) return toast.error("Couldn't save settings. Please try again.", { description: error.message });
+    if (!saved) return toast.error("Settings were not saved. Please refresh and try again.");
+    setForm((f: any) => ({ ...f, ...saved }));
     toast.success("Settings saved");
     qc.invalidateQueries({ queryKey: ["store_settings"] });
   };
@@ -88,8 +105,34 @@ function Page() {
             <div className="font-medium">Store</div>
             <div><Label>Store name</Label><Input value={form.store_name ?? ""} onChange={(e) => set({ store_name: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Currency code</Label><Input value={form.currency ?? ""} onChange={(e) => set({ currency: e.target.value })} placeholder="USD / PKR / EUR…" /></div>
-              <div><Label>Currency symbol</Label><Input value={form.currency_symbol ?? ""} onChange={(e) => set({ currency_symbol: e.target.value })} /></div>
+              <div>
+                <Label>Currency unit</Label>
+                <Select
+                  value={form.currency ?? "PKR"}
+                  onValueChange={(value) => {
+                    const picked = CURRENCY_CODES.find((c) => c.code === value);
+                    set({ currency: value, currency_symbol: picked?.symbol ?? form.currency_symbol ?? "Rs" });
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CURRENCY_CODES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Currency symbol</Label>
+                <Select value={form.currency_symbol ?? "Rs"} onValueChange={(value) => set({ currency_symbol: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CURRENCY_SYMBOLS.map((symbol) => (
+                      <SelectItem key={symbol} value={symbol}>{symbol}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Default tax rate (%)</Label><Input type="number" step="0.01" value={form.tax_rate ?? 0} onChange={(e) => set({ tax_rate: Number(e.target.value) })} /></div>
