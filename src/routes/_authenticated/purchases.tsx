@@ -337,10 +337,15 @@ function Page() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
-              <Button variant="outline" onClick={clearDraft}>Discard</Button>
-              <Button onClick={submit}>Record purchase</Button>
+            <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 mt-2 border-t bg-background px-6 py-3 sm:flex-row sm:justify-between gap-2">
+              <div className="text-sm text-muted-foreground">
+                {lines.length} item{lines.length === 1 ? "" : "s"} • Total <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+                <Button variant="outline" onClick={clearDraft}>Discard</Button>
+                <Button onClick={submit} disabled={lines.length === 0} size="lg">Record purchase</Button>
+              </div>
             </DialogFooter>
 
           </DialogContent>
