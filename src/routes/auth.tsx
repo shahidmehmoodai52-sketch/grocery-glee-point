@@ -71,7 +71,7 @@ function AuthPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       // Only auto-forward if we're not in the middle of a signup flow
-      if (data.session && regStep !== "details") void goToApp();
+      if (data.session) void goToApp();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goToApp]);
