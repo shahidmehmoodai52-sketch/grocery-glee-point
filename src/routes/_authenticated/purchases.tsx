@@ -349,12 +349,28 @@ function Page() {
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
                 <Button variant="outline" onClick={clearDraft}>Discard</Button>
-                <Button onClick={submit} disabled={lines.length === 0} size="lg">Record purchase</Button>
+                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0} size="lg">Record purchase</Button>
               </div>
             </DialogFooter>
 
           </DialogContent>
         </Dialog>
+
+        <Dialog open={confirmOpen} onOpenChange={(v) => { if (!saving) setConfirmOpen(v); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Confirm purchase</DialogTitle></DialogHeader>
+            <div className="space-y-2 text-sm">
+              <p>Save this purchase with <b>{lines.length}</b> item{lines.length === 1 ? "" : "s"}?</p>
+              <p className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span></p>
+              <p className="text-xs text-muted-foreground">Stock and costs will be updated. This cannot be undone.</p>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
+              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : "Yes, save purchase"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
 
       <Card className="p-3 space-y-3">
