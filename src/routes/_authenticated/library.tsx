@@ -648,12 +648,13 @@ function BulkUploadDialog({ onDone }: { onDone: () => void }) {
           <DialogTitle>Bulk upload to global library</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Upload a CSV or Excel file. Only these columns are read — everything else is ignored:
+          Upload a CSV or Excel file. Recognized columns (any of these names, case-insensitive):
           <br />
-          <strong>name</strong> (required), <strong>barcode</strong> (required), <strong>category</strong>, <strong>unit</strong>.
+          <strong>Item Name</strong>, <strong>Barcode</strong>, <strong>Item Code / SKU</strong>, <strong>Category</strong>, <strong>Unit</strong>, <strong>Sale Rate</strong>, <strong>Purchase Rate</strong>.
           <br />
-          Rows without a name or barcode are skipped. Items are submitted as <em>pending</em> and need admin approval.
+          Aik item ke multiple barcodes chahte ho to same name ki multiple rows daal do — har row ka barcode alag. Rows without a name or barcode are skipped. Items <em>pending</em> me jate hain admin approval ke liye.
         </p>
+
         <div
           className={`rounded-md border border-dashed p-4 transition-colors ${dragActive ? "border-primary bg-muted" : "border-input"}`}
           onDragEnter={(e) => {
