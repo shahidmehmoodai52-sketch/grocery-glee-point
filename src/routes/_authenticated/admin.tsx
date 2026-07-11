@@ -723,6 +723,9 @@ function SecurityTab() {
     if (error) return toast.error(error.message);
     toast.success("Unblocked");
     qc.invalidateQueries({ queryKey: ["admin-security-blocks"] });
+    qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
+  };
+
   const clearEvents = async (severity?: "info" | "warning" | "critical", olderDays?: number) => {
     const label = severity ? `${severity} events` : olderDays ? `events older than ${olderDays} days` : "ALL events";
     if (!confirm(`Clear ${label} from the log? Blocklist entries are NOT affected.`)) return;
