@@ -143,65 +143,13 @@ function AuthPage() {
     }
   };
 
-  // ---------- Register: step 1 send OTP ----------
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true); setFormError(null);
-    const cleanEmail = regEmail.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      showErr("Please enter a valid email address."); setBusy(false); return;
-    }
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: cleanEmail,
-        options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/auth` },
-      });
-      if (error) { showErr(error.message); return; }
-      toast.success("Verification code sent. Check your inbox (and spam).");
-      setRegStep("otp");
-    } catch (err: any) {
-      showErr(err?.message ?? "Could not send code");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // ---------- Register: step 2 verify OTP ----------
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true); setFormError(null);
-    const cleanEmail = regEmail.trim().toLowerCase();
-    const code = otp.trim();
-    if (code.length < 6) { showErr("Enter the 6-digit code from your email."); setBusy(false); return; }
-    try {
-      const { error } = await supabase.auth.verifyOtp({ email: cleanEmail, token: code, type: "email" });
-      if (error) { showErr("Invalid or expired code. Try again."); return; }
-      toast.success("Email verified. Now set your password and shop details.");
-      setRegStep("details");
-    } catch (err: any) {
-      showErr(err?.message ?? "Verification failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    const cleanEmail = regEmail.trim().toLowerCase();
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email: cleanEmail,
-      options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/auth` },
-    });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success("New code sent.");
-  };
-
-  // ---------- Register: step 3 finish (password + shop) ----------
+  // ---------- Register (simple: email + password + shop details) ----------
   const handleFinishRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setFormError(null);
     try {
+      const cleanEmail = regEmail.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { showErr("Please enter a valid email address."); return; }
       const pwErr = checkStrongPassword(regPwd);
       if (pwErr) { showErr(pwErr); return; }
       if (shopName.trim().length < 2) { showErr("Shop name is required."); return; }
@@ -209,12 +157,22 @@ function AuthPage() {
         showErr("Please enter shop phone, address and city."); return;
       }
 
-      // Set the password on the freshly-verified account
-      const { error: pwdErr } = await supabase.auth.updateUser({
+      // Sign up (email verification disabled → session issued immediately)
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: cleanEmail,
         password: regPwd,
-        data: { full_name: fullName.trim() || undefined },
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
+          data: { full_name: fullName.trim() || undefined },
+        },
       });
-      if (pwdErr) { showErr(`Could not save password: ${pwdErr.message}`); return; }
+      if (signUpErr) { showErr(signUpErr.message); return; }
+
+      // If no session (rare — e.g. email confirm re-enabled), try password sign-in
+      if (!signUpData.session) {
+        const { error: siErr } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: regPwd });
+        if (siErr) { showErr(siErr.message); return; }
+      }
 
       // Register the shop for this user
       const { error: rpcErr } = await supabase.rpc("register_shop" as any, {
@@ -235,8 +193,7 @@ function AuthPage() {
   };
 
   const resetRegister = () => {
-    setRegStep("email"); setOtp(""); setRegPwd("");
-    setShopName(""); setShopPhone(""); setShopAddress(""); setShopCity(""); setFullName("");
+    setRegPwd(""); setShopName(""); setShopPhone(""); setShopAddress(""); setShopCity(""); setFullName(""); setRegEmail("");
   };
 
   return (
