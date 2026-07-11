@@ -3411,6 +3411,7 @@ export type Database = {
         Args: { _session_id: string }
         Returns: string
       }
+      bulk_import_from_global_library: { Args: never; Returns: number }
       business_date_of: { Args: { _ts: string }; Returns: string }
       can_add_product: { Args: { _tenant_id: string }; Returns: boolean }
       can_add_user: { Args: { _tenant_id: string }; Returns: boolean }
