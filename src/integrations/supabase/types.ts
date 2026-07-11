@@ -3031,6 +3031,8 @@ export type Database = {
           created_at: string
           id: string
           library_approved: boolean
+          library_show_cost_price: boolean
+          library_show_sell_price: boolean
           metadata: Json
           name: string
           owner_id: string | null
@@ -3043,6 +3045,8 @@ export type Database = {
           created_at?: string
           id?: string
           library_approved?: boolean
+          library_show_cost_price?: boolean
+          library_show_sell_price?: boolean
           metadata?: Json
           name: string
           owner_id?: string | null
@@ -3055,6 +3059,8 @@ export type Database = {
           created_at?: string
           id?: string
           library_approved?: boolean
+          library_show_cost_price?: boolean
+          library_show_sell_price?: boolean
           metadata?: Json
           name?: string
           owner_id?: string | null
