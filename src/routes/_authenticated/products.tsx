@@ -214,7 +214,7 @@ function ProductsPage() {
                 <EmptyState icon={Package} title="No products yet" description="Add a new product to start selling." />
               </TableCell></TableRow>
             )}
-            {filtered.map((p) => (
+            {pageRows.map((p) => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.name}</TableCell>
                 <TableCell className="text-muted-foreground">{p.sku ?? "—"}</TableCell>
@@ -243,6 +243,18 @@ function ProductsPage() {
             ))}
           </TableBody>
         </Table>
+        {!isLoading && filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between mt-3 text-sm">
+            <div className="text-muted-foreground">
+              Showing {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage(pageSafe - 1)}>Prev</Button>
+              <span className="px-2 py-1">Page {pageSafe} / {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={pageSafe >= totalPages} onClick={() => setPage(pageSafe + 1)}>Next</Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
