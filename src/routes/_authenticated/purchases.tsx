@@ -373,6 +373,86 @@ function Page() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={!!editRow} onOpenChange={(v) => { if (!editSaving && !v) setEditRow(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Edit purchase {editRow?.invoice_no}</DialogTitle></DialogHeader>
+            {editRow && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Invoice #</Label>
+                    <Input value={editRow.invoice_no ?? ""} onChange={(e) => setEditRow({ ...editRow, invoice_no: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Supplier</Label>
+                    <Select value={editRow.supplier_id ?? "none"} onValueChange={(v) => setEditRow({ ...editRow, supplier_id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div><Label>Tax</Label><Input type="number" step="0.01" value={editRow.tax ?? 0} onChange={(e) => setEditRow({ ...editRow, tax: Number(e.target.value) })} /></div>
+                  <div><Label>Paid</Label><Input type="number" step="0.01" value={editRow.paid ?? 0} onChange={(e) => setEditRow({ ...editRow, paid: Number(e.target.value) })} /></div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select value={editRow.status ?? "completed"} onValueChange={(v) => setEditRow({ ...editRow, status: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="completed">completed</SelectItem>
+                        <SelectItem value="pending">pending</SelectItem>
+                        <SelectItem value="cancelled">cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label>Note</Label>
+                  <Input value={editRow.note ?? ""} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Item quantities and costs cannot be changed here — they've already updated stock and average costs. To fix items, delete the purchase and re-record it.
+                </p>
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setEditRow(null)} disabled={editSaving}>Cancel</Button>
+              <Button
+                disabled={editSaving}
+                onClick={async () => {
+                  if (!editRow) return;
+                  setEditSaving(true);
+                  const subtotal = Number(editRow.subtotal ?? 0);
+                  const newTax = Number(editRow.tax ?? 0);
+                  const newTotal = subtotal + newTax;
+                  const { error } = await supabase
+                    .from("purchases")
+                    .update({
+                      invoice_no: editRow.invoice_no,
+                      supplier_id: editRow.supplier_id === "none" ? null : editRow.supplier_id,
+                      tax: newTax,
+                      total: newTotal,
+                      paid: Number(editRow.paid ?? 0),
+                      note: editRow.note ?? null,
+                      status: editRow.status ?? "completed",
+                    })
+                    .eq("id", editRow.id);
+                  setEditSaving(false);
+                  if (error) return toast.error(error.message);
+                  toast.success("Purchase updated");
+                  setEditRow(null);
+                  qc.invalidateQueries({ queryKey: ["purchases"] });
+                }}
+              >
+                {editSaving ? "Saving…" : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
 
       <Card className="p-3 space-y-3">
