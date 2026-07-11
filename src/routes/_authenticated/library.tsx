@@ -331,6 +331,46 @@ function MineTable({ search, setSearch }: { search: string; setSearch: (v: strin
   );
 }
 
+function ImportAllButton({ onDone }: { onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    const { data, error } = await supabase.rpc("bulk_import_from_global_library");
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    const n = (data as number) ?? 0;
+    toast.success(
+      n > 0
+        ? `Imported ${n} new item${n === 1 ? "" : "s"}. Open Products to set your sale and purchase prices.`
+        : "Nothing new to import — your catalog already has every library item.",
+    );
+    setOpen(false);
+    onDone();
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <Download className="h-4 w-4 mr-2" /> Import all
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Import every library item to your shop?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          This pulls every approved library item into your product list in one go. Sale price, cost price and stock start at 0 — open the Products page to fill them in before billing. Items you already have (matched by barcode) are skipped.
+        </p>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+          <Button disabled={busy} onClick={run}>{busy ? "Importing…" : "Import all"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ImportButton({ item, onDone }: { item: GlobalProduct; onDone?: () => void }) {
   const [open, setOpen] = useState(false);
   const [sell, setSell] = useState(0);
