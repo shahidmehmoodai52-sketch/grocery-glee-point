@@ -155,6 +155,9 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
                 <Archive className="h-4 w-4 mr-1" /> Archive
               </Button>
             )}
+            <Button size="sm" variant="destructive" onClick={removeShop}>
+              <Trash2 className="h-4 w-4 mr-1" /> Delete shop
+            </Button>
           </div>
         }
       />
