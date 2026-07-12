@@ -40,7 +40,13 @@ export function usePermissions() {
       ]);
       if (rolesRes.error) throw rolesRes.error;
       if (permsRes.error) throw permsRes.error;
-      const isAdmin = (rolesRes.data ?? []).some((r) => r.role === "admin");
+      const { data: tenantMemberships, error: tenantMembershipsError } = await supabase
+        .from("tenant_members")
+        .select("role")
+        .eq("user_id", user!.id);
+      if (tenantMembershipsError) throw tenantMembershipsError;
+      const isTenantAdmin = (tenantMemberships ?? []).some((m) => m.role === "owner" || m.role === "admin");
+      const isAdmin = isTenantAdmin || (rolesRes.data ?? []).some((r) => r.role === "admin");
       const isSuperAdmin = (rolesRes.data ?? []).some((r) => r.role === "super_admin");
       const granted = new Set((permsRes.data ?? []).map((p) => p.perm));
       const tenantStatus = (statusRes.data as string | null) ?? null;
