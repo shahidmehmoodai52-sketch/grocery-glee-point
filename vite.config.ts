@@ -6,6 +6,7 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 // Electron desktop build uses the Nitro `node-server` preset so we can spawn a
 // local Node server from main.cjs. Enable via NITRO_PRESET=node-server (see the
@@ -19,7 +20,50 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    plugins: [mcpPlugin()],
+    plugins: [
+      mcpPlugin(),
+      VitePWA({
+        registerType: "autoUpdate",
+        injectRegister: null, // registration happens from our guarded wrapper
+        filename: "sw.js",
+        devOptions: { enabled: false },
+        workbox: {
+          navigateFallback: "/",
+          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/\.mcp/, /^\/\.well-known/],
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
+          runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.mode === "navigate",
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "html-nav",
+                networkTimeoutSeconds: 3,
+                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              },
+            },
+            {
+              urlPattern: ({ url, sameOrigin }) =>
+                sameOrigin && /\.(?:js|css|woff2?|png|svg|ico|webmanifest)$/.test(url.pathname),
+              handler: "CacheFirst",
+              options: {
+                cacheName: "static-assets",
+                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
+            },
+          ],
+        },
+        manifest: {
+          name: "POS",
+          short_name: "POS",
+          start_url: "/",
+          scope: "/",
+          display: "standalone",
+          background_color: "#ffffff",
+          theme_color: "#ffffff",
+          icons: [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml" }],
+        },
+      }),
+    ],
   },
   ...(nitroPreset
     ? {

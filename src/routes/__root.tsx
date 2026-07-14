@@ -139,7 +139,9 @@ function RootComponent() {
       try {
         const { bootOfflineStatus, getOfflineStatus } = await import("@/lib/offline/status");
         const { runSync } = await import("@/lib/offline/sync");
+        const { registerAppShellSW } = await import("@/lib/offline/register-sw");
         bootOfflineStatus();
+        void registerAppShellSW();
         const s = getOfflineStatus();
         if (s.enabled && s.online) void runSync({ silent: true });
         const onOnline = () => { if (getOfflineStatus().enabled) void runSync({ silent: true }); };
@@ -151,6 +153,7 @@ function RootComponent() {
       } catch {/* SSR / unsupported */}
     })();
   }, []);
+
 
   return (
     <QueryClientProvider client={queryClient}>
