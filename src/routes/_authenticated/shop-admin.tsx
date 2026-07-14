@@ -23,10 +23,31 @@ export const Route = createFileRoute("/_authenticated/shop-admin")({ component: 
 
 function Page() {
   const info = useServerFn(getMyShopInfo);
-  const { data: shop } = useQuery({ queryKey: ["my-shop-info"], queryFn: () => (info as any)() });
+  const { data: shop, isLoading, error, refetch } = useQuery({
+    queryKey: ["my-shop-info"],
+    queryFn: () => (info as any)(),
+    retry: 1,
+  });
 
-  if (!shop) {
+  if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading shop…</div>;
+  }
+  if (error) {
+    return (
+      <div className="p-6 max-w-lg space-y-3">
+        <h2 className="text-lg font-semibold">Couldn't load shop</h2>
+        <p className="text-sm text-muted-foreground break-words">{(error as any)?.message ?? String(error)}</p>
+        <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
+  if (!shop) {
+    return (
+      <div className="p-6 max-w-lg space-y-3">
+        <h2 className="text-lg font-semibold">No shop found</h2>
+        <p className="text-sm text-muted-foreground">Your account isn't linked to a shop yet.</p>
+      </div>
+    );
   }
   if (!shop.is_owner) {
     return (
