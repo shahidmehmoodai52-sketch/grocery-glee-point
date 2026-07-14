@@ -67,9 +67,9 @@ function Page() {
         </div>
         <div>
           <h1 className="text-2xl font-semibold">{shop.name}</h1>
-          <p className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground">
             Status: <Badge variant={shop.status === "active" ? "default" : "secondary"}>{shop.status}</Badge> · Plan: <span className="font-medium">{shop.plan}</span>
-          </p>
+          </div>
         </div>
       </div>
 
