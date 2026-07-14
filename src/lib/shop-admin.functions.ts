@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireCloudAuth } from "@/lib/cloud-auth-middleware";
 
 // Verify caller owns the tenant they operate on and return that tenant.
 async function callerTenant(context: any): Promise<{ tenant_id: string; slug: string }> {
@@ -29,7 +29,7 @@ function usernameFromEmail(email: string | null | undefined, slug: string) {
 }
 
 export const getMyShopInfo = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCloudAuth])
   .handler(async ({ context }) => {
     const { data: tid } = await context.supabase.rpc("current_tenant_id");
     if (!tid) return null;
@@ -50,7 +50,7 @@ export const getMyShopInfo = createServerFn({ method: "GET" })
   });
 
 export const listShopStaff = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCloudAuth])
   .handler(async ({ context }) => {
     const { tenant_id, slug } = await callerTenant(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -91,7 +91,7 @@ export const listShopStaff = createServerFn({ method: "GET" })
   });
 
 export const createShopStaff = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCloudAuth])
   .inputValidator((data: { username: string; password: string; role: "admin" | "cashier"; perms: string[] }) => data)
   .handler(async ({ data, context }) => {
     const { tenant_id, slug } = await callerTenant(context);
@@ -139,7 +139,7 @@ export const createShopStaff = createServerFn({ method: "POST" })
   });
 
 export const resetShopStaffPassword = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCloudAuth])
   .inputValidator((data: { user_id: string; password: string }) => data)
   .handler(async ({ data, context }) => {
     const { tenant_id } = await callerTenant(context);
@@ -156,7 +156,7 @@ export const resetShopStaffPassword = createServerFn({ method: "POST" })
   });
 
 export const setShopStaffPerms = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCloudAuth])
   .inputValidator((data: { user_id: string; role: "admin" | "cashier"; perms: string[] }) => data)
   .handler(async ({ data, context }) => {
     const { tenant_id } = await callerTenant(context);
@@ -182,7 +182,7 @@ export const setShopStaffPerms = createServerFn({ method: "POST" })
   });
 
 export const deleteShopStaff = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireCloudAuth])
   .inputValidator((data: { user_id: string }) => data)
   .handler(async ({ data, context }) => {
     const { tenant_id } = await callerTenant(context);
