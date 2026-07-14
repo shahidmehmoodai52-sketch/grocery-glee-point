@@ -72,6 +72,11 @@ const UNDO_REASONS = [
 
 const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category";
 
+const cleanItemCode = (value: unknown) => {
+  const code = String(value ?? "").trim();
+  return code && code !== "null" && code !== "undefined" ? code : "";
+};
+
 const newTab = (n: number): Tab => ({
   id: crypto.randomUUID(),
   name: `Invoice ${n}`,
@@ -310,6 +315,61 @@ function POSPage() {
     return m;
   }, [searchableProducts, extraBarcodes]);
 
+  const itemCodeLookupBarcodes = useMemo(() => {
+    const set = new Set<string>();
+    searchableProducts.forEach((p) => {
+      if (p.barcode) set.add(String(p.barcode));
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => set.add(String(bc)));
+    });
+    return Array.from(set).slice(0, 1000);
+  }, [searchableProducts, barcodesByProduct]);
+
+  const { data: libraryItemCodes = {} } = useQuery({
+    queryKey: ["global_products", "item-codes", itemCodeLookupBarcodes.join("|")],
+    enabled: itemCodeLookupBarcodes.length > 0,
+    queryFn: async () => {
+      const map: Record<string, string> = {};
+      for (let i = 0; i < itemCodeLookupBarcodes.length; i += 500) {
+        const slice = itemCodeLookupBarcodes.slice(i, i + 500);
+        const { data, error } = await supabase
+          .from("global_products")
+          .select("barcode,item_code")
+          .in("barcode", slice)
+          .not("item_code", "is", null);
+        if (error) throw error;
+        (data ?? []).forEach((row: any) => {
+          const barcode = String(row.barcode ?? "").trim();
+          const itemCode = cleanItemCode(row.item_code);
+          if (barcode && itemCode && itemCode !== barcode) map[barcode] = itemCode;
+        });
+      }
+      return map;
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const itemCodeByBarcode = useMemo(() => {
+    const m: Record<string, string> = { ...libraryItemCodes };
+    searchableProducts.forEach((p) => {
+      const sku = cleanItemCode(p.sku);
+      if (!sku) return;
+      if (p.barcode) m[String(p.barcode)] = sku;
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => { m[String(bc)] = sku; });
+    });
+    return m;
+  }, [searchableProducts, barcodesByProduct, libraryItemCodes]);
+
+  const itemCodeForProduct = (p: any) => {
+    const sku = cleanItemCode(p?.sku);
+    if (sku) return sku;
+    const candidates = Array.from(new Set([p?.barcode, ...(barcodesByProduct[p?.id] ?? [])].filter(Boolean).map(String)));
+    for (const bc of candidates) {
+      const itemCode = cleanItemCode(itemCodeByBarcode[bc]);
+      if (itemCode && itemCode !== bc) return itemCode;
+    }
+    return "";
+  };
+
   // Exact-barcode lookup for scan
   const productByBarcode = useMemo(() => {
     const m: Record<string, any> = {};
@@ -386,12 +446,13 @@ function POSPage() {
     const exIdx = items.findIndex((i) => i.product_id === p.id);
     let idx: number;
     if (exIdx >= 0) {
-      items[exIdx] = { ...items[exIdx], qty: Number(items[exIdx].qty) + 1 };
+      const nextCode = itemCodeForProduct(p);
+      items[exIdx] = { ...items[exIdx], code: items[exIdx].code || nextCode, qty: Number(items[exIdx].qty) + 1 };
       idx = exIdx;
     } else {
       items.push({
         product_id: p.id,
-        code: p.sku ?? "",
+        code: itemCodeForProduct(p),
         name: p.name,
         qty: 1,
         price: Number(p.sell_price),
@@ -1049,9 +1110,9 @@ function POSPage() {
                 const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
                 const p = it.product_id ? searchableProducts.find((x) => x.id === it.product_id) : null;
                 const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
+                const displayCode = it.code || (p ? itemCodeForProduct(p) : "");
                 const subline = p
                   ? [
-                      p.sku ? `SKU ${p.sku}` : null,
                       bcs[0] ? `BC ${bcs[0]}` : null,
                       p.category || null,
                     ].filter(Boolean).join(" · ")
@@ -1059,7 +1120,7 @@ function POSPage() {
                 const stockNum = p ? Number(p.stock ?? 0) : null;
                 return (
                   <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
-                    <td className="px-2 py-1 font-mono text-xs">{it.code || String(idx + 1).padStart(3, "0")}</td>
+                    <td className="px-2 py-1 font-mono text-xs">{displayCode || "—"}</td>
                     <td className="px-2 py-1">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="font-medium text-sm truncate min-w-0 flex-1">{it.name}</div>
@@ -1149,10 +1210,9 @@ function POSPage() {
                     {filtered.map((p, i) => {
                       const rate = Number(p.sell_price ?? 0);
                       const pRate = Number(p.cost_price ?? 0);
-                      const code = p.sku || p.barcode || "—";
+                      const code = itemCodeForProduct(p) || "—";
                       const bcs = barcodesByProduct[p.id] ?? [];
                       const subline = [
-                        p.sku ? `SKU ${p.sku}` : null,
                         bcs[0] ? `BC ${bcs[0]}` : null,
                         p.category || null,
                       ].filter(Boolean).join(" · ");
