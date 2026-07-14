@@ -82,7 +82,7 @@ function Page() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("current_shift");
       if (error) throw error;
-      return (Array.isArray(data) ? data[0] : data) as ShiftRow | null;
+      return (Array.isArray(data) ? (data[0] ?? null) : (data ?? null)) as ShiftRow | null;
     },
   });
   const current = currentQ.data;

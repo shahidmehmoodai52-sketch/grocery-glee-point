@@ -26,12 +26,18 @@ async function setWatermark(table: string, ts: string) {
   await db()._sync_state.put({ table, last_pulled_at: ts, last_error: null });
 }
 
+// Only these tables actually have an `updated_at` column in the cloud schema.
+// The rest must fall back to `created_at` for the incremental watermark, otherwise
+// PostgREST returns 42703 "column ... does not exist" and the sync fails loudly.
+const HAS_UPDATED_AT = new Set<string>(["products", "expenses", "store_settings"]);
+
 async function pullTable(table: MirroredTable): Promise<number> {
   const since = await getWatermark(table);
-  // store_settings has no updated_at reliably in every project; pull all.
-  const useWatermark = table !== "store_settings" && since;
+  const watermarkCol = HAS_UPDATED_AT.has(table) ? "updated_at" : "created_at";
+  // store_settings is small and always pulled in full — no watermark filter.
+  const useWatermark = table !== "store_settings" && !!since;
   let q = supabase.from(table as any).select("*").limit(1000);
-  if (useWatermark) q = q.gt("updated_at", since);
+  if (useWatermark) q = q.gt(watermarkCol, since);
   const { data, error } = await q;
   if (error) throw new Error(`${table}: ${error.message}`);
   if (!data || data.length === 0) return 0;
