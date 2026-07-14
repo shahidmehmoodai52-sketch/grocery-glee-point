@@ -391,7 +391,7 @@ function POSPage() {
     } else {
       items.push({
         product_id: p.id,
-        code: p.sku ?? p.barcode ?? "",
+        code: p.sku ?? "",
         name: p.name,
         qty: 1,
         price: Number(p.sell_price),
