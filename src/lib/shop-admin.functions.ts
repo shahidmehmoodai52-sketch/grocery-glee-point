@@ -64,15 +64,19 @@ export const listShopStaff = createServerFn({ method: "GET" })
     const ids = (members ?? []).map((m) => m.user_id);
     if (!ids.length) return [];
 
-    const { data: users } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
-    const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids);
-    const { data: perms } = await supabaseAdmin.from("user_permissions").select("user_id, perm").in("user_id", ids);
+    const [rolesRes, permsRes, ...userRes] = await Promise.all([
+      supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids),
+      supabaseAdmin.from("user_permissions").select("user_id, perm").in("user_id", ids),
+      ...ids.map((id) => supabaseAdmin.auth.admin.getUserById(id)),
+    ]);
+    const roles = rolesRes.data ?? [];
+    const perms = permsRes.data ?? [];
 
     return ids
-      .map((id) => {
-        const u = users.users.find((x) => x.id === id);
+      .map((id, i) => {
+        const u = (userRes[i] as any)?.data?.user;
         if (!u) return null;
-        const role = (roles ?? []).find((r) => r.user_id === id)?.role ?? "cashier";
+        const role = roles.find((r) => r.user_id === id)?.role ?? "cashier";
         return {
           id,
           username: usernameFromEmail(u.email, slug),
@@ -80,7 +84,7 @@ export const listShopStaff = createServerFn({ method: "GET" })
           created_at: u.created_at,
           role,
           is_owner: id === context.userId,
-          perms: (perms ?? []).filter((p) => p.user_id === id).map((p) => p.perm),
+          perms: perms.filter((p) => p.user_id === id).map((p) => p.perm),
         };
       })
       .filter(Boolean);
