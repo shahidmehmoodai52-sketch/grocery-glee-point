@@ -1547,7 +1547,7 @@ function POSPage() {
               />
             </div>
             <div className="col-span-2">
-              <Label>Barcode</Label>
+              <Label>Item code</Label>
               <Input
                 value={quickAdd.barcode}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, barcode: e.target.value }))}
