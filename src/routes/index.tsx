@@ -575,7 +575,57 @@ function LandingPage() {
         </div>
       </section>
 
+      {/* CONNECT */}
+      <section id="connect" className="bg-white">
+        <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
+          <SectionTitle
+            eyebrow="Connect"
+            title="Connect with Tillix"
+            sub="Follow us on social media and watch product videos on YouTube."
+          />
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { Icon: Facebook, label: "Facebook", handle: "@tillix.co", href: "https://facebook.com/tillix.co" },
+              { Icon: Instagram, label: "Instagram", handle: "@tillix.co", href: "https://instagram.com/tillix.co" },
+              { Icon: Linkedin, label: "LinkedIn", handle: "tillix-co", href: "https://linkedin.com/company/tillix-co" },
+              { Icon: Youtube, label: "YouTube", handle: "@tillixpos", href: "https://www.youtube.com/@tillixpos" },
+            ].map(({ Icon, label, handle, href }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Follow Tillix on ${label}`}
+                className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5"
+              >
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-tx-green-light text-tx-green-dark transition group-hover:scale-105">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-tx-navy">{label}</span>
+                  <span className="block truncate text-xs text-slate-500">{handle}</span>
+                </span>
+              </a>
+            ))}
+          </div>
+
+          <div className="mt-8 flex justify-center">
+            <a
+              href="https://www.youtube.com/@tillixpos"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Watch Tillix product videos on YouTube"
+              className="inline-flex items-center gap-2 rounded-full bg-tx-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-tx-green-dark hover:shadow-md"
+            >
+              <PlayCircle className="h-5 w-5" />
+              Watch Tillix Product Videos
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
+
       <section id="faq" className="bg-slate-50/60">
         <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:px-8">
           <SectionTitle eyebrow="FAQ" title="Frequently asked questions" sub="Everything you need to know about Tillix POS." />
