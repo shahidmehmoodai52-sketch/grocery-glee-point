@@ -245,7 +245,9 @@ function LandingPage() {
         )}
       </header>
 
+      <main id="main">
       {/* HERO */}
+
       <section id="top" className="hero-grad">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2">
@@ -655,7 +657,10 @@ function LandingPage() {
       </section>
 
       {/* FOOTER */}
+      </main>
+
       <footer className="border-t border-slate-200 bg-white">
+
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
           <div className="md:col-span-2">
             <BrandMark className="h-10 w-auto" />
