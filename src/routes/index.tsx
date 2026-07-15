@@ -546,38 +546,8 @@ function LandingPage() {
               <li><Link to="/auth" className="hover:text-tx-green-dark">Sign in</Link></li>
               <li><Link to="/auth" className="hover:text-tx-green-dark">Register free</Link></li>
             </ul>
-
-            <div className="mt-6 text-xs font-bold uppercase tracking-wider text-tx-navy">Follow Tillix</div>
-            <div className="mt-3 flex items-center gap-2">
-              {[
-                { Icon: Facebook, label: "Facebook", href: "https://facebook.com/tillix.co" },
-                { Icon: Instagram, label: "Instagram", href: "https://instagram.com/tillix.co" },
-                { Icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
-                { Icon: Youtube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
-              ].map(({ Icon, label, href }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Follow Tillix on ${label}`}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:-translate-y-0.5 hover:border-tx-green/50 hover:text-tx-green-dark hover:shadow-sm"
-                >
-                  <Icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
-            <a
-              href="https://www.youtube.com/@tillixpos"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Watch Tillix product videos on YouTube"
-              className="mt-4 inline-flex items-center gap-2 rounded-full border border-tx-green/30 bg-tx-green-light px-3.5 py-2 text-xs font-semibold text-tx-green-dark transition hover:-translate-y-0.5 hover:border-tx-green/60 hover:shadow-sm"
-            >
-              <PlayCircle className="h-4 w-4" />
-              Watch Tillix Product Videos
-            </a>
           </div>
+
 
         </div>
         <div className="border-t border-slate-100">
