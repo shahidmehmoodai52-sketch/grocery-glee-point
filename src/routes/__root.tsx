@@ -87,15 +87,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Grocery POS" },
-      { name: "description", content: "Point of sale, inventory, accounts and reports for your grocery store." },
-      { property: "og:title", content: "Grocery POS" },
-      { property: "og:description", content: "Point of sale, inventory, accounts and reports for your grocery store." },
+      { title: "Tillix – Smart Retail Starts Here | Cloud POS & Retail Management" },
+      { name: "description", content: "Tillix is a cloud POS and retail management platform for grocery, supermarkets, pharmacies, restaurants and multi-store businesses. Billing, inventory, barcodes, loyalty and analytics in one." },
+      { name: "theme-color", content: "#0b1220" },
+      { property: "og:site_name", content: "Tillix" },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
-      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "icon", type: "image/jpeg", href: "/__l5e/assets-v1/af045d19-3c41-405e-a9b8-40993356b86e/tillix-logo.jpeg" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
