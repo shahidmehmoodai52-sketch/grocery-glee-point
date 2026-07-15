@@ -73,6 +73,25 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
   const partyLabel = kind === "purchase-return" ? "Supplier" : "Customer";
   const savings = Number(invoice.discount ?? 0);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const html = document.documentElement;
+    const styleId = "receipt-print-page-size";
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `@media print { @page { size: ${width} auto; margin: 0; } }`;
+    if (width === "58mm") html.classList.add("print-58mm");
+    else html.classList.remove("print-58mm");
+    return () => {
+      html.classList.remove("print-58mm");
+    };
+  }, [width]);
+
+
   return (
     <div
       className="receipt-paper bg-white text-black mx-auto relative"
