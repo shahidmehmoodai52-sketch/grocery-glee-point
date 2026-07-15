@@ -201,7 +201,7 @@ function AuthPage() {
       <Toaster richColors position="top-right" />
       <Card className="w-full max-w-md p-8">
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-primary">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white">
             <img
               src="/favicon.png"
               alt="Tillix POS logo"
