@@ -256,14 +256,18 @@ function LandingPage() {
                 <Globe2 className="h-3.5 w-3.5" /> Trusted worldwide — UAE · SA · PK · US · EU · AU
               </div>
               <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight text-tx-navy sm:text-5xl lg:text-6xl">
-                Smart Retail <span className="text-tx-green">Starts Here.</span>
+                Tillix — Smart Retail <span className="text-tx-green">Starts Here.</span>
               </h1>
-              <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
+              <p className="mt-3 text-lg font-semibold text-tx-navy/80 sm:text-xl">
+                Cloud POS &amp; Retail Management Software
+              </p>
+              <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
                 Tillix is a modern cloud POS and retail management platform for grocery stores,
                 supermarkets, pharmacies, restaurants, wholesalers and multi-store chains.
                 Billing, inventory, barcodes, customers, suppliers and real-time analytics —
                 one secure, lightning-fast platform.
               </p>
+
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link to="/auth" className="inline-flex items-center gap-2 rounded-xl bg-tx-green px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-tx-green-dark">
                   Register your shop free <Zap className="h-4 w-4" />
