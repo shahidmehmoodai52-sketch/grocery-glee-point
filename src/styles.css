@@ -166,8 +166,15 @@
 
 
 @media print {
-  @page { margin: 0; }
-  html, body { background: white !important; }
+  @page { size: 80mm auto; margin: 0; }
+  html.print-58mm { }
+  html, body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    height: auto !important;
+  }
   body * { visibility: hidden !important; }
   .print-area, .print-area * { visibility: visible !important; }
   .print-area {
@@ -176,7 +183,21 @@
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
+  html.print-58mm .print-area { width: 58mm !important; max-width: 58mm !important; }
+  .print-area .receipt-paper {
+    box-shadow: none !important;
+    margin: 0 !important;
+    width: 100% !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+  .print-area > *:last-child,
+  .print-area *:last-child { page-break-after: avoid !important; break-after: avoid !important; }
   .no-print { display: none !important; }
 }
 
