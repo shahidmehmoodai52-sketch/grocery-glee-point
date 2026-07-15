@@ -4,6 +4,7 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
+  Facebook, Instagram, Linkedin, Youtube, PlayCircle,
 } from "lucide-react";
 const SITE_URL = "https://grocery-glee-point.lovable.app";
 const LOGO_URL = "/tillix-logo.jpeg?v=2";
@@ -574,7 +575,57 @@ function LandingPage() {
         </div>
       </section>
 
+      {/* CONNECT */}
+      <section id="connect" className="bg-white">
+        <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
+          <SectionTitle
+            eyebrow="Connect"
+            title="Connect with Tillix"
+            sub="Follow us on social media and watch product videos on YouTube."
+          />
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { Icon: Facebook, label: "Facebook", handle: "@tillix.co", href: "https://facebook.com/tillix.co" },
+              { Icon: Instagram, label: "Instagram", handle: "@tillix.co", href: "https://instagram.com/tillix.co" },
+              { Icon: Linkedin, label: "LinkedIn", handle: "tillix-co", href: "https://linkedin.com/company/tillix-co" },
+              { Icon: Youtube, label: "YouTube", handle: "@tillixpos", href: "https://www.youtube.com/@tillixpos" },
+            ].map(({ Icon, label, handle, href }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Follow Tillix on ${label}`}
+                className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5"
+              >
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-tx-green-light text-tx-green-dark transition group-hover:scale-105">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-tx-navy">{label}</span>
+                  <span className="block truncate text-xs text-slate-500">{handle}</span>
+                </span>
+              </a>
+            ))}
+          </div>
+
+          <div className="mt-8 flex justify-center">
+            <a
+              href="https://www.youtube.com/@tillixpos"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Watch Tillix product videos on YouTube"
+              className="inline-flex items-center gap-2 rounded-full bg-tx-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-tx-green-dark hover:shadow-md"
+            >
+              <PlayCircle className="h-5 w-5" />
+              Watch Tillix Product Videos
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
+
       <section id="faq" className="bg-slate-50/60">
         <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:px-8">
           <SectionTitle eyebrow="FAQ" title="Frequently asked questions" sub="Everything you need to know about Tillix POS." />
@@ -631,7 +682,39 @@ function LandingPage() {
               <li><Link to="/auth" className="hover:text-tx-green-dark">Sign in</Link></li>
               <li><Link to="/auth" className="hover:text-tx-green-dark">Register free</Link></li>
             </ul>
+
+            <div className="mt-6 text-xs font-bold uppercase tracking-wider text-tx-navy">Follow Tillix</div>
+            <div className="mt-3 flex items-center gap-2">
+              {[
+                { Icon: Facebook, label: "Facebook", href: "https://facebook.com/tillix.co" },
+                { Icon: Instagram, label: "Instagram", href: "https://instagram.com/tillix.co" },
+                { Icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
+                { Icon: Youtube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
+              ].map(({ Icon, label, href }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Follow Tillix on ${label}`}
+                  className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:-translate-y-0.5 hover:border-tx-green/50 hover:text-tx-green-dark hover:shadow-sm"
+                >
+                  <Icon className="h-4 w-4" />
+                </a>
+              ))}
+            </div>
+            <a
+              href="https://www.youtube.com/@tillixpos"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Watch Tillix product videos on YouTube"
+              className="mt-4 inline-flex items-center gap-2 rounded-full border border-tx-green/30 bg-tx-green-light px-3.5 py-2 text-xs font-semibold text-tx-green-dark transition hover:-translate-y-0.5 hover:border-tx-green/60 hover:shadow-sm"
+            >
+              <PlayCircle className="h-4 w-4" />
+              Watch Tillix Product Videos
+            </a>
           </div>
+
         </div>
         <div className="border-t border-slate-100">
           <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:px-6 lg:px-8">
