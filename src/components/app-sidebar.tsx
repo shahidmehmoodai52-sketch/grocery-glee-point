@@ -97,7 +97,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-sidebar-primary">
+          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-white">
             <img
               src="/favicon.png"
               alt="Tillix POS logo"
