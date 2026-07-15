@@ -4,7 +4,6 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  Facebook, Instagram, Linkedin, Youtube, PlayCircle,
 } from "lucide-react";
 const SITE_URL = "https://grocery-glee-point.lovable.app";
 const LOGO_URL = "/tillix-logo.jpeg?v=2";
