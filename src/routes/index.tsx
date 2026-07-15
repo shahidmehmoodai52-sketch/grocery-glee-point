@@ -4,7 +4,6 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  Facebook, Instagram, Linkedin, Youtube, PlayCircle,
 } from "lucide-react";
 const SITE_URL = "https://grocery-glee-point.lovable.app";
 const LOGO_URL = "/tillix-logo.jpeg?v=2";
@@ -365,94 +364,7 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* MULTI-CURRENCY */}
-      <section id="multi-currency" className="bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-          <SectionTitle
-            eyebrow="🌍 Global Ready"
-            title="Sell Anywhere with Multi-Currency Support"
-            sub="One POS Platform. Multiple Countries. Multiple Currencies."
-          />
-          <div className="mx-auto mt-6 max-w-3xl text-center">
-            <p className="text-sm leading-relaxed text-slate-600 sm:text-base">
-              Tillix is a cloud POS and retail management software built for businesses operating across different countries and regions. Whether you run a grocery store, supermarket, pharmacy, restaurant, wholesale business, or a multi-store retail chain, Tillix lets you manage your business in your local currency with a consistent, powerful international POS experience.
-            </p>
-            <p className="mt-4 text-sm font-medium text-tx-navy">Perfect for businesses operating in:</p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {[
-                ["🇵🇰", "Pakistan"],
-                ["🇦🇪", "United Arab Emirates"],
-                ["🇸🇦", "Saudi Arabia"],
-                ["🇺🇸", "United States"],
-                ["🇬🇧", "United Kingdom"],
-                ["🇪🇺", "Europe"],
-                ["🇦🇺", "Australia"],
-                ["🇳🇿", "New Zealand"],
-                ["🇨🇦", "Canada"],
-              ].map(([flag, name]) => (
-                <span key={name} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:bg-white hover:shadow-sm">
-                  <span aria-hidden>{flag}</span>{name}
-                </span>
-              ))}
-              <span className="inline-flex items-center rounded-full border border-dashed border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-500">…and many more</span>
-            </div>
-          </div>
 
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { icon: Globe2, title: "Global Ready", text: "Operate your business anywhere in the world with a truly international POS system." },
-              { icon: Landmark, title: "Multi-Currency Support", text: "Supports different currencies based on your business location — PKR, AED, SAR, USD, EUR and more." },
-              { icon: TrendingUp, title: "Accurate Financial Reports", text: "Reports are generated using your selected business currency for clean, reliable accounting." },
-              { icon: Store, title: "Multi-Store Ready", text: "Ideal multi store POS for businesses managing one or many retail locations." },
-              { icon: Cloud, title: "Cloud Based", text: "Cloud POS access — run your grocery, supermarket, pharmacy, restaurant or wholesale business securely from anywhere." },
-              { icon: Shield, title: "Secure & Reliable", text: "Enterprise-grade security with fast, resilient cloud infrastructure." },
-            ].map(({ icon: Icon, title, text }) => (
-              <div key={title} className="group rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5">
-                <div className="grid h-11 w-11 place-items-center rounded-xl bg-tx-green-light text-tx-green-dark">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="mt-4 text-lg font-bold text-tx-navy">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{text}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-14 rounded-3xl border border-slate-200 bg-gradient-to-br from-tx-green-light/40 via-white to-white p-8 sm:p-10">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-tx-green-dark ring-1 ring-tx-green/20">
-                💱 Supported Currencies
-              </div>
-              <h3 className="mt-3 text-xl font-bold text-tx-navy sm:text-2xl">Bill in the currency your customers use</h3>
-              <p className="mt-2 text-sm text-slate-600">From Pakistan POS to UAE POS software, Saudi Arabia POS and USA POS software — Tillix adapts to your market.</p>
-            </div>
-            <div className="mt-6 flex flex-wrap justify-center gap-2.5">
-              {[
-                { code: "PKR", name: "Pakistani Rupee" },
-                { code: "AED", name: "UAE Dirham" },
-                { code: "SAR", name: "Saudi Riyal" },
-                { code: "USD", name: "US Dollar" },
-                { code: "EUR", name: "Euro" },
-                { code: "GBP", name: "British Pound" },
-                { code: "AUD", name: "Australian Dollar" },
-                { code: "NZD", name: "NZ Dollar" },
-                { code: "CAD", name: "Canadian Dollar" },
-              ].map(({ code, name }) => (
-                <span
-                  key={code}
-                  title={name}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-tx-navy shadow-sm transition hover:-translate-y-0.5 hover:border-tx-green/50 hover:text-tx-green-dark hover:shadow-md"
-                >
-                  <span className="text-tx-green-dark">{code}</span>
-                  <span className="hidden text-xs font-normal text-slate-500 sm:inline">{name}</span>
-                </span>
-              ))}
-              <span className="inline-flex items-center rounded-full border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-500">
-                + More…
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
 
 
       {/* BENEFITS + PHONE */}
@@ -575,55 +487,6 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* CONNECT */}
-      <section id="connect" className="bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
-          <SectionTitle
-            eyebrow="Connect"
-            title="Connect with Tillix"
-            sub="Follow us on social media and watch product videos on YouTube."
-          />
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { Icon: Facebook, label: "Facebook", handle: "@tillix.co", href: "https://facebook.com/tillix.co" },
-              { Icon: Instagram, label: "Instagram", handle: "@tillix.co", href: "https://instagram.com/tillix.co" },
-              { Icon: Linkedin, label: "LinkedIn", handle: "tillix-co", href: "https://linkedin.com/company/tillix-co" },
-              { Icon: Youtube, label: "YouTube", handle: "@tillixpos", href: "https://www.youtube.com/@tillixpos" },
-            ].map(({ Icon, label, handle, href }) => (
-              <a
-                key={label}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Follow Tillix on ${label}`}
-                className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5"
-              >
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-tx-green-light text-tx-green-dark transition group-hover:scale-105">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-tx-navy">{label}</span>
-                  <span className="block truncate text-xs text-slate-500">{handle}</span>
-                </span>
-              </a>
-            ))}
-          </div>
-
-          <div className="mt-8 flex justify-center">
-            <a
-              href="https://www.youtube.com/@tillixpos"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Watch Tillix product videos on YouTube"
-              className="inline-flex items-center gap-2 rounded-full bg-tx-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-tx-green-dark hover:shadow-md"
-            >
-              <PlayCircle className="h-5 w-5" />
-              Watch Tillix Product Videos
-            </a>
-          </div>
-        </div>
-      </section>
-
       {/* FAQ */}
 
       <section id="faq" className="bg-slate-50/60">
@@ -682,38 +545,8 @@ function LandingPage() {
               <li><Link to="/auth" className="hover:text-tx-green-dark">Sign in</Link></li>
               <li><Link to="/auth" className="hover:text-tx-green-dark">Register free</Link></li>
             </ul>
-
-            <div className="mt-6 text-xs font-bold uppercase tracking-wider text-tx-navy">Follow Tillix</div>
-            <div className="mt-3 flex items-center gap-2">
-              {[
-                { Icon: Facebook, label: "Facebook", href: "https://facebook.com/tillix.co" },
-                { Icon: Instagram, label: "Instagram", href: "https://instagram.com/tillix.co" },
-                { Icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
-                { Icon: Youtube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
-              ].map(({ Icon, label, href }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Follow Tillix on ${label}`}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:-translate-y-0.5 hover:border-tx-green/50 hover:text-tx-green-dark hover:shadow-sm"
-                >
-                  <Icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
-            <a
-              href="https://www.youtube.com/@tillixpos"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Watch Tillix product videos on YouTube"
-              className="mt-4 inline-flex items-center gap-2 rounded-full border border-tx-green/30 bg-tx-green-light px-3.5 py-2 text-xs font-semibold text-tx-green-dark transition hover:-translate-y-0.5 hover:border-tx-green/60 hover:shadow-sm"
-            >
-              <PlayCircle className="h-4 w-4" />
-              Watch Tillix Product Videos
-            </a>
           </div>
+
 
         </div>
         <div className="border-t border-slate-100">
