@@ -6,7 +6,7 @@ import {
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
 } from "lucide-react";
 const SITE_URL = "https://grocery-glee-point.lovable.app";
-const LOGO_URL = "/__l5e/assets-v1/6ae54824-0de8-432b-a4c5-e6f8b3a8efe9/tillix-logo-full.jpeg";
+const LOGO_URL = "/tillix-logo.jpeg?v=2";
 const OG_LOGO_URL = `${SITE_URL}${LOGO_URL}`;
 
 const FAQS: { q: string; a: string }[] = [
