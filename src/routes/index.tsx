@@ -5,11 +5,9 @@ import {
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
 } from "lucide-react";
-import tillixLogo from "@/assets/tillix-logo.asset.json";
-
 const SITE_URL = "https://grocery-glee-point.lovable.app";
-const LOGO_URL = tillixLogo.url;
-const OG_LOGO_URL = tillixLogo.url;
+const LOGO_URL = "/tillix-logo.jpeg?v=2";
+const OG_LOGO_URL = `${SITE_URL}${LOGO_URL}`;
 
 const FAQS: { q: string; a: string }[] = [
   { q: "What is Tillix POS software?",
