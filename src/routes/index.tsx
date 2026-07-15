@@ -182,16 +182,16 @@ function LandingPage() {
     <div className="min-h-screen bg-white text-slate-800 antialiased" style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
       {/* Local design tokens for the landing page (scoped to this page, no global overrides) */}
       <style>{`
-        :root { --tx-navy: #0b1220; --tx-green: #16a34a; --tx-green-dark: #0f7a37; --tx-green-light: #dcfce7; }
+        :root { --tx-navy: #0E1A2E; --tx-green: #22C55E; --tx-green-dark: #15803D; --tx-green-light: #DCFCE7; }
         .text-tx-navy { color: var(--tx-navy); }
         .bg-tx-navy { background-color: var(--tx-navy); }
         .text-tx-green { color: var(--tx-green); }
         .text-tx-green-dark { color: var(--tx-green-dark); }
         .bg-tx-green { background-color: var(--tx-green); }
         .bg-tx-green-light { background-color: var(--tx-green-light); }
-        .border-tx-green\\/30 { border-color: rgb(22 163 74 / 0.3); }
-        .bg-tx-green\\/10 { background-color: rgb(22 163 74 / 0.10); }
-        .hero-grad { background: radial-gradient(1200px 500px at 85% -10%, rgba(22,163,74,0.18), transparent 60%), radial-gradient(900px 400px at -10% 10%, rgba(11,18,32,0.05), transparent 60%), linear-gradient(180deg,#ffffff, #f8fafc); }
+        .border-tx-green\\/30 { border-color: rgb(34 197 94 / 0.3); }
+        .bg-tx-green\\/10 { background-color: rgb(34 197 94 / 0.10); }
+        .hero-grad { background: radial-gradient(1200px 500px at 85% -10%, rgba(34,197,94,0.18), transparent 60%), radial-gradient(900px 400px at -10% 10%, rgba(14,26,46,0.05), transparent 60%), linear-gradient(180deg,#ffffff, #f8fafc); }
       `}</style>
 
       {/* NAV */}
