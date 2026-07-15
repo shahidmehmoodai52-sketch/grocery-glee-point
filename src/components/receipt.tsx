@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { fmtMoney, fmtQty } from "@/lib/format";
 
 export type ReceiptSettings = {
