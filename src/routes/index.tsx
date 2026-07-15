@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
@@ -30,6 +30,11 @@ const FAQS: { q: string; a: string }[] = [
 ];
 
 export const Route = createFileRoute("/")({
+  beforeLoad: () => {
+    if (import.meta.env.DEV) {
+      throw redirect({ to: "/pos" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Tillix – Smart Retail Starts Here | Cloud POS & Retail Management Software" },
