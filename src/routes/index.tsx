@@ -30,6 +30,11 @@ const FAQS: { q: string; a: string }[] = [
 ];
 
 export const Route = createFileRoute("/")({
+  beforeLoad: () => {
+    if (import.meta.env.DEV) {
+      throw redirect({ to: "/pos" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Tillix – Smart Retail Starts Here | Cloud POS & Retail Management Software" },
