@@ -47,47 +47,48 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* Modern enterprise palette: professional blue primary, neutral slate surfaces */
+/* Tillix brand palette: logo green primary + deep navy sidebar */
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.985 0.003 250);
-  --foreground: oklch(0.21 0.02 260);
+  --background: oklch(0.985 0.004 160);
+  --foreground: oklch(0.18 0.03 265);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.02 260);
+  --card-foreground: oklch(0.18 0.03 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.02 260);
-  --primary: oklch(0.56 0.19 258);
+  --popover-foreground: oklch(0.18 0.03 265);
+  --primary: oklch(0.6 0.17 148);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.965 0.005 250);
-  --secondary-foreground: oklch(0.28 0.03 260);
-  --muted: oklch(0.965 0.005 250);
-  --muted-foreground: oklch(0.52 0.02 260);
-  --accent: oklch(0.95 0.02 258);
-  --accent-foreground: oklch(0.28 0.05 260);
+  --secondary: oklch(0.96 0.01 160);
+  --secondary-foreground: oklch(0.24 0.04 265);
+  --muted: oklch(0.96 0.008 160);
+  --muted-foreground: oklch(0.5 0.02 250);
+  --accent: oklch(0.94 0.05 150);
+  --accent-foreground: oklch(0.28 0.08 150);
   --destructive: oklch(0.6 0.22 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.62 0.16 155);
+  --success: oklch(0.6 0.17 148);
   --success-foreground: oklch(0.99 0 0);
   --warning: oklch(0.76 0.15 75);
   --warning-foreground: oklch(0.24 0.05 80);
   --info: oklch(0.68 0.13 220);
   --info-foreground: oklch(0.99 0 0);
-  --border: oklch(0.92 0.005 250);
-  --input: oklch(0.92 0.005 250);
-  --ring: oklch(0.56 0.19 258);
-  --chart-1: oklch(0.56 0.19 258);
-  --chart-2: oklch(0.62 0.16 155);
+  --border: oklch(0.92 0.008 160);
+  --input: oklch(0.92 0.008 160);
+  --ring: oklch(0.6 0.17 148);
+  --chart-1: oklch(0.6 0.17 148);
+  --chart-2: oklch(0.18 0.04 265);
   --chart-3: oklch(0.6 0.22 25);
   --chart-4: oklch(0.76 0.15 75);
   --chart-5: oklch(0.68 0.13 220);
-  --sidebar: oklch(0.22 0.02 260);
-  --sidebar-foreground: oklch(0.97 0.005 250);
-  --sidebar-primary: oklch(0.65 0.18 258);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.28 0.03 260);
-  --sidebar-accent-foreground: oklch(0.97 0.005 250);
-  --sidebar-border: oklch(0.3 0.03 260);
-  --sidebar-ring: oklch(0.65 0.18 258);
+  --sidebar: oklch(0.18 0.04 265);
+  --sidebar-foreground: oklch(0.97 0.005 160);
+  --sidebar-primary: oklch(0.65 0.18 148);
+  --sidebar-primary-foreground: oklch(0.14 0.04 265);
+  --sidebar-accent: oklch(0.26 0.04 265);
+  --sidebar-accent-foreground: oklch(0.97 0.005 160);
+  --sidebar-border: oklch(0.3 0.04 265);
+  --sidebar-ring: oklch(0.65 0.18 148);
+
 
   /* Spacing scale */
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
