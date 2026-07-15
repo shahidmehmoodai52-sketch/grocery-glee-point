@@ -95,7 +95,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
-      { rel: "icon", type: "image/jpeg", href: "/__l5e/assets-v1/af045d19-3c41-405e-a9b8-40993356b86e/tillix-logo.jpeg" },
+      { rel: "icon", type: "image/jpeg", href: "/__l5e/assets-v1/b8658d0c-853f-4086-9176-bf636de954c2/tillix-logo.jpeg" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
