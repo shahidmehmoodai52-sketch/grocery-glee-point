@@ -8,7 +8,8 @@ import {
 import tillixLogo from "@/assets/tillix-logo.asset.json";
 
 const SITE_URL = "https://grocery-glee-point.lovable.app";
-const LOGO_URL = tillixLogo.url;
+const LOGO_URL = "/favicon.png";
+const OG_LOGO_URL = tillixLogo.url;
 
 const FAQS: { q: string; a: string }[] = [
   { q: "What is Tillix POS software?",
