@@ -657,7 +657,10 @@ function LandingPage() {
       </section>
 
       {/* FOOTER */}
+      </main>
+
       <footer className="border-t border-slate-200 bg-white">
+
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
           <div className="md:col-span-2">
             <BrandMark className="h-10 w-auto" />
