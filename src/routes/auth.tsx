@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Store, Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -201,8 +201,16 @@ function AuthPage() {
       <Toaster richColors position="top-right" />
       <Card className="w-full max-w-md p-8">
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-3">
-            <Store className="h-6 w-6" />
+          <div className="mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-primary">
+            <img
+              src="/favicon.png"
+              alt="Tillix POS logo"
+              className="h-12 w-12 object-cover"
+              width={48}
+              height={48}
+              decoding="async"
+              loading="eager"
+            />
           </div>
           <h1 className="text-2xl font-semibold">Grocery POS</h1>
           <p className="text-sm text-muted-foreground mt-1">Sign in or register your shop</p>
