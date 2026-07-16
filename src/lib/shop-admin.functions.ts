@@ -111,7 +111,12 @@ export const createShopStaff = createServerFn({ method: "POST" })
       password: data.password,
       email_confirm: true,
     });
-    if (error) throw error;
+    if (error) {
+      if ((error as any)?.code === "weak_password" || /weak/i.test(error.message)) {
+        throw new Error("Password is too weak or common. Use a longer password with mixed characters.");
+      }
+      throw new Error(error.message);
+    }
     const uid = created.user!.id;
 
     // Override the default role/tenant assigned by handle_new_user trigger
@@ -151,7 +156,12 @@ export const resetShopStaffPassword = createServerFn({ method: "POST" })
     if (!m) throw new Error("This user is not part of your shop");
 
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { password: data.password });
-    if (error) throw error;
+    if (error) {
+      if ((error as any)?.code === "weak_password" || /weak/i.test(error.message)) {
+        throw new Error("Password is too weak or common. Use a longer password with mixed characters.");
+      }
+      throw new Error(error.message);
+    }
     return { ok: true };
   });
 
