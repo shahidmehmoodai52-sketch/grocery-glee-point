@@ -307,6 +307,9 @@ function TenantsTab() {
                     <div className="text-xs text-muted-foreground">{t.subscription_status}</div>
                   )}
                 </TableCell>
+                <TableCell>
+                  <ExpiryCell tenantId={t.id} expiresAt={t.subscription_expires_at} />
+                </TableCell>
                 <TableCell className="text-right">{t.member_count}</TableCell>
                 <TableCell className="text-right">{t.product_count}</TableCell>
                 <TableCell className="text-right">
