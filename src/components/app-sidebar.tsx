@@ -145,7 +145,11 @@ export function AppSidebar() {
         )}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleSignOut} tooltip="Sign out">
+            <SidebarMenuButton
+              onClick={handleSignOut}
+              tooltip="Sign out"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground font-medium"
+            >
               <LogOut className="h-4 w-4" />
               {!collapsed && <span>Sign out</span>}
             </SidebarMenuButton>
