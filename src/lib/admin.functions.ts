@@ -29,6 +29,11 @@ export const resetTenantOwnerPassword = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.auth.admin.updateUserById(tenant.owner_id, {
       password: data.new_password,
     });
-    if (error) throw error;
+    if (error) {
+      if ((error as any)?.code === "weak_password" || /weak/i.test(error.message)) {
+        throw new Error("Password is too weak or common. Use a longer password with mixed characters.");
+      }
+      throw new Error(error.message);
+    }
     return { ok: true, shop: tenant.name };
   });
