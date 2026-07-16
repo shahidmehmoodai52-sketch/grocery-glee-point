@@ -640,8 +640,8 @@ function LandingPage() {
                 aria-label={`Follow Tillix on ${label}`}
                 className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5"
               >
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-tx-green-light text-tx-green-dark transition group-hover:scale-105">
-                  <Icon className="h-5 w-5" />
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-white ring-1 ring-slate-200 transition group-hover:scale-105 group-hover:ring-slate-300">
+                  <Icon className="h-6 w-6" />
                 </span>
                 <span className="min-w-0">
                   <span className="block text-sm font-bold text-tx-navy">{label}</span>
