@@ -1603,6 +1603,25 @@ function POSPage() {
         onClose={() => setReprintView(null)}
       />
 
+      {/* Post-sale print prompt — Enter triggers the default action (Settings > POS). */}
+      <PrintPromptDialog
+        sale={printAsk}
+        defaultAction={((settings as any)?.pos_print_prompt_default ?? "yes") as "yes" | "no"}
+        onYes={() => {
+          const s = printAsk;
+          setPrintAsk(null);
+          if (s) {
+            setReprintView(s);
+            setTimeout(() => { printReceipt(); }, 150);
+          }
+          setTimeout(() => searchRef.current?.focus(), 50);
+        }}
+        onNo={() => {
+          setPrintAsk(null);
+          setTimeout(() => searchRef.current?.focus(), 50);
+        }}
+      />
+
       {/* Quick-add product dialog — for scanned/typed items not yet in catalog */}
       <Dialog open={quickAdd.open} onOpenChange={(v) => setQuickAdd((q) => ({ ...q, open: v }))}>
         <DialogContent className="max-w-md">
