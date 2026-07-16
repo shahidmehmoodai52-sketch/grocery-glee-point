@@ -361,6 +361,69 @@ function TenantsTab() {
   );
 }
 
+function ExpiryCell({ tenantId, expiresAt }: { tenantId: string; expiresAt: string | null }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(expiresAt ? new Date(expiresAt).toISOString().slice(0, 10) : "");
+  const [busy, setBusy] = useState(false);
+
+  const now = Date.now();
+  const exp = expiresAt ? new Date(expiresAt).getTime() : null;
+  const daysLeft = exp !== null ? Math.ceil((exp - now) / 86400000) : null;
+  const expired = exp !== null && exp < now;
+  const soon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 7;
+
+  const save = async () => {
+    setBusy(true);
+    const iso = value ? new Date(value + "T23:59:59").toISOString() : null;
+    const { error } = await supabase.rpc("admin_set_tenant_expiry", {
+      _tenant_id: tenantId,
+      _expires_at: iso,
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Expiry updated");
+    setOpen(false);
+    qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="text-left group">
+          <div className="text-sm">
+            {expiresAt ? new Date(expiresAt).toLocaleDateString() : <span className="text-muted-foreground">Not set</span>}
+          </div>
+          {daysLeft !== null && (
+            <div className={
+              "text-xs " +
+              (expired ? "text-destructive font-medium" : soon ? "text-amber-600" : "text-muted-foreground")
+            }>
+              {expired ? `Expired ${Math.abs(daysLeft)}d ago` : `${daysLeft}d left`}
+            </div>
+          )}
+          <div className="text-[10px] text-primary opacity-0 group-hover:opacity-100">Click to change</div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 space-y-2" align="start">
+        <Label className="text-xs">Shop expiry date</Label>
+        <Input type="date" value={value} onChange={(e) => setValue(e.target.value)} />
+        <div className="flex gap-2">
+          <Button size="sm" onClick={save} disabled={busy} className="flex-1">
+            <CalendarClock className="h-4 w-4 mr-1" /> Save
+          </Button>
+          {expiresAt && (
+            <Button size="sm" variant="outline" onClick={() => { setValue(""); save(); }} disabled={busy}>
+              Clear
+            </Button>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground">Shop is blocked when the date passes.</p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 type TenantDetail = {
   tenant: any;
   members: Array<{ user_id: string; role: string; joined_at: string; full_name: string | null; email: string | null }>;
