@@ -56,6 +56,51 @@ type Props = {
   kind?: "sale" | "sale-return" | "purchase-return";
 };
 
+function setReceiptPrintPageSize(styleEl: HTMLStyleElement, preferredWidth: string) {
+  const receipt = document.querySelector<HTMLElement>(".print-area .receipt-paper, .receipt-paper");
+  const rect = receipt?.getBoundingClientRect();
+  const measuredWidthMm = rect ? (rect.width * 25.4) / 96 : Number.parseFloat(preferredWidth);
+  const width = measuredWidthMm <= 65 ? "58mm" : "80mm";
+  const contentHeightPx = rect?.height ?? 0;
+  const contentHeightMm = Math.max(40, Math.ceil((contentHeightPx * 25.4) / 96) + 2);
+
+  styleEl.textContent = `
+    @media print {
+      @page { size: ${width} ${contentHeightMm}mm; margin: 0; }
+      html, body {
+        width: ${width} !important;
+        height: ${contentHeightMm}mm !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+      body > :not(:has(.print-area)) { display: none !important; }
+      .print-area {
+        width: ${width} !important;
+        height: ${contentHeightMm}mm !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+      .print-area .receipt-paper {
+        min-height: 0 !important;
+        height: auto !important;
+      }
+    }
+  `;
+}
+
+export function printReceipt() {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  const styleId = "receipt-print-page-size";
+  let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = styleId;
+    document.head.appendChild(styleEl);
+  }
+  setReceiptPrintPageSize(styleEl, "80mm");
+  requestAnimationFrame(() => window.print());
+}
+
 export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Props) {
   const sym = settings?.currency_symbol ?? "Rs";
   const width = settings?.paper_width === "58mm" ? "58mm" : "80mm";
@@ -83,12 +128,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       styleEl.id = styleId;
       document.head.appendChild(styleEl);
     }
-    const updatePrintSize = () => {
-      const receipt = document.querySelector<HTMLElement>(".print-area .receipt-paper, .receipt-paper");
-      const contentHeightPx = receipt?.getBoundingClientRect().height ?? 0;
-      const contentHeightMm = Math.max(40, Math.ceil((contentHeightPx * 25.4) / 96) + 2);
-      styleEl.textContent = `@media print { @page { size: ${width} ${contentHeightMm}mm; margin: 0; } }`;
-    };
+    const updatePrintSize = () => setReceiptPrintPageSize(styleEl, width);
     updatePrintSize();
     const raf = requestAnimationFrame(updatePrintSize);
     window.addEventListener("beforeprint", updatePrintSize);
