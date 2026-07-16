@@ -4,8 +4,43 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  Facebook, Instagram, Linkedin, Youtube, PlayCircle,
+  PlayCircle,
 } from "lucide-react";
+
+// Authentic brand-colored social icons (official SVG marks)
+const BrandFacebook = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <path fill="#1877F2" d="M24 12a12 12 0 1 0-13.875 11.854v-8.385H7.078V12h3.047V9.356c0-3.007 1.792-4.668 4.533-4.668 1.313 0 2.686.234 2.686.234v2.953H15.83c-1.491 0-1.956.925-1.956 1.874V12h3.328l-.532 3.469h-2.796v8.385A12.003 12.003 0 0 0 24 12Z"/>
+  </svg>
+);
+const BrandInstagram = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <defs>
+      <radialGradient id="ig-g" cx="30%" cy="107%" r="150%">
+        <stop offset="0%" stopColor="#fdf497"/>
+        <stop offset="5%" stopColor="#fdf497"/>
+        <stop offset="45%" stopColor="#fd5949"/>
+        <stop offset="60%" stopColor="#d6249f"/>
+        <stop offset="90%" stopColor="#285AEB"/>
+      </radialGradient>
+    </defs>
+    <rect x="2" y="2" width="20" height="20" rx="5" fill="url(#ig-g)"/>
+    <path fill="none" stroke="#fff" strokeWidth="1.8" d="M12 7.6a4.4 4.4 0 1 0 0 8.8 4.4 4.4 0 0 0 0-8.8Z"/>
+    <circle cx="17.4" cy="6.6" r="1.1" fill="#fff"/>
+  </svg>
+);
+const BrandLinkedin = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <rect width="24" height="24" rx="4" fill="#0A66C2"/>
+    <path fill="#fff" d="M7.1 9.5H4.5V19h2.6V9.5ZM5.8 8.4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM19.5 19h-2.6v-4.6c0-1.1 0-2.5-1.6-2.5-1.6 0-1.8 1.2-1.8 2.4V19h-2.6V9.5h2.5v1.3h.03a2.7 2.7 0 0 1 2.5-1.4c2.6 0 3.1 1.7 3.1 4V19Z"/>
+  </svg>
+);
+const BrandYoutube = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <path fill="#FF0000" d="M23.5 6.5a3 3 0 0 0-2.1-2.1C19.5 3.9 12 3.9 12 3.9s-7.5 0-9.4.5A3 3 0 0 0 .5 6.5C0 8.4 0 12 0 12s0 3.6.5 5.5a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.6 24 12 24 12s0-3.6-.5-5.5Z"/>
+    <path fill="#fff" d="M9.6 15.6 15.8 12 9.6 8.4v7.2Z"/>
+  </svg>
+);
 const SITE_URL = "https://grocery-glee-point.lovable.app";
 const LOGO_URL = "/tillix-logo.jpeg?v=2";
 const OG_LOGO_URL = `${SITE_URL}${LOGO_URL}`;
