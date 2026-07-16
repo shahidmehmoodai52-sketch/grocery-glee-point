@@ -49,11 +49,14 @@ export const getMyShopInfo = createServerFn({ method: "GET" })
     };
   });
 
+
+
 export const listShopStaff = createServerFn({ method: "GET" })
   .middleware([requireCloudAuth])
   .handler(async ({ context }) => {
     const { tenant_id, slug } = await callerTenant(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { data: members, error } = await supabaseAdmin
       .from("tenant_members")
@@ -98,7 +101,8 @@ export const createShopStaff = createServerFn({ method: "POST" })
     if (!data.password || data.password.length < 6) throw new Error("Password must be 6+ chars");
     const email = internalEmail(data.username, slug);
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Prevent duplicate username in the same shop
     const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
@@ -149,7 +153,8 @@ export const resetShopStaffPassword = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { tenant_id } = await callerTenant(context);
     if (!data.password || data.password.length < 6) throw new Error("Password must be 6+ chars");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { data: m } = await supabaseAdmin
       .from("tenant_members").select("user_id").eq("tenant_id", tenant_id).eq("user_id", data.user_id).maybeSingle();
@@ -171,7 +176,8 @@ export const setShopStaffPerms = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { tenant_id } = await callerTenant(context);
     if (data.user_id === context.userId) throw new Error("You cannot change your own role");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { data: m } = await supabaseAdmin
       .from("tenant_members").select("user_id").eq("tenant_id", tenant_id).eq("user_id", data.user_id).maybeSingle();
@@ -197,7 +203,8 @@ export const deleteShopStaff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { tenant_id } = await callerTenant(context);
     if (data.user_id === context.userId) throw new Error("You cannot remove yourself");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { data: m } = await supabaseAdmin
       .from("tenant_members").select("user_id").eq("tenant_id", tenant_id).eq("user_id", data.user_id).maybeSingle();
