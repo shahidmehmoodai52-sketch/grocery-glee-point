@@ -11,6 +11,8 @@ import { RouteGuard } from "@/components/route-guard";
 import { LowStockAlerts } from "@/components/low-stock-alerts";
 import { useSettings } from "@/hooks/use-settings";
 import { setDefaultCurrencySymbol } from "@/lib/format";
+import { PendingBanner } from "@/components/pending-banner";
+
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -45,6 +47,8 @@ function Layout() {
       <div className="h-screen overflow-hidden flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
+          <PendingBanner />
+
           <header className="h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print gap-2">
             <SidebarTrigger />
             <div className="flex-1 min-w-0">

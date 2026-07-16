@@ -60,20 +60,13 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Pending shops: allow into the app with limited access + a persistent banner.
+  // Pending shops: allow into the app with limited access. Banner is rendered
+  // inside the authenticated layout header (see PendingBanner) so it sits
+  // beside the sidebar instead of being covered by the fixed sidebar panel.
   if (status === "pending") {
-    return (
-      <>
-        <div className="w-full bg-amber-500/15 border-b border-amber-500/30 text-amber-900 dark:text-amber-100 text-xs px-3 py-2 flex items-center gap-2 no-print">
-          <Clock className="h-3.5 w-3.5" />
-          <span>
-            Your shop is <strong>pending approval</strong>. You have limited access (POS &amp; Sales) until the developer approves it.
-          </span>
-        </div>
-        {children}
-      </>
-    );
+    return <>{children}</>;
   }
+
 
   return <>{children}</>;
 }
