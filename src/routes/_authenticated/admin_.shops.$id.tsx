@@ -212,15 +212,20 @@ function OverviewTab({ detail }: { detail: TenantDetail }) {
   const { data: settings } = useQuery({
     queryKey: ["admin-shop-settings", t.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("store_settings")
-        .select("store_name, phone, address")
-        .eq("tenant_id", t.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const [ss, tm] = await Promise.all([
+        supabase.from("store_settings").select("store_name, phone, address").eq("tenant_id", t.id).maybeSingle(),
+        supabase.from("tenants").select("metadata").eq("id", t.id).maybeSingle(),
+      ]);
+      const meta = (tm.data?.metadata ?? {}) as { phone?: string; address?: string; city?: string };
+      const metaAddr = [meta.address, meta.city].filter(Boolean).join(", ") || null;
+      return {
+        store_name: ss.data?.store_name ?? null,
+        phone: ss.data?.phone ?? meta.phone ?? null,
+        address: ss.data?.address ?? metaAddr,
+      };
     },
   });
+
 
   return (
     <div className="space-y-4">
