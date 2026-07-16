@@ -60,6 +60,10 @@ function Layout() {
             <div className="flex-1 min-w-0">
               <LowStockAlerts />
             </div>
+            <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2">
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign out</span>
+            </Button>
           </header>
           <main className="flex-1 min-w-0 overflow-auto">
             <RouteGuard><Outlet /></RouteGuard>
