@@ -660,6 +660,78 @@ function LandingPage() {
         </div>
       </section>
 
+      {/* TEAM */}
+      <section id="team" className="relative border-t border-slate-100 bg-gradient-to-b from-white via-slate-50 to-white py-20 sm:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-tx-green/30 bg-tx-green-light px-3 py-1 text-xs font-semibold text-tx-green-dark">
+              Meet the Team
+            </div>
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              The people behind Tillix
+            </h2>
+            <p className="mt-3 text-base text-slate-600">
+              A dedicated crew building, supporting and scaling retail technology you can rely on.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                name: "Shahid Mehmood",
+                role: "Developer",
+                phone: "0304-4604659",
+                initials: "SM",
+                gradient: "from-emerald-500 to-teal-600",
+              },
+              {
+                name: "Abdullah Iftekhar",
+                role: "I.T. Manager",
+                phone: "0301-7160701",
+                initials: "AI",
+                gradient: "from-indigo-500 to-blue-600",
+              },
+              {
+                name: "Babar Hussain",
+                role: "Technical Support",
+                phone: "0333-4950141",
+                initials: "BH",
+                gradient: "from-amber-500 to-orange-600",
+              },
+            ].map((m) => (
+              <div
+                key={m.name}
+                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-tx-green/40 hover:shadow-xl"
+              >
+                <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${m.gradient}`} />
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`grid h-14 w-14 place-items-center rounded-xl bg-gradient-to-br ${m.gradient} text-lg font-bold text-white shadow-md ring-4 ring-white`}
+                  >
+                    {m.initials}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-lg font-bold text-slate-900">{m.name}</div>
+                    <div className="text-sm font-medium text-slate-500">{m.role}</div>
+                  </div>
+                </div>
+                <div className="mt-5 border-t border-slate-100 pt-4">
+                  <a
+                    href={`tel:${m.phone.replace(/-/g, "")}`}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition group-hover:text-tx-green-dark"
+                  >
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-tx-green-light group-hover:text-tx-green-dark">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    </span>
+                    {m.phone}
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* FOOTER */}
       </main>
 
