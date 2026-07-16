@@ -99,14 +99,18 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         paper
           ? {
               width,
-              padding: "5mm 4mm 6mm",
+              maxWidth: width,
+              boxSizing: "border-box",
+              padding: "3mm 3mm 2mm",
               fontFamily: "'SF Mono','Menlo','Consolas','Liberation Mono',monospace",
               fontSize: "11px",
-              lineHeight: 1.35,
+              lineHeight: 1.3,
+              overflow: "hidden",
             }
           : undefined
       }
     >
+
       <div className="flex flex-col items-center">
         <div className="w-full flex items-center gap-1 mb-1">
           <span className="flex-1 border-t-2 border-double border-black" />
@@ -319,11 +323,12 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         <div className="text-[9px] mt-0.5 tracking-[0.2em]">*{docNo}*</div>
       </div>
 
-      <div className="mt-1 flex items-center gap-1">
+      <div className="mt-1 flex items-center gap-1" style={{ marginBottom: 0 }}>
         <span className="flex-1 border-t-2 border-double border-black" />
         <span className="text-[8px] tracking-[0.3em] uppercase">end</span>
         <span className="flex-1 border-t-2 border-double border-black" />
       </div>
+
     </div>
   );
 }

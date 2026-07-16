@@ -176,8 +176,9 @@
     padding: 0 !important;
     width: auto !important;
     height: auto !important;
+    overflow: hidden !important;
   }
-  body * { visibility: hidden !important; }
+  body * { visibility: hidden !important; box-sizing: border-box !important; }
   .print-area, .print-area * { visibility: visible !important; }
   .print-area {
     position: absolute !important;
@@ -187,6 +188,7 @@
     box-shadow: none !important;
     width: 80mm !important;
     max-width: 80mm !important;
+    overflow: hidden !important;
     page-break-after: avoid !important;
     break-after: avoid !important;
   }
@@ -195,11 +197,20 @@
     box-shadow: none !important;
     margin: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
     page-break-after: avoid !important;
     break-after: avoid !important;
   }
   .print-area > *:last-child,
-  .print-area *:last-child { page-break-after: avoid !important; break-after: avoid !important; }
+  .print-area *:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
   .no-print { display: none !important; }
 }
+
 
