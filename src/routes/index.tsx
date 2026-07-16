@@ -814,9 +814,9 @@ function LandingPage() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`Follow Tillix on ${label}`}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:-translate-y-0.5 hover:border-tx-green/50 hover:text-tx-green-dark hover:shadow-sm"
+                  className="inline-flex transition hover:-translate-y-0.5 hover:drop-shadow-md"
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-8 w-8" />
                 </a>
               ))}
             </div>
