@@ -735,7 +735,22 @@ function LandingPage() {
             <div>Smart Retail Starts Here.</div>
           </div>
         </div>
+        <div className="border-t border-slate-200 bg-slate-50">
+          <div className="mx-auto max-w-7xl px-4 py-4 text-center text-xs text-slate-600 sm:px-6 lg:px-8">
+            Copyrights reserved by{" "}
+            <a
+              href="https://tillix.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-slate-900 hover:underline"
+            >
+              tillix.co
+            </a>{" "}
+            — Designed &amp; developed with precision for modern retail.
+          </div>
+        </div>
       </footer>
+
     </div>
   );
 }
