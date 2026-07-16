@@ -33,6 +33,7 @@ const FIELDS = [
   "ops_allow_multiple_shifts", "ops_cash_drawer_enabled", "ops_safe_drop_enabled",
   "ops_paid_in_out_enabled", "ops_shift_notes_enabled", "ops_pending_tasks_enabled",
   "ops_receipt_reprint_enabled",
+  "pos_print_prompt_enabled", "pos_print_prompt_default",
 ] as const;
 
 const CURRENCY_CODES = [
