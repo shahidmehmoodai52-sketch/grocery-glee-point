@@ -22,12 +22,15 @@ import {
   Check,
   Wand2,
   Trash2,
+  CalendarClock,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
@@ -262,6 +265,7 @@ function TenantsTab() {
               <TableHead>Owner</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Plan</TableHead>
+              <TableHead>Expiry</TableHead>
               <TableHead className="text-right">Users</TableHead>
               <TableHead className="text-right">Products</TableHead>
               <TableHead className="text-right">Sales</TableHead>
@@ -270,10 +274,10 @@ function TenantsTab() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={8} className="py-4"><TableSkeleton rows={5} columns={7} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-4"><TableSkeleton rows={5} columns={8} /></TableCell></TableRow>
             )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="py-8">
+              <TableRow><TableCell colSpan={9} className="py-8">
                 <EmptyState icon={Store} title="No shops match" description="Try clearing filters or search." />
               </TableCell></TableRow>
             )}
@@ -302,6 +306,9 @@ function TenantsTab() {
                   {t.subscription_status && (
                     <div className="text-xs text-muted-foreground">{t.subscription_status}</div>
                   )}
+                </TableCell>
+                <TableCell>
+                  <ExpiryCell tenantId={t.id} expiresAt={t.subscription_expires_at} />
                 </TableCell>
                 <TableCell className="text-right">{t.member_count}</TableCell>
                 <TableCell className="text-right">{t.product_count}</TableCell>
@@ -351,6 +358,69 @@ function TenantsTab() {
 
       
     </div>
+  );
+}
+
+function ExpiryCell({ tenantId, expiresAt }: { tenantId: string; expiresAt: string | null }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(expiresAt ? new Date(expiresAt).toISOString().slice(0, 10) : "");
+  const [busy, setBusy] = useState(false);
+
+  const now = Date.now();
+  const exp = expiresAt ? new Date(expiresAt).getTime() : null;
+  const daysLeft = exp !== null ? Math.ceil((exp - now) / 86400000) : null;
+  const expired = exp !== null && exp < now;
+  const soon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 7;
+
+  const save = async () => {
+    setBusy(true);
+    const iso = value ? new Date(value + "T23:59:59").toISOString() : null;
+    const { error } = await supabase.rpc("admin_set_tenant_expiry", {
+      _tenant_id: tenantId,
+      _expires_at: iso as any,
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Expiry updated");
+    setOpen(false);
+    qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="text-left group">
+          <div className="text-sm">
+            {expiresAt ? new Date(expiresAt).toLocaleDateString() : <span className="text-muted-foreground">Not set</span>}
+          </div>
+          {daysLeft !== null && (
+            <div className={
+              "text-xs " +
+              (expired ? "text-destructive font-medium" : soon ? "text-amber-600" : "text-muted-foreground")
+            }>
+              {expired ? `Expired ${Math.abs(daysLeft)}d ago` : `${daysLeft}d left`}
+            </div>
+          )}
+          <div className="text-[10px] text-primary opacity-0 group-hover:opacity-100">Click to change</div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 space-y-2" align="start">
+        <Label className="text-xs">Shop expiry date</Label>
+        <Input type="date" value={value} onChange={(e) => setValue(e.target.value)} />
+        <div className="flex gap-2">
+          <Button size="sm" onClick={save} disabled={busy} className="flex-1">
+            <CalendarClock className="h-4 w-4 mr-1" /> Save
+          </Button>
+          {expiresAt && (
+            <Button size="sm" variant="outline" onClick={() => { setValue(""); save(); }} disabled={busy}>
+              Clear
+            </Button>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground">Shop is blocked when the date passes.</p>
+      </PopoverContent>
+    </Popover>
   );
 }
 
