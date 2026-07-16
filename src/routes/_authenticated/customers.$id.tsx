@@ -15,7 +15,7 @@ import { fmtMoney, fmtQty } from "@/lib/format";
 
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
-import { Receipt } from "@/components/receipt";
+import { Receipt, printReceipt } from "@/components/receipt";
 import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
