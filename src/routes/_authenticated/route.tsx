@@ -30,6 +30,11 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function Layout() {
+  const navigate = useNavigate();
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", search: { next: "/dashboard" }, replace: true });
+  };
   const { data: settings } = useSettings();
   useEffect(() => {
     setDefaultCurrencySymbol((settings as any)?.currency_symbol ?? "Rs");
