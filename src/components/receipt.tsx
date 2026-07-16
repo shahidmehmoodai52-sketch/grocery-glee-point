@@ -142,7 +142,7 @@ export function printReceipt() {
 }
 
 export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Props) {
-  const sym = settings?.currency_symbol ?? "Rs";
+  const sym = "";
   const width = settings?.paper_width === "58mm" ? "58mm" : "80mm";
   const date = invoice.created_at ? new Date(invoice.created_at) : new Date();
   const isReturn = kind !== "sale";
@@ -309,8 +309,8 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         {savings > 0 && <Row label="Discount" value={`-${fmtMoney(savings, sym)}`} />}
       </div>
 
-      <div className="mt-1 bg-black text-white px-2 py-1 flex justify-between text-[13px] font-extrabold tracking-wide">
-        <span>{isReturn ? "REFUND DUE" : "TOTAL"}</span>
+      <div className="mt-1 border-2 border-black bg-black text-white px-2 py-1.5 flex justify-between items-center text-[16px] font-black tracking-wider" style={{ boxShadow: "0 0 0 2px #000, 0 0 0 3px #fff, 0 0 0 5px #000" }}>
+        <span className="uppercase">{isReturn ? "Refund Due" : "Total"}</span>
         <span>{fmtMoney(invoice.total, sym)}</span>
       </div>
 
