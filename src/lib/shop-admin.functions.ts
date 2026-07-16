@@ -151,7 +151,12 @@ export const resetShopStaffPassword = createServerFn({ method: "POST" })
     if (!m) throw new Error("This user is not part of your shop");
 
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { password: data.password });
-    if (error) throw error;
+    if (error) {
+      if ((error as any)?.code === "weak_password" || /weak/i.test(error.message)) {
+        throw new Error("Password is too weak or common. Use a longer password with mixed characters.");
+      }
+      throw new Error(error.message);
+    }
     return { ok: true };
   });
 
