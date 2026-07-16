@@ -1,5 +1,6 @@
-import { createFileRoute, Outlet, redirect, useRouter, Link } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouter, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { LogOut } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
@@ -29,6 +30,11 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function Layout() {
+  const navigate = useNavigate();
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", search: { next: "/dashboard" }, replace: true });
+  };
   const { data: settings } = useSettings();
   useEffect(() => {
     setDefaultCurrencySymbol((settings as any)?.currency_symbol ?? "Rs");
@@ -54,6 +60,10 @@ function Layout() {
             <div className="flex-1 min-w-0">
               <LowStockAlerts />
             </div>
+            <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2">
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign out</span>
+            </Button>
           </header>
           <main className="flex-1 min-w-0 overflow-auto">
             <RouteGuard><Outlet /></RouteGuard>
