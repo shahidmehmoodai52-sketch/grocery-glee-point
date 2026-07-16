@@ -274,10 +274,10 @@ function TenantsTab() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={8} className="py-4"><TableSkeleton rows={5} columns={7} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-4"><TableSkeleton rows={5} columns={8} /></TableCell></TableRow>
             )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="py-8">
+              <TableRow><TableCell colSpan={9} className="py-8">
                 <EmptyState icon={Store} title="No shops match" description="Try clearing filters or search." />
               </TableCell></TableRow>
             )}
