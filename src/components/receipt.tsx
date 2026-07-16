@@ -83,13 +83,25 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       styleEl.id = styleId;
       document.head.appendChild(styleEl);
     }
-    styleEl.textContent = `@media print { @page { size: ${width} auto; margin: 0; } }`;
+    const updatePrintSize = () => {
+      const receipt = document.querySelector<HTMLElement>(".print-area .receipt-paper, .receipt-paper");
+      const contentHeightPx = receipt?.getBoundingClientRect().height ?? 0;
+      const contentHeightMm = Math.max(40, Math.ceil((contentHeightPx * 25.4) / 96) + 2);
+      styleEl.textContent = `@media print { @page { size: ${width} ${contentHeightMm}mm; margin: 0; } }`;
+    };
+    updatePrintSize();
+    const raf = requestAnimationFrame(updatePrintSize);
+    window.addEventListener("beforeprint", updatePrintSize);
+    window.addEventListener("resize", updatePrintSize);
     if (width === "58mm") html.classList.add("print-58mm");
     else html.classList.remove("print-58mm");
     return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("beforeprint", updatePrintSize);
+      window.removeEventListener("resize", updatePrintSize);
       html.classList.remove("print-58mm");
     };
-  }, [width]);
+  }, [width, invoice, settings]);
 
 
   return (
