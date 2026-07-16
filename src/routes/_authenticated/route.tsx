@@ -47,6 +47,8 @@ function Layout() {
       <div className="h-screen overflow-hidden flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
+          <PendingBanner />
+
           <header className="h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print gap-2">
             <SidebarTrigger />
             <div className="flex-1 min-w-0">
