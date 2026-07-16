@@ -22,6 +22,7 @@ import {
   Check,
   Wand2,
   Trash2,
+  CalendarClock,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
