@@ -265,6 +265,7 @@ function TenantsTab() {
               <TableHead>Owner</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Plan</TableHead>
+              <TableHead>Expiry</TableHead>
               <TableHead className="text-right">Users</TableHead>
               <TableHead className="text-right">Products</TableHead>
               <TableHead className="text-right">Sales</TableHead>
