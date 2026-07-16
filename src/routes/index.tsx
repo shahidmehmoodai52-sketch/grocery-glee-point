@@ -627,10 +627,10 @@ function LandingPage() {
           />
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { Icon: Facebook, label: "Facebook", handle: "@tillix.co", href: "https://facebook.com/tillix.co" },
-              { Icon: Instagram, label: "Instagram", handle: "@tillix.co", href: "https://instagram.com/tillix.co" },
-              { Icon: Linkedin, label: "LinkedIn", handle: "tillix-co", href: "https://linkedin.com/company/tillix-co" },
-              { Icon: Youtube, label: "YouTube", handle: "@tillixpos", href: "https://www.youtube.com/@tillixpos" },
+              { Icon: BrandFacebook, label: "Facebook", handle: "@tillix.co", href: "https://facebook.com/tillix.co" },
+              { Icon: BrandInstagram, label: "Instagram", handle: "@tillix.co", href: "https://instagram.com/tillix.co" },
+              { Icon: BrandLinkedin, label: "LinkedIn", handle: "tillix-co", href: "https://linkedin.com/company/tillix-co" },
+              { Icon: BrandYoutube, label: "YouTube", handle: "@tillixpos", href: "https://www.youtube.com/@tillixpos" },
             ].map(({ Icon, label, handle, href }) => (
               <a
                 key={label}
@@ -803,10 +803,10 @@ function LandingPage() {
             <div className="mt-6 text-xs font-bold uppercase tracking-wider text-tx-navy">Follow Tillix</div>
             <div className="mt-3 flex items-center gap-2">
               {[
-                { Icon: Facebook, label: "Facebook", href: "https://facebook.com/tillix.co" },
-                { Icon: Instagram, label: "Instagram", href: "https://instagram.com/tillix.co" },
-                { Icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
-                { Icon: Youtube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
+                { Icon: BrandFacebook, label: "Facebook", href: "https://facebook.com/tillix.co" },
+                { Icon: BrandInstagram, label: "Instagram", href: "https://instagram.com/tillix.co" },
+                { Icon: BrandLinkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
+                { Icon: BrandYoutube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
               ].map(({ Icon, label, href }) => (
                 <a
                   key={label}
