@@ -183,9 +183,26 @@
   html.print-58mm,
   html.print-58mm body { width: 58mm !important; }
   body * { visibility: hidden !important; box-sizing: border-box !important; }
+  html.receipt-printing body > :not(.receipt-print-root) { display: none !important; }
+  html.receipt-printing .receipt-print-root,
+  html.receipt-printing .receipt-print-root * { visibility: visible !important; }
+  html.receipt-printing .receipt-print-root {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
+  html.print-58mm.receipt-printing .receipt-print-root { width: 58mm !important; max-width: 58mm !important; }
   .print-area, .print-area * { visibility: visible !important; }
+  html.receipt-printing body > :not(.receipt-print-root) .print-area,
+  html.receipt-printing body > :not(.receipt-print-root) .print-area * { visibility: hidden !important; }
   .print-area {
-    position: fixed !important;
+    position: absolute !important;
     inset: 0 auto auto 0 !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -197,6 +214,14 @@
     break-after: avoid !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+  html.receipt-printing .receipt-print-root .print-area {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    transform: none !important;
+    overflow: visible !important;
   }
   html.print-58mm .print-area { width: 58mm !important; max-width: 58mm !important; }
   .print-area .receipt-paper {
