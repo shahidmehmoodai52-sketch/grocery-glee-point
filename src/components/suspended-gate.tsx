@@ -33,17 +33,21 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
     return <ShopSetup onDone={() => refetch()} />;
   }
 
-  if (status === "suspended" || status === "archived") {
+  if (status === "suspended" || status === "archived" || status === "expired") {
+    const isExpired = status === "expired";
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="max-w-md rounded-lg border border-destructive/40 bg-destructive/5 p-8 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-            <AlertOctagon className="h-6 w-6" />
+            {isExpired ? <Clock className="h-6 w-6" /> : <AlertOctagon className="h-6 w-6" />}
           </div>
-          <h1 className="mt-4 text-xl font-semibold">Shop suspended</h1>
+          <h1 className="mt-4 text-xl font-semibold">
+            {isExpired ? "Subscription expired" : "Shop suspended"}
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your shop has been {status === "archived" ? "archived" : "suspended"} by the platform administrator. Please
-            contact support to restore access.
+            {isExpired
+              ? "Your shop's subscription has expired. Please contact the developer (Shahid Mehmood · 0304-4604659) to renew your plan and restore access."
+              : `Your shop has been ${status === "archived" ? "archived" : "suspended"} by the platform administrator. Please contact support to restore access.`}
           </p>
           <Button
             className="mt-6"
