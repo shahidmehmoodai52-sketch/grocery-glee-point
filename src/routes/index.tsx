@@ -818,7 +818,16 @@ function LandingPage() {
             >
               tillix.co
             </a>{" "}
-            — Designed &amp; developed with precision for modern retail.
+            — Designed &amp; developed by{" "}
+            <a
+              href="https://logichills.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-slate-900 hover:underline"
+            >
+              logichills.com
+            </a>
+            .
           </div>
         </div>
       </footer>
