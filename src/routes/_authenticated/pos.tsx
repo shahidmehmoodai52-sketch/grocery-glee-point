@@ -705,12 +705,24 @@ function POSPage() {
       closeTab(active);
       // restored badge is cleared implicitly since tab is closed
       void 0;
-      setTimeout(() => searchRef.current?.focus(), 50);
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["expense_persons"] });
+
+      // Post-sale print behaviour, configurable in Settings.
+      const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled !== false;
+      const printDefault = ((settings as any)?.pos_print_prompt_default ?? "yes") as "yes" | "no";
+      if (printPromptEnabled) {
+        setPrintAsk(patchedSale);
+      } else if (printDefault === "yes" && patchedSale) {
+        setReprintView(patchedSale);
+        setTimeout(() => { printReceipt(); }, 150);
+        setTimeout(() => searchRef.current?.focus(), 50);
+      } else {
+        setTimeout(() => searchRef.current?.focus(), 50);
+      }
 
     } catch (err: any) {
       toast.error(err.message ?? "Failed to complete sale");
