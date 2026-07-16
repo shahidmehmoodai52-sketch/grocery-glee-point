@@ -56,13 +56,17 @@ type Props = {
   kind?: "sale" | "sale-return" | "purchase-return";
 };
 
-function setReceiptPrintPageSize(styleEl: HTMLStyleElement, preferredWidth: string) {
-  const receipt = document.querySelector<HTMLElement>(".print-area .receipt-paper, .receipt-paper");
+function setReceiptPrintPageSize(
+  styleEl: HTMLStyleElement,
+  preferredWidth: string,
+  scope: ParentNode = document,
+) {
+  const receipt = scope.querySelector<HTMLElement>(".receipt-paper");
   const rect = receipt?.getBoundingClientRect();
   const measuredWidthMm = rect ? (rect.width * 25.4) / 96 : Number.parseFloat(preferredWidth);
   const width = measuredWidthMm <= 65 ? "58mm" : "80mm";
   const contentHeightPx = rect?.height ?? 0;
-  const contentHeightMm = Math.max(40, Math.ceil((contentHeightPx * 25.4) / 96) + 2);
+  const contentHeightMm = Math.max(40, Math.ceil((contentHeightPx * 25.4) / 96) + 4);
 
   styleEl.textContent = `
     @media print {
@@ -73,16 +77,34 @@ function setReceiptPrintPageSize(styleEl: HTMLStyleElement, preferredWidth: stri
         min-height: 0 !important;
         overflow: hidden !important;
       }
-      body > :not(:has(.print-area)) { display: none !important; }
-      .print-area {
+      html.receipt-printing body > :not(.receipt-print-root) { display: none !important; }
+      html.receipt-printing .receipt-print-root {
+        display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
         width: ${width} !important;
-        height: ${contentHeightMm}mm !important;
         min-height: 0 !important;
-        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: none !important;
+        overflow: visible !important;
       }
-      .print-area .receipt-paper {
+      html.receipt-printing .receipt-print-root .print-area {
+        position: static !important;
+        width: ${width} !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: none !important;
+        overflow: visible !important;
+      }
+      html.receipt-printing .receipt-print-root .receipt-paper {
         min-height: 0 !important;
         height: auto !important;
+        margin: 0 !important;
+        transform: none !important;
       }
     }
   `;
@@ -90,6 +112,18 @@ function setReceiptPrintPageSize(styleEl: HTMLStyleElement, preferredWidth: stri
 
 export function printReceipt() {
   if (typeof document === "undefined" || typeof window === "undefined") return;
+  document.querySelector(".receipt-print-root")?.remove();
+  const source = document.querySelector<HTMLElement>(".print-area");
+  if (!source) {
+    window.print();
+    return;
+  }
+  const printRoot = document.createElement("div");
+  printRoot.className = "receipt-print-root";
+  printRoot.appendChild(source.cloneNode(true));
+  document.body.appendChild(printRoot);
+  document.documentElement.classList.add("receipt-printing");
+
   const styleId = "receipt-print-page-size";
   let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
   if (!styleEl) {
@@ -97,7 +131,13 @@ export function printReceipt() {
     styleEl.id = styleId;
     document.head.appendChild(styleEl);
   }
-  setReceiptPrintPageSize(styleEl, "80mm");
+  const cleanup = () => {
+    document.documentElement.classList.remove("receipt-printing");
+    printRoot.remove();
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+  setReceiptPrintPageSize(styleEl, "80mm", printRoot);
   requestAnimationFrame(() => window.print());
 }
 
