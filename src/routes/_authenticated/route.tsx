@@ -1,5 +1,6 @@
-import { createFileRoute, Outlet, redirect, useRouter, Link } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouter, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { LogOut } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
