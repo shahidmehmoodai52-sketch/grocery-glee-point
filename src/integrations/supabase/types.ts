@@ -3410,6 +3410,10 @@ export type Database = {
         Returns: number
       }
       admin_security_summary: { Args: never; Returns: Json }
+      admin_set_tenant_expiry: {
+        Args: { _expires_at: string; _tenant_id: string }
+        Returns: undefined
+      }
       admin_set_tenant_plan: {
         Args: {
           _expires_at?: string
