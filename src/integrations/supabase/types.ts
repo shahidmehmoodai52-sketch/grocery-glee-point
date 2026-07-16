@@ -3779,6 +3779,27 @@ export type Database = {
         Returns: string
       }
       shift_report: { Args: { _shift_id: string }; Returns: Json }
+      shop_owner_finalize_staff: {
+        Args: {
+          _perms?: string[]
+          _role: Database["public"]["Enums"]["app_role"]
+          _staff_user_id: string
+          _username: string
+        }
+        Returns: undefined
+      }
+      shop_owner_remove_staff: {
+        Args: { _staff_user_id: string }
+        Returns: undefined
+      }
+      shop_owner_set_staff_access: {
+        Args: {
+          _perms?: string[]
+          _role: Database["public"]["Enums"]["app_role"]
+          _staff_user_id: string
+        }
+        Returns: undefined
+      }
       tenant_category_allowed: {
         Args: { _category: string; _tenant: string }
         Returns: boolean
