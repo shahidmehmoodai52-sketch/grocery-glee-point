@@ -11,6 +11,8 @@ import { RouteGuard } from "@/components/route-guard";
 import { LowStockAlerts } from "@/components/low-stock-alerts";
 import { useSettings } from "@/hooks/use-settings";
 import { setDefaultCurrencySymbol } from "@/lib/format";
+import { PendingBanner } from "@/components/pending-banner";
+
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
