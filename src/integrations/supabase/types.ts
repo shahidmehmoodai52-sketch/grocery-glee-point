@@ -2502,6 +2502,8 @@ export type Database = {
           payment_qr_label: string | null
           payment_qr_url: string | null
           phone: string | null
+          pos_print_prompt_default: string
+          pos_print_prompt_enabled: boolean
           receipt_footer: string | null
           receipt_header: string | null
           show_address: boolean
@@ -2551,6 +2553,8 @@ export type Database = {
           payment_qr_label?: string | null
           payment_qr_url?: string | null
           phone?: string | null
+          pos_print_prompt_default?: string
+          pos_print_prompt_enabled?: boolean
           receipt_footer?: string | null
           receipt_header?: string | null
           show_address?: boolean
@@ -2600,6 +2604,8 @@ export type Database = {
           payment_qr_label?: string | null
           payment_qr_url?: string | null
           phone?: string | null
+          pos_print_prompt_default?: string
+          pos_print_prompt_enabled?: boolean
           receipt_footer?: string | null
           receipt_header?: string | null
           show_address?: boolean
@@ -3668,6 +3674,8 @@ export type Database = {
           payment_qr_label: string | null
           payment_qr_url: string | null
           phone: string | null
+          pos_print_prompt_default: string
+          pos_print_prompt_enabled: boolean
           receipt_footer: string | null
           receipt_header: string | null
           show_address: boolean

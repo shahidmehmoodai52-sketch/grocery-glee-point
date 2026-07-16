@@ -149,6 +149,7 @@ function POSPage() {
   const [lastInvoice, setLastInvoice] = useState<any>(null);
   const [reprintOpen, setReprintOpen] = useState(false);
   const [reprintView, setReprintView] = useState<any>(null);
+  const [printAsk, setPrintAsk] = useState<any>(null);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const [heldOpen, setHeldOpen] = useState(false);
   const [holding, setHolding] = useState(false);
@@ -704,12 +705,24 @@ function POSPage() {
       closeTab(active);
       // restored badge is cleared implicitly since tab is closed
       void 0;
-      setTimeout(() => searchRef.current?.focus(), 50);
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["expense_persons"] });
+
+      // Post-sale print behaviour, configurable in Settings.
+      const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled !== false;
+      const printDefault = ((settings as any)?.pos_print_prompt_default ?? "yes") as "yes" | "no";
+      if (printPromptEnabled) {
+        setPrintAsk(patchedSale);
+      } else if (printDefault === "yes" && patchedSale) {
+        setReprintView(patchedSale);
+        setTimeout(() => { printReceipt(); }, 150);
+        setTimeout(() => searchRef.current?.focus(), 50);
+      } else {
+        setTimeout(() => searchRef.current?.focus(), 50);
+      }
 
     } catch (err: any) {
       toast.error(err.message ?? "Failed to complete sale");
@@ -1590,6 +1603,25 @@ function POSPage() {
         onClose={() => setReprintView(null)}
       />
 
+      {/* Post-sale print prompt — Enter triggers the default action (Settings > POS). */}
+      <PrintPromptDialog
+        sale={printAsk}
+        defaultAction={((settings as any)?.pos_print_prompt_default ?? "yes") as "yes" | "no"}
+        onYes={() => {
+          const s = printAsk;
+          setPrintAsk(null);
+          if (s) {
+            setReprintView(s);
+            setTimeout(() => { printReceipt(); }, 150);
+          }
+          setTimeout(() => searchRef.current?.focus(), 50);
+        }}
+        onNo={() => {
+          setPrintAsk(null);
+          setTimeout(() => searchRef.current?.focus(), 50);
+        }}
+      />
+
       {/* Quick-add product dialog — for scanned/typed items not yet in catalog */}
       <Dialog open={quickAdd.open} onOpenChange={(v) => setQuickAdd((q) => ({ ...q, open: v }))}>
         <DialogContent className="max-w-md">
@@ -1890,6 +1922,64 @@ function Kbd({ label, hint }: { label: string; hint: string }) {
       <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono font-semibold text-foreground">{label}</kbd>
       <span>{hint}</span>
     </div>
+  );
+}
+
+function PrintPromptDialog({
+  sale,
+  defaultAction,
+  onYes,
+  onNo,
+}: {
+  sale: any;
+  defaultAction: "yes" | "no";
+  onYes: () => void;
+  onNo: () => void;
+}) {
+  const yesRef = useRef<HTMLButtonElement>(null);
+  const noRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!sale) return;
+    const t = setTimeout(() => {
+      (defaultAction === "yes" ? yesRef.current : noRef.current)?.focus();
+    }, 30);
+    return () => clearTimeout(t);
+  }, [sale, defaultAction]);
+  return (
+    <Dialog open={!!sale} onOpenChange={(o) => !o && onNo()}>
+      <DialogContent
+        className="max-w-xs"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (defaultAction === "yes" ? onYes : onNo)();
+          }
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Print receipt?</DialogTitle>
+        </DialogHeader>
+        <div className="text-sm text-muted-foreground">
+          Invoice <span className="font-mono">{sale?.invoice_no}</span> saved. Print it now?
+        </div>
+        <DialogFooter className="gap-2">
+          <Button
+            ref={noRef}
+            variant={defaultAction === "no" ? "default" : "outline"}
+            onClick={onNo}
+          >
+            No
+          </Button>
+          <Button
+            ref={yesRef}
+            variant={defaultAction === "yes" ? "default" : "outline"}
+            onClick={onYes}
+          >
+            <Printer className="h-4 w-4 mr-2" />Yes, print
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

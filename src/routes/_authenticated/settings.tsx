@@ -33,6 +33,7 @@ const FIELDS = [
   "ops_allow_multiple_shifts", "ops_cash_drawer_enabled", "ops_safe_drop_enabled",
   "ops_paid_in_out_enabled", "ops_shift_notes_enabled", "ops_pending_tasks_enabled",
   "ops_receipt_reprint_enabled",
+  "pos_print_prompt_enabled", "pos_print_prompt_default",
 ] as const;
 
 const CURRENCY_CODES = [
@@ -295,6 +296,39 @@ function Page() {
               ))}
             </div>
           </Card>
+
+          <Card className="p-5 space-y-3">
+            <div>
+              <div className="font-medium">Post-sale print prompt</div>
+              <div className="text-xs text-muted-foreground">
+                After completing a sale, ask the cashier whether to print the receipt. Pressing Enter picks the default below.
+              </div>
+            </div>
+            <label className="flex items-center justify-between rounded border p-2 text-sm">
+              <span>Show Yes/No print prompt after each sale</span>
+              <Switch
+                checked={form.pos_print_prompt_enabled !== false}
+                onCheckedChange={(v) => set({ pos_print_prompt_enabled: v })}
+              />
+            </label>
+            <div>
+              <Label>Default action (Enter key)</Label>
+              <Select
+                value={form.pos_print_prompt_default ?? "yes"}
+                onValueChange={(v) => set({ pos_print_prompt_default: v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes — print receipt</SelectItem>
+                  <SelectItem value="no">No — skip printing</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-muted-foreground mt-1">
+                When the prompt is off, this default runs automatically after every sale.
+              </div>
+            </div>
+          </Card>
+
 
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
