@@ -165,7 +165,7 @@ function StaffTab({ shopCode }: { shopCode: string }) {
               </div>
               <div>
                 <Label>Password</Label>
-                <Input type="text" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="min 6 chars" />
+                <Input type="text" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="8+ chars, Aa and 1" />
               </div>
               <div>
                 <Label>Role</Label>
@@ -199,7 +199,7 @@ function StaffTab({ shopCode }: { shopCode: string }) {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setNewOpen(false)}>Cancel</Button>
-              <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !username || pwd.length < 6}>
+              <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !username || pwd.length < 8}>
                 {createMut.isPending ? "Creating…" : "Create"}
               </Button>
             </DialogFooter>
@@ -316,10 +316,10 @@ function StaffRow({ u, reset, del, refresh }: any) {
               <DialogTrigger asChild><Button size="sm" variant="outline"><KeyRound className="h-3.5 w-3.5 mr-1" />Password</Button></DialogTrigger>
               <DialogContent className="max-w-sm">
                 <DialogHeader><DialogTitle>Set new password for {u.username}</DialogTitle></DialogHeader>
-                <Input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} placeholder="min 6 chars" />
+                <Input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} placeholder="8+ chars, Aa and 1" />
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
-                  <Button onClick={() => resetMut.mutate()} disabled={resetMut.isPending || newPwd.length < 6}>Update</Button>
+                  <Button onClick={() => resetMut.mutate()} disabled={resetMut.isPending || newPwd.length < 8}>Update</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

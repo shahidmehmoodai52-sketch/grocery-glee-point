@@ -1,32 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireCloudAuth } from "@/lib/cloud-auth-middleware";
-
-// Verify caller owns the tenant they operate on and return that tenant.
-async function callerTenant(context: any): Promise<{ tenant_id: string; slug: string }> {
-  const { data: tid, error: e1 } = await context.supabase.rpc("current_tenant_id");
-  if (e1 || !tid) throw new Error("No shop found for your account");
-  const { data: t, error: e2 } = await context.supabase
-    .from("tenants")
-    .select("id, slug, owner_id")
-    .eq("id", tid)
-    .maybeSingle();
-  if (e2 || !t) throw new Error("Shop not found");
-  if (t.owner_id !== context.userId) throw new Error("Only the shop owner can manage staff");
-  if (!t.slug) throw new Error("Shop code missing — contact support");
-  return { tenant_id: t.id, slug: t.slug };
-}
-
-function internalEmail(username: string, slug: string) {
-  const clean = username.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
-  if (!clean || clean.length < 2) throw new Error("Username must be 2+ chars (letters, numbers, . _ -)");
-  return `${clean}@shop-${slug}.local`;
-}
-
-function usernameFromEmail(email: string | null | undefined, slug: string) {
-  if (!email) return "";
-  const suffix = `@shop-${slug}.local`;
-  return email.endsWith(suffix) ? email.slice(0, -suffix.length) : email;
-}
+import {
+  assertStrongStaffPassword,
+  callerTenant,
+  cleanUsername,
+  displayUsername,
+  getSignupClient,
+  internalEmail,
+} from "@/lib/shop-admin.server";
 
 export const getMyShopInfo = createServerFn({ method: "GET" })
   .middleware([requireCloudAuth])
@@ -54,11 +35,9 @@ export const getMyShopInfo = createServerFn({ method: "GET" })
 export const listShopStaff = createServerFn({ method: "GET" })
   .middleware([requireCloudAuth])
   .handler(async ({ context }) => {
-    const { tenant_id, slug } = await callerTenant(context);
-    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
-    const supabaseAdmin = getSupabaseAdmin();
+    const { tenant_id } = await callerTenant(context);
 
-    const { data: members, error } = await supabaseAdmin
+    const { data: members, error } = await context.supabase
       .from("tenant_members")
       .select("user_id, role")
       .eq("tenant_id", tenant_id);
@@ -67,24 +46,28 @@ export const listShopStaff = createServerFn({ method: "GET" })
     const ids = (members ?? []).map((m) => m.user_id);
     if (!ids.length) return [];
 
-    const [rolesRes, permsRes, ...userRes] = await Promise.all([
-      supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids),
-      supabaseAdmin.from("user_permissions").select("user_id, perm").in("user_id", ids),
-      ...ids.map((id) => supabaseAdmin.auth.admin.getUserById(id)),
+    const [rolesRes, permsRes, profilesRes] = await Promise.all([
+      context.supabase.from("user_roles").select("user_id, role").in("user_id", ids),
+      context.supabase.from("user_permissions").select("user_id, perm").in("user_id", ids),
+      context.supabase.from("profiles").select("id, full_name, created_at").in("id", ids),
     ]);
+    if (rolesRes.error) throw rolesRes.error;
+    if (permsRes.error) throw permsRes.error;
+    if (profilesRes.error) throw profilesRes.error;
+
     const roles = rolesRes.data ?? [];
     const perms = permsRes.data ?? [];
+    const profiles = profilesRes.data ?? [];
 
     return ids
-      .map((id, i) => {
-        const u = (userRes[i] as any)?.data?.user;
-        if (!u) return null;
+      .map((id) => {
+        const profile = profiles.find((p) => p.id === id);
         const role = roles.find((r) => r.user_id === id)?.role ?? "cashier";
         return {
           id,
-          username: usernameFromEmail(u.email, slug),
-          email: u.email,
-          created_at: u.created_at,
+          username: displayUsername(profile?.full_name, id),
+          email: null,
+          created_at: profile?.created_at ?? null,
           role,
           is_owner: id === context.userId,
           perms: perms.filter((p) => p.user_id === id).map((p) => p.perm),
@@ -97,54 +80,41 @@ export const createShopStaff = createServerFn({ method: "POST" })
   .middleware([requireCloudAuth])
   .inputValidator((data: { username: string; password: string; role: "admin" | "cashier"; perms: string[] }) => data)
   .handler(async ({ data, context }) => {
-    const { tenant_id, slug } = await callerTenant(context);
-    if (!data.password || data.password.length < 6) throw new Error("Password must be 6+ chars");
-    const email = internalEmail(data.username, slug);
+    const { slug } = await callerTenant(context);
+    const username = cleanUsername(data.username);
+    assertStrongStaffPassword(data.password);
+    const email = internalEmail(username, slug);
+    const signupClient = getSignupClient();
 
-    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
-    const supabaseAdmin = getSupabaseAdmin();
-
-    // Prevent duplicate username in the same shop
-    const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
-    if (existing.users.some((u) => u.email === email)) {
-      throw new Error(`Username "${data.username}" already exists in this shop`);
-    }
-
-    const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+    const { data: created, error } = await signupClient.auth.signUp({
       email,
       password: data.password,
-      email_confirm: true,
+      options: { data: { full_name: username } },
     });
     if (error) {
       if ((error as any)?.code === "weak_password" || /weak/i.test(error.message)) {
         throw new Error("Password is too weak or common. Use a longer password with mixed characters.");
       }
+      if (/already|registered|exists/i.test(error.message)) {
+        throw new Error(`Username "${username}" already exists in this shop`);
+      }
       throw new Error(error.message);
     }
-    const uid = created.user!.id;
-
-    // Override the default role/tenant assigned by handle_new_user trigger
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", uid);
-    await supabaseAdmin.from("user_roles").insert({ user_id: uid, role: data.role });
-
-    if (data.role === "cashier" && data.perms.length) {
-      await supabaseAdmin.from("user_permissions").insert(
-        data.perms.map((p) => ({ user_id: uid, perm: p, granted_by: context.userId })),
-      );
+    const uid = created.user?.id;
+    const identities = (created.user as any)?.identities;
+    if (!uid || (Array.isArray(identities) && identities.length === 0)) {
+      throw new Error(`Username "${username}" already exists in this shop`);
     }
 
-    // Move into this tenant
-    await supabaseAdmin.from("tenant_members").delete().eq("user_id", uid);
-    await supabaseAdmin.from("tenant_members").insert({
-      user_id: uid,
-      tenant_id,
-      role: data.role === "admin" ? "admin" : "cashier",
+    const { error: finalizeError } = await context.supabase.rpc("shop_owner_finalize_staff", {
+      _staff_user_id: uid,
+      _username: username,
+      _role: data.role,
+      _perms: data.role === "cashier" ? data.perms : [],
     });
+    if (finalizeError) throw new Error(finalizeError.message);
 
-    // The trigger may have auto-created a tenant for this new user — clean up.
-    await supabaseAdmin.from("tenants").delete().eq("owner_id", uid).neq("id", tenant_id);
-
-    return { id: uid, username: data.username };
+    return { id: uid, username };
   });
 
 export const resetShopStaffPassword = createServerFn({ method: "POST" })
@@ -152,48 +122,28 @@ export const resetShopStaffPassword = createServerFn({ method: "POST" })
   .inputValidator((data: { user_id: string; password: string }) => data)
   .handler(async ({ data, context }) => {
     const { tenant_id } = await callerTenant(context);
-    if (!data.password || data.password.length < 6) throw new Error("Password must be 6+ chars");
-    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
-    const supabaseAdmin = getSupabaseAdmin();
+    assertStrongStaffPassword(data.password);
 
-    const { data: m } = await supabaseAdmin
+    const { data: m, error: memberError } = await context.supabase
       .from("tenant_members").select("user_id").eq("tenant_id", tenant_id).eq("user_id", data.user_id).maybeSingle();
+    if (memberError) throw memberError;
     if (!m) throw new Error("This user is not part of your shop");
 
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { password: data.password });
-    if (error) {
-      if ((error as any)?.code === "weak_password" || /weak/i.test(error.message)) {
-        throw new Error("Password is too weak or common. Use a longer password with mixed characters.");
-      }
-      throw new Error(error.message);
-    }
-    return { ok: true };
+    throw new Error("Password reset is unavailable for staff accounts. Remove this staff member and create a new login with the new password.");
   });
 
 export const setShopStaffPerms = createServerFn({ method: "POST" })
   .middleware([requireCloudAuth])
   .inputValidator((data: { user_id: string; role: "admin" | "cashier"; perms: string[] }) => data)
   .handler(async ({ data, context }) => {
-    const { tenant_id } = await callerTenant(context);
+    await callerTenant(context);
     if (data.user_id === context.userId) throw new Error("You cannot change your own role");
-    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
-    const supabaseAdmin = getSupabaseAdmin();
-
-    const { data: m } = await supabaseAdmin
-      .from("tenant_members").select("user_id").eq("tenant_id", tenant_id).eq("user_id", data.user_id).maybeSingle();
-    if (!m) throw new Error("This user is not part of your shop");
-
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
-    await supabaseAdmin.from("user_roles").insert({ user_id: data.user_id, role: data.role });
-    await supabaseAdmin.from("user_permissions").delete().eq("user_id", data.user_id);
-    if (data.role === "cashier" && data.perms.length) {
-      await supabaseAdmin.from("user_permissions").insert(
-        data.perms.map((p) => ({ user_id: data.user_id, perm: p, granted_by: context.userId })),
-      );
-    }
-    await supabaseAdmin.from("tenant_members")
-      .update({ role: data.role === "admin" ? "admin" : "cashier" })
-      .eq("tenant_id", tenant_id).eq("user_id", data.user_id);
+    const { error } = await context.supabase.rpc("shop_owner_set_staff_access", {
+      _staff_user_id: data.user_id,
+      _role: data.role,
+      _perms: data.role === "cashier" ? data.perms : [],
+    });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
@@ -201,24 +151,9 @@ export const deleteShopStaff = createServerFn({ method: "POST" })
   .middleware([requireCloudAuth])
   .inputValidator((data: { user_id: string }) => data)
   .handler(async ({ data, context }) => {
-    const { tenant_id } = await callerTenant(context);
+    await callerTenant(context);
     if (data.user_id === context.userId) throw new Error("You cannot remove yourself");
-    const { getSupabaseAdmin } = await import("@/lib/admin-client.server");
-    const supabaseAdmin = getSupabaseAdmin();
-
-    const { data: m } = await supabaseAdmin
-      .from("tenant_members").select("user_id").eq("tenant_id", tenant_id).eq("user_id", data.user_id).maybeSingle();
-    if (!m) throw new Error("This user is not part of your shop");
-
-    // Only delete auth user if their email is an internal shop staff email.
-    const { data: users } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
-    const target = users.users.find((u) => u.id === data.user_id);
-    const isInternal = target?.email?.endsWith(".local") ?? false;
-
-    await supabaseAdmin.from("tenant_members").delete().eq("user_id", data.user_id).eq("tenant_id", tenant_id);
-    if (isInternal) {
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
-      if (error) throw error;
-    }
+    const { error } = await context.supabase.rpc("shop_owner_remove_staff", { _staff_user_id: data.user_id });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
