@@ -85,10 +85,10 @@ app.whenReady().then(async () => {
   try {
     let startUrl;
     if (IS_DEV) {
-      startUrl = DEV_URL;
+      startUrl = `${DEV_URL.replace(/\/$/, '')}/dashboard`;
     } else {
       await startNitroServer();
-      startUrl = `http://127.0.0.1:${nitroPort}/`;
+      startUrl = `http://127.0.0.1:${nitroPort}/dashboard`;
     }
     createWindow(startUrl);
     if (!IS_DEV) setupAutoUpdater(mainWindow);
