@@ -1925,6 +1925,64 @@ function Kbd({ label, hint }: { label: string; hint: string }) {
   );
 }
 
+function PrintPromptDialog({
+  sale,
+  defaultAction,
+  onYes,
+  onNo,
+}: {
+  sale: any;
+  defaultAction: "yes" | "no";
+  onYes: () => void;
+  onNo: () => void;
+}) {
+  const yesRef = useRef<HTMLButtonElement>(null);
+  const noRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!sale) return;
+    const t = setTimeout(() => {
+      (defaultAction === "yes" ? yesRef.current : noRef.current)?.focus();
+    }, 30);
+    return () => clearTimeout(t);
+  }, [sale, defaultAction]);
+  return (
+    <Dialog open={!!sale} onOpenChange={(o) => !o && onNo()}>
+      <DialogContent
+        className="max-w-xs"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (defaultAction === "yes" ? onYes : onNo)();
+          }
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Print receipt?</DialogTitle>
+        </DialogHeader>
+        <div className="text-sm text-muted-foreground">
+          Invoice <span className="font-mono">{sale?.invoice_no}</span> saved. Print it now?
+        </div>
+        <DialogFooter className="gap-2">
+          <Button
+            ref={noRef}
+            variant={defaultAction === "no" ? "default" : "outline"}
+            onClick={onNo}
+          >
+            No
+          </Button>
+          <Button
+            ref={yesRef}
+            variant={defaultAction === "yes" ? "default" : "outline"}
+            onClick={onYes}
+          >
+            <Printer className="h-4 w-4 mr-2" />Yes, print
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function InvoiceDialog({ invoice, settings, onClose }: any) {
   if (!invoice) return null;
   return (
