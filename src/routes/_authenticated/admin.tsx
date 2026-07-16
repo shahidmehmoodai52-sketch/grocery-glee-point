@@ -378,7 +378,7 @@ function ExpiryCell({ tenantId, expiresAt }: { tenantId: string; expiresAt: stri
     const iso = value ? new Date(value + "T23:59:59").toISOString() : null;
     const { error } = await supabase.rpc("admin_set_tenant_expiry", {
       _tenant_id: tenantId,
-      _expires_at: iso,
+      _expires_at: iso as any,
     });
     setBusy(false);
     if (error) return toast.error(error.message);
