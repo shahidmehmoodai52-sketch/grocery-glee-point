@@ -306,7 +306,7 @@ function Page() {
           </div>
           <DialogFooter className="no-print">
             <Button variant="outline" onClick={() => setOpenInvoice(null)}>Close</Button>
-            <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+            <Button onClick={printReceipt}><Printer className="h-4 w-4 mr-2" />Print</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
