@@ -174,14 +174,18 @@
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: auto !important;
-    height: auto !important;
+    width: 80mm !important;
+    min-width: 0 !important;
+    height: fit-content !important;
+    min-height: 0 !important;
     overflow: hidden !important;
   }
+  html.print-58mm,
+  html.print-58mm body { width: 58mm !important; }
   body * { visibility: hidden !important; box-sizing: border-box !important; }
   .print-area, .print-area * { visibility: visible !important; }
   .print-area {
-    position: absolute !important;
+    position: fixed !important;
     inset: 0 auto auto 0 !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -191,6 +195,8 @@
     overflow: hidden !important;
     page-break-after: avoid !important;
     break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
   html.print-58mm .print-area { width: 58mm !important; max-width: 58mm !important; }
   .print-area .receipt-paper {
@@ -200,8 +206,11 @@
     max-width: 100% !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
+    display: block !important;
     page-break-after: avoid !important;
     break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
   .print-area > *:last-child,
   .print-area *:last-child {

@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
-import { Receipt } from "@/components/receipt";
+import { Receipt, printReceipt } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
 import {
@@ -1908,7 +1908,7 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
         </div>
         <DialogFooter className="no-print">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          <Button onClick={printReceipt}><Printer className="h-4 w-4 mr-2" />Print</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
