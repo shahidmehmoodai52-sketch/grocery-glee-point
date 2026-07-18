@@ -66,7 +66,15 @@ const FAQS: { q: string; a: string }[] = [
 
 export const Route = createFileRoute("/")({
   beforeLoad: () => {
-    if (import.meta.env.DEV) {
+    const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+    const isLovablePreview =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.startsWith("id-preview--") ||
+      hostname.includes("-preview--") ||
+      hostname.endsWith("-dev.lovable.app");
+
+    if (import.meta.env.DEV || isLovablePreview) {
       throw redirect({ to: "/pos" });
     }
   },
