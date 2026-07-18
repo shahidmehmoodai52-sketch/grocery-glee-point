@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
@@ -65,19 +65,6 @@ const FAQS: { q: string; a: string }[] = [
 ];
 
 export const Route = createFileRoute("/")({
-  beforeLoad: () => {
-    const hostname = typeof window !== "undefined" ? window.location.hostname : "";
-    const isLovablePreview =
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname.startsWith("id-preview--") ||
-      hostname.includes("-preview--") ||
-      hostname.endsWith("-dev.lovable.app");
-
-    if (import.meta.env.DEV || isLovablePreview) {
-      throw redirect({ to: "/pos" });
-    }
-  },
   head: () => ({
     meta: [
       { title: "Tillix – Smart Retail Starts Here | Cloud POS & Retail Management Software" },
