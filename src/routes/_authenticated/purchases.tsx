@@ -194,14 +194,18 @@ function Page() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New purchase</Button></DialogTrigger>
-          <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>New purchase</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+          <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
+            <DialogHeader className="px-6 py-3 border-b shrink-0">
+              <DialogTitle>New purchase</DialogTitle>
+            </DialogHeader>
+
+            {/* Top bar: supplier + big scan/search — POS style */}
+            <div className="px-6 py-4 border-b bg-muted/30 shrink-0">
+              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3 items-end">
                 <div>
-                  <Label>Supplier</Label>
+                  <Label className="text-xs">Supplier</Label>
                   <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
-                    <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                    <SelectTrigger className="h-12"><SelectValue placeholder="Select supplier" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">— None —</SelectItem>
                       {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -209,9 +213,9 @@ function Page() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Search &amp; add product</Label>
+                  <Label className="text-xs">Scan or search product</Label>
                   <div className="relative">
-                    <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Search className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <Input
                       ref={searchRef}
                       value={entrySearch}
@@ -219,24 +223,18 @@ function Page() {
                       onBlur={() => setTimeout(() => setEntryActive(false), 120)}
                       onChange={(e) => { setEntrySearch(e.target.value); setEntryActive(true); setEntryIndex(0); }}
                       onKeyDown={(e) => {
-                        if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          setEntryIndex((n) => Math.min(n + 1, Math.max(entryMatches.length - 1, 0)));
-                        }
-                        if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          setEntryIndex((n) => Math.max(n - 1, 0));
-                        }
+                        if (e.key === "ArrowDown") { e.preventDefault(); setEntryIndex((n) => Math.min(n + 1, Math.max(entryMatches.length - 1, 0))); }
+                        if (e.key === "ArrowUp") { e.preventDefault(); setEntryIndex((n) => Math.max(n - 1, 0)); }
                         if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
                       }}
-                      placeholder="Scan barcode or type name, press Enter…"
-                      className="pl-8 h-10"
+                      placeholder="🔍  Scan barcode or type name, press Enter to add…"
+                      className="pl-10 h-12 text-base"
                       autoFocus
                     />
                     {entryActive && entrySearch.trim() && (
-                      <div className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md">
+                      <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover p-1 shadow-lg">
                         {entryMatches.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-muted-foreground">No stock item found. Press Enter to add new item.</div>
+                          <div className="px-3 py-2 text-sm text-muted-foreground">No stock item found. Press Enter to add as new item.</div>
                         ) : entryMatches.map((p, idx) => (
                           <button
                             key={p.id}
@@ -259,110 +257,121 @@ function Page() {
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2">
+            {/* Selected items — takes all available space */}
+            <div className="flex-1 min-h-0 flex flex-col px-6 py-3 overflow-hidden">
+              <div className="flex items-center justify-between mb-2 shrink-0">
                 <div className="text-sm">
-                  <span className="font-medium">{lines.length}</span>
-                  <span className="text-muted-foreground"> item{lines.length === 1 ? "" : "s"} added</span>
-                  {lines.length > 0 && (
-                    <span className="ml-2 text-xs text-muted-foreground">— add all items, then press <b>Record purchase</b> to save</span>
-                  )}
+                  <span className="font-semibold text-base">{lines.length}</span>
+                  <span className="text-muted-foreground"> item{lines.length === 1 ? "" : "s"} in this purchase</span>
                 </div>
                 <Button type="button" size="sm" variant="outline" onClick={() => { addProductLine(null, ""); }}>
                   <Plus className="h-4 w-4 mr-1" /> Add empty row
                 </Button>
               </div>
 
-              <div className="border rounded-md overflow-x-auto">
-                <Table className="min-w-[860px] table-fixed">
-                  <TableHeader><TableRow>
-                    <TableHead className="w-[180px]">Product</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="w-[150px]">Cost</TableHead>
-                    <TableHead className="w-[140px]">Qty</TableHead>
-                    <TableHead className="w-24 text-right">Old Avg</TableHead>
-                    <TableHead className="w-24 text-right">New Avg</TableHead>
-                    <TableHead className="w-16 text-right">Δ%</TableHead>
-                    <TableHead className="text-right w-[120px]">Total</TableHead><TableHead className="w-11"></TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {lines.map((l, i) => {
-                      const oldStock = Number(l.old_stock ?? 0);
-                      const oldCost = Number(l.old_cost ?? 0);
-                      const qty = Number(l.qty || 0);
-                      const cost = Number(l.cost || 0);
-                      const hasProduct = !!l.product_id;
-                      const newAvg = hasProduct
-                        ? (oldStock > 0 ? (oldStock * oldCost + qty * cost) / (oldStock + qty) : cost)
-                        : cost;
-                      const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
-                      const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
-                      return (
-                      <TableRow key={i}>
-                        <TableCell className="align-middle">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">{l.barcode || (hasProduct ? "Stock item" : "New item")}</div>
-                            <div className="truncate text-[11px] text-muted-foreground">stock {oldStock}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-10" /></TableCell>
-                        <TableCell>
-                          <Input
-                            id={`purchase-cost-${i}`}
-                            type="number"
-                            step="0.01"
-                            value={l.cost}
-                            onChange={(e) => setLine(i, { cost: Number(e.target.value) })}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); }
-                            }}
-                            className="h-10 text-right text-base"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`purchase-qty-${i}`}
-                            type="number"
-                            step="0.001"
-                            value={l.qty}
-                            onChange={(e) => setLine(i, { qty: Number(e.target.value) })}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusSearch(); }
-                            }}
-                            className="h-10 text-right text-base"
-                          />
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
-                        </TableCell>
-                        <TableCell className="text-right text-xs font-medium">
-                          {hasProduct ? fmtMoney(newAvg, sym) : "—"}
-                        </TableCell>
-                        <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
-                          {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}%` : "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">{fmtMoney(qty * cost, sym)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" onClick={() => setLines(lines.filter((_, x) => x !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+              <div className="flex-1 min-h-0 border rounded-md overflow-auto">
+                {lines.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
+                    <Search className="h-10 w-10 mb-3 opacity-40" />
+                    <p className="text-sm font-medium">No items added yet</p>
+                    <p className="text-xs mt-1">Scan a barcode or type a product name above, then press Enter.</p>
+                  </div>
+                ) : (
+                  <Table className="min-w-[900px]">
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead className="w-[170px]">Product</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="w-[140px]">Cost</TableHead>
+                        <TableHead className="w-[130px]">Qty</TableHead>
+                        <TableHead className="w-24 text-right">Old Avg</TableHead>
+                        <TableHead className="w-24 text-right">New Avg</TableHead>
+                        <TableHead className="w-16 text-right">Δ%</TableHead>
+                        <TableHead className="text-right w-[120px]">Total</TableHead>
+                        <TableHead className="w-11"></TableHead>
                       </TableRow>
-                      );
-                    })}
-                  </TableBody>
-
-                </Table>
-                <div className="p-2"></div>
+                    </TableHeader>
+                    <TableBody>
+                      {lines.map((l, i) => {
+                        const oldStock = Number(l.old_stock ?? 0);
+                        const oldCost = Number(l.old_cost ?? 0);
+                        const qty = Number(l.qty || 0);
+                        const cost = Number(l.cost || 0);
+                        const hasProduct = !!l.product_id;
+                        const newAvg = hasProduct
+                          ? (oldStock > 0 ? (oldStock * oldCost + qty * cost) / (oldStock + qty) : cost)
+                          : cost;
+                        const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
+                        const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
+                        return (
+                          <TableRow key={i}>
+                            <TableCell className="align-middle">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-medium">{l.barcode || (hasProduct ? "Stock item" : "New item")}</div>
+                                <div className="truncate text-[11px] text-muted-foreground">stock {oldStock}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-10" /></TableCell>
+                            <TableCell>
+                              <Input
+                                id={`purchase-cost-${i}`}
+                                type="number"
+                                step="0.01"
+                                value={l.cost}
+                                onChange={(e) => setLine(i, { cost: Number(e.target.value) })}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
+                                className="h-10 text-right text-base"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                id={`purchase-qty-${i}`}
+                                type="number"
+                                step="0.001"
+                                value={l.qty}
+                                onChange={(e) => setLine(i, { qty: Number(e.target.value) })}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusSearch(); } }}
+                                className="h-10 text-right text-base"
+                              />
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-xs font-medium">
+                              {hasProduct ? fmtMoney(newAvg, sym) : "—"}
+                            </TableCell>
+                            <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
+                              {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}%` : "—"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">{fmtMoney(qty * cost, sym)}</TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => setLines(lines.filter((_, x) => x !== i))}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
-                <div><Label>Tax</Label><Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} /></div>
-                <div><Label>Paid</Label><Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} /></div>
-                <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
-                <div className="flex flex-col justify-end">
-                  <div className="text-sm text-muted-foreground">Total</div>
-                  <div className="text-2xl font-semibold text-primary">{fmtMoney(total, sym)}</div>
+              {/* Totals strip */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-3 shrink-0">
+                <div><Label className="text-xs">Tax</Label><Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} /></div>
+                <div><Label className="text-xs">Paid</Label><Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} /></div>
+                <div><Label className="text-xs">Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
+                <div className="flex flex-col justify-end rounded-md border bg-primary/5 px-3 py-1.5">
+                  <div className="text-xs text-muted-foreground">Total</div>
+                  <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
                 </div>
               </div>
             </div>
-            <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 mt-2 border-t bg-background px-6 py-3 sm:flex-row sm:justify-between gap-2">
+
+            <DialogFooter className="border-t bg-background px-6 py-3 shrink-0 sm:flex-row sm:justify-between gap-2">
               <div className="text-sm text-muted-foreground">
                 {lines.length} item{lines.length === 1 ? "" : "s"} • Total <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span>
               </div>
@@ -372,7 +381,6 @@ function Page() {
                 <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0} size="lg">Record purchase</Button>
               </div>
             </DialogFooter>
-
           </DialogContent>
         </Dialog>
 
