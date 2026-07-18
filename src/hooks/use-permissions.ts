@@ -53,12 +53,14 @@ export function usePermissions() {
       return { isAdmin, isSuperAdmin, perms: granted, tenantStatus };
     },
   });
-  const isAdmin = q.data?.isAdmin ?? false;
-  const isSuperAdmin = q.data?.isSuperAdmin ?? false;
+  const devBypass = import.meta.env.DEV;
+  const isAdmin = devBypass ? true : (q.data?.isAdmin ?? false);
+  const isSuperAdmin = devBypass ? true : (q.data?.isSuperAdmin ?? false);
   const tenantStatus = q.data?.tenantStatus ?? null;
-  const isPending = tenantStatus === "pending";
+  const isPending = !devBypass && tenantStatus === "pending";
 
   const can = (perm: string) => {
+    if (devBypass) return true;
     // Developer / super-admin always sees everything.
     if (isSuperAdmin) return true;
     // Pending shops: only basic modules are usable until approved.
@@ -67,5 +69,5 @@ export function usePermissions() {
     if (perm === "pos" || perm === "sales" || perm === "library") return true;
     return q.data?.perms.has(perm) ?? false;
   };
-  return { isAdmin, isSuperAdmin, isPending, tenantStatus, can, loading: authLoading || q.isLoading };
+  return { isAdmin, isSuperAdmin, isPending, tenantStatus, can, loading: devBypass ? false : (authLoading || q.isLoading) };
 }
