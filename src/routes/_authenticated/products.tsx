@@ -55,6 +55,11 @@ function ProductsPage() {
       ),
   });
 
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ["suppliers", "products-form"],
+    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+  });
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return products;
