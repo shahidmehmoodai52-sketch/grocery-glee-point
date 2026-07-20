@@ -21,7 +21,7 @@ import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; old_stock?: number; old_cost?: number; barcode?: string | null };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null };
 
 type Draft = {
   open: boolean;
@@ -96,6 +96,7 @@ function Page() {
           old_stock: Number(product.stock ?? 0),
           old_cost: Number(product.cost_price ?? 0),
           barcode: product.barcode ?? null,
+          item_code: product.sku ?? null,
         }];
       }
       return [...ls, { product_id: null, name: fallbackName ?? "", qty: 1, cost: 0 }];
@@ -110,15 +111,22 @@ function Page() {
     if (!term) return;
     const t = term.toLowerCase();
     const prods = products as PickerProduct[];
-    // 1) exact match on primary barcode
-    let exact = prods.find((p) => (p.barcode ?? "").toLowerCase() === t);
-    // 2) exact match on extra barcodes (product_barcodes table)
+    const isFourDigitItemCode = /^\d{4}$/.test(term);
+    // Item Code/SKU is different from barcode. In purchases, manual 4-digit codes
+    // should resolve by item_code first, then scanner barcodes.
+    let exact = prods.find((p) => (p.sku ?? "").toLowerCase() === t);
+    if (!exact && isFourDigitItemCode) {
+      exact = prods.find((p) => (p.sku ?? "").toLowerCase().startsWith(t));
+    }
+    // 2) exact match on primary barcode
+    if (!exact) exact = prods.find((p) => (p.barcode ?? "").toLowerCase() === t);
+    // 3) exact match on extra barcodes (product_barcodes table)
     if (!exact) {
       const bcRow = (extraBarcodes as { product_id: string; barcode: string }[])
         .find((b) => (b.barcode ?? "").toLowerCase() === t);
       if (bcRow) exact = prods.find((p) => p.id === bcRow.product_id);
     }
-    // 3) exact match on SKU/name
+    // 4) exact match on name
     if (!exact) exact = prods.find((p) => (p.name ?? "").toLowerCase() === t);
     // If the term looks like a code (digits) but has no exact match, treat as new item
     // instead of silently picking an unrelated substring match.
@@ -143,8 +151,8 @@ function Page() {
     queryKey: ["products"],
     staleTime: 60_000,
     queryFn: async () => offlineFirst<any[]>(
-      async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,barcode,cost_price,stock").order("name").range(from, to)),
-      async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, barcode: p.barcode, cost_price: p.cost_price, stock: p.stock })),
+      async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,sku,barcode,cost_price,stock").order("name").range(from, to)),
+      async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, barcode: p.barcode, cost_price: p.cost_price, stock: p.stock })),
       cacheProducts,
     ),
   });
@@ -165,11 +173,23 @@ function Page() {
         .map((b) => b.product_id)
     );
     return (products as PickerProduct[])
-      .filter((p) =>
-        (p.name ?? "").toLowerCase().includes(term) ||
-        (p.barcode ?? "").toLowerCase().includes(term) ||
-        bcProductIds.has(p.id)
-      )
+      .map((p) => {
+        const sku = (p.sku ?? "").toLowerCase();
+        const name = (p.name ?? "").toLowerCase();
+        const barcode = (p.barcode ?? "").toLowerCase();
+        const extraBarcodeMatch = bcProductIds.has(p.id);
+        let rank = Number.POSITIVE_INFINITY;
+        if (sku === term) rank = 0;
+        else if (sku.startsWith(term)) rank = 1;
+        else if (sku.includes(term)) rank = 2;
+        else if (name.includes(term)) rank = 3;
+        else if (barcode === term) rank = 4;
+        else if (barcode.includes(term) || extraBarcodeMatch) rank = 5;
+        return { p, rank };
+      })
+      .filter(({ rank }) => Number.isFinite(rank))
+      .sort((a, b) => a.rank - b.rank || (a.p.name ?? "").localeCompare(b.p.name ?? ""))
+      .map(({ p }) => p)
       .slice(0, 8);
   }, [entrySearch, products, extraBarcodes]);
   const { data: purchases = [] } = useQuery({
@@ -243,7 +263,7 @@ function Page() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Scan or search product</Label>
+                  <Label className="text-xs">Item code, barcode, or product name</Label>
                   <div className="relative">
                     <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <Input
@@ -257,7 +277,7 @@ function Page() {
                         if (e.key === "ArrowUp") { e.preventDefault(); setEntryIndex((n) => Math.max(n - 1, 0)); }
                         if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
                       }}
-                      placeholder="🔍  Scan barcode or type name, press Enter to add…"
+                      placeholder="🔍  Type 4-digit item code first, scan barcode, or type name…"
                       className="pl-10 h-9 text-sm"
                       autoFocus
                     />
@@ -274,7 +294,9 @@ function Page() {
                           >
                             <span className="min-w-0">
                               <span className="block truncate font-medium">{p.name}</span>
-                              <span className="block truncate text-xs text-muted-foreground">{p.barcode || "No barcode"}</span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                Code {p.sku || "—"}{p.barcode ? ` · Barcode ${p.barcode}` : ""}
+                              </span>
                             </span>
                             <span className="shrink-0 text-right text-xs text-muted-foreground">
                               <span className="block">stock {Number(p.stock ?? 0)}</span>
@@ -306,13 +328,13 @@ function Page() {
                   <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
                     <Search className="h-10 w-10 mb-3 opacity-40" />
                     <p className="text-sm font-medium">No items added yet</p>
-                    <p className="text-xs mt-1">Scan a barcode or type a product name above, then press Enter.</p>
+                    <p className="text-xs mt-1">Type the 4-digit item code, scan barcode, or type product name above, then press Enter.</p>
                   </div>
                 ) : (
                   <Table className="min-w-[900px] [&_td]:py-1 [&_th]:py-1.5 [&_th]:h-8">
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
-                        <TableHead className="w-[170px]">Product</TableHead>
+                        <TableHead className="w-[170px]">Code</TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead className="w-[130px]">Cost</TableHead>
                         <TableHead className="w-[110px]">Qty</TableHead>
@@ -339,7 +361,7 @@ function Page() {
                           <TableRow key={i}>
                             <TableCell className="align-middle">
                               <div className="min-w-0 leading-tight">
-                                <div className="truncate text-xs font-medium">{l.barcode || (hasProduct ? "Stock item" : "New item")}</div>
+                                <div className="truncate text-xs font-medium">{l.item_code || l.barcode || (hasProduct ? "Stock item" : "New item")}</div>
                                 <div className="truncate text-[10px] text-muted-foreground">stock {oldStock}</div>
                               </div>
                             </TableCell>
@@ -691,5 +713,5 @@ function Page() {
   );
 }
 
-type PickerProduct = { id: string; name: string; barcode?: string | null; cost_price?: number | null; stock?: number | null };
+type PickerProduct = { id: string; name: string; sku?: string | null; barcode?: string | null; cost_price?: number | null; stock?: number | null };
 
