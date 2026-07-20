@@ -60,6 +60,48 @@ function Page() {
   const [entrySearch, setEntrySearch] = useState("");
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
+  const [newProdOpen, setNewProdOpen] = useState(false);
+  const [newProd, setNewProd] = useState({ name: "", sku: "", barcode: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0 });
+  const [newProdSaving, setNewProdSaving] = useState(false);
+  const openNewProduct = (term: string) => {
+    const t = term.trim();
+    const isCode = /^\d+$/.test(t);
+    setNewProd({
+      name: isCode ? "" : t,
+      sku: isCode && t.length <= 6 ? t : "",
+      barcode: isCode && t.length > 4 ? t : (isCode ? "" : ""),
+      unit: "pcs",
+      cost_price: 0,
+      sell_price: 0,
+      stock: 0,
+    });
+    setNewProdOpen(true);
+  };
+  const saveNewProduct = async () => {
+    if (!newProd.name.trim()) return toast.error("Name required");
+    const primary = newProd.barcode.trim() || newProd.sku.trim() || newProd.name.trim();
+    setNewProdSaving(true);
+    const payload = {
+      name: newProd.name.trim(),
+      sku: newProd.sku.trim() || null,
+      barcode: primary,
+      unit: newProd.unit || "pcs",
+      cost_price: Number(newProd.cost_price) || 0,
+      sell_price: Number(newProd.sell_price) || 0,
+      stock: Number(newProd.stock) || 0,
+    };
+    const { data, error } = await supabase.from("products").insert(payload).select("id,name,sku,barcode,cost_price,stock").single();
+    if (!error && data) {
+      await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: primary });
+    }
+    setNewProdSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Product added");
+    setNewProdOpen(false);
+    qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["product_barcodes"] });
+    addProductLine(data as any);
+  };
   const [editRow, setEditRow] = useState<any | null>(null);
   const [editItems, setEditItems] = useState<any[]>([]);
   const [editItemsOriginal, setEditItemsOriginal] = useState<any[]>([]);
