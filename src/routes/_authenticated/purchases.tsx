@@ -475,6 +475,11 @@ function Page() {
                                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
                                   className="h-8 text-right text-sm"
                                 />
+                                {taxShare > 0 && qty > 0 && (
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Cost including distributed tax">
+                                    +tax = {fmtMoney(effCost, sym)}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Input
