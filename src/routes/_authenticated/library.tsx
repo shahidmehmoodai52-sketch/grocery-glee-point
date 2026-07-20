@@ -50,47 +50,62 @@ function LibraryPage() {
   const { isSuperAdmin } = usePermissions();
   const [tab, setTab] = useState<"browse" | "queue" | "mine">("browse");
   const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const { data: prefs } = usePriceVisibility();
   const hasAccess = !!prefs?.hasAccess;
   const showSell = prefs?.showSell ?? true;
   const showCost = prefs?.showCost ?? true;
 
-  const { data: items = [], isLoading } = useQuery({
-    queryKey: ["global_products", tab],
+  const PAGE_LIMIT = 300;
+
+  const { data: items = [], isLoading, isFetching } = useQuery({
+    queryKey: ["global_products", tab, debounced],
     enabled: hasAccess || isSuperAdmin,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
     queryFn: async () => {
-      const rows = await fetchAll<GlobalProduct>((from, to) => {
-        let q = supabase.from("global_products").select("*").order("created_at", { ascending: false });
-        if (tab === "browse") q = q.eq("status", "approved");
-        else if (tab === "queue") q = q.eq("status", "pending");
-        return q.range(from, to);
-      });
-      return rows;
+      let q = supabase
+        .from("global_products")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(PAGE_LIMIT);
+      if (tab === "browse") q = q.eq("status", "approved");
+      else if (tab === "queue") q = q.eq("status", "pending");
+      if (debounced) {
+        const term = debounced.replace(/[,%()]/g, " ").trim();
+        q = q.or(
+          `name.ilike.%${term}%,barcode.ilike.%${term}%,item_code.ilike.%${term}%,category.ilike.%${term}%`,
+        );
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as GlobalProduct[];
     },
   });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (it) =>
-        it.name.toLowerCase().includes(q) ||
-        (it.barcode ?? "").toLowerCase().includes(q) ||
-        (it.category ?? "").toLowerCase().includes(q),
-    );
-  }, [items, search]);
+  // Server-side search already applied; keep local list as-is.
+  const filtered = items;
 
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["global_products"] });
+  const invalidateAfterImport = () => {
+    // Import doesn't change the library list itself — only the shop's products.
     qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["dash-products"] });
+  };
+
+  const invalidateAfterReview = () => {
+    qc.invalidateQueries({ queryKey: ["global_products"] });
   };
 
   const approve = async (id: string) => {
     const { error } = await supabase.from("global_products").update({ status: "approved" }).eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Approved");
-    invalidate();
+    invalidateAfterReview();
   };
 
   const reject = async (id: string) => {
@@ -101,8 +116,9 @@ function LibraryPage() {
       .eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Rejected");
-    invalidate();
+    invalidateAfterReview();
   };
+
 
   return (
     <div className="p-6 space-y-4">
