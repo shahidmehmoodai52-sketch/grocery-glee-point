@@ -28,10 +28,11 @@ type Draft = {
   supplier: string;
   lines: Line[];
   tax: number;
+  taxMode: "amt" | "pct";
   paid: number;
   note: string;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, paid: 0, note: "" };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", paid: 0, note: "" };
 
 const normalizeItemCode = (value: string | null | undefined) => {
   const raw = String(value ?? "").trim().toLowerCase();
@@ -46,11 +47,13 @@ function Page() {
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
   const { open, supplier, lines, tax, paid, note } = draft;
+  const taxMode: "amt" | "pct" = draft.taxMode ?? "amt";
   const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
     setDraft((d) => ({ ...d, lines: typeof updater === "function" ? (updater as any)(d.lines) : updater }));
   const setTax = (v: number) => setDraft((d) => ({ ...d, tax: v }));
+  const setTaxMode = (v: "amt" | "pct") => setDraft((d) => ({ ...d, taxMode: v }));
   const setPaid = (v: number) => setDraft((d) => ({ ...d, paid: v }));
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
