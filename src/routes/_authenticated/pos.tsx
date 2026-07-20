@@ -1952,7 +1952,7 @@ function PrintPromptDialog({
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            (defaultAction === "yes" ? onYes : onNo)();
+            onYes();
           }
         }}
       >
