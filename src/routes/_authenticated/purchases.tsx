@@ -33,6 +33,12 @@ type Draft = {
 };
 const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, paid: 0, note: "" };
 
+const normalizeItemCode = (value: string | null | undefined) => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!/^\d{1,4}$/.test(raw)) return raw;
+  return raw.replace(/^0+/, "") || "0";
+};
+
 function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
@@ -110,11 +116,12 @@ function Page() {
     const term = entrySearch.trim();
     if (!term) return;
     const t = term.toLowerCase();
+    const normalizedItemCode = normalizeItemCode(term);
     const prods = products as PickerProduct[];
     const isFourDigitItemCode = /^\d{4}$/.test(term);
     // Item Code/SKU is different from barcode. In purchases, manual 4-digit codes
     // should resolve by item_code first, then scanner barcodes.
-    let exact = prods.find((p) => (p.sku ?? "").toLowerCase() === t);
+    let exact = prods.find((p) => normalizeItemCode(p.sku) === normalizedItemCode);
     if (!exact && isFourDigitItemCode) {
       exact = prods.find((p) => (p.sku ?? "").toLowerCase().startsWith(t));
     }
@@ -167,6 +174,7 @@ function Page() {
   const entryMatches = useMemo(() => {
     const term = entrySearch.trim().toLowerCase();
     if (!term) return [] as PickerProduct[];
+    const normalizedTermItemCode = normalizeItemCode(term);
     const bcProductIds = new Set(
       (extraBarcodes as { product_id: string; barcode: string }[])
         .filter((b) => (b.barcode ?? "").toLowerCase().includes(term))
@@ -175,13 +183,15 @@ function Page() {
     return (products as PickerProduct[])
       .map((p) => {
         const sku = (p.sku ?? "").toLowerCase();
+        const normalizedSku = normalizeItemCode(p.sku);
         const name = (p.name ?? "").toLowerCase();
         const barcode = (p.barcode ?? "").toLowerCase();
         const extraBarcodeMatch = bcProductIds.has(p.id);
         let rank = Number.POSITIVE_INFINITY;
-        if (sku === term) rank = 0;
-        else if (sku.startsWith(term)) rank = 1;
-        else if (sku.includes(term)) rank = 2;
+        if (normalizedSku === normalizedTermItemCode) rank = 0;
+        else if (sku === term) rank = 1;
+        else if (sku.startsWith(term)) rank = 2;
+        else if (sku.includes(term)) rank = 3;
         else if (name.includes(term)) rank = 3;
         else if (barcode === term) rank = 4;
         else if (barcode.includes(term) || extraBarcodeMatch) rank = 5;
