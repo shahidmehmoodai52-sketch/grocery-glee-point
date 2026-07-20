@@ -1279,8 +1279,8 @@ function POSPage() {
                         step="0.001"
                         display={fmtQty(it.qty)}
                         onActivate={() => setEditing({ idx, field: "qty" })}
-                        onCommit={(v) => { updateLine(idx, { qty: v }); setEditing(null); searchRef.current?.focus(); }}
-                        onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
+                        onCommit={(v) => { updateLine(idx, { qty: v }); setEditing(null); setCartCursor(-1); setTimeout(() => searchRef.current?.focus(), 0); }}
+                        onCancel={() => { setEditing(null); setCartCursor(-1); setTimeout(() => searchRef.current?.focus(), 0); }}
                       />
                     </td>
                     <td className="p-0">
