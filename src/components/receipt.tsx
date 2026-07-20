@@ -193,11 +193,13 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
               width,
               maxWidth: width,
               boxSizing: "border-box",
-              padding: "3mm 3mm 2mm",
-              fontFamily: "'SF Mono','Menlo','Consolas','Liberation Mono',monospace",
-              fontSize: "11px",
-              lineHeight: 1.3,
+              padding: "2mm 2.5mm 1.5mm",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, 'Segoe UI', sans-serif",
+              fontSize: "12px",
+              lineHeight: 1.25,
+              fontWeight: 500,
               overflow: "hidden",
+              WebkitFontSmoothing: "antialiased",
             }
           : undefined
       }
