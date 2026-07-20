@@ -28,10 +28,11 @@ type Draft = {
   supplier: string;
   lines: Line[];
   tax: number;
+  taxMode: "amt" | "pct";
   paid: number;
   note: string;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, paid: 0, note: "" };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", paid: 0, note: "" };
 
 const normalizeItemCode = (value: string | null | undefined) => {
   const raw = String(value ?? "").trim().toLowerCase();
@@ -46,11 +47,13 @@ function Page() {
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
   const { open, supplier, lines, tax, paid, note } = draft;
+  const taxMode: "amt" | "pct" = draft.taxMode ?? "amt";
   const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
     setDraft((d) => ({ ...d, lines: typeof updater === "function" ? (updater as any)(d.lines) : updater }));
   const setTax = (v: number) => setDraft((d) => ({ ...d, tax: v }));
+  const setTaxMode = (v: "amt" | "pct") => setDraft((d) => ({ ...d, taxMode: v }));
   const setPaid = (v: number) => setDraft((d) => ({ ...d, paid: v }));
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
@@ -269,7 +272,8 @@ function Page() {
 
 
   const subtotal = lines.reduce((s, l) => s + l.qty * l.cost, 0);
-  const total = subtotal + Number(tax || 0);
+  const taxAmt = taxMode === "pct" ? +(subtotal * (Number(tax || 0) / 100)).toFixed(2) : Number(tax || 0);
+  const total = subtotal + taxAmt;
 
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -278,12 +282,11 @@ function Page() {
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
     const sub = items.reduce((s, l) => s + l.qty * l.cost, 0);
-    const taxAmt = Number(tax || 0);
     setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier === "none" ? null : supplier,
-        tax, paid, note,
+        tax: taxAmt, paid, note,
         items: items.map((l) => {
           const share = sub > 0 ? taxAmt * ((l.qty * l.cost) / sub) : 0;
           const effCost = l.qty > 0 ? l.cost + share / l.qty : l.cost;
@@ -385,6 +388,15 @@ function Page() {
                 <Button type="button" variant="outline" className="h-9 mt-0 shrink-0" onClick={() => openNewProduct("")}>
                   <Plus className="h-4 w-4 mr-1" /> New item
                 </Button>
+                <div className="w-[240px] shrink-0">
+                  <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Supplier (optional)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— No supplier —</SelectItem>
+                      {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -420,6 +432,7 @@ function Page() {
                           <TableHead className="w-16 text-right">Old Avg</TableHead>
                           <TableHead className="w-16 text-right">New Avg</TableHead>
                           <TableHead className="w-12 text-right">Δ%</TableHead>
+                          <TableHead className="w-[90px] text-right">Tax</TableHead>
                           <TableHead className="w-[120px]">Total</TableHead>
                           <TableHead className="w-9"></TableHead>
                         </TableRow>
@@ -432,7 +445,7 @@ function Page() {
                           const cost = Number(l.cost || 0);
                           const hasProduct = !!l.product_id;
                           const lineSub = qty * cost;
-                          const taxShare = subtotal > 0 ? Number(tax || 0) * (lineSub / subtotal) : 0;
+                          const taxShare = subtotal > 0 ? taxAmt * (lineSub / subtotal) : 0;
                           const effCost = qty > 0 ? cost + taxShare / qty : cost;
                           const newAvg = hasProduct
                             ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
@@ -491,6 +504,13 @@ function Page() {
                               <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
                                 {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%` : "—"}
                               </TableCell>
+                              <TableCell className="text-right text-xs">
+                                {taxShare > 0 ? (
+                                  <span title={qty > 0 ? `${fmtMoney(taxShare / qty, sym)} /unit` : ""}>
+                                    {fmtMoney(taxShare, sym)}
+                                  </span>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </TableCell>
                               <TableCell>
                                 <Input
                                   type="number"
@@ -534,27 +554,44 @@ function Page() {
                   <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}</div>
                 </div>
                 <div className="px-4 py-3 space-y-3">
-                  <div>
-                    <Label className="text-xs">Supplier</Label>
-                    <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— None —</SelectItem>
-                        {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
                     <Label className="text-xs">Tax</Label>
-                    <Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} className="h-9" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Paid</Label>
-                    <Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} className="h-9" />
-                    <div className="text-[10px] text-muted-foreground mt-1">
-                      Due: <span className="font-medium text-foreground">{fmtMoney(Math.max(0, total - Number(paid || 0)), sym)}</span>
+                    <div className="inline-flex rounded-md border overflow-hidden text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setTaxMode("amt")}
+                        className={`px-2 py-0.5 ${taxMode === "amt" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                      >{sym}</button>
+                      <button
+                        type="button"
+                        onClick={() => setTaxMode("pct")}
+                        className={`px-2 py-0.5 border-l ${taxMode === "pct" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                      >%</button>
                     </div>
                   </div>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={tax || ""}
+                    onChange={(e) => setTax(Number(e.target.value))}
+                    className="h-9"
+                    placeholder={taxMode === "pct" ? "e.g. 5" : "0.00"}
+                  />
+                  {taxAmt > 0 && (
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      Tax on bill: <span className="font-medium text-foreground">{fmtMoney(taxAmt, sym)}</span>
+                      {taxMode === "pct" ? ` (${Number(tax || 0)}% of subtotal)` : ""} — distributed across all items.
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">Paid</Label>
+                  <Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} className="h-9" />
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Due: <span className="font-medium text-foreground">{fmtMoney(Math.max(0, total - Number(paid || 0)), sym)}</span>
+                  </div>
+                </div>
                   <div>
                     <Label className="text-xs">Note</Label>
                     <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
