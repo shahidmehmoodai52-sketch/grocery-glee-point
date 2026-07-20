@@ -277,12 +277,18 @@ function Page() {
   const submit = async () => {
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
+    const sub = items.reduce((s, l) => s + l.qty * l.cost, 0);
+    const taxAmt = Number(tax || 0);
     setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier === "none" ? null : supplier,
         tax, paid, note,
-        items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
+        items: items.map((l) => {
+          const share = sub > 0 ? taxAmt * ((l.qty * l.cost) / sub) : 0;
+          const effCost = l.qty > 0 ? l.cost + share / l.qty : l.cost;
+          return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
+        }),
       },
     });
     setSaving(false);
