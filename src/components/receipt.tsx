@@ -193,11 +193,13 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
               width,
               maxWidth: width,
               boxSizing: "border-box",
-              padding: "3mm 3mm 2mm",
-              fontFamily: "'SF Mono','Menlo','Consolas','Liberation Mono',monospace",
-              fontSize: "11px",
-              lineHeight: 1.3,
+              padding: "2mm 2.5mm 1.5mm",
+              fontFamily: "'Helvetica Neue', Helvetica, Arial, 'Segoe UI', sans-serif",
+              fontSize: "12px",
+              lineHeight: 1.25,
+              fontWeight: 500,
               overflow: "hidden",
+              WebkitFontSmoothing: "antialiased",
             }
           : undefined
       }
@@ -233,7 +235,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         )}
       </div>
 
-      <div className="my-2 border-t border-dashed border-black" />
+      <div className="my-1 border-t border-dashed border-black" />
 
       <div className="text-center text-[11px] font-bold tracking-widest">{docTitle}</div>
 
@@ -262,7 +264,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         )}
       </div>
 
-      <div className="my-2 border-t border-dashed border-black" />
+      <div className="my-1 border-t border-dashed border-black" />
 
       <div className="text-[9.5px] grid grid-cols-12 font-bold uppercase tracking-wider pb-1 border-b border-black">
         <div className="col-span-5">Item</div>
@@ -290,7 +292,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         ))}
       </div>
 
-      <div className="my-2 border-t border-dashed border-black" />
+      <div className="my-1 border-t border-dashed border-black" />
 
       <div className="space-y-0.5">
         {invoice.sale_items && invoice.sale_items.length > 0 && (
@@ -309,8 +311,8 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         {savings > 0 && <Row label="Discount" value={`-${fmtMoney(savings, sym)}`} />}
       </div>
 
-      <div className="mt-1 border-2 border-black bg-black text-white px-2 py-1.5 flex justify-between items-center text-[16px] font-black tracking-wider" style={{ boxShadow: "0 0 0 2px #000, 0 0 0 3px #fff, 0 0 0 5px #000" }}>
-        <span className="uppercase">{isReturn ? "Refund Due" : "Total"}</span>
+      <div className="mt-1 flex justify-between items-center px-1 py-1 text-[15px] font-extrabold uppercase tracking-wide" style={{ borderTop: "2px solid #000", borderBottom: "2px solid #000" }}>
+        <span>{isReturn ? "Refund Due" : "Total"}</span>
         <span>{fmtMoney(invoice.total, sym)}</span>
       </div>
 
@@ -390,7 +392,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       {settings?.receipt_footer && (
         <>
-          <div className="my-2 border-t border-dashed border-black" />
+          <div className="my-1 border-t border-dashed border-black" />
           <div className="text-center text-[10px] whitespace-pre-line italic">
             {settings.receipt_footer}
           </div>
@@ -398,7 +400,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       )}
 
       <div className="mt-2 flex flex-col items-center">
-        <div className="flex h-8 items-end gap-[1px]">
+        <div className="flex h-6 items-end gap-[1px]">
           {String(docNo)
             .split("")
             .flatMap((ch, i) => {
