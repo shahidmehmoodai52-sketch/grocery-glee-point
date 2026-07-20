@@ -245,19 +245,29 @@ function Page() {
   };
 
 
+  const hasDraft = lines.length > 0 || !!note || tax > 0 || paid > 0 || supplier !== "none";
+
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Purchases</h1>
           <p className="text-sm text-muted-foreground">Record stock received from suppliers</p>
         </div>
+        <div className="flex items-center gap-2">
+          {hasDraft && !open && (
+            <Button variant="outline" onClick={() => setOpen(true)} className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
+              <Pencil className="h-4 w-4 mr-2" />
+              Draft ({lines.length} item{lines.length === 1 ? "" : "s"})
+            </Button>
+          )}
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New purchase</Button></DialogTrigger>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">
-              <DialogTitle>New purchase</DialogTitle>
+              <DialogTitle>New purchase{hasDraft ? " · Draft in progress" : ""}</DialogTitle>
             </DialogHeader>
+
 
             {/* Top bar: supplier + big scan/search — POS style */}
             <div className="px-6 py-2 border-b bg-muted/30 shrink-0">
