@@ -133,9 +133,9 @@ function LibraryPage() {
         icon={<Library className="h-5 w-5" />}
         actions={
           <div className="flex gap-2">
-            {!isSuperAdmin && hasAccess && <ImportAllButton onDone={invalidate} />}
-            {isSuperAdmin && <BulkUploadDialog onDone={invalidate} />}
-            {isSuperAdmin && <ContributeDialog onDone={invalidate} />}
+            {!isSuperAdmin && hasAccess && <ImportAllButton onDone={invalidateAfterImport} />}
+            {isSuperAdmin && <BulkUploadDialog onDone={invalidateAfterReview} />}
+            {isSuperAdmin && <ContributeDialog onDone={invalidateAfterReview} />}
           </div>
         }
       />
