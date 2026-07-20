@@ -360,25 +360,25 @@ function Page() {
               </div>
 
               {/* Totals strip */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-3 shrink-0">
-                <div><Label className="text-xs">Tax</Label><Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} /></div>
-                <div><Label className="text-xs">Paid</Label><Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} /></div>
-                <div><Label className="text-xs">Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
-                <div className="flex flex-col justify-end rounded-md border bg-primary/5 px-3 py-1.5">
-                  <div className="text-xs text-muted-foreground">Total</div>
-                  <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 pt-2 shrink-0">
+                <div><Label className="text-xs">Tax</Label><Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} className="h-8" /></div>
+                <div><Label className="text-xs">Paid</Label><Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} className="h-8" /></div>
+                <div><Label className="text-xs">Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} className="h-8" /></div>
+                <div className="flex flex-col justify-end rounded-md border bg-primary/5 px-3 py-1">
+                  <div className="text-[10px] text-muted-foreground leading-none">Total</div>
+                  <div className="text-xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
                 </div>
               </div>
             </div>
 
-            <DialogFooter className="border-t bg-background px-6 py-3 shrink-0 sm:flex-row sm:justify-between gap-2">
+            <DialogFooter className="border-t bg-background px-6 py-2 shrink-0 sm:flex-row sm:justify-between gap-2">
               <div className="text-sm text-muted-foreground">
                 {lines.length} item{lines.length === 1 ? "" : "s"} • Total <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span>
               </div>
               <div className="flex flex-wrap gap-2 justify-end">
-                <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
-                <Button variant="outline" onClick={clearDraft}>Discard</Button>
-                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0} size="lg">Record purchase</Button>
+                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+                <Button variant="outline" size="sm" onClick={clearDraft}>Discard</Button>
+                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>Record purchase</Button>
               </div>
             </DialogFooter>
           </DialogContent>
