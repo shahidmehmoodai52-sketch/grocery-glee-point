@@ -279,18 +279,18 @@ function Page() {
                     <p className="text-xs mt-1">Scan a barcode or type a product name above, then press Enter.</p>
                   </div>
                 ) : (
-                  <Table className="min-w-[900px]">
+                  <Table className="min-w-[900px] [&_td]:py-1 [&_th]:py-1.5 [&_th]:h-8">
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
                         <TableHead className="w-[170px]">Product</TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead className="w-[140px]">Cost</TableHead>
-                        <TableHead className="w-[130px]">Qty</TableHead>
-                        <TableHead className="w-24 text-right">Old Avg</TableHead>
-                        <TableHead className="w-24 text-right">New Avg</TableHead>
-                        <TableHead className="w-16 text-right">Δ%</TableHead>
-                        <TableHead className="text-right w-[120px]">Total</TableHead>
-                        <TableHead className="w-11"></TableHead>
+                        <TableHead className="w-[130px]">Cost</TableHead>
+                        <TableHead className="w-[110px]">Qty</TableHead>
+                        <TableHead className="w-20 text-right">Old Avg</TableHead>
+                        <TableHead className="w-20 text-right">New Avg</TableHead>
+                        <TableHead className="w-14 text-right">Δ%</TableHead>
+                        <TableHead className="text-right w-[110px]">Total</TableHead>
+                        <TableHead className="w-10"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -308,12 +308,12 @@ function Page() {
                         return (
                           <TableRow key={i}>
                             <TableCell className="align-middle">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-medium">{l.barcode || (hasProduct ? "Stock item" : "New item")}</div>
-                                <div className="truncate text-[11px] text-muted-foreground">stock {oldStock}</div>
+                              <div className="min-w-0 leading-tight">
+                                <div className="truncate text-xs font-medium">{l.barcode || (hasProduct ? "Stock item" : "New item")}</div>
+                                <div className="truncate text-[10px] text-muted-foreground">stock {oldStock}</div>
                               </div>
                             </TableCell>
-                            <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-10" /></TableCell>
+                            <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8 text-sm" /></TableCell>
                             <TableCell>
                               <Input
                                 id={`purchase-cost-${i}`}
@@ -322,7 +322,7 @@ function Page() {
                                 value={l.cost}
                                 onChange={(e) => setLine(i, { cost: Number(e.target.value) })}
                                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
-                                className="h-10 text-right text-base"
+                                className="h-8 text-right text-sm"
                               />
                             </TableCell>
                             <TableCell>
@@ -333,22 +333,22 @@ function Page() {
                                 value={l.qty}
                                 onChange={(e) => setLine(i, { qty: Number(e.target.value) })}
                                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusSearch(); } }}
-                                className="h-10 text-right text-base"
+                                className="h-8 text-right text-sm"
                               />
                             </TableCell>
                             <TableCell className="text-right text-xs text-muted-foreground">
-                              {hasProduct ? <>{fmtMoney(oldCost, sym)}<div className="text-[10px]">stock {oldStock}</div></> : "—"}
+                              {hasProduct ? fmtMoney(oldCost, sym) : "—"}
                             </TableCell>
                             <TableCell className="text-right text-xs font-medium">
                               {hasProduct ? fmtMoney(newAvg, sym) : "—"}
                             </TableCell>
                             <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
-                              {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}%` : "—"}
+                              {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%` : "—"}
                             </TableCell>
-                            <TableCell className="text-right font-medium">{fmtMoney(qty * cost, sym)}</TableCell>
+                            <TableCell className="text-right font-medium text-sm">{fmtMoney(qty * cost, sym)}</TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="icon" onClick={() => setLines(lines.filter((_, x) => x !== i))}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLines(lines.filter((_, x) => x !== i))}>
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
                             </TableCell>
                           </TableRow>
