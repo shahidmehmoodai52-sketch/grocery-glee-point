@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/import")({ component: Page });
 
@@ -144,6 +145,7 @@ function invalidateAfterImport(qc: ReturnType<typeof useQueryClient>) {
 function Page() {
   return (
     <div className="p-6 space-y-4">
+      <NeedsInternetBanner section="Import" />
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Bulk import &amp; export</h1>

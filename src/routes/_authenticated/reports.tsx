@@ -16,6 +16,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: Page });
 
@@ -173,6 +174,7 @@ function Page() {
 
   return (
     <div className="p-6 space-y-4">
+      <NeedsInternetBanner section="Reports" />
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Reports</h1>

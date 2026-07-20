@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePriceVisibility } from "@/hooks/use-price-visibility";
 import { fetchAll } from "@/lib/supabase-page";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/library")({
   component: LibraryPage,
@@ -105,6 +106,7 @@ function LibraryPage() {
 
   return (
     <div className="p-6 space-y-4">
+      <NeedsInternetBanner section="Library" />
       <PageHeader
         title="Global product library"
         description={

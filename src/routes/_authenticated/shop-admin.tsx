@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { ALL_PERMS } from "@/hooks/use-permissions";
 import {
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
   getMyShopInfo, listShopStaff, createShopStaff,
   resetShopStaffPassword, setShopStaffPerms, deleteShopStaff,
 } from "@/lib/shop-admin.functions";
@@ -35,6 +36,7 @@ function Page() {
   if (error) {
     return (
       <div className="p-6 max-w-lg space-y-3">
+      <NeedsInternetBanner section="Shop admin" />
         <h2 className="text-lg font-semibold">Couldn't load shop</h2>
         <p className="text-sm text-muted-foreground break-words">{(error as any)?.message ?? String(error)}</p>
         <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>

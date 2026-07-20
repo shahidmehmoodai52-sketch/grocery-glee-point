@@ -42,6 +42,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { fmtMoney } from "@/lib/format";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPanelPage,
@@ -122,6 +123,7 @@ function AdminPanelPage() {
 
   return (
     <div className="p-6 space-y-4">
+      <NeedsInternetBanner section="Admin panel" />
       <PageHeader
         title="Developer control panel"
         description="Managed by Shahid Mehmood (Developer) · shahidmehmoodai52@gmail.com"

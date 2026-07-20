@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { FolderOpen, HardDriveDownload, ShieldCheck, AlertTriangle, RefreshCw, Clock } from "lucide-react";
 import {
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
   getStatus, pickBackupFolder, clearBackupFolder, runBackup,
   setAutoEnabled, setBackupTime, isSupported, type BackupStatus,
 } from "@/lib/backup";
@@ -57,6 +58,7 @@ function BackupPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <NeedsInternetBanner section="Backup" />
       <div>
         <h1 className="text-2xl font-semibold">Auto Backup</h1>
         <p className="text-sm text-muted-foreground">

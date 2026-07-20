@@ -38,6 +38,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/intelligence")({
   component: IntelligencePage,
@@ -148,6 +149,7 @@ function IntelligencePage() {
 
   return (
     <div className="p-6 space-y-4">
+      <NeedsInternetBanner section="Intelligence" />
       <PageHeader
         title="Inventory Intelligence"
         description="ABC classification, velocity, reorder suggestions & smart alerts. Updates automatically from sales."
