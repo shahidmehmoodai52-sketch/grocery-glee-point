@@ -21,7 +21,7 @@ import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
 
 type Draft = {
   open: boolean;
@@ -277,12 +277,18 @@ function Page() {
   const submit = async () => {
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
+    const sub = items.reduce((s, l) => s + l.qty * l.cost, 0);
+    const taxAmt = Number(tax || 0);
     setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier === "none" ? null : supplier,
         tax, paid, note,
-        items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
+        items: items.map((l) => {
+          const share = sub > 0 ? taxAmt * ((l.qty * l.cost) / sub) : 0;
+          const effCost = l.qty > 0 ? l.cost + share / l.qty : l.cost;
+          return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
+        }),
       },
     });
     setSaving(false);
@@ -425,11 +431,15 @@ function Page() {
                           const qty = Number(l.qty || 0);
                           const cost = Number(l.cost || 0);
                           const hasProduct = !!l.product_id;
+                          const lineSub = qty * cost;
+                          const taxShare = subtotal > 0 ? Number(tax || 0) * (lineSub / subtotal) : 0;
+                          const effCost = qty > 0 ? cost + taxShare / qty : cost;
                           const newAvg = hasProduct
-                            ? (oldStock > 0 ? (oldStock * oldCost + qty * cost) / (oldStock + qty) : cost)
-                            : cost;
+                            ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
+                            : effCost;
                           const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
                           const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
+                          const totalDisplay = l._total != null ? l._total : (qty && cost ? +(qty * cost).toFixed(2) : 0);
                           return (
                             <TableRow key={i}>
                               <TableCell>
@@ -446,8 +456,9 @@ function Page() {
                                   id={`purchase-cost-${i}`}
                                   type="number"
                                   step="0.01"
-                                  value={l.cost}
-                                  onChange={(e) => setLine(i, { cost: Number(e.target.value) })}
+                                  value={l.cost ? l.cost : ""}
+                                  placeholder="0"
+                                  onChange={(e) => setLine(i, { cost: Number(e.target.value), _total: null })}
                                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
                                   className="h-8 text-right text-sm"
                                 />
@@ -457,8 +468,16 @@ function Page() {
                                   id={`purchase-qty-${i}`}
                                   type="number"
                                   step="0.001"
-                                  value={l.qty}
-                                  onChange={(e) => setLine(i, { qty: Number(e.target.value) })}
+                                  value={l.qty ? l.qty : ""}
+                                  placeholder="0"
+                                  onChange={(e) => {
+                                    const newQty = Number(e.target.value);
+                                    if (l._total != null && newQty > 0) {
+                                      setLine(i, { qty: newQty, cost: +(l._total / newQty).toFixed(4) });
+                                    } else {
+                                      setLine(i, { qty: newQty });
+                                    }
+                                  }}
                                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusSearch(); } }}
                                   className="h-8 text-right text-sm"
                                 />
@@ -476,10 +495,18 @@ function Page() {
                                 <Input
                                   type="number"
                                   step="0.01"
-                                  value={+(qty * cost).toFixed(2)}
+                                  value={totalDisplay ? totalDisplay : ""}
+                                  placeholder="0"
                                   onChange={(e) => {
-                                    const total = Number(e.target.value);
-                                    if (qty > 0) setLine(i, { cost: +(total / qty).toFixed(4) });
+                                    const t = Number(e.target.value);
+                                    if (!t) {
+                                      setLine(i, { _total: null });
+                                    } else if (qty > 0) {
+                                      setLine(i, { cost: +(t / qty).toFixed(4), _total: t });
+                                    } else {
+                                      // No qty yet — remember total, cost stays 0 until qty entered
+                                      setLine(i, { _total: t });
+                                    }
                                   }}
                                   title="Type total amount — cost auto-calculates as total ÷ qty"
                                   className="h-8 text-right text-sm font-medium"
