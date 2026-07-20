@@ -91,19 +91,28 @@ export async function insertOfflineAware<T extends Record<string, any>>(
     ...(hasUpdatedAt ? { updated_at: now } : {}),
   };
 
+  const saveOffline = async () => {
+    const marked = { ...withId, _offline_pending: true };
+    try { await (db() as any)[table]?.put(marked); } catch {}
+    await enqueueWrite({ op: "insert", table, payload: withId });
+    return marked;
+  };
+
   if (!offline) {
-    const { data, error } = await supabase.from(table as any).insert(withId).select("*").maybeSingle();
-    if (error) throw error;
-    const row = (data ?? withId) as any;
-    if (enabled) { try { await (db() as any)[table]?.put(row); } catch {} }
-    return row;
+    try {
+      const { data, error } = await supabase.from(table as any).insert(withId).select("*").maybeSingle();
+      if (error) throw error;
+      const row = (data ?? withId) as any;
+      if (enabled) { try { await (db() as any)[table]?.put(row); } catch {} }
+      return row;
+    } catch (e: any) {
+      if (enabled && isNetworkError(e)) return saveOffline();
+      throw e;
+    }
   }
 
-  const marked = { ...withId, _offline_pending: true };
-  try { await (db() as any)[table]?.put(marked); } catch {}
-  await enqueueWrite({ op: "insert", table, payload: withId });
-  return marked;
-}
+  return saveOffline();
+
 export async function cacheProductBarcodes(rows: any[]) {
   if (!rows?.length) return;
   // product_barcodes primary key in cloud is `id`, but our sparse rows here
