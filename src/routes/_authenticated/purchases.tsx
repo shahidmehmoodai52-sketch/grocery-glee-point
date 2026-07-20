@@ -279,6 +279,7 @@ function Page() {
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   const submit = async () => {
+    if (!supplier || supplier === "none") return toast.error("Supplier is required");
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
     const sub = items.reduce((s, l) => s + l.qty * l.cost, 0);
