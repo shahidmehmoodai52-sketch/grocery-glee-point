@@ -1038,16 +1038,26 @@ function POSPage() {
                 if (raw && e.key === "ArrowUp" && filtered.length) {
                   e.preventDefault(); setHighlight((h) => (h - 1 + filtered.length) % filtered.length); return;
                 }
-                // When search is empty, arrows move the cart line cursor
+                // When search is empty, arrows move the cart line cursor (clamped, no wrap)
                 if (!raw && (e.key === "ArrowDown" || e.key === "ArrowUp") && tab.items.length) {
                   e.preventDefault();
                   setCartCursor((c) => {
                     const n = tab.items.length;
-                    const base = c < 0 ? (e.key === "ArrowDown" ? -1 : 0) : c;
-                    const next = e.key === "ArrowDown" ? (base + 1) % n : (base - 1 + n) % n;
-                    return next;
+                    if (e.key === "ArrowDown") {
+                      if (c < 0) return 0;
+                      return Math.min(n - 1, c + 1);
+                    }
+                    // ArrowUp
+                    if (c < 0) return n - 1;
+                    return Math.max(0, c - 1);
                   });
                   return;
+                }
+                if (!raw && e.key === "Home" && tab.items.length) {
+                  e.preventDefault(); setCartCursor(0); return;
+                }
+                if (!raw && e.key === "End" && tab.items.length) {
+                  e.preventDefault(); setCartCursor(tab.items.length - 1); return;
                 }
                 if (!raw && (e.key === "Delete" || (e.key === "Backspace" && cartCursor >= 0)) && cartCursor >= 0 && cartCursor < tab.items.length) {
                   e.preventDefault();
