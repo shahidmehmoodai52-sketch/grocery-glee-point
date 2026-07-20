@@ -414,7 +414,7 @@ function Page() {
                           <TableHead className="w-16 text-right">Old Avg</TableHead>
                           <TableHead className="w-16 text-right">New Avg</TableHead>
                           <TableHead className="w-12 text-right">Δ%</TableHead>
-                          <TableHead className="text-right w-[100px]">Total</TableHead>
+                          <TableHead className="w-[120px]">Total</TableHead>
                           <TableHead className="w-9"></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -472,7 +472,19 @@ function Page() {
                               <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
                                 {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%` : "—"}
                               </TableCell>
-                              <TableCell className="text-right font-medium text-sm">{fmtMoney(qty * cost, sym)}</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={+(qty * cost).toFixed(2)}
+                                  onChange={(e) => {
+                                    const total = Number(e.target.value);
+                                    if (qty > 0) setLine(i, { cost: +(total / qty).toFixed(4) });
+                                  }}
+                                  title="Type total amount — cost auto-calculates as total ÷ qty"
+                                  className="h-8 text-right text-sm font-medium"
+                                />
+                              </TableCell>
                               <TableCell>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLines(lines.filter((_, x) => x !== i))}>
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
