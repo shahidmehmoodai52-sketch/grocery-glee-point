@@ -119,6 +119,7 @@ function Page() {
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
+    staleTime: 60_000,
     queryFn: async () => offlineFirst<any[]>(
       async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
       async () => (await db().suppliers.orderBy("name").toArray()).map((s: any) => ({ id: s.id, name: s.name })),
@@ -127,6 +128,7 @@ function Page() {
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
+    staleTime: 60_000,
     queryFn: async () => offlineFirst<any[]>(
       async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,barcode,cost_price,stock").order("name").range(from, to)),
       async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, barcode: p.barcode, cost_price: p.cost_price, stock: p.stock })),
@@ -146,6 +148,7 @@ function Page() {
   }, [entrySearch, products]);
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases"],
+    staleTime: 30_000,
     queryFn: async () => offlineFirst<any[]>(
       async () => (await supabase.from("purchases").select("*, suppliers(name)").order("created_at", { ascending: false }).limit(100)).data ?? [],
       async () => {
@@ -156,6 +159,7 @@ function Page() {
       cachePurchases,
     ),
   });
+
 
   const subtotal = lines.reduce((s, l) => s + l.qty * l.cost, 0);
   const total = subtotal + Number(tax || 0);
