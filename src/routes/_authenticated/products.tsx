@@ -90,7 +90,7 @@ function ProductsPage() {
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
     if (!primary) return toast.error("Barcode is required");
     const { barcodes_text: _bt, stock: newStock, ...rest } = form;
-    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null };
+    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null };
     let productId = form.id;
     if (form.id) {
       // Update all non-stock fields directly
