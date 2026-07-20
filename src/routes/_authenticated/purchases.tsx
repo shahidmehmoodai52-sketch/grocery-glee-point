@@ -548,6 +548,49 @@ function Page() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={newProdOpen} onOpenChange={(v) => { if (!newProdSaving) setNewProdOpen(v); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Add new product</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Name</Label>
+                <Input autoFocus value={newProd.name} onChange={(e) => setNewProd({ ...newProd, name: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Item code (SKU)</Label>
+                  <Input value={newProd.sku} onChange={(e) => setNewProd({ ...newProd, sku: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Barcode</Label>
+                  <Input value={newProd.barcode} onChange={(e) => setNewProd({ ...newProd, barcode: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label>Unit</Label>
+                  <Input value={newProd.unit} onChange={(e) => setNewProd({ ...newProd, unit: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Cost</Label>
+                  <Input type="number" step="0.01" value={newProd.cost_price || ""} onChange={(e) => setNewProd({ ...newProd, cost_price: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <Label>Sell</Label>
+                  <Input type="number" step="0.01" value={newProd.sell_price || ""} onChange={(e) => setNewProd({ ...newProd, sell_price: Number(e.target.value) })} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Opening stock stays 0 — this purchase will add the actual quantity.</p>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setNewProdOpen(false)} disabled={newProdSaving}>Cancel</Button>
+              <Button onClick={saveNewProduct} disabled={newProdSaving}>{newProdSaving ? "Saving…" : "Save & add to purchase"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+
+
         <Dialog open={!!editRow} onOpenChange={(v) => { if (!editSaving && !v) { setEditRow(null); setEditItems([]); setEditItemsOriginal([]); } }}>
           <DialogContent className="w-[96vw] max-w-5xl max-h-[92vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Edit purchase {editRow?.invoice_no}</DialogTitle></DialogHeader>
