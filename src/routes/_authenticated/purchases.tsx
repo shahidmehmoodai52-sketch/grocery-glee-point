@@ -588,6 +588,16 @@ function Page() {
                   <Input type="number" step="0.01" value={newProd.sell_price || ""} onChange={(e) => setNewProd({ ...newProd, sell_price: Number(e.target.value) })} />
                 </div>
               </div>
+              <div>
+                <Label>Supplier</Label>
+                <Select value={newProd.supplier_id || "none"} onValueChange={(v) => setNewProd({ ...newProd, supplier_id: v === "none" ? "" : v })}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <p className="text-xs text-muted-foreground">Opening stock stays 0 — this purchase will add the actual quantity.</p>
             </div>
             <DialogFooter className="gap-2">
