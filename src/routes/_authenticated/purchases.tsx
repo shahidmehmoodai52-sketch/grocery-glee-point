@@ -564,17 +564,44 @@ function Page() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
                     <Label className="text-xs">Tax</Label>
-                    <Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} className="h-9" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Paid</Label>
-                    <Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} className="h-9" />
-                    <div className="text-[10px] text-muted-foreground mt-1">
-                      Due: <span className="font-medium text-foreground">{fmtMoney(Math.max(0, total - Number(paid || 0)), sym)}</span>
+                    <div className="inline-flex rounded-md border overflow-hidden text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setTaxMode("amt")}
+                        className={`px-2 py-0.5 ${taxMode === "amt" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                      >{sym}</button>
+                      <button
+                        type="button"
+                        onClick={() => setTaxMode("pct")}
+                        className={`px-2 py-0.5 border-l ${taxMode === "pct" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                      >%</button>
                     </div>
                   </div>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={tax || ""}
+                    onChange={(e) => setTax(Number(e.target.value))}
+                    className="h-9"
+                    placeholder={taxMode === "pct" ? "e.g. 5" : "0.00"}
+                  />
+                  {taxAmt > 0 && (
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      Tax on bill: <span className="font-medium text-foreground">{fmtMoney(taxAmt, sym)}</span>
+                      {taxMode === "pct" ? ` (${Number(tax || 0)}% of subtotal)` : ""} — distributed across all items.
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">Paid</Label>
+                  <Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} className="h-9" />
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Due: <span className="font-medium text-foreground">{fmtMoney(Math.max(0, total - Number(paid || 0)), sym)}</span>
+                  </div>
+                </div>
                   <div>
                     <Label className="text-xs">Note</Label>
                     <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
