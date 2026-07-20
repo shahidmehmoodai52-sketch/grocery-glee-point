@@ -177,11 +177,18 @@ function Page() {
     }
     // 4) exact match on name
     if (!exact) exact = prods.find((p) => (p.name ?? "").toLowerCase() === t);
-    // If the term looks like a code (digits) but has no exact match, treat as new item
-    // instead of silently picking an unrelated substring match.
+    // If the term looks like a code (digits) but has no exact match, prompt to create a new product
     const looksLikeCode = /^\d+$/.test(term);
-    const match = exact || (looksLikeCode ? null : entryMatches[Math.min(entryIndex, Math.max(entryMatches.length - 1, 0))]);
-    addProductLine(match ?? null, term);
+    if (!exact && looksLikeCode) {
+      openNewProduct(term);
+      return;
+    }
+    const match = exact || entryMatches[Math.min(entryIndex, Math.max(entryMatches.length - 1, 0))];
+    if (!match) {
+      openNewProduct(term);
+      return;
+    }
+    addProductLine(match);
   };
 
 
