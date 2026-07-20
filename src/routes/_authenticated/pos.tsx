@@ -439,6 +439,17 @@ function POSPage() {
   // reset highlight whenever the filtered list changes
   useEffect(() => { setHighlight(0); }, [search]);
 
+  // Keep cart cursor in range and scroll into view
+  useEffect(() => {
+    if (tab.items.length === 0) { setCartCursor(-1); return; }
+    if (cartCursor >= tab.items.length) setCartCursor(tab.items.length - 1);
+  }, [tab.items.length]);
+  useEffect(() => {
+    if (cartCursor < 0) return;
+    const el = cartRowRefs.current[cartCursor];
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [cartCursor]);
+
 
 
   const setTab = (patch: Partial<Tab>) =>
