@@ -414,10 +414,17 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         <div className="text-[9px] mt-0.5 tracking-[0.2em]">*{docNo}*</div>
       </div>
 
-      <div className="mt-1 flex items-center gap-1" style={{ marginBottom: 0 }}>
+      <div className="mt-1 flex items-center gap-1">
         <span className="flex-1 border-t-2 border-double border-black" />
         <span className="text-[8px] tracking-[0.3em] uppercase">end</span>
         <span className="flex-1 border-t-2 border-double border-black" />
+      </div>
+
+      <div className="mt-1 text-center" style={{ marginBottom: 0 }}>
+        <div className="text-[9px] uppercase tracking-[0.28em] font-bold">
+          Powered by Tillix.co
+        </div>
+        <div className="text-[9px] tracking-wider mt-0.5">☎ +92 301 7160701</div>
       </div>
 
     </div>
