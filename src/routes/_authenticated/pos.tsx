@@ -1161,8 +1161,14 @@ function POSPage() {
                     ].filter(Boolean).join(" · ")
                   : "";
                 const stockNum = p ? Number(p.stock ?? 0) : null;
+                const isCursor = idx === cartCursor;
                 return (
-                  <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
+                  <tr
+                    key={idx}
+                    ref={(el) => { cartRowRefs.current[idx] = el; }}
+                    onClick={() => setCartCursor(idx)}
+                    className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40 ${isCursor ? "ring-2 ring-inset ring-primary bg-primary/5" : ""}`}
+                  >
                     <td className="px-2 py-1 font-mono text-xs">{displayCode || "—"}</td>
                     <td className="px-2 py-1">
                       <div className="flex items-center gap-2 min-w-0">
