@@ -1938,13 +1938,19 @@ function PrintPromptDialog({
 }) {
   const yesRef = useRef<HTMLButtonElement>(null);
   const noRef = useRef<HTMLButtonElement>(null);
+  const [focused, setFocused] = useState<"yes" | "no">(defaultAction);
   useEffect(() => {
     if (!sale) return;
+    setFocused(defaultAction);
     const t = setTimeout(() => {
       (defaultAction === "yes" ? yesRef.current : noRef.current)?.focus();
     }, 30);
     return () => clearTimeout(t);
   }, [sale, defaultAction]);
+  const focus = (which: "yes" | "no") => {
+    setFocused(which);
+    (which === "yes" ? yesRef.current : noRef.current)?.focus();
+  };
   return (
     <Dialog open={!!sale} onOpenChange={(o) => !o && onNo()}>
       <DialogContent
@@ -1952,7 +1958,16 @@ function PrintPromptDialog({
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
+            (focused === "yes" ? onYes : onNo)();
+          } else if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Tab") {
+            e.preventDefault();
+            focus(focused === "yes" ? "no" : "yes");
+          } else if (e.key.toLowerCase() === "y") {
+            e.preventDefault();
             onYes();
+          } else if (e.key.toLowerCase() === "n" || e.key === "Escape") {
+            e.preventDefault();
+            onNo();
           }
         }}
       >
@@ -1965,14 +1980,14 @@ function PrintPromptDialog({
         <DialogFooter className="gap-2">
           <Button
             ref={noRef}
-            variant={defaultAction === "no" ? "default" : "outline"}
+            variant={focused === "no" ? "default" : "outline"}
             onClick={onNo}
           >
             No
           </Button>
           <Button
             ref={yesRef}
-            variant={defaultAction === "yes" ? "default" : "outline"}
+            variant={focused === "yes" ? "default" : "outline"}
             onClick={onYes}
           >
             <Printer className="h-4 w-4 mr-2" />Yes, print
