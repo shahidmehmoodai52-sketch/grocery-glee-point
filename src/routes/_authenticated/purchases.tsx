@@ -435,7 +435,7 @@ function Page() {
                           const cost = Number(l.cost || 0);
                           const hasProduct = !!l.product_id;
                           const lineSub = qty * cost;
-                          const taxShare = subtotal > 0 ? Number(tax || 0) * (lineSub / subtotal) : 0;
+                          const taxShare = subtotal > 0 ? taxAmt * (lineSub / subtotal) : 0;
                           const effCost = qty > 0 ? cost + taxShare / qty : cost;
                           const newAvg = hasProduct
                             ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
