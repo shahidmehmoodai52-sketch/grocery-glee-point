@@ -43,11 +43,12 @@ export async function offlineFirst<T>(
     if (enabled && cacheWriter) { try { await cacheWriter(data); } catch {/* cache write is best-effort */} }
     return data;
   } catch (e: any) {
-    if (enabled && (e?.message?.match(/failed to fetch|network|offline/i))) {
+    if (enabled && isNetworkError(e)) {
       return cacheReader();
     }
     throw e;
   }
+
 }
 
 /** Warm helpers used by both queryFns and the sync engine. */
