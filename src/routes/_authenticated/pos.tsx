@@ -479,6 +479,7 @@ function POSPage() {
       idx = items.length - 1;
     }
     setTab({ items });
+    setCartCursor(idx);
     return idx;
   };
 
