@@ -16,6 +16,7 @@ import { ALL_PERMS } from "@/hooks/use-permissions";
 import { listStaff, createStaff, resetStaffPassword, setStaffPermissions, deleteStaff } from "@/lib/users.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Monitor } from "lucide-react";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/users")({ component: Page });
 
@@ -62,6 +63,7 @@ function Page() {
 
   return (
     <div className="p-6 space-y-4">
+      <NeedsInternetBanner section="Users" />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2"><Shield className="h-6 w-6" /> Staff & access</h1>
