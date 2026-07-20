@@ -1115,13 +1115,16 @@ function POSPage() {
                 if (e.key !== "Enter") return;
                 e.preventDefault();
                 if (!raw) {
-                  // Enter on a highlighted cart row → edit qty; otherwise complete the sale
+                  // Enter on a highlighted cart row → edit qty
                   if (cartCursor >= 0 && cartCursor < tab.items.length) {
                     const idx = cartCursor;
                     setTimeout(() => setEditing({ idx, field: "qty" }), 0);
                     return;
                   }
-                  if (tab.items.length > 0) handleSale();
+                  // Empty search + items in cart → jump to Paid field (Enter there completes sale)
+                  if (tab.items.length > 0) {
+                    setTimeout(() => { paidRef.current?.focus(); paidRef.current?.select(); }, 0);
+                  }
                   return;
                 }
                 const exact = productByBarcode[raw];
