@@ -308,9 +308,11 @@ function Page() {
                         ) : entryMatches.map((p, idx) => (
                           <button
                             key={p.id}
+                            ref={(el) => { if (el && idx === entryIndex) el.scrollIntoView({ block: "nearest" }); }}
                             type="button"
                             onMouseDown={(e) => { e.preventDefault(); addProductLine(p); }}
-                            className={`flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm ${idx === entryIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent hover:text-accent-foreground"}`}
+                            onMouseEnter={() => setEntryIndex(idx)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm ${idx === entryIndex ? "bg-accent text-accent-foreground ring-1 ring-primary/40" : "hover:bg-accent hover:text-accent-foreground"}`}
                           >
                             <span className="min-w-0">
                               <span className="block truncate font-medium">{p.name}</span>
@@ -324,6 +326,7 @@ function Page() {
                             </span>
                           </button>
                         ))}
+
                       </div>
                     )}
                   </div>
