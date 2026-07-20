@@ -238,6 +238,7 @@ function POSPage() {
     const { data, error } = await supabase.from("products").insert({
       name, barcode: bc, unit: quickAdd.unit || "pcs", category,
       cost_price: cost, sell_price: sell, stock, tax_rate: 0, is_active: true,
+      preferred_supplier_id: quickAdd.supplier_id || null,
     }).select(PRODUCT_COLUMNS).single();
     if (error) return toast.error(error.message);
     if (bc) {

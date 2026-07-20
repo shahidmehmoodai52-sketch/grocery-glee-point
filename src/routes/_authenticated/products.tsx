@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -29,8 +30,9 @@ export const Route = createFileRoute("/_authenticated/products")({
 type ProductForm = {
   id?: string; name: string; sku: string; barcode: string; barcodes_text: string; category: string; unit: string;
   cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean; low_stock_threshold: number;
+  preferred_supplier_id: string;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5 };
+const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "" };
 
 function ProductsPage() {
   const qc = useQueryClient();
@@ -51,6 +53,11 @@ function ProductsPage() {
       fetchAll<any>((from, to) =>
         supabase.from("products").select("*").order("name").range(from, to),
       ),
+  });
+
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ["suppliers", "products-form"],
+    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
   });
 
   const filtered = useMemo(() => {
@@ -83,7 +90,7 @@ function ProductsPage() {
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
     if (!primary) return toast.error("Barcode is required");
     const { barcodes_text: _bt, stock: newStock, ...rest } = form;
-    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null };
+    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null };
     let productId = form.id;
     if (form.id) {
       // Update all non-stock fields directly
@@ -144,6 +151,7 @@ function ProductsPage() {
       unit: p.unit ?? "pcs", cost_price: Number(p.cost_price), sell_price: Number(p.sell_price),
       stock: Number(p.stock), tax_rate: Number(p.tax_rate), is_active: p.is_active,
       low_stock_threshold: Number(p.low_stock_threshold ?? 5),
+      preferred_supplier_id: p.preferred_supplier_id ?? "",
     });
     setOpen(true);
   };
@@ -182,6 +190,16 @@ function ProductsPage() {
                 <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
                 <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
                 <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
+                <div className="col-span-2">
+                  <Label>Supplier</Label>
+                  <Select value={form.preferred_supplier_id || "none"} onValueChange={(v) => setForm({ ...form, preferred_supplier_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— None —</SelectItem>
+                      {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>

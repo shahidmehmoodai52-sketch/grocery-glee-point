@@ -61,7 +61,7 @@ function Page() {
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
   const [newProdOpen, setNewProdOpen] = useState(false);
-  const [newProd, setNewProd] = useState({ name: "", sku: "", barcode: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0 });
+  const [newProd, setNewProd] = useState({ name: "", sku: "", barcode: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, supplier_id: "" });
   const [newProdSaving, setNewProdSaving] = useState(false);
   const openNewProduct = (term: string) => {
     const t = term.trim();
@@ -74,6 +74,7 @@ function Page() {
       cost_price: 0,
       sell_price: 0,
       stock: 0,
+      supplier_id: supplier && supplier !== "none" ? supplier : "",
     });
     setNewProdOpen(true);
   };
@@ -89,6 +90,7 @@ function Page() {
       cost_price: Number(newProd.cost_price) || 0,
       sell_price: Number(newProd.sell_price) || 0,
       stock: Number(newProd.stock) || 0,
+      preferred_supplier_id: newProd.supplier_id || null,
     };
     const { data, error } = await supabase.from("products").insert(payload).select("id,name,sku,barcode,cost_price,stock").single();
     if (!error && data) {
@@ -585,6 +587,16 @@ function Page() {
                   <Label>Sell</Label>
                   <Input type="number" step="0.01" value={newProd.sell_price || ""} onChange={(e) => setNewProd({ ...newProd, sell_price: Number(e.target.value) })} />
                 </div>
+              </div>
+              <div>
+                <Label>Supplier</Label>
+                <Select value={newProd.supplier_id || "none"} onValueChange={(v) => setNewProd({ ...newProd, supplier_id: v === "none" ? "" : v })}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <p className="text-xs text-muted-foreground">Opening stock stays 0 — this purchase will add the actual quantity.</p>
             </div>
