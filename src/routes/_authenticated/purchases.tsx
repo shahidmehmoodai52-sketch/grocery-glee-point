@@ -488,6 +488,16 @@ function Page() {
                 </div>
                 <div className="px-4 py-3 space-y-3">
                   <div>
+                    <Label className="text-xs">Supplier</Label>
+                    <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <Label className="text-xs">Tax</Label>
                     <Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} className="h-9" />
                   </div>
