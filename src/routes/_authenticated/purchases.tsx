@@ -279,13 +279,14 @@ function Page() {
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   const submit = async () => {
+    if (!supplier || supplier === "none") return toast.error("Supplier is required");
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
     const sub = items.reduce((s, l) => s + l.qty * l.cost, 0);
     setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
-        supplier_id: supplier === "none" ? null : supplier,
+        supplier_id: supplier,
         tax: taxAmt, paid, note,
         items: items.map((l) => {
           const share = sub > 0 ? taxAmt * ((l.qty * l.cost) / sub) : 0;
@@ -390,9 +391,10 @@ function Page() {
                 </Button>
                 <div className="w-[240px] shrink-0">
                   <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Supplier (optional)" /></SelectTrigger>
+                    <SelectTrigger className={`h-9 ${supplier === "none" ? "border-destructive" : ""}`}>
+                      <SelectValue placeholder="Select supplier *" />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">— No supplier —</SelectItem>
                       {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
