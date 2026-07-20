@@ -311,8 +311,8 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         {savings > 0 && <Row label="Discount" value={`-${fmtMoney(savings, sym)}`} />}
       </div>
 
-      <div className="mt-1 border-2 border-black bg-black text-white px-2 py-1.5 flex justify-between items-center text-[16px] font-black tracking-wider" style={{ boxShadow: "0 0 0 2px #000, 0 0 0 3px #fff, 0 0 0 5px #000" }}>
-        <span className="uppercase">{isReturn ? "Refund Due" : "Total"}</span>
+      <div className="mt-1 flex justify-between items-center px-1 py-1 text-[15px] font-extrabold uppercase tracking-wide" style={{ borderTop: "2px solid #000", borderBottom: "2px solid #000" }}>
+        <span>{isReturn ? "Refund Due" : "Total"}</span>
         <span>{fmtMoney(invoice.total, sym)}</span>
       </div>
 
