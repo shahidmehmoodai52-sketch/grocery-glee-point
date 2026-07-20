@@ -15,6 +15,18 @@ function isOffline() {
   return false;
 }
 
+/** Heuristic: treat fetch/network/timeout/DNS errors as "offline-ish"
+ *  so we can gracefully fall back even when navigator.onLine lies
+ *  (captive portal, Wi-Fi up but ISP down, VPN blip, etc.). */
+function isNetworkError(e: any): boolean {
+  const msg = String(e?.message ?? e ?? "").toLowerCase();
+  if (!msg) return false;
+  return /failed to fetch|network(error)?|networkerror|fetch failed|load failed|timeout|timed out|offline|dns|err_(internet|network|name_not_resolved|connection)|socket|aborted|econn|enotfound/.test(
+    msg,
+  );
+}
+
+
 /** Try cloud, warm local cache on success. On network failure (offline / fetch throw),
  *  fall back to local cache. On other errors, rethrow so the UI shows them. */
 export async function offlineFirst<T>(
