@@ -109,8 +109,21 @@ function Page() {
     const term = entrySearch.trim();
     if (!term) return;
     const t = term.toLowerCase();
-    const exactBarcode = (products as PickerProduct[]).find((p) => (p.barcode ?? "").toLowerCase() === t);
-    const match = exactBarcode || entryMatches[Math.min(entryIndex, Math.max(entryMatches.length - 1, 0))];
+    const prods = products as PickerProduct[];
+    // 1) exact match on primary barcode
+    let exact = prods.find((p) => (p.barcode ?? "").toLowerCase() === t);
+    // 2) exact match on extra barcodes (product_barcodes table)
+    if (!exact) {
+      const bcRow = (extraBarcodes as { product_id: string; barcode: string }[])
+        .find((b) => (b.barcode ?? "").toLowerCase() === t);
+      if (bcRow) exact = prods.find((p) => p.id === bcRow.product_id);
+    }
+    // 3) exact match on SKU/name
+    if (!exact) exact = prods.find((p) => (p.name ?? "").toLowerCase() === t);
+    // If the term looks like a code (digits) but has no exact match, treat as new item
+    // instead of silently picking an unrelated substring match.
+    const looksLikeCode = /^\d+$/.test(term);
+    const match = exact || (looksLikeCode ? null : entryMatches[Math.min(entryIndex, Math.max(entryMatches.length - 1, 0))]);
     addProductLine(match ?? null, term);
   };
 
@@ -135,17 +148,30 @@ function Page() {
       cacheProducts,
     ),
   });
+  const { data: extraBarcodes = [] } = useQuery({
+    queryKey: ["product_barcodes"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.from("product_barcodes").select("product_id,barcode");
+      return data ?? [];
+    },
+  });
   const entryMatches = useMemo(() => {
     const term = entrySearch.trim().toLowerCase();
     if (!term) return [] as PickerProduct[];
+    const bcProductIds = new Set(
+      (extraBarcodes as { product_id: string; barcode: string }[])
+        .filter((b) => (b.barcode ?? "").toLowerCase().includes(term))
+        .map((b) => b.product_id)
+    );
     return (products as PickerProduct[])
       .filter((p) =>
         (p.name ?? "").toLowerCase().includes(term) ||
         (p.barcode ?? "").toLowerCase().includes(term) ||
-        String(p.stock ?? "").toLowerCase().includes(term)
+        bcProductIds.has(p.id)
       )
       .slice(0, 8);
-  }, [entrySearch, products]);
+  }, [entrySearch, products, extraBarcodes]);
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases"],
     staleTime: 30_000,
