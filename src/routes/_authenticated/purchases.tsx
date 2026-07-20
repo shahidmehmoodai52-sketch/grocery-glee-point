@@ -353,18 +353,17 @@ function Page() {
                       <p className="text-xs mt-1">Type the 4-digit item code, scan barcode, or type product name above, then press Enter.</p>
                     </div>
                   ) : (
-                    <Table className="min-w-[900px] [&_td]:py-1 [&_th]:py-1.5 [&_th]:h-8">
+                    <Table className="w-full [&_td]:py-1 [&_th]:py-1.5 [&_th]:h-8">
                       <TableHeader className="sticky top-0 bg-background z-10">
                         <TableRow>
-                          <TableHead className="w-[170px]">Code</TableHead>
                           <TableHead>Name</TableHead>
-                          <TableHead className="w-[130px]">Cost</TableHead>
-                          <TableHead className="w-[110px]">Qty</TableHead>
-                          <TableHead className="w-20 text-right">Old Avg</TableHead>
-                          <TableHead className="w-20 text-right">New Avg</TableHead>
-                          <TableHead className="w-14 text-right">Δ%</TableHead>
-                          <TableHead className="text-right w-[110px]">Total</TableHead>
-                          <TableHead className="w-10"></TableHead>
+                          <TableHead className="w-[120px]">Cost</TableHead>
+                          <TableHead className="w-[100px]">Qty</TableHead>
+                          <TableHead className="w-16 text-right">Old Avg</TableHead>
+                          <TableHead className="w-16 text-right">New Avg</TableHead>
+                          <TableHead className="w-12 text-right">Δ%</TableHead>
+                          <TableHead className="text-right w-[100px]">Total</TableHead>
+                          <TableHead className="w-9"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -381,13 +380,15 @@ function Page() {
                           const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
                           return (
                             <TableRow key={i}>
-                              <TableCell className="align-middle">
-                                <div className="min-w-0 leading-tight">
-                                  <div className="truncate text-xs font-medium">{l.item_code || l.barcode || (hasProduct ? "Stock item" : "New item")}</div>
-                                  <div className="truncate text-[10px] text-muted-foreground">stock {oldStock}</div>
-                                </div>
+                              <TableCell>
+                                <Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8 text-sm" />
+                                {(l.item_code || l.barcode) && (
+                                  <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                                    {l.item_code ? `Code ${l.item_code}` : `BC ${l.barcode}`} · stock {oldStock}
+                                  </div>
+                                )}
                               </TableCell>
-                              <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8 text-sm" /></TableCell>
+
                               <TableCell>
                                 <Input
                                   id={`purchase-cost-${i}`}
