@@ -13,16 +13,17 @@ import { LowStockAlerts } from "@/components/low-stock-alerts";
 import { useSettings } from "@/hooks/use-settings";
 import { setDefaultCurrencySymbol } from "@/lib/format";
 import { PendingBanner } from "@/components/pending-banner";
+import { getUserAllowOffline } from "@/lib/offline/session";
 
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    const user = await getUserAllowOffline();
+    if (!user) {
       throw redirect({ to: "/auth", search: { next: location.pathname + location.searchStr } });
     }
-    return { user: data.user };
+    return { user };
   },
   component: Layout,
   errorComponent: AuthedError,

@@ -5,6 +5,7 @@ import { AlertOctagon, LogOut, Store, Loader2, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
+import { useOfflineStatus } from "@/lib/offline/status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,10 +14,11 @@ import { toast } from "sonner";
 export function SuspendedGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
+  const { online } = useOfflineStatus();
 
   const { data: status, refetch } = useQuery({
     queryKey: ["my-tenant-status", user?.id],
-    enabled: !!user?.id,
+    enabled: !!user?.id && online,
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("my_tenant_status");
@@ -29,7 +31,7 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
   if (isSuperAdmin) return <>{children}</>;
 
   // Signed in but has NO shop yet (e.g. Google sign-up path) → force shop setup.
-  if (user && status === null) {
+  if (online && user && status === null) {
     return <ShopSetup onDone={() => refetch()} />;
   }
 
