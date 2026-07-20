@@ -713,7 +713,7 @@ function POSPage() {
 
       // Post-sale print behaviour, configurable in Settings.
       const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled !== false;
-      const printDefault = ((settings as any)?.pos_print_prompt_default ?? "yes") as "yes" | "no";
+      const printDefault = ((settings as any)?.pos_print_prompt_default ?? "no") as "yes" | "no";
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
       } else if (printDefault === "yes" && patchedSale) {
