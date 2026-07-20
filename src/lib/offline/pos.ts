@@ -153,26 +153,33 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
   const offline = isOffline() && enabled;
 
   if (!offline) {
-    // Normal online path.
-    const { data, error } = await supabase.rpc("complete_sale", { payload: payload as any });
-    if (error) throw error;
-    const { data: sale, error: readErr } = await supabase
-      .from("sales")
-      .select("*, sale_items(*), customers(name,phone)")
-      .eq("id", data as string)
-      .maybeSingle();
-    if (readErr) throw readErr;
-    // Cache locally so reprint works after refresh even offline.
-    if (enabled && sale) {
-      try {
-        await db().sales.put(sale);
-        if (Array.isArray((sale as any).sale_items)) {
-          await db().sale_items.bulkPut((sale as any).sale_items);
-        }
-      } catch {/* best effort */}
+    try {
+      // Normal online path.
+      const { data, error } = await supabase.rpc("complete_sale", { payload: payload as any });
+      if (error) throw error;
+      const { data: sale, error: readErr } = await supabase
+        .from("sales")
+        .select("*, sale_items(*), customers(name,phone)")
+        .eq("id", data as string)
+        .maybeSingle();
+      if (readErr) throw readErr;
+      // Cache locally so reprint works after refresh even offline.
+      if (enabled && sale) {
+        try {
+          await db().sales.put(sale);
+          if (Array.isArray((sale as any).sale_items)) {
+            await db().sale_items.bulkPut((sale as any).sale_items);
+          }
+        } catch {/* best effort */}
+      }
+      return { sale, offline: false };
+    } catch (e: any) {
+      // Network died mid-request → fall through to the offline path
+      // so the cashier never loses a sale.
+      if (!enabled || !isNetworkError(e)) throw e;
     }
-    return { sale, offline: false };
   }
+
 
   // Offline path — build a local sale record and enqueue the RPC for sync.
   const subtotal = payload.items.reduce((s, i) => s + i.qty * i.price, 0);
