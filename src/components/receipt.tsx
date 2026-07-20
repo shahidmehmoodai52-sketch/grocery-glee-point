@@ -274,19 +274,16 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       </div>
       <div className="divide-y divide-dotted divide-black/30">
         {invoice.sale_items?.map((it, i) => (
-          <div key={it.id ?? i} className="py-1">
-            <div className="text-[10.5px] font-medium leading-tight">
-              {String(i + 1).padStart(2, "0")}. {it.name}
+          <div key={it.id ?? i} className="py-0.5 grid grid-cols-12 text-[10.5px] items-center">
+            <div className="col-span-5 font-medium leading-tight pr-1 break-words">
+              {it.name}
             </div>
-            <div className="grid grid-cols-12 text-[10px]">
-              <div className="col-span-5" />
-              <div className="col-span-2 text-right">
-                {it.price != null ? fmtMoney(it.price, sym) : ""}
-              </div>
-              <div className="col-span-2 text-right">{fmtQty(it.qty)}</div>
-              <div className="col-span-3 text-right font-semibold">
-                {fmtMoney(it.line_total, sym)}
-              </div>
+            <div className="col-span-2 text-right">
+              {it.price != null ? fmtMoney(it.price, sym) : ""}
+            </div>
+            <div className="col-span-2 text-right">{fmtQty(it.qty)}</div>
+            <div className="col-span-3 text-right font-semibold">
+              {fmtMoney(it.line_total, sym)}
             </div>
           </div>
         ))}
