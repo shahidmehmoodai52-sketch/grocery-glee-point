@@ -60,6 +60,48 @@ function Page() {
   const [entrySearch, setEntrySearch] = useState("");
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
+  const [newProdOpen, setNewProdOpen] = useState(false);
+  const [newProd, setNewProd] = useState({ name: "", sku: "", barcode: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0 });
+  const [newProdSaving, setNewProdSaving] = useState(false);
+  const openNewProduct = (term: string) => {
+    const t = term.trim();
+    const isCode = /^\d+$/.test(t);
+    setNewProd({
+      name: isCode ? "" : t,
+      sku: isCode && t.length <= 6 ? t : "",
+      barcode: isCode && t.length > 4 ? t : (isCode ? "" : ""),
+      unit: "pcs",
+      cost_price: 0,
+      sell_price: 0,
+      stock: 0,
+    });
+    setNewProdOpen(true);
+  };
+  const saveNewProduct = async () => {
+    if (!newProd.name.trim()) return toast.error("Name required");
+    const primary = newProd.barcode.trim() || newProd.sku.trim() || newProd.name.trim();
+    setNewProdSaving(true);
+    const payload = {
+      name: newProd.name.trim(),
+      sku: newProd.sku.trim() || null,
+      barcode: primary,
+      unit: newProd.unit || "pcs",
+      cost_price: Number(newProd.cost_price) || 0,
+      sell_price: Number(newProd.sell_price) || 0,
+      stock: Number(newProd.stock) || 0,
+    };
+    const { data, error } = await supabase.from("products").insert(payload).select("id,name,sku,barcode,cost_price,stock").single();
+    if (!error && data) {
+      await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: primary });
+    }
+    setNewProdSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Product added");
+    setNewProdOpen(false);
+    qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["product_barcodes"] });
+    addProductLine(data as any);
+  };
   const [editRow, setEditRow] = useState<any | null>(null);
   const [editItems, setEditItems] = useState<any[]>([]);
   const [editItemsOriginal, setEditItemsOriginal] = useState<any[]>([]);
@@ -135,11 +177,18 @@ function Page() {
     }
     // 4) exact match on name
     if (!exact) exact = prods.find((p) => (p.name ?? "").toLowerCase() === t);
-    // If the term looks like a code (digits) but has no exact match, treat as new item
-    // instead of silently picking an unrelated substring match.
+    // If the term looks like a code (digits) but has no exact match, prompt to create a new product
     const looksLikeCode = /^\d+$/.test(term);
-    const match = exact || (looksLikeCode ? null : entryMatches[Math.min(entryIndex, Math.max(entryMatches.length - 1, 0))]);
-    addProductLine(match ?? null, term);
+    if (!exact && looksLikeCode) {
+      openNewProduct(term);
+      return;
+    }
+    const match = exact || entryMatches[Math.min(entryIndex, Math.max(entryMatches.length - 1, 0))];
+    if (!match) {
+      openNewProduct(term);
+      return;
+    }
+    addProductLine(match);
   };
 
 
@@ -269,68 +318,60 @@ function Page() {
             </DialogHeader>
 
 
-            {/* Top bar: supplier + big scan/search — single row */}
+            {/* Top bar: full-width scan/search */}
             <div className="px-6 py-2 border-b bg-muted/30 shrink-0">
-              <div className="grid grid-cols-[minmax(180px,240px)_1fr] gap-3 items-end">
-                <div className="min-w-0">
-                  <Label className="text-xs">Supplier</Label>
-                  <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-xs">Item code, barcode, or product name</Label>
-                  <div className="relative">
-                    <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                    <Input
-                      ref={searchRef}
-                      value={entrySearch}
-                      onFocus={() => setEntryActive(true)}
-                      onBlur={() => setTimeout(() => setEntryActive(false), 120)}
-                      onChange={(e) => { setEntrySearch(e.target.value); setEntryActive(true); setEntryIndex(0); }}
-                      onKeyDown={(e) => {
-                        if (e.key === "ArrowDown") { e.preventDefault(); setEntryIndex((n) => Math.min(n + 1, Math.max(entryMatches.length - 1, 0))); }
-                        if (e.key === "ArrowUp") { e.preventDefault(); setEntryIndex((n) => Math.max(n - 1, 0)); }
-                        if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
-                      }}
-                      placeholder="🔍  Type 4-digit item code first, scan barcode, or type name…"
-                      className="pl-10 h-9 text-sm"
-                      autoFocus
-                    />
-                    {entryActive && entrySearch.trim() && (
-                      <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover p-1 shadow-lg">
-                        {entryMatches.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-muted-foreground">No stock item found. Press Enter to add as new item.</div>
-                        ) : entryMatches.map((p, idx) => (
-                          <button
-                            key={p.id}
-                            ref={(el) => { if (el && idx === entryIndex) el.scrollIntoView({ block: "nearest" }); }}
-                            type="button"
-                            onMouseDown={(e) => { e.preventDefault(); addProductLine(p); }}
-                            onMouseEnter={() => setEntryIndex(idx)}
-                            className={`flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm ${idx === entryIndex ? "bg-accent text-accent-foreground ring-1 ring-primary/40" : "hover:bg-accent hover:text-accent-foreground"}`}
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate font-medium">{p.name}</span>
-                              <span className="block truncate text-xs text-muted-foreground">
-                                Code {p.sku || "—"}{p.barcode ? ` · Barcode ${p.barcode}` : ""}
-                              </span>
-                            </span>
-                            <span className="shrink-0 text-right text-xs text-muted-foreground">
-                              <span className="block">stock {Number(p.stock ?? 0)}</span>
-                              <span className="block">{fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
-                            </span>
-                          </button>
-                        ))}
-
-                      </div>
-                    )}
+              <Label className="text-xs">Item code, barcode, or product name</Label>
+              <div className="relative">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  ref={searchRef}
+                  value={entrySearch}
+                  onFocus={() => setEntryActive(true)}
+                  onBlur={() => setTimeout(() => setEntryActive(false), 120)}
+                  onChange={(e) => { setEntrySearch(e.target.value); setEntryActive(true); setEntryIndex(0); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setEntryIndex((n) => Math.min(n + 1, Math.max(entryMatches.length - 1, 0))); }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setEntryIndex((n) => Math.max(n - 1, 0)); }
+                    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
+                  }}
+                  placeholder="🔍  Type 4-digit item code first, scan barcode, or type name…"
+                  className="pl-10 h-9 text-sm"
+                  autoFocus
+                />
+                {entryActive && entrySearch.trim() && (
+                  <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover p-1 shadow-lg">
+                    {entryMatches.length === 0 ? (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); openNewProduct(entrySearch); }}
+                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
+                      >
+                        <Plus className="h-4 w-4 text-primary" />
+                        <span>Add <b>{entrySearch.trim()}</b> as a new product…</span>
+                      </button>
+                    ) : entryMatches.map((p, idx) => (
+                      <button
+                        key={p.id}
+                        ref={(el) => { if (el && idx === entryIndex) el.scrollIntoView({ block: "nearest" }); }}
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); addProductLine(p); }}
+                        onMouseEnter={() => setEntryIndex(idx)}
+                        className={`flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm ${idx === entryIndex ? "bg-accent text-accent-foreground ring-1 ring-primary/40" : "hover:bg-accent hover:text-accent-foreground"}`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{p.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            Code {p.sku || "—"}{p.barcode ? ` · Barcode ${p.barcode}` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right text-xs text-muted-foreground">
+                          <span className="block">stock {Number(p.stock ?? 0)}</span>
+                          <span className="block">{fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -447,6 +488,16 @@ function Page() {
                 </div>
                 <div className="px-4 py-3 space-y-3">
                   <div>
+                    <Label className="text-xs">Supplier</Label>
+                    <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <Label className="text-xs">Tax</Label>
                     <Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} className="h-9" />
                   </div>
@@ -496,6 +547,49 @@ function Page() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={newProdOpen} onOpenChange={(v) => { if (!newProdSaving) setNewProdOpen(v); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Add new product</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Name</Label>
+                <Input autoFocus value={newProd.name} onChange={(e) => setNewProd({ ...newProd, name: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Item code (SKU)</Label>
+                  <Input value={newProd.sku} onChange={(e) => setNewProd({ ...newProd, sku: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Barcode</Label>
+                  <Input value={newProd.barcode} onChange={(e) => setNewProd({ ...newProd, barcode: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label>Unit</Label>
+                  <Input value={newProd.unit} onChange={(e) => setNewProd({ ...newProd, unit: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Cost</Label>
+                  <Input type="number" step="0.01" value={newProd.cost_price || ""} onChange={(e) => setNewProd({ ...newProd, cost_price: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <Label>Sell</Label>
+                  <Input type="number" step="0.01" value={newProd.sell_price || ""} onChange={(e) => setNewProd({ ...newProd, sell_price: Number(e.target.value) })} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Opening stock stays 0 — this purchase will add the actual quantity.</p>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setNewProdOpen(false)} disabled={newProdSaving}>Cancel</Button>
+              <Button onClick={saveNewProduct} disabled={newProdSaving}>{newProdSaving ? "Saving…" : "Save & add to purchase"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+
 
         <Dialog open={!!editRow} onOpenChange={(v) => { if (!editSaving && !v) { setEditRow(null); setEditItems([]); setEditItemsOriginal([]); } }}>
           <DialogContent className="w-[96vw] max-w-5xl max-h-[92vh] overflow-y-auto">
