@@ -495,6 +495,13 @@ function Page() {
                               <TableCell className={`text-right text-xs font-semibold ${deltaClass}`}>
                                 {hasProduct && oldCost > 0 ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%` : "—"}
                               </TableCell>
+                              <TableCell className="text-right text-xs">
+                                {taxShare > 0 ? (
+                                  <span title={qty > 0 ? `${fmtMoney(taxShare / qty, sym)} /unit` : ""}>
+                                    {fmtMoney(taxShare, sym)}
+                                  </span>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </TableCell>
                               <TableCell>
                                 <Input
                                   type="number"
