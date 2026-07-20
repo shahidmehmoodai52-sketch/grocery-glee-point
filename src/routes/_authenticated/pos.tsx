@@ -165,6 +165,8 @@ function POSPage() {
   const [showStaff, setShowStaff] = useState(false);
   const [showProfit, setShowProfit] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [cartCursor, setCartCursor] = useState<number>(-1);
+  const cartRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   const [scanFlash, setScanFlash] = useState(false);
   const [undoReason, setUndoReason] = useState<string>(UNDO_REASONS[0]);
   const [undoReasonNote, setUndoReasonNote] = useState<string>("");
@@ -436,6 +438,17 @@ function POSPage() {
 
   // reset highlight whenever the filtered list changes
   useEffect(() => { setHighlight(0); }, [search]);
+
+  // Keep cart cursor in range and scroll into view
+  useEffect(() => {
+    if (tab.items.length === 0) { setCartCursor(-1); return; }
+    if (cartCursor >= tab.items.length) setCartCursor(tab.items.length - 1);
+  }, [tab.items.length]);
+  useEffect(() => {
+    if (cartCursor < 0) return;
+    const el = cartRowRefs.current[cartCursor];
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [cartCursor]);
 
 
 
@@ -1016,17 +1029,45 @@ function POSPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Escape") { setSearch(""); return; }
-                if (e.key === "ArrowDown" && filtered.length) {
+                if (e.key === "Escape") { setSearch(""); setCartCursor(-1); return; }
+                const raw = search.trim();
+                // When search has text, arrows navigate the search results popup
+                if (raw && e.key === "ArrowDown" && filtered.length) {
                   e.preventDefault(); setHighlight((h) => (h + 1) % filtered.length); return;
                 }
-                if (e.key === "ArrowUp" && filtered.length) {
+                if (raw && e.key === "ArrowUp" && filtered.length) {
                   e.preventDefault(); setHighlight((h) => (h - 1 + filtered.length) % filtered.length); return;
+                }
+                // When search is empty, arrows move the cart line cursor
+                if (!raw && (e.key === "ArrowDown" || e.key === "ArrowUp") && tab.items.length) {
+                  e.preventDefault();
+                  setCartCursor((c) => {
+                    const n = tab.items.length;
+                    const base = c < 0 ? (e.key === "ArrowDown" ? -1 : 0) : c;
+                    const next = e.key === "ArrowDown" ? (base + 1) % n : (base - 1 + n) % n;
+                    return next;
+                  });
+                  return;
+                }
+                if (!raw && (e.key === "Delete" || (e.key === "Backspace" && cartCursor >= 0)) && cartCursor >= 0 && cartCursor < tab.items.length) {
+                  e.preventDefault();
+                  const idx = cartCursor;
+                  removeLine(idx);
+                  setCartCursor((c) => Math.min(c, tab.items.length - 2));
+                  return;
                 }
                 if (e.key !== "Enter") return;
                 e.preventDefault();
-                const raw = search.trim();
-                if (!raw) { if (tab.items.length > 0) paidRef.current?.focus(); return; }
+                if (!raw) {
+                  // Enter on a highlighted cart row → edit qty; otherwise go to Paid
+                  if (cartCursor >= 0 && cartCursor < tab.items.length) {
+                    const idx = cartCursor;
+                    setTimeout(() => setEditing({ idx, field: "qty" }), 0);
+                    return;
+                  }
+                  if (tab.items.length > 0) paidRef.current?.focus();
+                  return;
+                }
                 const exact = productByBarcode[raw];
                 if (exact) { addProduct(exact); setSearch(""); triggerScanFlash(); return; }
                 if (filtered.length >= 1) {
@@ -1131,8 +1172,14 @@ function POSPage() {
                     ].filter(Boolean).join(" · ")
                   : "";
                 const stockNum = p ? Number(p.stock ?? 0) : null;
+                const isCursor = idx === cartCursor;
                 return (
-                  <tr key={idx} className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40`}>
+                  <tr
+                    key={idx}
+                    ref={(el) => { cartRowRefs.current[idx] = el; }}
+                    onClick={() => setCartCursor(idx)}
+                    className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40 ${isCursor ? "ring-2 ring-inset ring-primary bg-primary/5" : ""}`}
+                  >
                     <td className="px-2 py-1 font-mono text-xs">{displayCode || "—"}</td>
                     <td className="px-2 py-1">
                       <div className="flex items-center gap-2 min-w-0">
