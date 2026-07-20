@@ -148,17 +148,30 @@ function Page() {
       cacheProducts,
     ),
   });
+  const { data: extraBarcodes = [] } = useQuery({
+    queryKey: ["product_barcodes"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.from("product_barcodes").select("product_id,barcode");
+      return data ?? [];
+    },
+  });
   const entryMatches = useMemo(() => {
     const term = entrySearch.trim().toLowerCase();
     if (!term) return [] as PickerProduct[];
+    const bcProductIds = new Set(
+      (extraBarcodes as { product_id: string; barcode: string }[])
+        .filter((b) => (b.barcode ?? "").toLowerCase().includes(term))
+        .map((b) => b.product_id)
+    );
     return (products as PickerProduct[])
       .filter((p) =>
         (p.name ?? "").toLowerCase().includes(term) ||
         (p.barcode ?? "").toLowerCase().includes(term) ||
-        String(p.stock ?? "").toLowerCase().includes(term)
+        bcProductIds.has(p.id)
       )
       .slice(0, 8);
-  }, [entrySearch, products]);
+  }, [entrySearch, products, extraBarcodes]);
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases"],
     staleTime: 30_000,
