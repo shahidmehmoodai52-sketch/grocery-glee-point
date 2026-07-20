@@ -112,6 +112,8 @@ export async function insertOfflineAware<T extends Record<string, any>>(
   }
 
   return saveOffline();
+}
+
 
 export async function cacheProductBarcodes(rows: any[]) {
   if (!rows?.length) return;
