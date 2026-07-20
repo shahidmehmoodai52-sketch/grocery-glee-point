@@ -15,6 +15,18 @@ function isOffline() {
   return false;
 }
 
+/** Heuristic: treat fetch/network/timeout/DNS errors as "offline-ish"
+ *  so we can gracefully fall back even when navigator.onLine lies
+ *  (captive portal, Wi-Fi up but ISP down, VPN blip, etc.). */
+function isNetworkError(e: any): boolean {
+  const msg = String(e?.message ?? e ?? "").toLowerCase();
+  if (!msg) return false;
+  return /failed to fetch|network(error)?|networkerror|fetch failed|load failed|timeout|timed out|offline|dns|err_(internet|network|name_not_resolved|connection)|socket|aborted|econn|enotfound/.test(
+    msg,
+  );
+}
+
+
 /** Try cloud, warm local cache on success. On network failure (offline / fetch throw),
  *  fall back to local cache. On other errors, rethrow so the UI shows them. */
 export async function offlineFirst<T>(
@@ -31,11 +43,12 @@ export async function offlineFirst<T>(
     if (enabled && cacheWriter) { try { await cacheWriter(data); } catch {/* cache write is best-effort */} }
     return data;
   } catch (e: any) {
-    if (enabled && (e?.message?.match(/failed to fetch|network|offline/i))) {
+    if (enabled && isNetworkError(e)) {
       return cacheReader();
     }
     throw e;
   }
+
 }
 
 /** Warm helpers used by both queryFns and the sync engine. */
@@ -79,19 +92,30 @@ export async function insertOfflineAware<T extends Record<string, any>>(
     ...(hasUpdatedAt ? { updated_at: now } : {}),
   };
 
+  const saveOffline = async () => {
+    const marked = { ...withId, _offline_pending: true };
+    try { await (db() as any)[table]?.put(marked); } catch {}
+    await enqueueWrite({ op: "insert", table, payload: withId });
+    return marked;
+  };
+
   if (!offline) {
-    const { data, error } = await supabase.from(table as any).insert(withId).select("*").maybeSingle();
-    if (error) throw error;
-    const row = (data ?? withId) as any;
-    if (enabled) { try { await (db() as any)[table]?.put(row); } catch {} }
-    return row;
+    try {
+      const { data, error } = await supabase.from(table as any).insert(withId).select("*").maybeSingle();
+      if (error) throw error;
+      const row = (data ?? withId) as any;
+      if (enabled) { try { await (db() as any)[table]?.put(row); } catch {} }
+      return row;
+    } catch (e: any) {
+      if (enabled && isNetworkError(e)) return saveOffline();
+      throw e;
+    }
   }
 
-  const marked = { ...withId, _offline_pending: true };
-  try { await (db() as any)[table]?.put(marked); } catch {}
-  await enqueueWrite({ op: "insert", table, payload: withId });
-  return marked;
+  return saveOffline();
 }
+
+
 export async function cacheProductBarcodes(rows: any[]) {
   if (!rows?.length) return;
   // product_barcodes primary key in cloud is `id`, but our sparse rows here
@@ -130,26 +154,33 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
   const offline = isOffline() && enabled;
 
   if (!offline) {
-    // Normal online path.
-    const { data, error } = await supabase.rpc("complete_sale", { payload: payload as any });
-    if (error) throw error;
-    const { data: sale, error: readErr } = await supabase
-      .from("sales")
-      .select("*, sale_items(*), customers(name,phone)")
-      .eq("id", data as string)
-      .maybeSingle();
-    if (readErr) throw readErr;
-    // Cache locally so reprint works after refresh even offline.
-    if (enabled && sale) {
-      try {
-        await db().sales.put(sale);
-        if (Array.isArray((sale as any).sale_items)) {
-          await db().sale_items.bulkPut((sale as any).sale_items);
-        }
-      } catch {/* best effort */}
+    try {
+      // Normal online path.
+      const { data, error } = await supabase.rpc("complete_sale", { payload: payload as any });
+      if (error) throw error;
+      const { data: sale, error: readErr } = await supabase
+        .from("sales")
+        .select("*, sale_items(*), customers(name,phone)")
+        .eq("id", data as string)
+        .maybeSingle();
+      if (readErr) throw readErr;
+      // Cache locally so reprint works after refresh even offline.
+      if (enabled && sale) {
+        try {
+          await db().sales.put(sale);
+          if (Array.isArray((sale as any).sale_items)) {
+            await db().sale_items.bulkPut((sale as any).sale_items);
+          }
+        } catch {/* best effort */}
+      }
+      return { sale, offline: false };
+    } catch (e: any) {
+      // Network died mid-request → fall through to the offline path
+      // so the cashier never loses a sale.
+      if (!enabled || !isNetworkError(e)) throw e;
     }
-    return { sale, offline: false };
   }
+
 
   // Offline path — build a local sale record and enqueue the RPC for sync.
   const subtotal = payload.items.reduce((s, i) => s + i.qty * i.price, 0);
