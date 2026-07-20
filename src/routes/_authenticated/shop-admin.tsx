@@ -15,10 +15,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { ALL_PERMS } from "@/hooks/use-permissions";
 import {
-import { NeedsInternetBanner } from "@/components/needs-internet-banner";
   getMyShopInfo, listShopStaff, createShopStaff,
   resetShopStaffPassword, setShopStaffPerms, deleteShopStaff,
 } from "@/lib/shop-admin.functions";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/shop-admin")({ component: Page });
 

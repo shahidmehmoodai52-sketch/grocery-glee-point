@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { FolderOpen, HardDriveDownload, ShieldCheck, AlertTriangle, RefreshCw, Clock } from "lucide-react";
 import {
-import { NeedsInternetBanner } from "@/components/needs-internet-banner";
   getStatus, pickBackupFolder, clearBackupFolder, runBackup,
   setAutoEnabled, setBackupTime, isSupported, type BackupStatus,
 } from "@/lib/backup";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/backup")({
   component: BackupPage,
