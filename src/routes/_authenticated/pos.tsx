@@ -447,7 +447,26 @@ function POSPage() {
   useEffect(() => {
     if (cartCursor < 0) return;
     const el = cartRowRefs.current[cartCursor];
-    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (!el) return;
+    // Find the scroll container (the overflow-auto ancestor)
+    let scroller: HTMLElement | null = el.parentElement;
+    while (scroller && scroller !== document.body) {
+      const style = getComputedStyle(scroller);
+      if (/(auto|scroll)/.test(style.overflowY)) break;
+      scroller = scroller.parentElement;
+    }
+    if (!scroller) { el.scrollIntoView({ block: "nearest" }); return; }
+    const thead = scroller.querySelector<HTMLElement>("thead");
+    const headerH = thead?.offsetHeight ?? 0;
+    const rowTop = el.offsetTop;
+    const rowBottom = rowTop + el.offsetHeight;
+    const viewTop = scroller.scrollTop + headerH;
+    const viewBottom = scroller.scrollTop + scroller.clientHeight;
+    if (rowTop < viewTop) {
+      scroller.scrollTo({ top: rowTop - headerH, behavior: "smooth" });
+    } else if (rowBottom > viewBottom) {
+      scroller.scrollTo({ top: rowBottom - scroller.clientHeight, behavior: "smooth" });
+    }
   }, [cartCursor]);
 
 
