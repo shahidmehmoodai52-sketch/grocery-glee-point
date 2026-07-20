@@ -1606,7 +1606,7 @@ function POSPage() {
       {/* Post-sale print prompt — Enter triggers the default action (Settings > POS). */}
       <PrintPromptDialog
         sale={printAsk}
-        defaultAction={((settings as any)?.pos_print_prompt_default ?? "yes") as "yes" | "no"}
+        defaultAction={((settings as any)?.pos_print_prompt_default ?? "no") as "yes" | "no"}
         onYes={() => {
           const s = printAsk;
           setPrintAsk(null);
