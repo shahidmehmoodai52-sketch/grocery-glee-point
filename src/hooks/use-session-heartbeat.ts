@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
+import { isOfflineNow } from "@/lib/offline/session";
 
 function getDeviceId(): string {
   try {
@@ -26,6 +27,7 @@ export function useSessionHeartbeat() {
     const ua = typeof navigator !== "undefined" ? navigator.userAgent : null;
 
     const beat = async () => {
+      if (isOfflineNow()) return;
       await supabase
         .from("user_sessions")
         .upsert(
@@ -38,6 +40,7 @@ export function useSessionHeartbeat() {
 
     const cleanup = async () => {
       try {
+        if (isOfflineNow()) return;
         await supabase.from("user_sessions").delete().eq("user_id", user.id).eq("device_id", device_id);
       } catch {}
     };
