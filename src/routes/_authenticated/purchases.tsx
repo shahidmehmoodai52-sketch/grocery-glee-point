@@ -155,7 +155,7 @@ function Page() {
     ),
   });
   const { data: products = [] } = useQuery({
-    queryKey: ["products"],
+    queryKey: ["products", "purchase-picker", "with-item-code"],
     staleTime: 60_000,
     queryFn: async () => offlineFirst<any[]>(
       async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,sku,barcode,cost_price,stock").order("name").range(from, to)),
