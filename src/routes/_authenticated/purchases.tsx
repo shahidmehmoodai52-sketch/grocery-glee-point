@@ -286,7 +286,7 @@ function Page() {
     setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
-        supplier_id: supplier === "none" ? null : supplier,
+        supplier_id: supplier,
         tax: taxAmt, paid, note,
         items: items.map((l) => {
           const share = sub > 0 ? taxAmt * ((l.qty * l.cost) / sub) : 0;
