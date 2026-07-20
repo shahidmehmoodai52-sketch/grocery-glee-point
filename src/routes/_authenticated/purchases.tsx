@@ -195,17 +195,17 @@ function Page() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New purchase</Button></DialogTrigger>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
-            <DialogHeader className="px-6 py-3 border-b shrink-0">
+            <DialogHeader className="px-6 py-2 border-b shrink-0">
               <DialogTitle>New purchase</DialogTitle>
             </DialogHeader>
 
             {/* Top bar: supplier + big scan/search — POS style */}
-            <div className="px-6 py-4 border-b bg-muted/30 shrink-0">
+            <div className="px-6 py-2 border-b bg-muted/30 shrink-0">
               <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3 items-end">
                 <div>
                   <Label className="text-xs">Supplier</Label>
                   <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
-                    <SelectTrigger className="h-12"><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">— None —</SelectItem>
                       {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -215,7 +215,7 @@ function Page() {
                 <div>
                   <Label className="text-xs">Scan or search product</Label>
                   <div className="relative">
-                    <Search className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <Input
                       ref={searchRef}
                       value={entrySearch}
@@ -228,7 +228,7 @@ function Page() {
                         if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
                       }}
                       placeholder="🔍  Scan barcode or type name, press Enter to add…"
-                      className="pl-10 h-12 text-base"
+                      className="pl-10 h-9 text-sm"
                       autoFocus
                     />
                     {entryActive && entrySearch.trim() && (
@@ -260,14 +260,14 @@ function Page() {
             </div>
 
             {/* Selected items — takes all available space */}
-            <div className="flex-1 min-h-0 flex flex-col px-6 py-3 overflow-hidden">
-              <div className="flex items-center justify-between mb-2 shrink-0">
+            <div className="flex-1 min-h-0 flex flex-col px-6 py-2 overflow-hidden">
+              <div className="flex items-center justify-between mb-1 shrink-0">
                 <div className="text-sm">
-                  <span className="font-semibold text-base">{lines.length}</span>
-                  <span className="text-muted-foreground"> item{lines.length === 1 ? "" : "s"} in this purchase</span>
+                  <span className="font-semibold">{lines.length}</span>
+                  <span className="text-muted-foreground"> item{lines.length === 1 ? "" : "s"}</span>
                 </div>
-                <Button type="button" size="sm" variant="outline" onClick={() => { addProductLine(null, ""); }}>
-                  <Plus className="h-4 w-4 mr-1" /> Add empty row
+                <Button type="button" size="sm" variant="outline" onClick={() => { addProductLine(null, ""); }} className="h-7">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add empty row
                 </Button>
               </div>
 
