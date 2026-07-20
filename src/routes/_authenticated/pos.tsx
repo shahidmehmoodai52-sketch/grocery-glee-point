@@ -440,6 +440,31 @@ function POSPage() {
   // reset highlight whenever the filtered list changes
   useEffect(() => { setHighlight(0); }, [search]);
 
+  // Scroll highlighted search result into view (accounting for sticky header)
+  useEffect(() => {
+    if (!search.trim()) return;
+    const el = searchRowRefs.current[highlight];
+    if (!el) return;
+    let scroller: HTMLElement | null = el.parentElement;
+    while (scroller && scroller !== document.body) {
+      const s = getComputedStyle(scroller);
+      if (/(auto|scroll)/.test(s.overflowY)) break;
+      scroller = scroller.parentElement;
+    }
+    if (!scroller) { el.scrollIntoView({ block: "nearest" }); return; }
+    const thead = scroller.querySelector<HTMLElement>("thead");
+    const headerH = thead?.offsetHeight ?? 0;
+    const rowTop = el.offsetTop;
+    const rowBottom = rowTop + el.offsetHeight;
+    const viewTop = scroller.scrollTop + headerH;
+    const viewBottom = scroller.scrollTop + scroller.clientHeight;
+    if (rowTop < viewTop) {
+      scroller.scrollTo({ top: rowTop - headerH, behavior: "smooth" });
+    } else if (rowBottom > viewBottom) {
+      scroller.scrollTo({ top: rowBottom - scroller.clientHeight, behavior: "smooth" });
+    }
+  }, [highlight, search]);
+
   // Keep cart cursor in range and scroll into view
   useEffect(() => {
     if (tab.items.length === 0) { setCartCursor(-1); return; }
