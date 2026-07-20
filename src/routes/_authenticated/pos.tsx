@@ -713,7 +713,7 @@ function POSPage() {
 
       // Post-sale print behaviour, configurable in Settings.
       const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled !== false;
-      const printDefault = ((settings as any)?.pos_print_prompt_default ?? "yes") as "yes" | "no";
+      const printDefault = ((settings as any)?.pos_print_prompt_default ?? "no") as "yes" | "no";
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
       } else if (printDefault === "yes" && patchedSale) {
@@ -1606,7 +1606,7 @@ function POSPage() {
       {/* Post-sale print prompt — Enter triggers the default action (Settings > POS). */}
       <PrintPromptDialog
         sale={printAsk}
-        defaultAction={((settings as any)?.pos_print_prompt_default ?? "yes") as "yes" | "no"}
+        defaultAction={((settings as any)?.pos_print_prompt_default ?? "no") as "yes" | "no"}
         onYes={() => {
           const s = printAsk;
           setPrintAsk(null);
@@ -1952,7 +1952,7 @@ function PrintPromptDialog({
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            (defaultAction === "yes" ? onYes : onNo)();
+            onYes();
           }
         }}
       >
