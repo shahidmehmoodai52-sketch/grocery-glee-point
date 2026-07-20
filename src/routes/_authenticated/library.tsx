@@ -173,7 +173,7 @@ function LibraryPage() {
             search={search}
             setSearch={setSearch}
             mode="import"
-            onDone={invalidate}
+            onDone={invalidateAfterImport}
             showSell={showSell}
             showCost={showCost}
           />
