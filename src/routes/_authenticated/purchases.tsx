@@ -475,6 +475,11 @@ function Page() {
                                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
                                   className="h-8 text-right text-sm"
                                 />
+                                {taxShare > 0 && qty > 0 && (
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Cost including distributed tax">
+                                    +tax = {fmtMoney(effCost, sym)}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Input
@@ -528,9 +533,14 @@ function Page() {
                                       setLine(i, { _total: t });
                                     }
                                   }}
-                                  title="Type total amount — cost auto-calculates as total ÷ qty"
+                                  title="Base total — cost auto-calculates as total ÷ qty. Tax is added below."
                                   className="h-8 text-right text-sm font-medium"
                                 />
+                                {taxShare > 0 && (
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Line total including distributed tax">
+                                    +tax = <span className="font-medium text-foreground">{fmtMoney(totalDisplay + taxShare, sym)}</span>
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLines(lines.filter((_, x) => x !== i))}>
