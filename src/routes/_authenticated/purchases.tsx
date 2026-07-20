@@ -318,68 +318,60 @@ function Page() {
             </DialogHeader>
 
 
-            {/* Top bar: supplier + big scan/search — single row */}
+            {/* Top bar: full-width scan/search */}
             <div className="px-6 py-2 border-b bg-muted/30 shrink-0">
-              <div className="grid grid-cols-[minmax(180px,240px)_1fr] gap-3 items-end">
-                <div className="min-w-0">
-                  <Label className="text-xs">Supplier</Label>
-                  <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="min-w-0">
-                  <Label className="text-xs">Item code, barcode, or product name</Label>
-                  <div className="relative">
-                    <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                    <Input
-                      ref={searchRef}
-                      value={entrySearch}
-                      onFocus={() => setEntryActive(true)}
-                      onBlur={() => setTimeout(() => setEntryActive(false), 120)}
-                      onChange={(e) => { setEntrySearch(e.target.value); setEntryActive(true); setEntryIndex(0); }}
-                      onKeyDown={(e) => {
-                        if (e.key === "ArrowDown") { e.preventDefault(); setEntryIndex((n) => Math.min(n + 1, Math.max(entryMatches.length - 1, 0))); }
-                        if (e.key === "ArrowUp") { e.preventDefault(); setEntryIndex((n) => Math.max(n - 1, 0)); }
-                        if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
-                      }}
-                      placeholder="🔍  Type 4-digit item code first, scan barcode, or type name…"
-                      className="pl-10 h-9 text-sm"
-                      autoFocus
-                    />
-                    {entryActive && entrySearch.trim() && (
-                      <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover p-1 shadow-lg">
-                        {entryMatches.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-muted-foreground">No stock item found. Press Enter to add as new item.</div>
-                        ) : entryMatches.map((p, idx) => (
-                          <button
-                            key={p.id}
-                            ref={(el) => { if (el && idx === entryIndex) el.scrollIntoView({ block: "nearest" }); }}
-                            type="button"
-                            onMouseDown={(e) => { e.preventDefault(); addProductLine(p); }}
-                            onMouseEnter={() => setEntryIndex(idx)}
-                            className={`flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm ${idx === entryIndex ? "bg-accent text-accent-foreground ring-1 ring-primary/40" : "hover:bg-accent hover:text-accent-foreground"}`}
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate font-medium">{p.name}</span>
-                              <span className="block truncate text-xs text-muted-foreground">
-                                Code {p.sku || "—"}{p.barcode ? ` · Barcode ${p.barcode}` : ""}
-                              </span>
-                            </span>
-                            <span className="shrink-0 text-right text-xs text-muted-foreground">
-                              <span className="block">stock {Number(p.stock ?? 0)}</span>
-                              <span className="block">{fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
-                            </span>
-                          </button>
-                        ))}
-
-                      </div>
-                    )}
+              <Label className="text-xs">Item code, barcode, or product name</Label>
+              <div className="relative">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  ref={searchRef}
+                  value={entrySearch}
+                  onFocus={() => setEntryActive(true)}
+                  onBlur={() => setTimeout(() => setEntryActive(false), 120)}
+                  onChange={(e) => { setEntrySearch(e.target.value); setEntryActive(true); setEntryIndex(0); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setEntryIndex((n) => Math.min(n + 1, Math.max(entryMatches.length - 1, 0))); }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setEntryIndex((n) => Math.max(n - 1, 0)); }
+                    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
+                  }}
+                  placeholder="🔍  Type 4-digit item code first, scan barcode, or type name…"
+                  className="pl-10 h-9 text-sm"
+                  autoFocus
+                />
+                {entryActive && entrySearch.trim() && (
+                  <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover p-1 shadow-lg">
+                    {entryMatches.length === 0 ? (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); openNewProduct(entrySearch); }}
+                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
+                      >
+                        <Plus className="h-4 w-4 text-primary" />
+                        <span>Add <b>{entrySearch.trim()}</b> as a new product…</span>
+                      </button>
+                    ) : entryMatches.map((p, idx) => (
+                      <button
+                        key={p.id}
+                        ref={(el) => { if (el && idx === entryIndex) el.scrollIntoView({ block: "nearest" }); }}
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); addProductLine(p); }}
+                        onMouseEnter={() => setEntryIndex(idx)}
+                        className={`flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm ${idx === entryIndex ? "bg-accent text-accent-foreground ring-1 ring-primary/40" : "hover:bg-accent hover:text-accent-foreground"}`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{p.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            Code {p.sku || "—"}{p.barcode ? ` · Barcode ${p.barcode}` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right text-xs text-muted-foreground">
+                          <span className="block">stock {Number(p.stock ?? 0)}</span>
+                          <span className="block">{fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
