@@ -61,7 +61,7 @@ function Page() {
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
   const [newProdOpen, setNewProdOpen] = useState(false);
-  const [newProd, setNewProd] = useState({ name: "", sku: "", barcode: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0 });
+  const [newProd, setNewProd] = useState({ name: "", sku: "", barcode: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, supplier_id: "" });
   const [newProdSaving, setNewProdSaving] = useState(false);
   const openNewProduct = (term: string) => {
     const t = term.trim();
@@ -74,6 +74,7 @@ function Page() {
       cost_price: 0,
       sell_price: 0,
       stock: 0,
+      supplier_id: supplier && supplier !== "none" ? supplier : "",
     });
     setNewProdOpen(true);
   };
@@ -89,6 +90,7 @@ function Page() {
       cost_price: Number(newProd.cost_price) || 0,
       sell_price: Number(newProd.sell_price) || 0,
       stock: Number(newProd.stock) || 0,
+      preferred_supplier_id: newProd.supplier_id || null,
     };
     const { data, error } = await supabase.from("products").insert(payload).select("id,name,sku,barcode,cost_price,stock").single();
     if (!error && data) {
