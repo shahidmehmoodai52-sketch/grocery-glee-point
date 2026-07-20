@@ -1018,17 +1018,45 @@ function POSPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Escape") { setSearch(""); return; }
-                if (e.key === "ArrowDown" && filtered.length) {
+                if (e.key === "Escape") { setSearch(""); setCartCursor(-1); return; }
+                const raw = search.trim();
+                // When search has text, arrows navigate the search results popup
+                if (raw && e.key === "ArrowDown" && filtered.length) {
                   e.preventDefault(); setHighlight((h) => (h + 1) % filtered.length); return;
                 }
-                if (e.key === "ArrowUp" && filtered.length) {
+                if (raw && e.key === "ArrowUp" && filtered.length) {
                   e.preventDefault(); setHighlight((h) => (h - 1 + filtered.length) % filtered.length); return;
+                }
+                // When search is empty, arrows move the cart line cursor
+                if (!raw && (e.key === "ArrowDown" || e.key === "ArrowUp") && tab.items.length) {
+                  e.preventDefault();
+                  setCartCursor((c) => {
+                    const n = tab.items.length;
+                    const base = c < 0 ? (e.key === "ArrowDown" ? -1 : 0) : c;
+                    const next = e.key === "ArrowDown" ? (base + 1) % n : (base - 1 + n) % n;
+                    return next;
+                  });
+                  return;
+                }
+                if (!raw && (e.key === "Delete" || (e.key === "Backspace" && cartCursor >= 0)) && cartCursor >= 0 && cartCursor < tab.items.length) {
+                  e.preventDefault();
+                  const idx = cartCursor;
+                  removeLine(idx);
+                  setCartCursor((c) => Math.min(c, tab.items.length - 2));
+                  return;
                 }
                 if (e.key !== "Enter") return;
                 e.preventDefault();
-                const raw = search.trim();
-                if (!raw) { if (tab.items.length > 0) paidRef.current?.focus(); return; }
+                if (!raw) {
+                  // Enter on a highlighted cart row → edit qty; otherwise go to Paid
+                  if (cartCursor >= 0 && cartCursor < tab.items.length) {
+                    const idx = cartCursor;
+                    setTimeout(() => setEditing({ idx, field: "qty" }), 0);
+                    return;
+                  }
+                  if (tab.items.length > 0) paidRef.current?.focus();
+                  return;
+                }
                 const exact = productByBarcode[raw];
                 if (exact) { addProduct(exact); setSearch(""); triggerScanFlash(); return; }
                 if (filtered.length >= 1) {
