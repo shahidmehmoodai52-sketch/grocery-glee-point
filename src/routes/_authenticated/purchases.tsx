@@ -391,9 +391,10 @@ function Page() {
                 </Button>
                 <div className="w-[240px] shrink-0">
                   <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Supplier (optional)" /></SelectTrigger>
+                    <SelectTrigger className={`h-9 ${supplier === "none" ? "border-destructive" : ""}`}>
+                      <SelectValue placeholder="Select supplier *" />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">— No supplier —</SelectItem>
                       {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
