@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Library, Search, Download, Check, X, Clock, ShieldCheck, Plus, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
