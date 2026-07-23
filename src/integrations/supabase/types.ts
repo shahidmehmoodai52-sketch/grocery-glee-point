@@ -3700,6 +3700,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      my_tenant_expires_at: { Args: never; Returns: string }
       my_tenant_status: { Args: never; Returns: string }
       open_shift: {
         Args: { _notes?: string; _opening_cash: number }
