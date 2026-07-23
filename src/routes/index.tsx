@@ -476,7 +476,7 @@ function LandingPage() {
                 </div>
                 <div className="mt-4 flex items-center justify-between rounded-xl bg-tx-navy px-4 py-3 text-white">
                   <span className="text-sm font-medium opacity-80">Total due</span>
-                  <span className="text-xl font-extrabold">$34.80</span>
+                  <span className="text-xl font-extrabold">{formatPrice(34.8, cur)}</span>
                 </div>
               </div>
             </div>
