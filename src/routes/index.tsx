@@ -268,7 +268,18 @@ function SectionTitle({ eyebrow, title, sub }: { eyebrow?: string; title: string
 function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const cur = useLocalCurrency();
+
+  const plans = {
+    basic: { monthly: 9.99, monthlyOrig: 19.99, yearly: 100, yearlyOrig: 199 },
+    pro: { monthly: 14.99, monthlyOrig: 29.99, yearly: 150, yearlyOrig: 299 },
+  };
+  const basicPrice = billing === "monthly" ? plans.basic.monthly : plans.basic.yearly;
+  const basicOrig = billing === "monthly" ? plans.basic.monthlyOrig : plans.basic.yearlyOrig;
+  const proPrice = billing === "monthly" ? plans.pro.monthly : plans.pro.yearly;
+  const proOrig = billing === "monthly" ? plans.pro.monthlyOrig : plans.pro.yearlyOrig;
+  const perLabel = billing === "monthly" ? "/ month" : "/ year";
 
   const features = [
     { icon: ReceiptText, title: "Fast Billing & Receipts", text: "Ring up sales in seconds with a keyboard-first POS, thermal receipt printing and instant hold/resume." },
