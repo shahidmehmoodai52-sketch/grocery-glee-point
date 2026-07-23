@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronsUpDown, Search } from "lucide-react";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverContent, PopoverTrigger,
@@ -50,7 +50,7 @@ export function CurrencySelect({ value, onChange, className, compact, placeholde
             return itemValue.toLowerCase().includes(s) ? 1 : 0;
           }}
         >
-          <CommandInput placeholder="Search currency…" icon={<Search className="h-4 w-4" />} />
+          <CommandInput placeholder="Search currency…" />
           <CommandList>
             <CommandEmpty>No currency found.</CommandEmpty>
             <CommandGroup>
