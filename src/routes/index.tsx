@@ -64,18 +64,27 @@ async function detectCountry(): Promise<{ country?: string; currency?: string } 
   return null;
 }
 
-function useLocalCurrency(): CurrencyInfo {
-  const [cur, setCur] = useState<CurrencyInfo>(CURRENCIES.USD);
+const CURRENCY_OVERRIDE_KEY = "tx_cur_override";
+
+function useLocalCurrency(): { cur: CurrencyInfo; setCur: (code: string) => void } {
+  const [cur, setCurState] = useState<CurrencyInfo>(CURRENCIES.USD);
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Cache to avoid repeat fetches
+      // Manual override wins over IP detection
+      try {
+        const override = localStorage.getItem(CURRENCY_OVERRIDE_KEY);
+        if (override && CURRENCIES[override]) {
+          setCurState(CURRENCIES[override]);
+          return;
+        }
+      } catch { /* ignore */ }
       try {
         const cached = localStorage.getItem("tx_geo_cur_v2");
         if (cached) {
           const parsed = JSON.parse(cached) as { code: string; t: number };
           if (Date.now() - parsed.t < 24 * 60 * 60 * 1000 && CURRENCIES[parsed.code]) {
-            setCur(CURRENCIES[parsed.code]);
+            setCurState(CURRENCIES[parsed.code]);
             return;
           }
         }
@@ -83,13 +92,21 @@ function useLocalCurrency(): CurrencyInfo {
       const geo = await detectCountry();
       if (cancelled) return;
       const picked = pickCurrency(geo?.country, geo?.currency);
-      setCur(picked);
+      setCurState(picked);
       try { localStorage.setItem("tx_geo_cur_v2", JSON.stringify({ code: picked.code, t: Date.now() })); } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
   }, []);
-  return cur;
+
+  const setCur = (code: string) => {
+    if (!CURRENCIES[code]) return;
+    setCurState(CURRENCIES[code]);
+    try { localStorage.setItem(CURRENCY_OVERRIDE_KEY, code); } catch { /* ignore */ }
+  };
+
+  return { cur, setCur };
 }
+
 
 function formatPrice(usd: number, cur: CurrencyInfo) {
   const val = usd * cur.rate;
