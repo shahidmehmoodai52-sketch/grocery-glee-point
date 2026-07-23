@@ -268,7 +268,18 @@ function SectionTitle({ eyebrow, title, sub }: { eyebrow?: string; title: string
 function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const cur = useLocalCurrency();
+
+  const plans = {
+    basic: { monthly: 9.99, monthlyOrig: 19.99, yearly: 100, yearlyOrig: 199 },
+    pro: { monthly: 14.99, monthlyOrig: 29.99, yearly: 150, yearlyOrig: 299 },
+  };
+  const basicPrice = billing === "monthly" ? plans.basic.monthly : plans.basic.yearly;
+  const basicOrig = billing === "monthly" ? plans.basic.monthlyOrig : plans.basic.yearlyOrig;
+  const proPrice = billing === "monthly" ? plans.pro.monthly : plans.pro.yearly;
+  const proOrig = billing === "monthly" ? plans.pro.monthlyOrig : plans.pro.yearlyOrig;
+  const perLabel = billing === "monthly" ? "/ month" : "/ year";
 
   const features = [
     { icon: ReceiptText, title: "Fast Billing & Receipts", text: "Ring up sales in seconds with a keyboard-first POS, thermal receipt printing and instant hold/resume." },
@@ -708,17 +719,36 @@ function LandingPage() {
             </div>
           </div>
 
+          <div className="mt-6 flex justify-center">
+            <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 text-sm font-semibold shadow-sm">
+              <button
+                type="button"
+                onClick={() => setBilling("monthly")}
+                className={`rounded-full px-4 py-1.5 transition ${billing === "monthly" ? "bg-tx-navy text-white" : "text-slate-600 hover:text-tx-navy"}`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setBilling("yearly")}
+                className={`rounded-full px-4 py-1.5 transition ${billing === "yearly" ? "bg-tx-navy text-white" : "text-slate-600 hover:text-tx-navy"}`}
+              >
+                Yearly <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">SAVE</span>
+              </button>
+            </div>
+          </div>
+
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             {/* BASIC */}
             <div className="relative flex flex-col rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
               <h3 className="text-lg font-bold text-tx-navy">Basic</h3>
               <p className="mt-1 text-sm text-slate-500">Perfect for a single shop getting started.</p>
               <div className="mt-6 flex items-end gap-3">
-                <span className="text-4xl font-extrabold text-tx-navy">{formatPrice(9.99, cur)}</span>
-                <span className="pb-2 text-sm text-slate-500">/ month</span>
+                <span className="text-4xl font-extrabold text-tx-navy">{formatPrice(basicPrice, cur)}</span>
+                <span className="pb-2 text-sm text-slate-500">{perLabel}</span>
               </div>
               <div className="mt-1 flex items-center gap-2">
-                <span className="text-sm text-slate-400 line-through">{formatPrice(19.99, cur)}</span>
+                <span className="text-sm text-slate-400 line-through">{formatPrice(basicOrig, cur)}</span>
                 <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">SAVE 50%</span>
               </div>
               <ul className="mt-6 space-y-2.5 text-sm text-slate-700">
@@ -753,11 +783,11 @@ function LandingPage() {
               <h3 className="text-lg font-bold">Pro</h3>
               <p className="mt-1 text-sm text-slate-300">For growing shops & multi-cashier teams.</p>
               <div className="mt-6 flex items-end gap-3">
-                <span className="text-4xl font-extrabold">{formatPrice(14.99, cur)}</span>
-                <span className="pb-2 text-sm text-slate-300">/ month</span>
+                <span className="text-4xl font-extrabold">{formatPrice(proPrice, cur)}</span>
+                <span className="pb-2 text-sm text-slate-300">{perLabel}</span>
               </div>
               <div className="mt-1 flex items-center gap-2">
-                <span className="text-sm text-slate-400 line-through">{formatPrice(29.99, cur)}</span>
+                <span className="text-sm text-slate-400 line-through">{formatPrice(proOrig, cur)}</span>
                 <span className="rounded-md bg-tx-green px-2 py-0.5 text-[11px] font-bold text-white">SAVE 50%</span>
               </div>
               <ul className="mt-6 space-y-2.5 text-sm text-slate-100">
