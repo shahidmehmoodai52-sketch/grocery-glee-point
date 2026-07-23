@@ -4,8 +4,63 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  PlayCircle,
+  PlayCircle, Sparkles,
 } from "lucide-react";
+
+/* ---------- IP-based currency localization ---------- */
+type CurrencyInfo = { code: string; symbol: string; rate: number; decimals?: number };
+const CURRENCIES: Record<string, CurrencyInfo> = {
+  USD: { code: "USD", symbol: "$", rate: 1 },
+  EUR: { code: "EUR", symbol: "€", rate: 0.92 },
+  GBP: { code: "GBP", symbol: "£", rate: 0.79 },
+  PKR: { code: "PKR", symbol: "₨", rate: 278, decimals: 0 },
+  INR: { code: "INR", symbol: "₹", rate: 83, decimals: 0 },
+  AED: { code: "AED", symbol: "د.إ ", rate: 3.67, decimals: 0 },
+  SAR: { code: "SAR", symbol: "﷼", rate: 3.75, decimals: 0 },
+  QAR: { code: "QAR", symbol: "﷼", rate: 3.64, decimals: 0 },
+  KWD: { code: "KWD", symbol: "د.ك ", rate: 0.31 },
+  OMR: { code: "OMR", symbol: "﷼", rate: 0.38 },
+  BHD: { code: "BHD", symbol: ".د.ب ", rate: 0.38 },
+  AUD: { code: "AUD", symbol: "A$", rate: 1.52 },
+  CAD: { code: "CAD", symbol: "C$", rate: 1.36 },
+  TRY: { code: "TRY", symbol: "₺", rate: 34, decimals: 0 },
+  ZAR: { code: "ZAR", symbol: "R", rate: 18, decimals: 0 },
+};
+const EU_COUNTRIES = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
+const COUNTRY_TO_CURRENCY: Record<string, string> = {
+  PK: "PKR", IN: "INR", AE: "AED", SA: "SAR", QA: "QAR", KW: "KWD", OM: "OMR", BH: "BHD",
+  GB: "GBP", US: "USD", AU: "AUD", NZ: "AUD", CA: "CAD", TR: "TRY", ZA: "ZAR",
+};
+
+function pickCurrency(country: string | null | undefined, currency?: string | null): CurrencyInfo {
+  if (currency && CURRENCIES[currency]) return CURRENCIES[currency];
+  const c = (country || "").toUpperCase();
+  if (COUNTRY_TO_CURRENCY[c]) return CURRENCIES[COUNTRY_TO_CURRENCY[c]];
+  if (EU_COUNTRIES.has(c)) return CURRENCIES.EUR;
+  return CURRENCIES.USD;
+}
+
+function useLocalCurrency(): CurrencyInfo {
+  const [cur, setCur] = useState<CurrencyInfo>(CURRENCIES.USD);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("https://ipapi.co/json/")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d) setCur(pickCurrency(d.country_code, d.currency)); })
+      .catch(() => { /* keep USD */ });
+    return () => { cancelled = true; };
+  }, []);
+  return cur;
+}
+
+function formatPrice(usd: number, cur: CurrencyInfo) {
+  const val = usd * cur.rate;
+  if (cur.decimals === 0) {
+    const rounded = Math.round(val / 10) * 10; // psychological rounding for large-value currencies
+    return `${cur.symbol}${rounded.toLocaleString()}`;
+  }
+  return `${cur.symbol}${val.toFixed(2)}`;
+}
 
 // Authentic brand-colored social icons (official SVG marks)
 const BrandFacebook = ({ className = "" }: { className?: string }) => (
