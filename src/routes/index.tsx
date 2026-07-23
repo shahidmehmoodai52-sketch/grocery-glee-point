@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
