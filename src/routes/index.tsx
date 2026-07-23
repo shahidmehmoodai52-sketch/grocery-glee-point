@@ -463,9 +463,9 @@ function LandingPage() {
                 </div>
                 <div className="mt-4 rounded-xl border border-slate-100">
                   {[
-                    { n: "Basmati Rice 5kg", q: "×2", p: "$21.90" },
-                    { n: "Fresh Milk 1L", q: "×6", p: "$8.40" },
-                    { n: "Chocolate Bar", q: "×3", p: "$4.50" },
+                    { n: "Basmati Rice 5kg", q: "×2", p: formatPrice(21.9, cur) },
+                    { n: "Fresh Milk 1L", q: "×6", p: formatPrice(8.4, cur) },
+                    { n: "Chocolate Bar", q: "×3", p: formatPrice(4.5, cur) },
                   ].map((r) => (
                     <div key={r.n} className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
                       <span className="min-w-0 truncate text-slate-700">{r.n}</span>
