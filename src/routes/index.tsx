@@ -451,9 +451,9 @@ function LandingPage() {
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   {[
-                    { l: "Today's Sales", v: "$4,286" },
+                    { l: "Today's Sales", v: formatPrice(4286, cur) },
                     { l: "Bills", v: "142" },
-                    { l: "Profit", v: "$981" },
+                    { l: "Profit", v: formatPrice(981, cur) },
                   ].map((k) => (
                     <div key={k.l} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
                       <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{k.l}</div>
