@@ -274,7 +274,7 @@ function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
-  const cur = useLocalCurrency();
+  const { cur, setCur } = useLocalCurrency();
 
   const plans = {
     basic: { monthly: 9.99, monthlyOrig: 19.99, yearly: 100, yearlyOrig: 199 },
