@@ -13,6 +13,7 @@ import { LowStockAlerts } from "@/components/low-stock-alerts";
 import { useSettings } from "@/hooks/use-settings";
 import { setDefaultCurrencySymbol } from "@/lib/format";
 import { PendingBanner } from "@/components/pending-banner";
+import { ExpiryCountdown } from "@/components/expiry-countdown";
 import { getUserAllowOffline } from "@/lib/offline/session";
 
 
@@ -55,6 +56,7 @@ function Layout() {
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <PendingBanner />
+          <ExpiryCountdown />
 
           <header className="h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print gap-2">
             <SidebarTrigger />
