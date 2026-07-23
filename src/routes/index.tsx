@@ -651,7 +651,7 @@ function LandingPage() {
                 </div>
                 <div className="mt-4 space-y-3">
                   {[
-                    { l: "Sales this week", v: "$18,420", d: "+12.4%" },
+                    { l: "Sales this week", v: formatPrice(18420, cur), d: "+12.4%" },
                     { l: "Low stock items", v: "7", d: "review now" },
                     { l: "New customers", v: "31", d: "+9 vs last week" },
                   ].map(k => (
