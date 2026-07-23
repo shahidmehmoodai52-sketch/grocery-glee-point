@@ -251,6 +251,17 @@ function AuthPage() {
                   <Button type="submit" className="w-full" disabled={busy}>
                     {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Sign in
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-emerald-500/40 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                    onClick={() => { setMode("signup"); setFormError(null); }}
+                  >
+                    Start 7-day free trial
+                  </Button>
+                  <p className="text-[11px] text-center text-muted-foreground">
+                    No credit card required · Full access for 7 days
+                  </p>
                 </form>
               ) : (
                 <div className="space-y-3">

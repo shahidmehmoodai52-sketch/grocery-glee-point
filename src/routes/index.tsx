@@ -1,11 +1,66 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  PlayCircle,
+  PlayCircle, Sparkles,
 } from "lucide-react";
+
+/* ---------- IP-based currency localization ---------- */
+type CurrencyInfo = { code: string; symbol: string; rate: number; decimals?: number };
+const CURRENCIES: Record<string, CurrencyInfo> = {
+  USD: { code: "USD", symbol: "$", rate: 1 },
+  EUR: { code: "EUR", symbol: "€", rate: 0.92 },
+  GBP: { code: "GBP", symbol: "£", rate: 0.79 },
+  PKR: { code: "PKR", symbol: "₨", rate: 278, decimals: 0 },
+  INR: { code: "INR", symbol: "₹", rate: 83, decimals: 0 },
+  AED: { code: "AED", symbol: "د.إ ", rate: 3.67, decimals: 0 },
+  SAR: { code: "SAR", symbol: "﷼", rate: 3.75, decimals: 0 },
+  QAR: { code: "QAR", symbol: "﷼", rate: 3.64, decimals: 0 },
+  KWD: { code: "KWD", symbol: "د.ك ", rate: 0.31 },
+  OMR: { code: "OMR", symbol: "﷼", rate: 0.38 },
+  BHD: { code: "BHD", symbol: ".د.ب ", rate: 0.38 },
+  AUD: { code: "AUD", symbol: "A$", rate: 1.52 },
+  CAD: { code: "CAD", symbol: "C$", rate: 1.36 },
+  TRY: { code: "TRY", symbol: "₺", rate: 34, decimals: 0 },
+  ZAR: { code: "ZAR", symbol: "R", rate: 18, decimals: 0 },
+};
+const EU_COUNTRIES = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
+const COUNTRY_TO_CURRENCY: Record<string, string> = {
+  PK: "PKR", IN: "INR", AE: "AED", SA: "SAR", QA: "QAR", KW: "KWD", OM: "OMR", BH: "BHD",
+  GB: "GBP", US: "USD", AU: "AUD", NZ: "AUD", CA: "CAD", TR: "TRY", ZA: "ZAR",
+};
+
+function pickCurrency(country: string | null | undefined, currency?: string | null): CurrencyInfo {
+  if (currency && CURRENCIES[currency]) return CURRENCIES[currency];
+  const c = (country || "").toUpperCase();
+  if (COUNTRY_TO_CURRENCY[c]) return CURRENCIES[COUNTRY_TO_CURRENCY[c]];
+  if (EU_COUNTRIES.has(c)) return CURRENCIES.EUR;
+  return CURRENCIES.USD;
+}
+
+function useLocalCurrency(): CurrencyInfo {
+  const [cur, setCur] = useState<CurrencyInfo>(CURRENCIES.USD);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("https://ipapi.co/json/")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d) setCur(pickCurrency(d.country_code, d.currency)); })
+      .catch(() => { /* keep USD */ });
+    return () => { cancelled = true; };
+  }, []);
+  return cur;
+}
+
+function formatPrice(usd: number, cur: CurrencyInfo) {
+  const val = usd * cur.rate;
+  if (cur.decimals === 0) {
+    const rounded = Math.round(val / 10) * 10; // psychological rounding for large-value currencies
+    return `${cur.symbol}${rounded.toLocaleString()}`;
+  }
+  return `${cur.symbol}${val.toFixed(2)}`;
+}
 
 // Authentic brand-colored social icons (official SVG marks)
 const BrandFacebook = ({ className = "" }: { className?: string }) => (
@@ -163,6 +218,7 @@ function SectionTitle({ eyebrow, title, sub }: { eyebrow?: string; title: string
 function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const cur = useLocalCurrency();
 
   const features = [
     { icon: ReceiptText, title: "Fast Billing & Receipts", text: "Ring up sales in seconds with a keyboard-first POS, thermal receipt printing and instant hold/resume." },
@@ -578,39 +634,104 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* PRICING / CTA */}
-      <section id="pricing" className="bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-3xl bg-tx-navy p-8 text-white sm:p-12">
-            <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-              <div>
-                <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-                  Start free. Grow into every plan you'll ever need.
-                </h2>
-                <p className="mt-3 text-slate-300">
-                  Free tier for new shops. Affordable monthly plans as you scale — with multi-store,
-                  advanced analytics and priority support. No hidden fees, cancel anytime.
-                </p>
-                <ul className="mt-5 grid gap-2 sm:grid-cols-2">
-                  {["Unlimited products","Barcode scanning","Offline mode","Role-based access","Daily backups","Priority support"].map(f => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-slate-200">
-                      <Check className="h-4 w-4 text-tx-green" /> {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="flex flex-col gap-3 md:min-w-[220px]">
-                <Link to="/auth" className="inline-flex items-center justify-center rounded-xl bg-tx-green px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-tx-green-dark">
-                  Register your shop free
-                </Link>
-                <Link to="/auth" className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-                  Sign in to your account
-                </Link>
-              </div>
+      {/* PRICING */}
+      <section id="pricing" className="bg-slate-50/60">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
+          <SectionTitle
+            eyebrow="Pricing"
+            title="Simple plans that grow with your shop"
+            sub={`Launch offer — save 50% for a limited time. Prices shown in your local currency (${cur.code}).`}
+          />
+
+          <div className="mt-4 flex justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+              <Sparkles className="h-3.5 w-3.5" /> 7-day free trial · No credit card required
             </div>
           </div>
+
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
+            {/* BASIC */}
+            <div className="relative flex flex-col rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              <h3 className="text-lg font-bold text-tx-navy">Basic</h3>
+              <p className="mt-1 text-sm text-slate-500">Perfect for a single shop getting started.</p>
+              <div className="mt-6 flex items-end gap-3">
+                <span className="text-4xl font-extrabold text-tx-navy">{formatPrice(9.99, cur)}</span>
+                <span className="pb-2 text-sm text-slate-500">/ month</span>
+              </div>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-sm text-slate-400 line-through">{formatPrice(19.99, cur)}</span>
+                <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">SAVE 50%</span>
+              </div>
+              <ul className="mt-6 space-y-2.5 text-sm text-slate-700">
+                {[
+                  "Unlimited products & barcodes",
+                  "Fast POS billing & receipts",
+                  "Inventory & low-stock alerts",
+                  "Customers, suppliers & ledger",
+                  "Purchases & purchase returns",
+                  "Offline mode & auto-sync",
+                  "Daily automatic backups",
+                  "Email support",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-tx-green" /> {f}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/auth"
+                className="mt-8 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-tx-navy transition hover:bg-slate-50"
+              >
+                Start 7-day free trial
+              </Link>
+            </div>
+
+            {/* RECOMMENDED */}
+            <div className="relative flex flex-col rounded-3xl border-2 border-tx-green bg-tx-navy p-8 text-white shadow-xl shadow-emerald-900/10">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-tx-green px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow">
+                Recommended
+              </div>
+              <h3 className="text-lg font-bold">Pro</h3>
+              <p className="mt-1 text-sm text-slate-300">For growing shops & multi-cashier teams.</p>
+              <div className="mt-6 flex items-end gap-3">
+                <span className="text-4xl font-extrabold">{formatPrice(14.99, cur)}</span>
+                <span className="pb-2 text-sm text-slate-300">/ month</span>
+              </div>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-sm text-slate-400 line-through">{formatPrice(29.99, cur)}</span>
+                <span className="rounded-md bg-tx-green px-2 py-0.5 text-[11px] font-bold text-white">SAVE 50%</span>
+              </div>
+              <ul className="mt-6 space-y-2.5 text-sm text-slate-100">
+                {[
+                  "Everything in Basic",
+                  "Multi-cashier with roles & permissions",
+                  "Shifts, cash drawer & audit logs",
+                  "Expiry, batch & wastage tracking",
+                  "Bulk import & global product library",
+                  "Advanced reports & P&L analytics",
+                  "Business operations & shift tasks",
+                  "Priority support",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-tx-green" /> {f}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/auth"
+                className="mt-8 inline-flex items-center justify-center rounded-xl bg-tx-green px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-tx-green-dark"
+              >
+                Start 7-day free trial
+              </Link>
+            </div>
+          </div>
+
+          <p className="mt-6 text-center text-xs text-slate-500">
+            Prices auto-converted from USD based on your location. Taxes may apply. Cancel anytime.
+          </p>
         </div>
       </section>
+
 
       {/* CONNECT */}
       <section id="connect" className="bg-white">
