@@ -995,7 +995,7 @@ function POSPage() {
   });
 
   return (
-      <div className="h-full flex flex-col overflow-hidden">
+      <div className="min-h-full md:h-full flex flex-col md:overflow-hidden">
       <ShiftBanner />
       {/* Top strip — open bills + clock + reprint (jahaan se sidebar khulti hai us patti ke saath) */}
         <div className="flex items-center gap-2 px-2 py-1 border-b bg-card/60 no-print shrink-0">
@@ -1061,9 +1061,9 @@ function POSPage() {
 
 
       {/* Two-column layout */}
-      <div className="flex-1 min-h-0 flex">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row">
         {/* LEFT: items area (maximised) */}
-        <main className="relative flex-1 flex flex-col min-h-0 bg-background">
+        <main className="relative flex-1 flex flex-col min-h-[55vh] md:min-h-0 bg-background">
 
         <div className="relative flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
           {/* Search / scan */}
@@ -1389,7 +1389,7 @@ function POSPage() {
       </main>
 
       {/* RIGHT: side panel — open bills, party, payment, totals */}
-      <aside className="w-[280px] md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-l bg-card flex flex-col min-h-0 overflow-hidden no-print">
+      <aside className="w-full md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-t md:border-t-0 md:border-l bg-card flex flex-col min-h-0 max-h-[70vh] md:max-h-none overflow-hidden no-print">
 
         {/* Party + payment */}
         <div className="p-2.5 border-b space-y-2 shrink-0">
