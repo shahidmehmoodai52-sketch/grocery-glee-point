@@ -1389,7 +1389,7 @@ function POSPage() {
       </main>
 
       {/* RIGHT: side panel — open bills, party, payment, totals */}
-      <aside className="w-[280px] md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-l bg-card flex flex-col min-h-0 overflow-hidden no-print">
+      <aside className="w-full md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-t md:border-t-0 md:border-l bg-card flex flex-col min-h-0 max-h-[70vh] md:max-h-none overflow-hidden no-print">
 
         {/* Party + payment */}
         <div className="p-2.5 border-b space-y-2 shrink-0">
