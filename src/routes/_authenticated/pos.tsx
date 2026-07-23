@@ -1731,7 +1731,16 @@ function POSPage() {
       />
 
       {/* Quick-add product dialog — for scanned/typed items not yet in catalog */}
-      <Dialog open={quickAdd.open} onOpenChange={(v) => setQuickAdd((q) => ({ ...q, open: v }))}>
+      <Dialog open={quickAdd.open} onOpenChange={(v) => {
+        setQuickAdd((q) => ({ ...q, open: v }));
+        if (!v) {
+          // Cancel / close: clear the unmatched search term so the cashier
+          // can scan the next item — cart items are preserved.
+          setSearch("");
+          setTimeout(() => searchRef.current?.focus(), 0);
+        }
+      }}>
+
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add new item to catalog</DialogTitle>
@@ -1803,8 +1812,13 @@ function POSPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setQuickAdd((q) => ({ ...q, open: false }))}>Cancel</Button>
+            <Button variant="ghost" onClick={() => {
+              setQuickAdd((q) => ({ ...q, open: false }));
+              setSearch("");
+              setTimeout(() => searchRef.current?.focus(), 0);
+            }}>Cancel</Button>
             <Button onClick={saveQuickAdd}>Save & add to bill</Button>
+
           </DialogFooter>
         </DialogContent>
       </Dialog>
