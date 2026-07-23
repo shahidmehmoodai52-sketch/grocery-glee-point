@@ -332,7 +332,9 @@ function LandingPage() {
                   {label}
                 </a>
               ))}
-              <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-green-dark">Start free trial</Link>
+              <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-navy">Sign in</Link>
+              <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-green-dark">Start 7-day free trial</Link>
+
             </div>
           </div>
         )}
