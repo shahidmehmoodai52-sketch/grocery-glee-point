@@ -8,24 +8,12 @@ import {
 } from "lucide-react";
 
 /* ---------- IP-based currency localization ---------- */
-type CurrencyInfo = { code: string; symbol: string; rate: number; decimals?: number };
-const CURRENCIES: Record<string, CurrencyInfo> = {
-  USD: { code: "USD", symbol: "$", rate: 1 },
-  EUR: { code: "EUR", symbol: "€", rate: 0.92 },
-  GBP: { code: "GBP", symbol: "£", rate: 0.79 },
-  PKR: { code: "PKR", symbol: "₨", rate: 278, decimals: 0 },
-  INR: { code: "INR", symbol: "₹", rate: 83, decimals: 0 },
-  AED: { code: "AED", symbol: "د.إ ", rate: 3.67, decimals: 0 },
-  SAR: { code: "SAR", symbol: "﷼", rate: 3.75, decimals: 0 },
-  QAR: { code: "QAR", symbol: "﷼", rate: 3.64, decimals: 0 },
-  KWD: { code: "KWD", symbol: "د.ك ", rate: 0.31 },
-  OMR: { code: "OMR", symbol: "﷼", rate: 0.38 },
-  BHD: { code: "BHD", symbol: ".د.ب ", rate: 0.38 },
-  AUD: { code: "AUD", symbol: "A$", rate: 1.52 },
-  CAD: { code: "CAD", symbol: "C$", rate: 1.36 },
-  TRY: { code: "TRY", symbol: "₺", rate: 34, decimals: 0 },
-  ZAR: { code: "ZAR", symbol: "R", rate: 18, decimals: 0 },
-};
+import { WORLD_CURRENCIES_MAP, type WorldCurrency } from "@/lib/currencies";
+import { CurrencySelect } from "@/components/currency-select";
+
+type CurrencyInfo = WorldCurrency;
+const CURRENCIES = WORLD_CURRENCIES_MAP;
+
 const EU_COUNTRIES = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
 const COUNTRY_TO_CURRENCY: Record<string, string> = {
   PK: "PKR", IN: "INR", AE: "AED", SA: "SAR", QA: "QAR", KW: "KWD", OM: "OMR", BH: "BHD",
