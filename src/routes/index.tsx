@@ -361,6 +361,14 @@ function LandingPage() {
             <a href="#faq" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">FAQ</a>
           </nav>
           <div className="flex items-center gap-2">
+            <div className="hidden sm:block">
+              <CurrencySelect
+                value={cur.code}
+                onChange={(code) => setCur(code)}
+                compact
+                className="min-w-[132px]"
+              />
+            </div>
             <Link
               to="/auth"
               className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-tx-navy hover:bg-slate-100 sm:inline-flex"
