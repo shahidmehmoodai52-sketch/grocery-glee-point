@@ -408,6 +408,11 @@ function LandingPage() {
               ))}
               <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-navy">Sign in</Link>
               <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-green-dark">Start 7-day free trial</Link>
+              <div className="py-2">
+                <div className="mb-1 text-xs font-medium text-slate-500">Currency</div>
+                <CurrencySelect value={cur.code} onChange={(code) => setCur(code)} />
+              </div>
+
 
             </div>
           </div>
