@@ -13,6 +13,7 @@ import { LowStockAlerts } from "@/components/low-stock-alerts";
 import { useSettings } from "@/hooks/use-settings";
 import { setDefaultCurrencySymbol } from "@/lib/format";
 import { PendingBanner } from "@/components/pending-banner";
+import { ExpiryCountdown } from "@/components/expiry-countdown";
 import { getUserAllowOffline } from "@/lib/offline/session";
 
 
