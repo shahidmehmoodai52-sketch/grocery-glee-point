@@ -1812,8 +1812,13 @@ function POSPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setQuickAdd((q) => ({ ...q, open: false }))}>Cancel</Button>
+            <Button variant="ghost" onClick={() => {
+              setQuickAdd((q) => ({ ...q, open: false }));
+              setSearch("");
+              setTimeout(() => searchRef.current?.focus(), 0);
+            }}>Cancel</Button>
             <Button onClick={saveQuickAdd}>Save & add to bill</Button>
+
           </DialogFooter>
         </DialogContent>
       </Dialog>
