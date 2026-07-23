@@ -303,10 +303,17 @@ function LandingPage() {
             </Link>
             <Link
               to="/auth"
+              className="hidden items-center gap-1 rounded-lg border border-tx-green/30 bg-tx-green/10 px-3.5 py-2 text-sm font-semibold text-tx-green-dark transition hover:bg-tx-green/20 sm:inline-flex"
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Start free trial
+            </Link>
+            <Link
+              to="/auth"
               className="inline-flex items-center gap-1 rounded-lg bg-tx-green px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-emerald-600/20 transition hover:bg-tx-green-dark sm:px-4"
             >
               Register free
             </Link>
+
             <button
               type="button"
               aria-label="Open menu"
