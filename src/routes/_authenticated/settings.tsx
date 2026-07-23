@@ -16,6 +16,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Receipt, sampleInvoice } from "@/components/receipt";
 import { OfflineModeCard } from "@/components/offline-mode-card";
 import { setDefaultCurrencySymbol } from "@/lib/format";
+import { CurrencySelect } from "@/components/currency-select";
+
 
 
 export const Route = createFileRoute("/_authenticated/settings")({ component: Page });
@@ -36,15 +38,6 @@ const FIELDS = [
   "pos_print_prompt_enabled", "pos_print_prompt_default",
 ] as const;
 
-const CURRENCY_CODES = [
-  { code: "PKR", symbol: "Rs", label: "PKR — Pakistani Rupee" },
-  { code: "USD", symbol: "$", label: "USD — US Dollar" },
-  { code: "EUR", symbol: "€", label: "EUR — Euro" },
-  { code: "GBP", symbol: "£", label: "GBP — British Pound" },
-  { code: "AED", symbol: "AED", label: "AED — UAE Dirham" },
-] as const;
-
-const CURRENCY_SYMBOLS = ["Rs", "$", "€", "£", "AED", "₹"] as const;
 
 
 
@@ -109,32 +102,25 @@ function Page() {
             <div><Label>Store name</Label><Input value={form.store_name ?? ""} onChange={(e) => set({ store_name: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Currency unit</Label>
-                <Select
+                <Label>Currency</Label>
+                <CurrencySelect
                   value={form.currency ?? "PKR"}
-                  onValueChange={(value) => {
-                    const picked = CURRENCY_CODES.find((c) => c.code === value);
-                    set({ currency: value, currency_symbol: picked?.symbol ?? form.currency_symbol ?? "Rs" });
+                  onChange={(code, symbol) => {
+                    set({ currency: code, currency_symbol: symbol });
                   }}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CURRENCY_CODES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
+                <div className="text-xs text-muted-foreground mt-1">Search from all world currencies.</div>
               </div>
               <div>
                 <Label>Currency symbol</Label>
-                <Select value={form.currency_symbol ?? "Rs"} onValueChange={(value) => set({ currency_symbol: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CURRENCY_SYMBOLS.map((symbol) => (
-                      <SelectItem key={symbol} value={symbol}>{symbol}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={form.currency_symbol ?? ""}
+                  onChange={(e) => set({ currency_symbol: e.target.value })}
+                  placeholder="e.g. Rs, $, €, ₨"
+                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  Auto-filled from the currency you pick — edit if you want a different symbol.
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

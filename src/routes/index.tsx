@@ -8,24 +8,12 @@ import {
 } from "lucide-react";
 
 /* ---------- IP-based currency localization ---------- */
-type CurrencyInfo = { code: string; symbol: string; rate: number; decimals?: number };
-const CURRENCIES: Record<string, CurrencyInfo> = {
-  USD: { code: "USD", symbol: "$", rate: 1 },
-  EUR: { code: "EUR", symbol: "€", rate: 0.92 },
-  GBP: { code: "GBP", symbol: "£", rate: 0.79 },
-  PKR: { code: "PKR", symbol: "₨", rate: 278, decimals: 0 },
-  INR: { code: "INR", symbol: "₹", rate: 83, decimals: 0 },
-  AED: { code: "AED", symbol: "د.إ ", rate: 3.67, decimals: 0 },
-  SAR: { code: "SAR", symbol: "﷼", rate: 3.75, decimals: 0 },
-  QAR: { code: "QAR", symbol: "﷼", rate: 3.64, decimals: 0 },
-  KWD: { code: "KWD", symbol: "د.ك ", rate: 0.31 },
-  OMR: { code: "OMR", symbol: "﷼", rate: 0.38 },
-  BHD: { code: "BHD", symbol: ".د.ب ", rate: 0.38 },
-  AUD: { code: "AUD", symbol: "A$", rate: 1.52 },
-  CAD: { code: "CAD", symbol: "C$", rate: 1.36 },
-  TRY: { code: "TRY", symbol: "₺", rate: 34, decimals: 0 },
-  ZAR: { code: "ZAR", symbol: "R", rate: 18, decimals: 0 },
-};
+import { WORLD_CURRENCIES_MAP, type WorldCurrency } from "@/lib/currencies";
+import { CurrencySelect } from "@/components/currency-select";
+
+type CurrencyInfo = WorldCurrency;
+const CURRENCIES = WORLD_CURRENCIES_MAP;
+
 const EU_COUNTRIES = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
 const COUNTRY_TO_CURRENCY: Record<string, string> = {
   PK: "PKR", IN: "INR", AE: "AED", SA: "SAR", QA: "QAR", KW: "KWD", OM: "OMR", BH: "BHD",
@@ -76,18 +64,27 @@ async function detectCountry(): Promise<{ country?: string; currency?: string } 
   return null;
 }
 
-function useLocalCurrency(): CurrencyInfo {
-  const [cur, setCur] = useState<CurrencyInfo>(CURRENCIES.USD);
+const CURRENCY_OVERRIDE_KEY = "tx_cur_override";
+
+function useLocalCurrency(): { cur: CurrencyInfo; setCur: (code: string) => void } {
+  const [cur, setCurState] = useState<CurrencyInfo>(CURRENCIES.USD);
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Cache to avoid repeat fetches
+      // Manual override wins over IP detection
+      try {
+        const override = localStorage.getItem(CURRENCY_OVERRIDE_KEY);
+        if (override && CURRENCIES[override]) {
+          setCurState(CURRENCIES[override]);
+          return;
+        }
+      } catch { /* ignore */ }
       try {
         const cached = localStorage.getItem("tx_geo_cur_v2");
         if (cached) {
           const parsed = JSON.parse(cached) as { code: string; t: number };
           if (Date.now() - parsed.t < 24 * 60 * 60 * 1000 && CURRENCIES[parsed.code]) {
-            setCur(CURRENCIES[parsed.code]);
+            setCurState(CURRENCIES[parsed.code]);
             return;
           }
         }
@@ -95,13 +92,21 @@ function useLocalCurrency(): CurrencyInfo {
       const geo = await detectCountry();
       if (cancelled) return;
       const picked = pickCurrency(geo?.country, geo?.currency);
-      setCur(picked);
+      setCurState(picked);
       try { localStorage.setItem("tx_geo_cur_v2", JSON.stringify({ code: picked.code, t: Date.now() })); } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
   }, []);
-  return cur;
+
+  const setCur = (code: string) => {
+    if (!CURRENCIES[code]) return;
+    setCurState(CURRENCIES[code]);
+    try { localStorage.setItem(CURRENCY_OVERRIDE_KEY, code); } catch { /* ignore */ }
+  };
+
+  return { cur, setCur };
 }
+
 
 function formatPrice(usd: number, cur: CurrencyInfo) {
   const val = usd * cur.rate;
@@ -269,7 +274,7 @@ function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
-  const cur = useLocalCurrency();
+  const { cur, setCur } = useLocalCurrency();
 
   const plans = {
     basic: { monthly: 9.99, monthlyOrig: 19.99, yearly: 100, yearlyOrig: 199 },
@@ -356,6 +361,14 @@ function LandingPage() {
             <a href="#faq" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">FAQ</a>
           </nav>
           <div className="flex items-center gap-2">
+            <div className="hidden sm:block">
+              <CurrencySelect
+                value={cur.code}
+                onChange={(code) => setCur(code)}
+                compact
+                className="min-w-[132px]"
+              />
+            </div>
             <Link
               to="/auth"
               className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-tx-navy hover:bg-slate-100 sm:inline-flex"
@@ -395,6 +408,11 @@ function LandingPage() {
               ))}
               <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-navy">Sign in</Link>
               <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-green-dark">Start 7-day free trial</Link>
+              <div className="py-2">
+                <div className="mb-1 text-xs font-medium text-slate-500">Currency</div>
+                <CurrencySelect value={cur.code} onChange={(code) => setCur(code)} />
+              </div>
+
 
             </div>
           </div>
