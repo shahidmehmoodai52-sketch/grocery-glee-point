@@ -218,6 +218,7 @@ function SectionTitle({ eyebrow, title, sub }: { eyebrow?: string; title: string
 function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const cur = useLocalCurrency();
 
   const features = [
     { icon: ReceiptText, title: "Fast Billing & Receipts", text: "Ring up sales in seconds with a keyboard-first POS, thermal receipt printing and instant hold/resume." },
