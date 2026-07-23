@@ -38,15 +38,6 @@ const FIELDS = [
   "pos_print_prompt_enabled", "pos_print_prompt_default",
 ] as const;
 
-const CURRENCY_CODES = [
-  { code: "PKR", symbol: "Rs", label: "PKR — Pakistani Rupee" },
-  { code: "USD", symbol: "$", label: "USD — US Dollar" },
-  { code: "EUR", symbol: "€", label: "EUR — Euro" },
-  { code: "GBP", symbol: "£", label: "GBP — British Pound" },
-  { code: "AED", symbol: "AED", label: "AED — UAE Dirham" },
-] as const;
-
-const CURRENCY_SYMBOLS = ["Rs", "$", "€", "£", "AED", "₹"] as const;
 
 
 
