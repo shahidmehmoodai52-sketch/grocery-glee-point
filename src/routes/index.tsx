@@ -40,14 +40,64 @@ function pickCurrency(country: string | null | undefined, currency?: string | nu
   return CURRENCIES.USD;
 }
 
+async function detectCountry(): Promise<{ country?: string; currency?: string } | null> {
+  const providers: Array<() => Promise<{ country?: string; currency?: string } | null>> = [
+    async () => {
+      const r = await fetch("https://ipapi.co/json/");
+      if (!r.ok) return null;
+      const d = await r.json();
+      return { country: d.country_code || d.country, currency: d.currency };
+    },
+    async () => {
+      const r = await fetch("https://ipwho.is/");
+      if (!r.ok) return null;
+      const d = await r.json();
+      return { country: d.country_code, currency: d.currency?.code };
+    },
+    async () => {
+      const r = await fetch("https://get.geojs.io/v1/ip/country.json");
+      if (!r.ok) return null;
+      const d = await r.json();
+      return { country: d.country };
+    },
+    async () => {
+      const r = await fetch("https://api.country.is/");
+      if (!r.ok) return null;
+      const d = await r.json();
+      return { country: d.country };
+    },
+  ];
+  for (const p of providers) {
+    try {
+      const res = await p();
+      if (res && (res.country || res.currency)) return res;
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
 function useLocalCurrency(): CurrencyInfo {
   const [cur, setCur] = useState<CurrencyInfo>(CURRENCIES.USD);
   useEffect(() => {
     let cancelled = false;
-    fetch("https://ipapi.co/json/")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled && d) setCur(pickCurrency(d.country_code, d.currency)); })
-      .catch(() => { /* keep USD */ });
+    (async () => {
+      // Cache to avoid repeat fetches
+      try {
+        const cached = localStorage.getItem("tx_geo_cur_v2");
+        if (cached) {
+          const parsed = JSON.parse(cached) as { code: string; t: number };
+          if (Date.now() - parsed.t < 24 * 60 * 60 * 1000 && CURRENCIES[parsed.code]) {
+            setCur(CURRENCIES[parsed.code]);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+      const geo = await detectCountry();
+      if (cancelled) return;
+      const picked = pickCurrency(geo?.country, geo?.currency);
+      setCur(picked);
+      try { localStorage.setItem("tx_geo_cur_v2", JSON.stringify({ code: picked.code, t: Date.now() })); } catch { /* ignore */ }
+    })();
     return () => { cancelled = true; };
   }, []);
   return cur;
