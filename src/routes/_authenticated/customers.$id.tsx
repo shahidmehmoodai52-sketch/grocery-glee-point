@@ -234,7 +234,7 @@ function Page() {
                 <TableCell className="font-mono text-xs">{x.ref}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {x.note || "—"}
-                  {x.entity === "sale" && due > 0 && <Badge variant="destructive" className="ml-2 text-[10px]">Unpaid {fmtMoney(due, sym)}</Badge>}
+                  {/* unpaid badge removed */}
                 </TableCell>
                 <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
                 <TableCell className="text-right text-success">{x.credit > 0 ? fmtMoney(x.credit, sym) : "—"}</TableCell>
