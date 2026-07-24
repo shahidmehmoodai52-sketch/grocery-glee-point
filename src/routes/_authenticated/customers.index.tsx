@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, DollarSign, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { Plus, HandCoins, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -197,7 +197,7 @@ function Page() {
                         <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "" }); }}>
-                        <DollarSign className="h-3.5 w-3.5 mr-1" />Receive
+                        <HandCoins className="h-3.5 w-3.5 mr-1" />Receive
                       </Button>
                     </TableCell>
                   </TableRow>
