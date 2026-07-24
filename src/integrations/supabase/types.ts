@@ -67,6 +67,131 @@ export type Database = {
           },
         ]
       }
+      asset_categories: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          notes: string | null
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assets: {
+        Row: {
+          brand: string | null
+          category_id: string | null
+          condition: string
+          created_at: string
+          current_value: number
+          id: string
+          image_url: string | null
+          location: string | null
+          model_number: string | null
+          name: string
+          notes: string | null
+          purchase_date: string | null
+          purchase_price: number
+          quantity: number
+          serial_number: string | null
+          supplier: string | null
+          tenant_id: string
+          updated_at: string
+          user_id: string
+          warranty_expiry: string | null
+        }
+        Insert: {
+          brand?: string | null
+          category_id?: string | null
+          condition?: string
+          created_at?: string
+          current_value?: number
+          id?: string
+          image_url?: string | null
+          location?: string | null
+          model_number?: string | null
+          name: string
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_price?: number
+          quantity?: number
+          serial_number?: string | null
+          supplier?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+          warranty_expiry?: string | null
+        }
+        Update: {
+          brand?: string | null
+          category_id?: string | null
+          condition?: string
+          created_at?: string
+          current_value?: number
+          id?: string
+          image_url?: string | null
+          location?: string | null
+          model_number?: string | null
+          name?: string
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_price?: number
+          quantity?: number
+          serial_number?: string | null
+          supplier?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+          warranty_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string

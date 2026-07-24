@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library, ShieldCheck,
+  BarChart3, Settings, LogOut, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library, ShieldCheck, Box,
 } from "lucide-react";
 
 
@@ -50,6 +50,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Expiry & waste", url: "/expiry", icon: CalendarClock, perm: "expiry" },
       { title: "Intelligence", url: "/intelligence", icon: Brain, perm: "intelligence" },
       { title: "Global library", url: "/library", icon: Library, perm: "library" },
+      { title: "Assets", url: "/assets", icon: Box, perm: "assets" },
     ],
 
   },
