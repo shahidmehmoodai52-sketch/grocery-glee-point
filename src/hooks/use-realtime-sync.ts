@@ -58,6 +58,8 @@ const MAP: Record<string, string[][]> = {
   product_batches: [["batches-status"], ["expiry-reports"], ["product-intel"]],
   inventory_damages: [["damage-log"], ["expiry-reports"], ["products"], ["product-intel"]],
   inventory_waste: [["waste-log"], ["expiry-reports"], ["products"], ["product-intel"]],
+  assets: [["assets"], ["assets-stock-worth"]],
+  asset_categories: [["asset_categories"]],
   stock_count_sessions: [["stock-count-sessions"], ["stock-count-session"]],
   stock_count_items: [["stock-count-items"], ["stock-count-products"]],
   store_settings: [["store_settings"], ["store-settings"], ["settings"]],
