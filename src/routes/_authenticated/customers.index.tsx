@@ -81,7 +81,7 @@ function Page() {
   const save = async () => {
     if (!form.name) return toast.error("Name required");
     try {
-      const row = await insertOfflineAware("customers", form);
+      const row = await insertOfflineAware("customers", { ...form, opening_balance: form.balance });
       toast.success(row._offline_pending ? "Customer saved offline — will sync" : "Customer added");
     } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
     setOpen(false);
