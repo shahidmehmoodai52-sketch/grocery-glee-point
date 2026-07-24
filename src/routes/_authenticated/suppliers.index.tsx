@@ -197,7 +197,7 @@ function Page() {
                         <Link to="/suppliers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "" }); }}>
-                        <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
+                        <HandCoins className="h-3.5 w-3.5 mr-1" />Pay
                       </Button>
                     </TableCell>
                   </TableRow>
