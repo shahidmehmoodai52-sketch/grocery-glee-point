@@ -269,9 +269,11 @@ function Page() {
                   <TableRow className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
                     <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleDateString()}</TableCell>
                     <TableCell>
-                      <Badge variant={x.type === "purchase" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
-                        {x.type}
-                      </Badge>
+                      {x.type !== "purchase" && (
+                        <Badge variant={x.type === "return" ? "secondary" : "outline"} className="capitalize">
+                          {x.type}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {isPurchase ? (
