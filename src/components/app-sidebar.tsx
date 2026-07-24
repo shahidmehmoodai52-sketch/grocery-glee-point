@@ -50,6 +50,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Expiry & waste", url: "/expiry", icon: CalendarClock, perm: "expiry" },
       { title: "Intelligence", url: "/intelligence", icon: Brain, perm: "intelligence" },
       { title: "Global library", url: "/library", icon: Library, perm: "library" },
+      { title: "Assets", url: "/assets", icon: Box, perm: "assets" },
     ],
 
   },
