@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, DollarSign, BookOpen } from "lucide-react";
+import { Plus, DollarSign, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
@@ -18,6 +19,25 @@ import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/customers/")({ component: Page });
 
+function Stat({ icon: Icon, label, value, tone = "primary" }: { icon: any; label: string; value: string; tone?: "primary" | "destructive" | "success" | "muted" }) {
+  const toneCls =
+    tone === "destructive" ? "text-destructive bg-destructive/10"
+    : tone === "success" ? "text-success bg-success/10"
+    : tone === "muted" ? "text-muted-foreground bg-muted"
+    : "text-primary bg-primary/10";
+  return (
+    <Card className="p-4 flex items-center gap-3">
+      <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${toneCls}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs text-muted-foreground truncate">{label}</div>
+        <div className="text-lg font-semibold truncate">{value}</div>
+      </div>
+    </Card>
+  );
+}
+
 function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
@@ -26,6 +46,7 @@ function Page() {
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", balance: 0 });
   const [payOpen, setPayOpen] = useState<any>(null);
   const [pay, setPay] = useState({ amount: 0, method: "cash", note: "" });
+  const [search, setSearch] = useState("");
 
   const { data: rows = [] } = useQuery({
     queryKey: ["customers"],
@@ -35,6 +56,27 @@ function Page() {
       cacheCustomers,
     ),
   });
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((c: any) =>
+      (c.name ?? "").toLowerCase().includes(q) ||
+      (c.phone ?? "").toLowerCase().includes(q) ||
+      (c.email ?? "").toLowerCase().includes(q) ||
+      (c.address ?? "").toLowerCase().includes(q),
+    );
+  }, [rows, search]);
+
+  const totals = useMemo(() => {
+    let receivable = 0, advance = 0;
+    for (const c of rows as any[]) {
+      const b = Number(c.balance ?? 0);
+      if (b > 0) receivable += b;
+      else if (b < 0) advance += -b;
+    }
+    return { receivable, advance, net: receivable - advance };
+  }, [rows]);
 
   const save = async () => {
     if (!form.name) return toast.error("Name required");
@@ -61,11 +103,11 @@ function Page() {
   };
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-5">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Customers</h1>
-          <p className="text-sm text-muted-foreground">{rows.length} customers</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Customers</h1>
+          <p className="text-sm text-muted-foreground">Manage customer accounts and view outstanding balances.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New customer</Button></DialogTrigger>
@@ -85,36 +127,85 @@ function Page() {
         </Dialog>
       </div>
 
-      <Card className="p-3">
-        <Table>
-          <TableHeader><TableRow>
-            <TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Email</TableHead>
-            <TableHead className="text-right">Balance</TableHead><TableHead></TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No customers yet</TableCell></TableRow>}
-            {rows.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className="font-medium">
-                  <Link to="/customers/$id" params={{ id: c.id }} className="hover:underline text-primary">{c.name}</Link>
-                </TableCell>
-                <TableCell>{c.phone ?? "—"}</TableCell>
-                <TableCell>{c.email ?? "—"}</TableCell>
-                <TableCell className={`text-right font-medium ${Number(c.balance) > 0 ? "text-destructive" : ""}`}>
-                  {fmtMoney(c.balance, sym)}
-                </TableCell>
-                <TableCell className="text-right space-x-2">
-                  <Button size="sm" variant="ghost" asChild>
-                    <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Number(c.balance), method: "cash", note: "" }); }}>
-                    <DollarSign className="h-3.5 w-3.5 mr-1" />Receive payment
-                  </Button>
-                </TableCell>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat icon={Users} label="Total customers" value={String(rows.length)} tone="primary" />
+        <Stat icon={TrendingUp} label="Receivable (they owe)" value={fmtMoney(totals.receivable, sym)} tone="destructive" />
+        <Stat icon={TrendingDown} label="Advances held" value={fmtMoney(totals.advance, sym)} tone="success" />
+        <Stat icon={Wallet} label="Net receivable" value={fmtMoney(totals.net, sym)} tone={totals.net > 0 ? "destructive" : totals.net < 0 ? "success" : "muted"} />
+      </div>
+
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[240px] max-w-md">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, phone, email, address…"
+              className="pl-9"
+            />
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {filtered.length} of {rows.length} shown
+          </div>
+        </div>
+
+        <div className="rounded-md border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead className="text-right w-[260px]">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                    {rows.length === 0 ? "No customers yet — add your first customer." : "No customers match your search."}
+                  </TableCell>
+                </TableRow>
+              )}
+              {filtered.map((c: any) => {
+                const bal = Number(c.balance ?? 0);
+                return (
+                  <TableRow key={c.id} className="group">
+                    <TableCell className="font-medium">
+                      <Link to="/customers/$id" params={{ id: c.id }} className="hover:underline text-primary inline-flex items-center gap-2">
+                        <span className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
+                          {(c.name ?? "?").trim().slice(0, 2).toUpperCase()}
+                        </span>
+                        {c.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{c.email ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      {bal > 0 ? (
+                        <Badge variant="destructive" className="font-medium">Owes {fmtMoney(bal, sym)}</Badge>
+                      ) : bal < 0 ? (
+                        <Badge className="bg-success/15 text-success hover:bg-success/20 font-medium">Advance {fmtMoney(-bal, sym)}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Settled</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "" }); }}>
+                        <DollarSign className="h-3.5 w-3.5 mr-1" />Receive
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       <Dialog open={!!payOpen} onOpenChange={(o) => !o && setPayOpen(null)}>
