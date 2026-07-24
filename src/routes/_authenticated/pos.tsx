@@ -389,7 +389,7 @@ function POSPage() {
     queryFn: () =>
       offlineFirst(
         async () => {
-          const { data, error } = await supabase.from("customers").select("id,name,balance,phone,updated_at").order("name");
+          const { data, error } = await supabase.from("customers").select("id,name,balance,phone").order("name");
           if (error) throw error;
           return data ?? [];
         },
