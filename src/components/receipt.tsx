@@ -142,6 +142,35 @@ export function printReceipt() {
   requestAnimationFrame(() => window.print());
 }
 
+/** Print an invoice directly without opening a preview dialog.
+ *  Renders the receipt off-screen, prints it, then cleans up. */
+export function printInvoiceDirect(invoice: ReceiptInvoice, settings: ReceiptSettings | null | undefined, kind: Props["kind"] = "sale") {
+  if (typeof document === "undefined") return;
+  const host = document.createElement("div");
+  host.style.position = "fixed";
+  host.style.left = "-10000px";
+  host.style.top = "0";
+  host.style.pointerEvents = "none";
+  const wrapper = document.createElement("div");
+  wrapper.className = "print-area";
+  host.appendChild(wrapper);
+  document.body.appendChild(host);
+  const root = createRoot(wrapper);
+  root.render(<Receipt invoice={invoice as any} settings={settings as any} kind={kind} />);
+  const done = () => {
+    try { root.unmount(); } catch {}
+    host.remove();
+    window.removeEventListener("afterprint", done);
+  };
+  window.addEventListener("afterprint", done);
+  // Give React a frame to commit before printing.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    printReceipt();
+    // Safety cleanup in case afterprint doesn't fire (some browsers).
+    setTimeout(done, 5000);
+  }));
+}
+
 export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Props) {
   const sym = "";
   const width = settings?.paper_width === "58mm" ? "58mm" : "80mm";
