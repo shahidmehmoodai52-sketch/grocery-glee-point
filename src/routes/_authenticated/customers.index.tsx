@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, HandCoins, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { Plus, HandCoins, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
