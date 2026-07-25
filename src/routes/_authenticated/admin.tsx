@@ -86,7 +86,7 @@ function AdminPanelPage() {
 
   const { data: errorCount = 0 } = useQuery({
     queryKey: ["admin-errors-count"],
-    enabled: isSuperAdmin,
+    enabled: canEnter,
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_recent_errors", { _limit: 100 });
@@ -97,7 +97,7 @@ function AdminPanelPage() {
 
   const { data: securitySummary } = useQuery({
     queryKey: ["admin-security-summary"],
-    enabled: isSuperAdmin,
+    enabled: canEnter,
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_security_summary");
@@ -114,7 +114,7 @@ function AdminPanelPage() {
   if (loading) {
     return <div className="p-6"><TableSkeleton rows={6} columns={5} /></div>;
   }
-  if (!isSuperAdmin) return null;
+  if (!canEnter) return null;
 
   const alertTabClass =
     "data-[state=inactive]:bg-destructive/15 data-[state=inactive]:text-destructive data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground";
