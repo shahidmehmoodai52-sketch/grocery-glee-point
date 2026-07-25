@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_staff: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      admin_staff_permissions: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          perm: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          perm: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          perm?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_staff_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_staff"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       application_errors: {
         Row: {
           created_at: string
@@ -3590,6 +3640,10 @@ export type Database = {
         Args: { _confirm: string; _tenant_id: string }
         Returns: Json
       }
+      admin_has_perm: {
+        Args: { _perm: string; _user_id: string }
+        Returns: boolean
+      }
       admin_list_security_events: {
         Args: { _limit?: number; _severity?: string }
         Returns: {
@@ -3669,7 +3723,7 @@ export type Database = {
       }
       admin_set_tenant_status: {
         Args: { _reason?: string; _status: string; _tenant_id: string }
-        Returns: string
+        Returns: undefined
       }
       admin_shop_analytics: {
         Args: { _from?: string; _tenant_id: string; _to?: string }
@@ -3697,6 +3751,7 @@ export type Database = {
       }
       admin_tenant_detail: { Args: { _tenant_id: string }; Returns: Json }
       admin_unblock_identifier: { Args: { _id: string }; Returns: undefined }
+      am_i_admin_staff: { Args: never; Returns: boolean }
       am_i_super_admin: { Args: never; Returns: boolean }
       approve_shift: { Args: { _shift_id: string }; Returns: string }
       approve_stock_count_session: {
@@ -3847,6 +3902,7 @@ export type Database = {
         }
         Returns: string
       }
+      is_admin_staff: { Args: { _user_id: string }; Returns: boolean }
       is_blocked: { Args: { _email?: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_member: {
@@ -3878,6 +3934,12 @@ export type Database = {
         Returns: string
       }
       morning_dashboard: { Args: never; Returns: Json }
+      my_admin_perms: {
+        Args: never
+        Returns: {
+          perm: string
+        }[]
+      }
       my_store_settings: {
         Args: never
         Returns: {
