@@ -60,6 +60,8 @@ const MAP: Record<string, string[][]> = {
   inventory_waste: [["waste-log"], ["expiry-reports"], ["products"], ["product-intel"]],
   assets: [["assets"], ["assets-stock-worth"]],
   asset_categories: [["asset_categories"]],
+  cash_accounts: [["cash-accounts"]],
+  cash_transactions: [["cash-transactions"]],
   stock_count_sessions: [["stock-count-sessions"], ["stock-count-session"]],
   stock_count_items: [["stock-count-items"], ["stock-count-products"]],
   store_settings: [["store_settings"], ["store-settings"], ["settings"]],

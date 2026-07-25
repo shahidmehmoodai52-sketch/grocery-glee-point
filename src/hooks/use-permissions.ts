@@ -18,6 +18,7 @@ export const ALL_PERMS = [
   { key: "intelligence", label: "Inventory intelligence" },
   { key: "library", label: "Global product library" },
   { key: "assets", label: "Shop assets" },
+  { key: "cash-flow", label: "Cash flow" },
   { key: "reports", label: "Reports / P&L" },
   { key: "shifts", label: "Shifts & cash drawer" },
   { key: "operations", label: "Business operations" },

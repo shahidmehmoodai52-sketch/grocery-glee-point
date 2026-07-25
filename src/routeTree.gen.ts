@@ -32,6 +32,7 @@ import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedExpiryRouteImport } from './routes/_authenticated/expiry'
 import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticated/expenses'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCashFlowRouteImport } from './routes/_authenticated/cash-flow'
 import { Route as AuthenticatedBackupRouteImport } from './routes/_authenticated/backup'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -166,6 +167,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCashFlowRoute = AuthenticatedCashFlowRouteImport.update({
+  id: '/cash-flow',
+  path: '/cash-flow',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedBackupRoute = AuthenticatedBackupRouteImport.update({
   id: '/backup',
   path: '/backup',
@@ -268,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/backup': typeof AuthenticatedBackupRoute
+  '/cash-flow': typeof AuthenticatedCashFlowRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/expenses': typeof AuthenticatedExpensesRoute
   '/expiry': typeof AuthenticatedExpiryRoute
@@ -308,6 +315,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/backup': typeof AuthenticatedBackupRoute
+  '/cash-flow': typeof AuthenticatedCashFlowRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/expenses': typeof AuthenticatedExpensesRoute
   '/expiry': typeof AuthenticatedExpiryRoute
@@ -350,6 +358,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/backup': typeof AuthenticatedBackupRoute
+  '/_authenticated/cash-flow': typeof AuthenticatedCashFlowRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
   '/_authenticated/expiry': typeof AuthenticatedExpiryRoute
@@ -392,6 +401,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/assets'
     | '/backup'
+    | '/cash-flow'
     | '/dashboard'
     | '/expenses'
     | '/expiry'
@@ -432,6 +442,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/assets'
     | '/backup'
+    | '/cash-flow'
     | '/dashboard'
     | '/expenses'
     | '/expiry'
@@ -473,6 +484,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/assets'
     | '/_authenticated/backup'
+    | '/_authenticated/cash-flow'
     | '/_authenticated/dashboard'
     | '/_authenticated/expenses'
     | '/_authenticated/expiry'
@@ -679,6 +691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/cash-flow': {
+      id: '/_authenticated/cash-flow'
+      path: '/cash-flow'
+      fullPath: '/cash-flow'
+      preLoaderRoute: typeof AuthenticatedCashFlowRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/backup': {
       id: '/_authenticated/backup'
       path: '/backup'
@@ -811,6 +830,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedBackupRoute: typeof AuthenticatedBackupRoute
+  AuthenticatedCashFlowRoute: typeof AuthenticatedCashFlowRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
   AuthenticatedExpiryRoute: typeof AuthenticatedExpiryRoute
@@ -843,6 +863,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedBackupRoute: AuthenticatedBackupRoute,
+  AuthenticatedCashFlowRoute: AuthenticatedCashFlowRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
   AuthenticatedExpiryRoute: AuthenticatedExpiryRoute,
