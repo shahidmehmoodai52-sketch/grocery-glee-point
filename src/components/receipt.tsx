@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createRoot } from "react-dom/client";
 import { fmtMoney, fmtQty } from "@/lib/format";
 
 export type ReceiptSettings = {
