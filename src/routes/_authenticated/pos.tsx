@@ -758,7 +758,7 @@ function POSPage() {
           ? `Sale ${patchedSale?.invoice_no} saved offline — will sync when online`
           : `Sale ${patchedSale?.invoice_no} saved`,
         {
-          action: { label: "Print", onClick: () => setReprintView(patchedSale) },
+          action: { label: "Print", onClick: () => printInvoiceDirect(patchedSale, settings) },
           duration: 5000,
         },
       );
@@ -777,8 +777,7 @@ function POSPage() {
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
       } else if (printDefault === "yes" && patchedSale) {
-        setReprintView(patchedSale);
-        setTimeout(() => { printReceipt(); }, 150);
+        printInvoiceDirect(patchedSale, settings);
         setTimeout(() => searchRef.current?.focus(), 50);
       } else {
         setTimeout(() => searchRef.current?.focus(), 50);
@@ -1719,8 +1718,7 @@ function POSPage() {
           const s = printAsk;
           setPrintAsk(null);
           if (s) {
-            setReprintView(s);
-            setTimeout(() => { printReceipt(); }, 150);
+            printInvoiceDirect(s, settings);
           }
           setTimeout(() => searchRef.current?.focus(), 50);
         }}
