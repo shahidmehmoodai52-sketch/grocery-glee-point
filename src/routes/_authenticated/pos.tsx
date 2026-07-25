@@ -1718,8 +1718,7 @@ function POSPage() {
           const s = printAsk;
           setPrintAsk(null);
           if (s) {
-            setReprintView(s);
-            setTimeout(() => { printReceipt(); }, 150);
+            printInvoiceDirect(s, settings);
           }
           setTimeout(() => searchRef.current?.focus(), 50);
         }}
