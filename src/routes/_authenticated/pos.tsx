@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
-import { Receipt, printReceipt } from "@/components/receipt";
+import { Receipt, printReceipt, printInvoiceDirect } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
 import {
@@ -2398,7 +2398,8 @@ function ReprintDialog({
                             await supabase.rpc("log_receipt_reprint", { _sale_id: s.id, _reason: "reprint from POS" });
                           } catch {/* audit-only */}
                         }
-                        onView(s); onOpenChange(false);
+                        printInvoiceDirect(s, settings);
+                        onOpenChange(false);
                       }} title="Reprint invoice">
                         <Printer className="h-3.5 w-3.5 mr-1" /> Reprint
                       </Button>
