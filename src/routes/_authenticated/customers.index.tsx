@@ -47,6 +47,29 @@ function Page() {
   const [payOpen, setPayOpen] = useState<any>(null);
   const [pay, setPay] = useState({ amount: 0, method: "cash", note: "" });
   const [search, setSearch] = useState("");
+  const [editRow, setEditRow] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", address: "", opening_balance: 0 });
+
+  const openEdit = (c: any) => {
+    setEditRow(c);
+    setEditForm({
+      name: c.name ?? "",
+      phone: c.phone ?? "",
+      email: c.email ?? "",
+      address: c.address ?? "",
+      opening_balance: Number(c.opening_balance ?? 0),
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editRow) return;
+    if (!editForm.name.trim()) return toast.error("Name required");
+    const { error } = await supabase.from("customers").update(editForm).eq("id", editRow.id);
+    if (error) return toast.error(error.message);
+    toast.success("Customer updated");
+    setEditRow(null);
+    qc.invalidateQueries();
+  };
 
   const { data: rows = [] } = useQuery({
     queryKey: ["customers"],
