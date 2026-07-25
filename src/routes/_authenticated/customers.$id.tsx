@@ -37,6 +37,7 @@ type Entry = {
 
 function Page() {
   const { id } = Route.useParams();
+  const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   const [from, setFrom] = useState("");
@@ -47,6 +48,8 @@ function Page() {
   const [payDefault, setPayDefault] = useState(0);
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
+  const [obValue, setObValue] = useState<string>("");
+  const [obSaving, setObSaving] = useState(false);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
