@@ -99,9 +99,24 @@ function Page() {
     return true;
   });
 
-  const opening = entries
+  const initialOB = Number(customer?.opening_balance ?? 0);
+  useEffect(() => { if (customer) setObValue(String(Number(customer.opening_balance ?? 0))); }, [customer?.id, customer?.opening_balance]);
+
+  const opening = initialOB + entries
     .filter((x) => from && x.date < from)
     .reduce((s, x) => s + x.debit - x.credit, 0);
+
+  const saveOpeningBalance = async () => {
+    const v = Number(obValue);
+    if (!Number.isFinite(v)) return toast.error("Enter a valid number");
+    setObSaving(true);
+    const { error } = await supabase.from("customers").update({ opening_balance: v }).eq("id", id);
+    setObSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Opening balance saved");
+    qc.invalidateQueries({ queryKey: ["customer", id] });
+  };
+
   let running = opening;
   const rows = filtered.map((x) => { running += x.debit - x.credit; return { ...x, balance: running }; });
   const totalIn = filtered.reduce((s, x) => s + x.debit, 0);
