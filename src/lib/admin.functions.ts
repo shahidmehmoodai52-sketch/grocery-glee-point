@@ -6,6 +6,11 @@ async function assertSuperAdmin(context: any) {
   if (error || !data) throw new Error("Forbidden: super admin only");
 }
 
+async function assertAdminPerm(context: any, perm: string) {
+  const { data, error } = await context.supabase.rpc("admin_has_perm", { _user_id: context.userId, _perm: perm });
+  if (error || !data) throw new Error(`Forbidden: missing '${perm}' permission`);
+}
+
 /**
  * Reset the password for a tenant's owner. Super-admin only.
  */
