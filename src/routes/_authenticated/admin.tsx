@@ -40,7 +40,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useSuperAdmin } from "@/hooks/use-super-admin";
+import { useAdminAccess } from "@/hooks/use-admin-access";
 import { fmtMoney } from "@/lib/format";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
