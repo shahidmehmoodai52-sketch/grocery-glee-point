@@ -76,13 +76,13 @@ type SecuritySummary = {
 
 function AdminPanelPage() {
   const navigate = useNavigate();
-  const { isSuperAdmin, loading } = useSuperAdmin();
+  const { isSuperAdmin, isAdminStaff, canEnter, loading } = useAdminAccess();
 
   useEffect(() => {
-    if (!loading && !isSuperAdmin) {
+    if (!loading && !canEnter) {
       navigate({ to: "/dashboard", replace: true });
     }
-  }, [loading, isSuperAdmin, navigate]);
+  }, [loading, canEnter, navigate]);
 
   const { data: errorCount = 0 } = useQuery({
     queryKey: ["admin-errors-count"],
