@@ -18,7 +18,7 @@ export const resetTenantOwnerPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { tenant_id: string; new_password: string }) => data)
   .handler(async ({ data, context }) => {
-    await assertSuperAdmin(context);
+    await assertAdminPerm(context, "shops.reset_password");
     if (!data.new_password || data.new_password.length < 6) {
       throw new Error("Password must be 6+ chars");
     }
