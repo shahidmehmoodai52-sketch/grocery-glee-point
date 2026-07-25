@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, HandCoins, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { Plus, HandCoins, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,29 @@ function Page() {
   const [payOpen, setPayOpen] = useState<any>(null);
   const [pay, setPay] = useState({ amount: 0, method: "cash", note: "" });
   const [search, setSearch] = useState("");
+  const [editRow, setEditRow] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", address: "", opening_balance: 0 });
+
+  const openEdit = (c: any) => {
+    setEditRow(c);
+    setEditForm({
+      name: c.name ?? "",
+      phone: c.phone ?? "",
+      email: c.email ?? "",
+      address: c.address ?? "",
+      opening_balance: Number(c.opening_balance ?? 0),
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editRow) return;
+    if (!editForm.name.trim()) return toast.error("Name required");
+    const { error } = await supabase.from("customers").update(editForm).eq("id", editRow.id);
+    if (error) return toast.error(error.message);
+    toast.success("Customer updated");
+    setEditRow(null);
+    qc.invalidateQueries();
+  };
 
   const { data: rows = [] } = useQuery({
     queryKey: ["customers"],
@@ -199,6 +222,9 @@ function Page() {
                       <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "" }); }}>
                         <HandCoins className="h-3.5 w-3.5 mr-1" />Receive
                       </Button>
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title="Edit customer">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -219,6 +245,25 @@ function Page() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayOpen(null)}>Cancel</Button>
             <Button onClick={recordPayment}>Record</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit customer</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Phone</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+              <div><Label>Email</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
+            </div>
+            <div><Label>Address</Label><Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></div>
+            <div><Label>Opening balance (they owe)</Label><Input type="number" step="0.01" value={editForm.opening_balance || ""} onChange={(e) => setEditForm({ ...editForm, opening_balance: Number(e.target.value) })} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRow(null)}>Cancel</Button>
+            <Button onClick={saveEdit}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

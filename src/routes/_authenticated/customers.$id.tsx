@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, FileDown, Eye, Pencil, DollarSign, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, FileDown, Eye, Pencil, DollarSign, Plus, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,7 @@ type Entry = {
 
 function Page() {
   const { id } = Route.useParams();
+  const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   const [from, setFrom] = useState("");
@@ -46,6 +48,8 @@ function Page() {
   const [payDefault, setPayDefault] = useState(0);
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
+  const [obValue, setObValue] = useState<string>("");
+  const [obSaving, setObSaving] = useState(false);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
@@ -95,9 +99,24 @@ function Page() {
     return true;
   });
 
-  const opening = entries
+  const initialOB = Number(customer?.opening_balance ?? 0);
+  useEffect(() => { if (customer) setObValue(String(Number(customer.opening_balance ?? 0))); }, [customer?.id, customer?.opening_balance]);
+
+  const opening = initialOB + entries
     .filter((x) => from && x.date < from)
     .reduce((s, x) => s + x.debit - x.credit, 0);
+
+  const saveOpeningBalance = async () => {
+    const v = Number(obValue);
+    if (!Number.isFinite(v)) return toast.error("Enter a valid number");
+    setObSaving(true);
+    const { error } = await supabase.from("customers").update({ opening_balance: v }).eq("id", id);
+    setObSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Opening balance saved");
+    qc.invalidateQueries({ queryKey: ["customer", id] });
+  };
+
   let running = opening;
   const rows = filtered.map((x) => { running += x.debit - x.credit; return { ...x, balance: running }; });
   const totalIn = filtered.reduce((s, x) => s + x.debit, 0);
@@ -189,6 +208,27 @@ function Page() {
         </select>
       </div>
 
+
+      <Card className="p-3 no-print">
+        <div className="flex items-end gap-2 flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <Label className="text-xs">Opening balance <span className="text-muted-foreground">(+ they owe / − advance)</span></Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={obValue}
+              onChange={(e) => setObValue(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+          <Button onClick={saveOpeningBalance} disabled={obSaving}>
+            <Save className="h-4 w-4 mr-1" />{obSaving ? "Saving…" : "Save opening"}
+          </Button>
+          <div className="text-xs text-muted-foreground">
+            Current: <span className="font-medium text-foreground">{fmtMoney(initialOB, sym)}</span>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
