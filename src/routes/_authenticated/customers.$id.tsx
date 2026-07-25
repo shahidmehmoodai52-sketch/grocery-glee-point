@@ -209,6 +209,27 @@ function Page() {
       </div>
 
 
+      <Card className="p-3 no-print">
+        <div className="flex items-end gap-2 flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <Label className="text-xs">Opening balance <span className="text-muted-foreground">(+ they owe / − advance)</span></Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={obValue}
+              onChange={(e) => setObValue(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+          <Button onClick={saveOpeningBalance} disabled={obSaving}>
+            <Save className="h-4 w-4 mr-1" />{obSaving ? "Saving…" : "Save opening"}
+          </Button>
+          <div className="text-xs text-muted-foreground">
+            Current: <span className="font-medium text-foreground">{fmtMoney(initialOB, sym)}</span>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
         <Stat icon={ReceiptIcon} label="Total In (+)" value={fmtMoney(totalIn, sym)} tone="primary" />
