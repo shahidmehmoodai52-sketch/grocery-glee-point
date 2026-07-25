@@ -2398,7 +2398,8 @@ function ReprintDialog({
                             await supabase.rpc("log_receipt_reprint", { _sale_id: s.id, _reason: "reprint from POS" });
                           } catch {/* audit-only */}
                         }
-                        onView(s); onOpenChange(false);
+                        printInvoiceDirect(s, settings);
+                        onOpenChange(false);
                       }} title="Reprint invoice">
                         <Printer className="h-3.5 w-3.5 mr-1" /> Reprint
                       </Button>
