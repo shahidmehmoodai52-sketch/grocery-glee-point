@@ -327,6 +327,56 @@ export type Database = {
           },
         ]
       }
+      cash_accounts: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          opening_balance: number
+          sort_order: number
+          tenant_id: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          opening_balance?: number
+          sort_order?: number
+          tenant_id?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          opening_balance?: number
+          sort_order?: number
+          tenant_id?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_drawer_events: {
         Row: {
           amount: number
@@ -374,6 +424,69 @@ export type Database = {
           },
           {
             foreignKeyName: "cash_drawer_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_transactions: {
+        Row: {
+          account_id: string
+          amount: number
+          category: string
+          created_at: string
+          direction: string
+          id: string
+          notes: string | null
+          occurred_on: string
+          reference: string | null
+          tenant_id: string
+          transfer_group_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          category?: string
+          created_at?: string
+          direction: string
+          id?: string
+          notes?: string | null
+          occurred_on?: string
+          reference?: string | null
+          tenant_id?: string
+          transfer_group_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          category?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          notes?: string | null
+          occurred_on?: string
+          reference?: string | null
+          tenant_id?: string
+          transfer_group_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "cash_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_transactions_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
