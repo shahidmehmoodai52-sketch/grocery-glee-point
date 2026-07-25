@@ -777,8 +777,7 @@ function POSPage() {
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
       } else if (printDefault === "yes" && patchedSale) {
-        setReprintView(patchedSale);
-        setTimeout(() => { printReceipt(); }, 150);
+        printInvoiceDirect(patchedSale, settings);
         setTimeout(() => searchRef.current?.focus(), 50);
       } else {
         setTimeout(() => searchRef.current?.focus(), 50);
