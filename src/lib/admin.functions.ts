@@ -6,6 +6,11 @@ async function assertSuperAdmin(context: any) {
   if (error || !data) throw new Error("Forbidden: super admin only");
 }
 
+async function assertAdminPerm(context: any, perm: string) {
+  const { data, error } = await context.supabase.rpc("admin_has_perm", { _user_id: context.userId, _perm: perm });
+  if (error || !data) throw new Error(`Forbidden: missing '${perm}' permission`);
+}
+
 /**
  * Reset the password for a tenant's owner. Super-admin only.
  */
@@ -13,7 +18,7 @@ export const resetTenantOwnerPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { tenant_id: string; new_password: string }) => data)
   .handler(async ({ data, context }) => {
-    await assertSuperAdmin(context);
+    await assertAdminPerm(context, "shops.reset_password");
     if (!data.new_password || data.new_password.length < 6) {
       throw new Error("Password must be 6+ chars");
     }
