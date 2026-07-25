@@ -758,7 +758,7 @@ function POSPage() {
           ? `Sale ${patchedSale?.invoice_no} saved offline — will sync when online`
           : `Sale ${patchedSale?.invoice_no} saved`,
         {
-          action: { label: "Print", onClick: () => setReprintView(patchedSale) },
+          action: { label: "Print", onClick: () => printInvoiceDirect(patchedSale, settings) },
           duration: 5000,
         },
       );
