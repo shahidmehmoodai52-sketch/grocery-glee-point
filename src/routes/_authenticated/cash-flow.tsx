@@ -74,6 +74,7 @@ const emptyAcc = { name: "", type: "cash", opening_balance: 0, notes: "", is_act
 const today = () => new Date().toISOString().slice(0, 10);
 const emptyTx = { account_id: "", direction: "in" as "in" | "out", amount: 0, occurred_on: today(), category: "other", reference: "", notes: "" };
 const emptyTransfer = { from_id: "", to_id: "", amount: 0, occurred_on: today(), notes: "" };
+const emptySupplierPay = { supplier_id: "", from_id: "", amount: 0, occurred_on: today(), note: "" };
 
 function Page() {
   const qc = useQueryClient();
