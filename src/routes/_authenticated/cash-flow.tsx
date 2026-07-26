@@ -300,21 +300,45 @@ function Page() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-4">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setDetails({ kind: "opening" })}
+          className="p-4 cursor-pointer hover:shadow-md hover:border-primary/40 transition"
+        >
           <div className="text-xs text-muted-foreground">Opening balance</div>
           <div className="text-2xl font-bold mt-1">{fmt(totals.opening)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Click to see per-account opening</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setDetails({ kind: "in" })}
+          className="p-4 cursor-pointer hover:shadow-md hover:border-emerald-500/40 transition"
+        >
           <div className="text-xs text-muted-foreground">Total received</div>
           <div className="text-2xl font-bold mt-1 text-emerald-600">{fmt(totals.inSum)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Click to see every payment received</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setDetails({ kind: "out" })}
+          className="p-4 cursor-pointer hover:shadow-md hover:border-rose-500/40 transition"
+        >
           <div className="text-xs text-muted-foreground">Total paid out</div>
           <div className="text-2xl font-bold mt-1 text-rose-600">{fmt(totals.outSum)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Click to see every payment sent</div>
         </Card>
-        <Card className="p-4 border-primary/40">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setDetails({ kind: "balance" })}
+          className="p-4 cursor-pointer hover:shadow-md border-primary/40 hover:border-primary transition"
+        >
           <div className="text-xs text-muted-foreground">Cash on hand (all accounts)</div>
           <div className="text-2xl font-bold mt-1">{fmt(totals.balance)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Click to see per-account balance</div>
         </Card>
       </div>
 
