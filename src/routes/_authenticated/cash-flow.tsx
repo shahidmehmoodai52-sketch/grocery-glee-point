@@ -93,6 +93,9 @@ function Page() {
   const [tfOpen, setTfOpen] = useState(false);
   const [tfForm, setTfForm] = useState<any>({ ...emptyTransfer });
 
+  const [spOpen, setSpOpen] = useState(false);
+  const [spForm, setSpForm] = useState<any>({ ...emptySupplierPay });
+
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
