@@ -81,6 +81,11 @@ function Page() {
     ),
   });
 
+  const { data: cashAccounts = [] } = useQuery({
+    queryKey: ["cash-accounts", "supplier-pay"],
+    queryFn: async () => (await supabase.from("cash_accounts").select("id,name,type,is_active").eq("is_active", true).order("sort_order").order("name")).data ?? [],
+  });
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
