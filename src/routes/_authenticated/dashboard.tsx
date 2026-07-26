@@ -330,29 +330,30 @@ function Page() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <Kpi onClick={() => setDetailKey("net")}
           icon={TrendingUp} label="Revenue" value={fmtMoney(netRevenue, sym)}
-          delta={delta} sub={`${sales.length} invoices · after returns`} tone="primary"
+          delta={dNet} sub={`${sales.length} invoices · after returns`} tone="primary"
         />
         <Kpi onClick={() => setDetailKey("revenue")}
           icon={Receipt} label="Gross sales" value={fmtMoney(revenue, sym)}
-          sub="Before returns" tone="info"
+          delta={dRevenue} sub="Before returns" tone="info"
         />
         <Kpi onClick={() => setDetailKey("returns")}
           icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
-          sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
+          delta={dReturns} deltaInverse sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
         />
         <Kpi onClick={() => setDetailKey("profit")}
           icon={Wallet} label="Profit" value={fmtMoney(profit, sym)}
-          sub="Net of returns" tone="success"
+          delta={dProfit} sub="Net of returns" tone="success"
         />
         <Kpi onClick={() => setDetailKey("purch")}
           icon={TrendingDown} label="Purchases" value={fmtMoney(purchTotal, sym)}
-          sub={`${purchases.length} entries`} tone="warning"
+          delta={dPurch} deltaInverse sub={`${purchases.length} entries`} tone="warning"
         />
         <Kpi onClick={() => setDetailKey("inventory")}
           icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
           sub={`${products.length} active SKUs`} tone="info"
         />
       </div>
+
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
