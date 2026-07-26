@@ -247,9 +247,42 @@ function ProductsPage() {
       />
 
       <Card className="p-3">
-        <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by name, SKU, barcode…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        <div className="mb-3 flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search by name, SKU, barcode…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          </div>
+          {(() => {
+            const total = products.length;
+            const allowedCount = products.filter((p: any) => p.allow_negative_stock).length;
+            const allChecked = total > 0 && allowedCount === total;
+            const someChecked = allowedCount > 0 && allowedCount < total;
+            return (
+              <label className="flex items-start gap-2 rounded-md border p-2 px-3 bg-muted/30 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={allChecked}
+                  ref={(el) => { if (el) el.indeterminate = someChecked; }}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    if (!confirm(`${next ? "Enable" : "Disable"} negative stock for ALL ${total} products?`)) return;
+                    const { error } = await supabase
+                      .from("products")
+                      .update({ allow_negative_stock: next })
+                      .not("id", "is", null);
+                    if (error) return toast.error(error.message);
+                    toast.success(`Negative stock ${next ? "enabled" : "disabled"} for all products`);
+                    qc.invalidateQueries({ queryKey: ["products"] });
+                  }}
+                />
+                <span className="text-sm">
+                  <div className="font-medium leading-tight">Allow negative stock (all products)</div>
+                  <div className="text-xs text-muted-foreground">{allowedCount}/{total} currently allow negative stock</div>
+                </span>
+              </label>
+            );
+          })()}
         </div>
         <Table>
           <TableHeader>
