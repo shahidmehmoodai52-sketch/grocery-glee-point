@@ -40,9 +40,18 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAdminAccess } from "@/hooks/use-admin-access";
+import { useAdminAccess, ADMIN_PERMS } from "@/hooks/use-admin-access";
 import { fmtMoney } from "@/lib/format";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  listAdminStaff,
+  addAdminStaff,
+  setAdminStaffPermissions,
+  removeAdminStaff,
+} from "@/lib/admin-staff.functions";
+import { Checkbox } from "@/components/ui/checkbox";
+import { UserCog, BookOpen } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPanelPage,
