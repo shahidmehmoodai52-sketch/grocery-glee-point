@@ -120,15 +120,17 @@ function Page() {
 
   const recordPayment = async () => {
     if (!payOpen || pay.amount <= 0) return;
+    const acc = (cashAccounts as any[]).find((a) => a.id === pay.account_id);
+    const method = acc ? acc.name : (pay.method || "cash");
     const { error } = await supabase.rpc("record_payment", {
-      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
+      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: method, p_note: pay.note,
     });
     if (error) return toast.error(error.message);
     toast.success("Payment sent");
 
     setPayOpen(null);
     setPay({ amount: 0, method: "cash", note: "", account_id: "" });
-    qc.invalidateQueries({ queryKey: ["suppliers"] });
+    qc.invalidateQueries();
   };
 
   return (
