@@ -242,11 +242,13 @@ function Page() {
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Invoice {viewing?.invoice_no}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{viewing?.__isReturn ? `Return ${viewing?.return_no}` : `Invoice ${viewing?.invoice_no}`}</DialogTitle></DialogHeader>
           {viewing && (
             <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
               <div className="print-area">
-                <Receipt invoice={viewing} settings={settings} />
+                {viewing.__isReturn
+                  ? <Receipt kind="sale-return" invoice={viewing} settings={settings} />
+                  : <Receipt invoice={viewing} settings={settings} />}
               </div>
             </div>
           )}
