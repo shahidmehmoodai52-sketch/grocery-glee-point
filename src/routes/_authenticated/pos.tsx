@@ -1736,7 +1736,7 @@ function POSPage() {
             disabled={submitting}
           >
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Complete Sale · F4
+            {tab.editing_sale_id ? `Save changes · F4` : `Complete Sale · F4`}
           </Button>
         </div>
 
