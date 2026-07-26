@@ -32,7 +32,7 @@ function guessAccountType(name: string) {
   const s = name.toLowerCase();
   if (s.includes("bank")) return "bank";
   if (s.includes("card")) return "card";
-  if (s.includes("easy") || s.includes("jazz") || s.includes("wallet")) return "wallet";
+  if (s.includes("easy") || s.includes("jazz") || s.includes("wallet")) return "mobile_wallet";
   return "cash";
 }
 
