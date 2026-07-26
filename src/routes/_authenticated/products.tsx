@@ -177,6 +177,16 @@ function ProductsPage() {
               <DialogHeader><DialogTitle>{form.id ? "Edit" : "New"} product</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                <div className="col-span-2">
+                  <Label>Supplier</Label>
+                  <Select value={form.preferred_supplier_id || "none"} onValueChange={(v) => setForm({ ...form, preferred_supplier_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— None —</SelectItem>
+                      {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
                 <div><Label>Primary barcode <span className="text-destructive">*</span></Label><Input required value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
                 <div className="col-span-2">
