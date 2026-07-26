@@ -276,14 +276,22 @@ function Page() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <Kpi onClick={() => setDetailKey("revenue")}
           icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)}
           delta={delta} sub={`${sales.length} invoices`} tone="primary"
         />
+        <Kpi onClick={() => setDetailKey("returns")}
+          icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
+          sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
+        />
+        <Kpi onClick={() => setDetailKey("net")}
+          icon={Receipt} label="Net revenue" value={fmtMoney(netRevenue, sym)}
+          sub="Revenue − Returns" tone="info"
+        />
         <Kpi onClick={() => setDetailKey("profit")}
           icon={Wallet} label="Profit" value={fmtMoney(profit, sym)}
-          sub="After cost & tax" tone="success"
+          sub="Net of returns" tone="success"
         />
         <Kpi onClick={() => setDetailKey("purch")}
           icon={TrendingDown} label="Purchases" value={fmtMoney(purchTotal, sym)}
@@ -292,10 +300,6 @@ function Page() {
         <Kpi onClick={() => setDetailKey("inventory")}
           icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
           sub={`${products.length} active SKUs`} tone="info"
-        />
-        <Kpi onClick={() => setDetailKey("returns")}
-          icon={Undo2} label="Returns" value={fmtMoney(returnsTotal, sym)}
-          sub={`${fmtMoney(refundsTotal, sym)} refunded`} tone="warning"
         />
       </div>
 
