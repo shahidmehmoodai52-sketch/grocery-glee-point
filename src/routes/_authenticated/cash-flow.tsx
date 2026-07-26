@@ -97,6 +97,12 @@ function Page() {
   const [dateTo, setDateTo] = useState("");
   const [filterAcc, setFilterAcc] = useState<string>("all");
 
+  const [details, setDetails] = useState<
+    | { kind: "opening" | "in" | "out" | "balance" }
+    | { kind: "account"; accountId: string }
+    | null
+  >(null);
+
   const accountsQ = useQuery({
     queryKey: ["cash-accounts"],
     queryFn: async () => {
