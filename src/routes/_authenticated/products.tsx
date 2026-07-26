@@ -191,7 +191,19 @@ function ProductsPage() {
                 <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
                 <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
                 {showCost && <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>}
-                {showSell && <div><Label>Price</Label><Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} /></div>}
+                {showSell && (
+                  <div>
+                    <Label className="flex items-center justify-between">
+                      <span>Price</span>
+                      {form.cost_price > 0 && form.sell_price > 0 && (
+                        <span className={`text-xs ${form.sell_price >= form.cost_price ? "text-emerald-600" : "text-destructive"}`}>
+                          {(((form.sell_price - form.cost_price) / form.cost_price) * 100).toFixed(1)}% margin
+                        </span>
+                      )}
+                    </Label>
+                    <Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} />
+                  </div>
+                )}
                 <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
                 <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
                 <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
