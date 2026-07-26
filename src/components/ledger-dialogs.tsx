@@ -102,7 +102,7 @@ export function AddPaymentDialog({
     try {
       const account = await resolveAccount();
       const res = await supabase.rpc("record_payment", {
-        p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id,
+        p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id ?? undefined,
       });
       error = res.error;
     } catch (e: any) {
