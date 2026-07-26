@@ -524,34 +524,50 @@ function Page() {
 }
 
 function Kpi({
-  icon: Icon, label, value, delta, sub, tone, onClick,
-}: { icon: any; label: string; value: string; delta?: number; sub?: string; tone: string; onClick?: () => void }) {
+  icon: Icon, label, value, delta, deltaInverse, sub, tone, onClick,
+}: { icon: any; label: string; value: string; delta?: number; deltaInverse?: boolean; sub?: string; tone: string; onClick?: () => void }) {
   const ring: Record<string, string> = {
     primary: "from-primary/15 to-primary/0 text-primary",
     success: "from-success/15 to-success/0 text-success",
     warning: "from-warning/20 to-warning/0 text-accent-foreground",
     info: "from-chart-5/20 to-chart-5/0 text-foreground",
   };
+  const hasDelta = delta !== undefined && Number.isFinite(delta);
+  const positive = hasDelta ? (deltaInverse ? (delta as number) < 0 : (delta as number) >= 0) : true;
+  const deltaClass = !hasDelta
+    ? ""
+    : (delta === 0
+        ? "bg-muted text-muted-foreground"
+        : positive
+          ? "bg-success/10 text-success"
+          : "bg-destructive/10 text-destructive");
   return (
-    <Card onClick={onClick} className={`p-5 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
+    <Card onClick={onClick} className={`p-5 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200" : ""}`}>
       <div className={`absolute inset-0 bg-gradient-to-br ${ring[tone]} pointer-events-none`} />
       <div className="relative">
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-muted-foreground uppercase tracking-wider">{label}</div>
-          <div className={`h-8 w-8 rounded-md bg-background/60 backdrop-blur flex items-center justify-center ${ring[tone].split(" ").pop()}`}>
+        <div className="flex items-start justify-between">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
+          <div className={`h-8 w-8 rounded-lg bg-background/70 backdrop-blur flex items-center justify-center shadow-sm ${ring[tone].split(" ").pop()}`}>
             <Icon className="h-4 w-4" />
           </div>
         </div>
-        <div className="text-3xl font-bold mt-2">{value}</div>
-        <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-          <span>{sub}</span>
-          {delta !== undefined && delta !== 0 && (
-            <span className={`flex items-center gap-0.5 font-medium ${delta >= 0 ? "text-success" : "text-destructive"}`}>
-              {delta >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-              {Math.abs(delta).toFixed(1)}%
+        <div className="text-2xl md:text-[1.7rem] font-bold mt-2 tracking-tight tabular-nums">{value}</div>
+        <div className="flex items-center justify-between mt-2 gap-2">
+          {hasDelta ? (
+            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-semibold ${deltaClass}`}>
+              {(delta as number) === 0
+                ? "—"
+                : (delta as number) > 0
+                  ? <ArrowUpRight className="h-3 w-3" />
+                  : <ArrowDownRight className="h-3 w-3" />}
+              {Math.abs(delta as number).toFixed(1)}%
             </span>
-          )}
+          ) : <span />}
+          <span className="text-[11px] text-muted-foreground truncate text-right">{sub}</span>
         </div>
+        {hasDelta && (
+          <div className="text-[10px] text-muted-foreground mt-1">vs previous period</div>
+        )}
       </div>
     </Card>
   );
