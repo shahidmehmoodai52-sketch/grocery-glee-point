@@ -46,6 +46,7 @@ function Page() {
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", balance: 0 });
   const [payOpen, setPayOpen] = useState<any>(null);
   const [pay, setPay] = useState({ amount: 0, method: "cash", note: "", account_id: "" });
+  const [search, setSearch] = useState("");
   const [editRow, setEditRow] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", address: "", opening_balance: 0 });
 
