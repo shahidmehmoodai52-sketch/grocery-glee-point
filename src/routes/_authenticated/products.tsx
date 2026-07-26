@@ -31,8 +31,9 @@ type ProductForm = {
   id?: string; name: string; sku: string; barcode: string; barcodes_text: string; category: string; unit: string;
   cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean; low_stock_threshold: number;
   preferred_supplier_id: string;
+  batch_no: string; expiry_date: string; rack_location: string; allow_negative_stock: boolean;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "" };
+const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: false };
 
 function ProductsPage() {
   const qc = useQueryClient();
@@ -90,7 +91,7 @@ function ProductsPage() {
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
     if (!primary) return toast.error("Barcode is required");
     const { barcodes_text: _bt, stock: newStock, ...rest } = form;
-    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null };
+    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null, batch_no: form.batch_no || null, expiry_date: form.expiry_date || null, rack_location: form.rack_location || null, allow_negative_stock: form.allow_negative_stock };
     let productId = form.id;
     if (form.id) {
       // Update all non-stock fields directly
@@ -152,6 +153,10 @@ function ProductsPage() {
       stock: Number(p.stock), tax_rate: Number(p.tax_rate), is_active: p.is_active,
       low_stock_threshold: Number(p.low_stock_threshold ?? 5),
       preferred_supplier_id: p.preferred_supplier_id ?? "",
+      batch_no: p.batch_no ?? "",
+      expiry_date: p.expiry_date ?? "",
+      rack_location: p.rack_location ?? "",
+      allow_negative_stock: !!p.allow_negative_stock,
     });
     setOpen(true);
   };
@@ -186,7 +191,19 @@ function ProductsPage() {
                 <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
                 <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
                 {showCost && <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>}
-                {showSell && <div><Label>Price</Label><Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} /></div>}
+                {showSell && (
+                  <div>
+                    <Label className="flex items-center justify-between">
+                      <span>Price</span>
+                      {form.cost_price > 0 && form.sell_price > 0 && (
+                        <span className={`text-xs ${form.sell_price >= form.cost_price ? "text-emerald-600" : "text-destructive"}`}>
+                          {(((form.sell_price - form.cost_price) / form.cost_price) * 100).toFixed(1)}% margin
+                        </span>
+                      )}
+                    </Label>
+                    <Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} />
+                  </div>
+                )}
                 <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
                 <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
                 <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
@@ -199,6 +216,24 @@ function ProductsPage() {
                       {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+                <div><Label>Batch #</Label><Input value={form.batch_no} onChange={(e) => setForm({ ...form, batch_no: e.target.value })} placeholder="e.g. B-2026-01" /></div>
+                <div><Label>Expiry date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
+                <div className="col-span-2"><Label>Rack / Shelf location</Label><Input value={form.rack_location} onChange={(e) => setForm({ ...form, rack_location: e.target.value })} placeholder="e.g. A-3, Shelf 2" /></div>
+                <div className="col-span-2 flex items-start gap-2 rounded-md border p-3 bg-muted/30">
+                  <input
+                    id="allow-neg-stock"
+                    type="checkbox"
+                    className="mt-1 h-4 w-4"
+                    checked={form.allow_negative_stock}
+                    onChange={(e) => setForm({ ...form, allow_negative_stock: e.target.checked })}
+                  />
+                  <label htmlFor="allow-neg-stock" className="text-sm cursor-pointer">
+                    <div className="font-medium">Allow negative stock</div>
+                    <div className="text-xs text-muted-foreground">
+                      If checked, POS will keep selling this item even after stock is zero. If unchecked, POS blocks the sale when stock is insufficient.
+                    </div>
+                  </label>
                 </div>
               </div>
               <DialogFooter>
