@@ -193,8 +193,8 @@ function Page() {
           rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
           total: fmtMoney(revenue, sym) };
       case "profit":
-        return { title: `Profit · ${rangeLabel}`, cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
-          rows: withProfit(sales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
+        return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
+          rows: [["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)], ["Returns profit reversed", `- ${fmtMoney(returnsProfit, sym)}`], ["Net profit", fmtMoney(profit, sym)]],
           total: fmtMoney(profit, sym) };
       case "purch":
         return { title: `Purchases · ${rangeLabel}`, cols: ["Date", "Total", "Paid"],
