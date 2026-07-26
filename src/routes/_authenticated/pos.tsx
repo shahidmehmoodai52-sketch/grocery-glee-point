@@ -1790,7 +1790,22 @@ function POSPage() {
                 )}
                 {heldBills.map((b: any) => (
                   <tr key={b.id} className="border-t hover:bg-accent/40">
-                    <td className="px-3 py-1.5">{b.label || "Untitled"}</td>
+                    <td className="px-3 py-1.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        {b.payload?.editing_sale_id ? (
+                          <span className="inline-flex items-center gap-1 text-primary" title="Paused edit — resume to continue editing invoice">
+                            <Clock className="h-3.5 w-3.5" />
+                            <Pencil className="h-3 w-3" />
+                          </span>
+                        ) : null}
+                        <span>{b.label || "Untitled"}</span>
+                        {b.payload?.editing_sale_id && (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1 border-primary/40 text-primary">
+                            Editing {b.payload?.editing_invoice_no ?? ""}
+                          </Badge>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-3 py-1.5">{b.customers?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-xs text-muted-foreground">{new Date(b.created_at).toLocaleString()}</td>
                     <td className="px-3 py-1.5 text-right">{b.item_count}</td>
