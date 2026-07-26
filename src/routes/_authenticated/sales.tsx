@@ -138,7 +138,7 @@ function Page() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{presetLabel} · sales</div>
           <div className="text-2xl font-semibold mt-1">{sales.length}</div>
@@ -150,6 +150,15 @@ function Page() {
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{presetLabel} · profit</div>
           <div className="text-2xl font-semibold mt-1 text-success">{fmtMoney(rangeProfit, sym)}</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">{presetLabel} · returns</div>
+          <div className="text-2xl font-semibold mt-1 text-destructive">-{fmtMoney(rangeReturns, sym)}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{returns.length} refund{returns.length === 1 ? "" : "s"}</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">{presetLabel} · net revenue</div>
+          <div className="text-2xl font-semibold mt-1">{fmtMoney(netRevenue, sym)}</div>
         </Card>
       </div>
 
@@ -186,6 +195,44 @@ function Page() {
                       <Ban className="h-4 w-4 text-destructive" />
                     </Button>
                   )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <div className="flex items-center justify-between pt-2">
+        <div>
+          <h2 className="text-lg font-semibold">Sale returns</h2>
+          <p className="text-xs text-muted-foreground">{returns.length} refund{returns.length === 1 ? "" : "s"} · stock restored automatically</p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/sale-returns"><Undo2 className="h-4 w-4 mr-1" />New return</Link>
+        </Button>
+      </div>
+      <Card className="p-3">
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead>Return #</TableHead><TableHead>Date</TableHead><TableHead>Original invoice</TableHead>
+            <TableHead>Customer</TableHead><TableHead className="text-right">Total</TableHead>
+            <TableHead className="text-right">Refund</TableHead><TableHead>Method</TableHead><TableHead></TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {returns.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No returns in this range</TableCell></TableRow>}
+            {returns.map((r: any) => (
+              <TableRow key={r.id}>
+                <TableCell className="font-mono text-xs">{r.return_no}</TableCell>
+                <TableCell className="text-sm">{new Date(r.created_at).toLocaleString()}</TableCell>
+                <TableCell className="font-mono text-xs">{r.sales?.invoice_no ?? "—"}</TableCell>
+                <TableCell>{r.customers?.name ?? "Walk-in"}</TableCell>
+                <TableCell className="text-right font-medium text-destructive">-{fmtMoney(r.total, sym)}</TableCell>
+                <TableCell className="text-right">{fmtMoney(r.refund_amount, sym)}</TableCell>
+                <TableCell><Badge variant="outline" className="capitalize">{r.refund_method}</Badge></TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" onClick={() => setViewing({ ...r, __isReturn: true, sale_items: r.sale_return_items })} title="View return">
+                    <Eye className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
