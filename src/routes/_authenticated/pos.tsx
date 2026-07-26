@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog, PauseCircle, Play, ChevronDown } from "lucide-react";
+import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog, PauseCircle, Play, ChevronDown, Pencil } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,8 @@ type Tab = {
   paid: string;
   note: string;
   restored?: boolean;
+  editing_sale_id?: string | null;
+  editing_invoice_no?: string | null;
 };
 
 const UNDO_REASONS = [
@@ -624,9 +626,12 @@ function POSPage() {
         disc: Number(i.disc ?? 0),
       };
     });
+    const isEdit = !!payload.editing_sale_id;
     const restored: Tab = {
       id: crypto.randomUUID(),
-      name: `${labelPrefix} ${payload.label ?? "Bill"}`,
+      name: isEdit
+        ? `✎ Edit ${payload.editing_invoice_no ?? payload.label ?? "Invoice"}`
+        : `${labelPrefix} ${payload.label ?? "Bill"}`,
       items: restoredItems,
       customer_id: payload.customer_id ?? null,
       expense_person_id: payload.expense_person_id ?? null,
@@ -635,11 +640,50 @@ function POSPage() {
       discount_pct: "",
       paid: String(payload.paid ?? ""),
       note: payload.note ?? "",
-      restored: true,
+      restored: !isEdit,
+      editing_sale_id: payload.editing_sale_id ?? null,
+      editing_invoice_no: payload.editing_invoice_no ?? null,
     };
     setTabs((ts) => [...ts, restored]);
     setActive(restored.id);
   };
+
+  const loadInvoiceForEdit = (sale: any) => {
+    if (!sale) return;
+    const items: CartItem[] = (sale.sale_items ?? []).map((it: any) => {
+      const qty = Number(it.qty ?? 1);
+      const price = Number(it.price ?? 0);
+      return {
+        product_id: it.product_id ?? null,
+        code: "",
+        name: String(it.name ?? "Item"),
+        qty, price,
+        mrp: price,
+        cost: Number(it.cost ?? 0),
+        disc_pct: 0,
+        tax_pct: 0,
+        disc: Math.max(qty * price - Number(it.line_total ?? qty * price), 0),
+      };
+    });
+    const editTab: Tab = {
+      id: crypto.randomUUID(),
+      name: `✎ Edit ${sale.invoice_no}`,
+      items,
+      customer_id: sale.customer_id ?? null,
+      expense_person_id: sale.expense_person_id ?? null,
+      payment_method: sale.payment_method ?? "cash",
+      discount: Number(sale.discount ?? 0),
+      discount_pct: "",
+      paid: String(sale.paid ?? ""),
+      note: sale.note ?? "",
+      editing_sale_id: sale.id,
+      editing_invoice_no: sale.invoice_no,
+    };
+    setTabs((ts) => [...ts, editTab]);
+    setActive(editTab.id);
+    toast.success(`Editing invoice ${sale.invoice_no}`);
+  };
+
 
   const resumeHeld = async (id: string) => {
     const { data, error } = await supabase.rpc("resume_bill", { _id: id });
@@ -672,11 +716,15 @@ function POSPage() {
         paid: tab.paid,
         note: tab.note,
         label: tab.name,
+        editing_sale_id: tab.editing_sale_id ?? null,
+        editing_invoice_no: tab.editing_invoice_no ?? null,
       };
       const { error } = await supabase.rpc("hold_bill", {
         _customer: tab.customer_id as any,
         _item_count: tab.items.length,
-        _label: tab.name,
+        _label: tab.editing_sale_id
+          ? `✎ Edit ${tab.editing_invoice_no ?? tab.name}`
+          : tab.name,
         _payload: payload as any,
         _total: total,
       });
@@ -737,6 +785,44 @@ function POSPage() {
   const doSale = async () => {
     setSubmitting(true);
     try {
+      // ---- Edit existing invoice path ----
+      if (tab.editing_sale_id) {
+        const items = tab.items.map((i) => ({
+          product_id: i.product_id,
+          name: i.name,
+          qty: i.qty,
+          price: i.price,
+          cost: i.cost,
+        }));
+        const { error } = await supabase.rpc("edit_sale", {
+          _sale_id: tab.editing_sale_id,
+          _items: items as any,
+        });
+        if (error) throw error;
+        // Also update lightweight header fields (customer / payment / note)
+        // that the RPC does not touch, so the cashier's edits stick.
+        try {
+          await supabase
+            .from("sales")
+            .update({
+              customer_id: tab.customer_id,
+              payment_method: tab.payment_method,
+              note: tab.note,
+            })
+            .eq("id", tab.editing_sale_id);
+        } catch { /* non-fatal */ }
+        toast.success(`Invoice ${tab.editing_invoice_no ?? ""} updated`);
+        closeTab(active);
+        qc.invalidateQueries({ queryKey: ["products"] });
+        qc.invalidateQueries({ queryKey: ["sales"] });
+        qc.invalidateQueries({ queryKey: ["customers"] });
+        qc.invalidateQueries({ queryKey: ["expenses"] });
+        qc.invalidateQueries({ queryKey: ["expense_persons"] });
+        refetchHeld?.();
+        return;
+      }
+
+
       const payload = {
         customer_id: tab.customer_id,
         expense_person_id: tab.expense_person_id,
@@ -1672,16 +1758,9 @@ function POSPage() {
         settings={settings}
         sym={sym}
         reprintAuditEnabled={!!(settings as any)?.ops_reprint_audit_enabled}
-        onView={(s: any) => setReprintView(s)}
-        onEdit={(s: any) => setEditingInvoice(s)}
+        onEdit={(s: any) => loadInvoiceForEdit(s)}
       />
 
-      {/* Editable invoice */}
-      <EditInvoiceDialog
-        invoice={editingInvoice}
-        sym={sym}
-        onClose={() => setEditingInvoice(null)}
-      />
 
 
       {/* Held bills tray */}
@@ -2324,7 +2403,6 @@ function ReprintDialog({
   settings,
   sym,
   reprintAuditEnabled,
-  onView,
   onEdit,
 }: {
   open: boolean;
@@ -2332,7 +2410,6 @@ function ReprintDialog({
   settings: any;
   sym: string;
   reprintAuditEnabled?: boolean;
-  onView: (s: any) => void;
   onEdit: (s: any) => void;
 }) {
   const [q, setQ] = useState("");
@@ -2411,8 +2488,8 @@ function ReprintDialog({
                     <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(s.total, sym)}</td>
                     <td className="px-2 py-1 text-right whitespace-nowrap">
-                      <Button size="sm" variant="ghost" onClick={() => { onEdit(s); onOpenChange(false); }} title="Review & edit invoice">
-                        <Eye className="h-3.5 w-3.5 mr-1" /> Review
+                      <Button size="sm" variant="ghost" onClick={() => { onEdit(s); onOpenChange(false); }} title="Edit invoice in POS">
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                       </Button>
                       <Button size="sm" variant="ghost" onClick={async () => {
                         if (reprintAuditEnabled) {
