@@ -178,6 +178,7 @@ function AdminPanelPage() {
 
 function TenantsTab() {
   const qc = useQueryClient();
+  const { has } = useAdminAccess();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "suspended" | "archived">("all");
 
