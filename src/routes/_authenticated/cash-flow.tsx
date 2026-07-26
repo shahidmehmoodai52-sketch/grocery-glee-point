@@ -467,21 +467,74 @@ function Page() {
   };
 
   const openTransfer = () => { setTfForm({ ...emptyTransfer }); setTfOpen(true); };
+  const openSupplierPay = () => { setSpForm({ ...emptySupplierPay }); setSpOpen(true); };
+
+  // Turn an "auto:<method>" bucket into a real cash_accounts row so it can be referenced by FK
+  const materializeAccount = async (id: string): Promise<{ id: string; name: string } | null> => {
+    if (!id) return null;
+    if (!id.startsWith("auto:")) {
+      const a = accounts.find(x => x.id === id);
+      return a ? { id: a.id, name: a.name } : null;
+    }
+    const method = id.slice(5);
+    const type = methodBuckets.typeGuess(method);
+    const name = method.charAt(0).toUpperCase() + method.slice(1);
+    const existing = accounts.find(a => a.name.toLowerCase() === name.toLowerCase());
+    if (existing) return { id: existing.id, name: existing.name };
+    const { data, error } = await supabase.from("cash_accounts")
+      .insert({ name, type, opening_balance: 0, is_active: true, notes: "Auto-created from POS bucket" })
+      .select("id,name").single();
+    if (error) throw error;
+    await qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    return { id: data.id as string, name: data.name as string };
+  };
+
   const saveTransfer = async () => {
     if (!tfForm.from_id || !tfForm.to_id) { toast.error("Pick both accounts"); return; }
     if (tfForm.from_id === tfForm.to_id) { toast.error("Choose two different accounts"); return; }
     const amt = Number(tfForm.amount);
     if (!amt || amt <= 0) { toast.error("Amount must be greater than zero"); return; }
-    const groupId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    const rows = [
-      { account_id: tfForm.from_id, direction: "out", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
-      { account_id: tfForm.to_id, direction: "in", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
-    ];
-    const { error } = await supabase.from("cash_transactions").insert(rows);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Transfer recorded");
-    setTfOpen(false);
-    qc.invalidateQueries({ queryKey: ["cash-transactions"] });
+    try {
+      const from = await materializeAccount(tfForm.from_id);
+      const to = await materializeAccount(tfForm.to_id);
+      if (!from || !to) { toast.error("Could not resolve accounts"); return; }
+      const groupId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+      const rows = [
+        { account_id: from.id, direction: "out", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
+        { account_id: to.id, direction: "in", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
+      ];
+      const { error } = await supabase.from("cash_transactions").insert(rows);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Transfer recorded");
+      setTfOpen(false);
+      qc.invalidateQueries({ queryKey: ["cash-transactions"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Transfer failed");
+    }
+  };
+
+  const saveSupplierPay = async () => {
+    if (!spForm.supplier_id) { toast.error("Choose a supplier"); return; }
+    if (!spForm.from_id) { toast.error("Choose a payment source account"); return; }
+    const amt = Number(spForm.amount);
+    if (!amt || amt <= 0) { toast.error("Amount must be greater than zero"); return; }
+    try {
+      const from = await materializeAccount(spForm.from_id);
+      if (!from) { toast.error("Could not resolve source account"); return; }
+      const { error } = await supabase.rpc("record_payment", {
+        p_party_type: "supplier",
+        p_party_id: spForm.supplier_id,
+        p_amount: amt,
+        p_method: from.name,
+        p_note: spForm.note || "",
+      });
+      if (error) { toast.error(error.message); return; }
+      toast.success("Supplier paid");
+      setSpOpen(false);
+      qc.invalidateQueries();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Payment failed");
+    }
   };
 
   const accById = (id: string) => allAccounts.find((a) => a.id === id);
