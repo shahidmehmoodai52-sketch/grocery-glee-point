@@ -119,11 +119,18 @@ function Page() {
   };
 
   const recordPayment = async () => {
-    if (!payOpen || pay.amount <= 0) return;
-    const acc = (cashAccounts as any[]).find((a) => a.id === pay.account_id);
-    const method = acc ? acc.name : (pay.method || "cash");
+    if (!payOpen || pay.amount <= 0) return toast.error("Enter amount");
+    if (!pay.method) return toast.error("Pick a payment source");
+    // Ensure a cash_accounts row exists for this method so it flows into Cash Flow
+    const existing = (cashAccounts as any[]).find((a) => a.name.toLowerCase() === pay.method.toLowerCase());
+    if (!existing) {
+      const t = pay.method.toLowerCase();
+      const type = t.includes("bank") ? "bank" : t.includes("card") ? "card" : (t.includes("easy") || t.includes("jazz") || t.includes("wallet")) ? "wallet" : "cash";
+      const { error: accErr } = await supabase.from("cash_accounts").insert({ name: pay.method, type, opening_balance: 0, is_active: true });
+      if (accErr) return toast.error(accErr.message);
+    }
     const { error } = await supabase.rpc("record_payment", {
-      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: method, p_note: pay.note,
+      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
     });
     if (error) return toast.error(error.message);
     toast.success("Payment sent");
@@ -248,21 +255,33 @@ function Page() {
           <div className="space-y-3">
             <div><Label>Amount</Label><Input type="number" step="0.01" value={pay.amount || ""} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></div>
             <div>
-              <Label>Payment source (cash in hand, bank, wallet…)</Label>
-              <Select value={pay.account_id} onValueChange={(v) => {
-                const acc = (cashAccounts as any[]).find((a) => a.id === v);
-                setPay({ ...pay, account_id: v, method: acc?.name ?? pay.method });
-              }}>
-                <SelectTrigger><SelectValue placeholder={cashAccounts.length ? "Choose account" : "No cash accounts — add one in Cash Flow"} /></SelectTrigger>
-                <SelectContent>
-                  {(cashAccounts as any[]).map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground mt-1">Deducts from this account in Cash Flow.</p>
+              <Label>Payment source</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {(() => {
+                  const presets = ["Cash in hand", "Bank", "EasyPaisa", "JazzCash", "Card"];
+                  const names = new Set((cashAccounts as any[]).map((a) => a.name));
+                  const merged = [
+                    ...(cashAccounts as any[]).map((a) => ({ id: a.id, name: a.name })),
+                    ...presets.filter((p) => !names.has(p)).map((p) => ({ id: `preset:${p}`, name: p })),
+                  ];
+                  return merged.map((a) => {
+                    const active = pay.account_id === a.id || (!pay.account_id && pay.method.toLowerCase() === a.name.toLowerCase());
+                    return (
+                      <Button
+                        key={a.id}
+                        type="button"
+                        size="sm"
+                        variant={active ? "default" : "outline"}
+                        onClick={() => setPay({ ...pay, account_id: a.id, method: a.name })}
+                      >
+                        {a.name}
+                      </Button>
+                    );
+                  });
+                })()}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-2">Deducts from this account in Cash Flow. New sources are created automatically.</p>
             </div>
-            <div><Label>Method label (optional)</Label><Input value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })} placeholder="cash / bank / easypaisa…" /></div>
             <div><Label>Note</Label><Input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
           </div>
           <DialogFooter>
