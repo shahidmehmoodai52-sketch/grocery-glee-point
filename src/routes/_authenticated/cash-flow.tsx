@@ -586,16 +586,17 @@ function Page() {
 
         {/* Accounts */}
         <TabsContent value="accounts" className="mt-4">
-          {accounts.length === 0 ? (
+          {allAccounts.length === 0 ? (
             <Card className="p-8 text-center text-muted-foreground">
               No accounts yet. Add your Till, Bank, Card terminal, EasyPaisa or JazzCash to get started.
             </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {accounts.map((a) => {
+              {allAccounts.map((a) => {
                 const Icon = iconFor(a.type);
                 const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
                 const bal = Number(a.opening_balance) + b.inSum - b.outSum;
+                const auto = isAutoAcc(a.id);
                 return (
                   <Card
                     key={a.id}
@@ -614,7 +615,7 @@ function Page() {
                           <div className="text-xs text-muted-foreground">{labelFor(a.type)}</div>
                         </div>
                       </div>
-                      {!a.is_active && <Badge variant="secondary">Inactive</Badge>}
+                      {auto ? <Badge variant="outline">Auto</Badge> : !a.is_active && <Badge variant="secondary">Inactive</Badge>}
                     </div>
                     <div className="mt-3 text-2xl font-bold">{fmt(bal)}</div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -622,7 +623,7 @@ function Page() {
                       <span className="text-emerald-600">In {fmt(b.inSum)}</span>
                       <span className="text-rose-600">Out {fmt(b.outSum)}</span>
                     </div>
-                    {isAdmin && (
+                    {isAdmin && !auto && (
                       <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button size="sm" variant="secondary" onClick={() => openTxCreate("in", a.id)}>Receive</Button>
                         <Button size="sm" variant="outline" onClick={() => openTxCreate("out", a.id)}>Pay</Button>
@@ -630,12 +631,16 @@ function Page() {
                         <Button size="sm" variant="ghost" onClick={() => deleteAcc(a.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                       </div>
                     )}
+                    {auto && (
+                      <div className="mt-3 text-[11px] text-muted-foreground">Auto bucket from POS. Create a matching account (same name/type) to customize opening balance.</div>
+                    )}
                   </Card>
                 );
               })}
             </div>
           )}
         </TabsContent>
+
 
         {/* Transactions */}
         <TabsContent value="transactions" className="mt-4 space-y-3">
