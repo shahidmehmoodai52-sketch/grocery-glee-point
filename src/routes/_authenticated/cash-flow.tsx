@@ -566,6 +566,7 @@ function Page() {
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={openTransfer}><ArrowLeftRight className="h-4 w-4 mr-2" />Transfer</Button>
+            <Button variant="outline" onClick={openSupplierPay}><Truck className="h-4 w-4 mr-2" />Pay supplier</Button>
             <Button variant="outline" onClick={() => openTxCreate("out")}><ArrowUpCircle className="h-4 w-4 mr-2" />Pay out</Button>
             <Button onClick={() => openTxCreate("in")}><ArrowDownCircle className="h-4 w-4 mr-2" />Receive</Button>
             <Button variant="secondary" onClick={openAccCreate}><Plus className="h-4 w-4 mr-2" />New account</Button>
