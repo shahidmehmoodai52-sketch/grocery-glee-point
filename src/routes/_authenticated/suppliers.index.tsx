@@ -122,15 +122,16 @@ function Page() {
     if (!payOpen || pay.amount <= 0) return toast.error("Enter amount");
     if (!pay.method) return toast.error("Pick a payment source");
     // Ensure a cash_accounts row exists for this method so it flows into Cash Flow
-    const existing = (cashAccounts as any[]).find((a) => a.name.toLowerCase() === pay.method.toLowerCase());
-    if (!existing) {
+    let account = (cashAccounts as any[]).find((a) => a.name.toLowerCase() === pay.method.toLowerCase());
+    if (!account) {
       const t = pay.method.toLowerCase();
-      const type = t.includes("bank") ? "bank" : t.includes("card") ? "card" : (t.includes("easy") || t.includes("jazz") || t.includes("wallet")) ? "wallet" : "cash";
-      const { error: accErr } = await supabase.from("cash_accounts").insert({ name: pay.method, type, opening_balance: 0, is_active: true });
+      const type = t.includes("bank") ? "bank" : t.includes("card") ? "card" : (t.includes("easy") || t.includes("jazz") || t.includes("wallet")) ? "mobile_wallet" : "cash";
+      const { data, error: accErr } = await supabase.from("cash_accounts").insert({ name: pay.method, type, opening_balance: 0, is_active: true }).select("id,name").single();
       if (accErr) return toast.error(accErr.message);
+      account = data;
     }
     const { error } = await supabase.rpc("record_payment", {
-      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
+      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: account.name, p_note: pay.note, p_account_id: account.id,
     });
     if (error) return toast.error(error.message);
     toast.success("Payment sent");
