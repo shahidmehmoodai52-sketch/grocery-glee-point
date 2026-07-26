@@ -119,11 +119,18 @@ function Page() {
   };
 
   const recordPayment = async () => {
-    if (!payOpen || pay.amount <= 0) return;
-    const acc = (cashAccounts as any[]).find((a) => a.id === pay.account_id);
-    const method = acc ? acc.name : (pay.method || "cash");
+    if (!payOpen || pay.amount <= 0) return toast.error("Enter amount");
+    if (!pay.method) return toast.error("Pick a payment source");
+    // Ensure a cash_accounts row exists for this method so it flows into Cash Flow
+    const existing = (cashAccounts as any[]).find((a) => a.name.toLowerCase() === pay.method.toLowerCase());
+    if (!existing) {
+      const t = pay.method.toLowerCase();
+      const type = t.includes("bank") ? "bank" : t.includes("card") ? "card" : (t.includes("easy") || t.includes("jazz") || t.includes("wallet")) ? "wallet" : "cash";
+      const { error: accErr } = await supabase.from("cash_accounts").insert({ name: pay.method, type, opening_balance: 0, is_active: true });
+      if (accErr) return toast.error(accErr.message);
+    }
     const { error } = await supabase.rpc("record_payment", {
-      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: method, p_note: pay.note,
+      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
     });
     if (error) return toast.error(error.message);
     toast.success("Payment sent");
