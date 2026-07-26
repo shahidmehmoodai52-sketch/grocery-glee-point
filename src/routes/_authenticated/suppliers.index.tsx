@@ -247,7 +247,22 @@ function Page() {
           <DialogHeader><DialogTitle>Pay supplier — {payOpen?.name}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Amount</Label><Input type="number" step="0.01" value={pay.amount || ""} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></div>
-            <div><Label>Method</Label><Input value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })} /></div>
+            <div>
+              <Label>Payment source (cash in hand, bank, wallet…)</Label>
+              <Select value={pay.account_id} onValueChange={(v) => {
+                const acc = (cashAccounts as any[]).find((a) => a.id === v);
+                setPay({ ...pay, account_id: v, method: acc?.name ?? pay.method });
+              }}>
+                <SelectTrigger><SelectValue placeholder={cashAccounts.length ? "Choose account" : "No cash accounts — add one in Cash Flow"} /></SelectTrigger>
+                <SelectContent>
+                  {(cashAccounts as any[]).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground mt-1">Deducts from this account in Cash Flow.</p>
+            </div>
+            <div><Label>Method label (optional)</Label><Input value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })} placeholder="cash / bank / easypaisa…" /></div>
             <div><Label>Note</Label><Input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
           </div>
           <DialogFooter>
