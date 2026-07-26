@@ -135,8 +135,20 @@ function Page() {
         map.set(key, cur);
       }
     }
+    // Subtract returned qty/revenue/cost per product so product-wise report reflects net sales
+    for (const r of saleReturns as any[]) {
+      for (const it of r.sale_return_items ?? []) {
+        const key = it.product_id || it.name;
+        const cur = map.get(key);
+        if (!cur) continue;
+        const rev = Number(it.qty) * Number(it.price);
+        const cost = Number(it.qty) * Number(it.cost ?? 0);
+        cur.qty -= Number(it.qty); cur.revenue -= rev; cur.cost -= cost; cur.profit -= rev - cost;
+        map.set(key, cur);
+      }
+    }
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [sales]);
+  }, [sales, saleReturns]);
 
   // Payment method breakdown
   const paymentBreakdown = useMemo(() => {
