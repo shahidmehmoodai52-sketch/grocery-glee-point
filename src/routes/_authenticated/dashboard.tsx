@@ -138,6 +138,54 @@ function Page() {
     .sort((a: any, b: any) => Number(a.stock) - Number(b.stock)).slice(0, 6);
   const inventoryValue = products.reduce((s: number, p: any) => s + Number(p.stock) * Number(p.cost_price), 0);
 
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+
+  const detail = useMemo(() => {
+    if (!detailKey) return null;
+    const fmtDate = (d: string) => new Date(d).toLocaleString();
+    const purchToday = purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today);
+    const withProfit = (arr: any[]) => arr.map((s:any)=>({...s, profit: Number(s.total)-Number(s.tax)-Number(s.cost_total)}));
+    switch (detailKey) {
+      case "rev-today":
+        return { title: "Today's revenue", cols: ["Date", "Method", "Status", "Total"],
+          rows: todaySales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
+          total: fmtMoney(revToday, sym) };
+      case "profit-today":
+        return { title: "Today's profit", cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
+          rows: withProfit(todaySales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
+          total: fmtMoney(profitToday, sym) };
+      case "purch-30":
+        return { title: "Purchases (30 days)", cols: ["Date", "Total", "Paid"],
+          rows: purchases.map((p:any)=>[fmtDate(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
+          total: fmtMoney(purch30, sym) };
+      case "purch-today":
+        return { title: "Purchases today", cols: ["Date", "Total", "Paid"],
+          rows: purchToday.map((p:any)=>[fmtDate(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
+          total: fmtMoney(purchToday.reduce((s:number,p:any)=>s+Number(p.total),0), sym) };
+      case "inventory":
+        return { title: "Inventory value", cols: ["Product", "Stock", "Cost", "Value"],
+          rows: [...products].sort((a:any,b:any)=>Number(b.stock)*Number(b.cost_price)-Number(a.stock)*Number(a.cost_price)).map((p:any)=>[p.name, String(p.stock), fmtMoney(Number(p.cost_price), sym), fmtMoney(Number(p.stock)*Number(p.cost_price), sym)]),
+          total: fmtMoney(inventoryValue, sym) };
+      case "returns-30":
+        return { title: "Returns (30 days)", cols: ["Date", "Total", "Refunded"],
+          rows: saleReturns.map((r:any)=>[fmtDate(r.created_at), fmtMoney(Number(r.total), sym), fmtMoney(Number(r.refund_amount), sym)]),
+          total: fmtMoney(returns30, sym) };
+      case "rev-30":
+        return { title: "Revenue (30 days)", cols: ["Date", "Method", "Total"],
+          rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", fmtMoney(Number(s.total), sym)]),
+          total: fmtMoney(rev30, sym) };
+      case "profit-30":
+        return { title: "Profit (30 days)", cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
+          rows: withProfit(sales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
+          total: fmtMoney(profit30, sym) };
+      case "invoices-30":
+        return { title: "Invoices (30 days)", cols: ["Date", "Method", "Status", "Total", "Paid"],
+          rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
+          total: `${sales.length} invoices` };
+    }
+    return null;
+  }, [detailKey, sales, purchases, saleReturns, products, todaySales, revToday, profitToday, purch30, returns30, refunds30, rev30, profit30, inventoryValue, sym, today]);
+
   return (
     <div className="p-6 space-y-6">
       <PageHeader
@@ -155,23 +203,23 @@ function Page() {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Kpi
+        <Kpi onClick={() => setDetailKey("rev-today")}
           icon={TrendingUp} label="Today's revenue" value={fmtMoney(revToday, sym)}
           delta={dayDelta} sub={`${todaySales.length} invoices`} tone="primary"
         />
-        <Kpi
+        <Kpi onClick={() => setDetailKey("profit-today")}
           icon={Wallet} label="Today's profit" value={fmtMoney(profitToday, sym)}
           sub="After cost & tax" tone="success"
         />
-        <Kpi
+        <Kpi onClick={() => setDetailKey("purch-30")}
           icon={TrendingDown} label="Purchases (30d)" value={fmtMoney(purch30, sym)}
           sub={`${fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} today`} tone="warning"
         />
-        <Kpi
+        <Kpi onClick={() => setDetailKey("inventory")}
           icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
           sub={`${products.length} active SKUs`} tone="info"
         />
-        <Kpi
+        <Kpi onClick={() => setDetailKey("returns-30")}
           icon={Undo2} label="Returns (30d)" value={fmtMoney(returns30, sym)}
           sub={`${fmtMoney(refunds30, sym)} refunded`} tone="warning"
         />
