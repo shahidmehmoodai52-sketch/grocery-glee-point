@@ -1082,3 +1082,391 @@ function BlockDialog({ open, onClose, onDone }: { open: boolean; onClose: () => 
     </Dialog>
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// Global library moderation
+// ─────────────────────────────────────────────────────────────
+type LibraryRow = {
+  id: string;
+  name: string;
+  barcode: string | null;
+  item_code: string | null;
+  category: string | null;
+  unit: string | null;
+  status: "pending" | "approved" | "rejected";
+  default_sell_price: number;
+  default_cost_price: number;
+  contributed_by_tenant: string | null;
+  created_at: string;
+};
+
+function LibraryTab() {
+  const qc = useQueryClient();
+  const { has, isSuperAdmin } = useAdminAccess();
+  const canManage = isSuperAdmin || has("library.manage");
+  const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [search, setSearch] = useState("");
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["admin-library", status],
+    queryFn: async () => {
+      let q = supabase
+        .from("global_products")
+        .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (status !== "all") q = q.eq("status", status);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data as LibraryRow[]) ?? [];
+    },
+  });
+
+  const filtered = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    if (!s) return rows;
+    return rows.filter(
+      (r) =>
+        r.name.toLowerCase().includes(s) ||
+        (r.barcode ?? "").toLowerCase().includes(s) ||
+        (r.item_code ?? "").toLowerCase().includes(s) ||
+        (r.category ?? "").toLowerCase().includes(s),
+    );
+  }, [rows, search]);
+
+  const setRowStatus = async (id: string, next: "approved" | "rejected") => {
+    const { error } = await supabase
+      .from("global_products")
+      .update({ status: next, reviewed_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success(next === "approved" ? "Item approved — fanned out to shops" : "Item rejected");
+    qc.invalidateQueries({ queryKey: ["admin-library"] });
+  };
+
+  const remove = async (id: string, name: string) => {
+    if (!confirm(`Delete "${name}" from the global library?`)) return;
+    const { error } = await supabase.from("global_products").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Deleted");
+    qc.invalidateQueries({ queryKey: ["admin-library"] });
+  };
+
+  const pendingCount = rows.filter((r) => r.status === "pending").length;
+
+  return (
+    <div className="space-y-3">
+      <Card className="p-3">
+        <div className="flex flex-col md:flex-row gap-2 md:items-center mb-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, barcode, code, category…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {(["pending", "approved", "rejected", "all"] as const).map((f) => (
+              <Button
+                key={f}
+                size="sm"
+                variant={status === f ? "default" : "outline"}
+                onClick={() => setStatus(f)}
+              >
+                {f}{f === "pending" && pendingCount > 0 && status !== "pending" ? ` (${pendingCount})` : ""}
+              </Button>
+            ))}
+          </div>
+        </div>
+        {!canManage && (
+          <div className="mb-2 text-xs text-muted-foreground">
+            Read-only view — ask a super admin to grant the <b>library.manage</b> permission to moderate items.
+          </div>
+        )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Item</TableHead>
+              <TableHead>Barcode / Code</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Sell</TableHead>
+              <TableHead className="text-right">Cost</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && (
+              <TableRow><TableCell colSpan={7} className="py-4"><TableSkeleton rows={5} columns={7} /></TableCell></TableRow>
+            )}
+            {!isLoading && filtered.length === 0 && (
+              <TableRow><TableCell colSpan={7} className="py-8">
+                <EmptyState icon={BookOpen} title="Nothing here" description="No library items match the current filter." />
+              </TableCell></TableRow>
+            )}
+            {filtered.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell>
+                  <div className="font-medium">{r.name}</div>
+                  <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()} · {r.unit ?? "pcs"}</div>
+                </TableCell>
+                <TableCell className="text-xs font-mono">
+                  <div>{r.barcode ?? "—"}</div>
+                  <div className="text-muted-foreground">{r.item_code ?? ""}</div>
+                </TableCell>
+                <TableCell className="text-xs">{r.category ?? "—"}</TableCell>
+                <TableCell>
+                  {r.status === "pending" && <StatusBadge tone="warning">Pending</StatusBadge>}
+                  {r.status === "approved" && <StatusBadge tone="success">Approved</StatusBadge>}
+                  {r.status === "rejected" && <StatusBadge tone="danger">Rejected</StatusBadge>}
+                </TableCell>
+                <TableCell className="text-right">{fmtMoney(r.default_sell_price, "")}</TableCell>
+                <TableCell className="text-right">{fmtMoney(r.default_cost_price, "")}</TableCell>
+                <TableCell className="text-right">
+                  {canManage && (
+                    <div className="inline-flex gap-1">
+                      {r.status !== "approved" && (
+                        <Button size="sm" variant="outline" onClick={() => setRowStatus(r.id, "approved")}>
+                          <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                        </Button>
+                      )}
+                      {r.status !== "rejected" && (
+                        <Button size="sm" variant="ghost" onClick={() => setRowStatus(r.id, "rejected")}>
+                          <Ban className="h-4 w-4 mr-1 text-destructive" /> Reject
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" title="Delete permanently" onClick={() => remove(r.id, r.name)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Admin staff management (super-admin only)
+// ─────────────────────────────────────────────────────────────
+type AdminStaffRow = {
+  user_id: string;
+  email: string;
+  created_at: string;
+  perms: string[];
+};
+
+function AdminStaffTab() {
+  const qc = useQueryClient();
+  const list = useServerFn(listAdminStaff);
+  const add = useServerFn(addAdminStaff);
+  const setPerms = useServerFn(setAdminStaffPermissions);
+  const remove = useServerFn(removeAdminStaff);
+
+  const { data: staff = [], isLoading } = useQuery({
+    queryKey: ["admin-staff"],
+    queryFn: async () => ((await list()) as AdminStaffRow[]) ?? [],
+  });
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [editUser, setEditUser] = useState<AdminStaffRow | null>(null);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-staff"] });
+
+  const removeStaff = async (u: AdminStaffRow) => {
+    if (!confirm(`Remove admin access for ${u.email}?`)) return;
+    try {
+      await remove({ data: { user_id: u.user_id } });
+      toast.success("Removed");
+      invalidate();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Card className="p-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <UserCog className="h-4 w-4" />
+            <div className="font-medium">Admin staff</div>
+            <span className="text-xs text-muted-foreground">Delegate admin panel actions with granular permissions</span>
+          </div>
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add staff
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Permissions</TableHead>
+              <TableHead>Added</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && (
+              <TableRow><TableCell colSpan={4} className="py-4"><TableSkeleton rows={3} columns={4} /></TableCell></TableRow>
+            )}
+            {!isLoading && staff.length === 0 && (
+              <TableRow><TableCell colSpan={4} className="py-8">
+                <EmptyState icon={UserCog} title="No admin staff yet" description="Add staff to delegate shop approvals, library moderation, and more." />
+              </TableCell></TableRow>
+            )}
+            {staff.map((u) => (
+              <TableRow key={u.user_id}>
+                <TableCell className="font-medium">{u.email}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {u.perms.length === 0 && <span className="text-xs text-muted-foreground">No permissions</span>}
+                    {u.perms.map((p) => (
+                      <span key={p} className="text-[10px] rounded bg-muted px-1.5 py-0.5">{p}</span>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</TableCell>
+                <TableCell className="text-right">
+                  <div className="inline-flex gap-1">
+                    <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>Edit</Button>
+                    <Button size="icon" variant="ghost" title="Remove" onClick={() => removeStaff(u)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <AdminStaffDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={async (email, perms) => {
+          await add({ data: { email, perms } });
+          toast.success("Staff added");
+          invalidate();
+        }}
+      />
+      {editUser && (
+        <AdminStaffDialog
+          open
+          initialEmail={editUser.email}
+          emailLocked
+          initialPerms={editUser.perms}
+          onClose={() => setEditUser(null)}
+          onSubmit={async (_e, perms) => {
+            await setPerms({ data: { user_id: editUser.user_id, perms } });
+            toast.success("Permissions updated");
+            invalidate();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AdminStaffDialog({
+  open,
+  onClose,
+  onSubmit,
+  initialEmail = "",
+  initialPerms = [],
+  emailLocked = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (email: string, perms: string[]) => Promise<void>;
+  initialEmail?: string;
+  initialPerms?: string[];
+  emailLocked?: boolean;
+}) {
+  const [email, setEmail] = useState(initialEmail);
+  const [perms, setPerms] = useState<Set<string>>(new Set(initialPerms));
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setEmail(initialEmail);
+      setPerms(new Set(initialPerms));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const toggle = (k: string) => {
+    const n = new Set(perms);
+    if (n.has(k)) n.delete(k); else n.add(k);
+    setPerms(n);
+  };
+
+  const submit = async () => {
+    if (!email.trim()) return toast.error("Email required");
+    setBusy(true);
+    try {
+      await onSubmit(email.trim(), Array.from(perms));
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{emailLocked ? "Edit admin staff" : "Add admin staff"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Email of an existing Tillix user</Label>
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={emailLocked}
+              placeholder="staff@example.com"
+            />
+            {!emailLocked && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                The person must already have a Tillix account. Ask them to sign up first, then add them here.
+              </p>
+            )}
+          </div>
+          <div>
+            <Label className="text-xs">Permissions</Label>
+            <div className="space-y-1.5 mt-1 rounded-md border p-2">
+              {ADMIN_PERMS.map((p) => (
+                <label key={p.key} className="flex items-start gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={perms.has(p.key)}
+                    onCheckedChange={() => toggle(p.key)}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <div className="font-medium">{p.label}</div>
+                    <div className="text-[10px] text-muted-foreground font-mono">{p.key}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={submit} disabled={busy}>
+              {busy ? "Saving…" : emailLocked ? "Save permissions" : "Add staff"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
