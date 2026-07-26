@@ -942,22 +942,35 @@ function Page() {
         <DialogContent>
           <DialogHeader><DialogTitle>Transfer between accounts</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {allAccounts.length < 2 && (
+              <div className="text-xs rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-amber-700">
+                You need at least two accounts to transfer. Add one from "New account", or start using POS to auto-create buckets.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>From</Label>
                 <Select value={tfForm.from_id} onValueChange={(v) => setTfForm((f: any) => ({ ...f, from_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Source" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Source account" /></SelectTrigger>
                   <SelectContent>
-                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    {allAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}{isAutoAcc(a.id) ? " · Auto" : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>To</Label>
                 <Select value={tfForm.to_id} onValueChange={(v) => setTfForm((f: any) => ({ ...f, to_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Destination" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Destination account" /></SelectTrigger>
                   <SelectContent>
-                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    {allAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}{isAutoAcc(a.id) ? " · Auto" : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -976,6 +989,19 @@ function Page() {
               <Label>Notes</Label>
               <Textarea value={tfForm.notes} onChange={(e) => setTfForm((f: any) => ({ ...f, notes: e.target.value }))} />
             </div>
+            <div className="pt-2 border-t">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { setTfOpen(false); openSupplierPay(); }}
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                Pay a supplier instead
+              </Button>
+              <p className="text-[11px] text-muted-foreground mt-1 text-center">
+                Deducts from the chosen account and reduces the supplier's ledger balance.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTfOpen(false)}>Cancel</Button>
@@ -983,6 +1009,64 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Supplier payment dialog */}
+      <Dialog open={spOpen} onOpenChange={setSpOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Pay a supplier</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Supplier</Label>
+              <Select value={spForm.supplier_id} onValueChange={(v) => {
+                const s = (suppliersQ.data ?? []).find((x: any) => x.id === v);
+                const owed = Math.max(Number(s?.balance ?? 0), 0);
+                setSpForm((f: any) => ({ ...f, supplier_id: v, amount: f.amount || owed }));
+              }}>
+                <SelectTrigger><SelectValue placeholder="Choose supplier" /></SelectTrigger>
+                <SelectContent>
+                  {(suppliersQ.data ?? []).map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}{Number(s.balance) > 0 ? ` · owed ${fmt(Number(s.balance))}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Payment source (cash in hand, bank, wallet…)</Label>
+              <Select value={spForm.from_id} onValueChange={(v) => setSpForm((f: any) => ({ ...f, from_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Choose account" /></SelectTrigger>
+                <SelectContent>
+                  {allAccounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}{isAutoAcc(a.id) ? " · Auto" : ""} — {labelFor(a.type)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Amount</Label>
+                <Input type="number" step="0.01" value={spForm.amount} onChange={(e) => setSpForm((f: any) => ({ ...f, amount: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Input type="date" value={spForm.occurred_on} onChange={(e) => setSpForm((f: any) => ({ ...f, occurred_on: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label>Note</Label>
+              <Input value={spForm.note} onChange={(e) => setSpForm((f: any) => ({ ...f, note: e.target.value }))} placeholder="Optional reference" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSpOpen(false)}>Cancel</Button>
+            <Button onClick={saveSupplierPay}>Pay supplier</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Details dialog */}
       <Dialog open={!!details} onOpenChange={(o) => !o && setDetails(null)}>
