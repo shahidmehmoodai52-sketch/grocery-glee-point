@@ -394,8 +394,8 @@ function Page() {
 }
 
 function Kpi({
-  icon: Icon, label, value, delta, sub, tone,
-}: { icon: any; label: string; value: string; delta?: number; sub?: string; tone: string }) {
+  icon: Icon, label, value, delta, sub, tone, onClick,
+}: { icon: any; label: string; value: string; delta?: number; sub?: string; tone: string; onClick?: () => void }) {
   const ring: Record<string, string> = {
     primary: "from-primary/15 to-primary/0 text-primary",
     success: "from-success/15 to-success/0 text-success",
@@ -403,7 +403,7 @@ function Kpi({
     info: "from-chart-5/20 to-chart-5/0 text-foreground",
   };
   return (
-    <Card className="p-5 relative overflow-hidden">
+    <Card onClick={onClick} className={`p-5 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
       <div className={`absolute inset-0 bg-gradient-to-br ${ring[tone]} pointer-events-none`} />
       <div className="relative">
         <div className="flex items-center justify-between">
@@ -427,9 +427,9 @@ function Kpi({
   );
 }
 
-function Mini({ label, value, icon: Icon, accent }: { label: string; value: string; icon: any; accent?: boolean }) {
+function Mini({ label, value, icon: Icon, accent, onClick }: { label: string; value: string; icon: any; accent?: boolean; onClick?: () => void }) {
   return (
-    <Card className="p-4 flex items-center gap-3">
+    <Card onClick={onClick} className={`p-4 flex items-center gap-3 ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
       <div className={`h-9 w-9 rounded-md flex items-center justify-center ${accent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
         <Icon className="h-4 w-4" />
       </div>
