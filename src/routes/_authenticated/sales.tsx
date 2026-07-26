@@ -50,25 +50,28 @@ function Page() {
       (await supabase.from("sales").select("*, customers(name), sale_items(*)").order("created_at", { ascending: false }).limit(1000)).data ?? [],
   });
 
-  const sales = useMemo(() => {
-    return allSales.filter((s: any) => {
-      const d = new Date(s.created_at);
-      if (fromDate) {
-        const f = new Date(fromDate); f.setHours(0, 0, 0, 0);
-        if (d < f) return false;
-      }
-      if (toDate) {
-        const t = new Date(toDate); t.setHours(23, 59, 59, 999);
-        if (d > t) return false;
-      }
-      return true;
-    });
-  }, [allSales, fromDate, toDate]);
+  const { data: allReturns = [] } = useQuery({
+    queryKey: ["sale-returns-on-sales"],
+    queryFn: async () =>
+      (await supabase.from("sale_returns").select("*, customers(name), sale_return_items(*), sales(invoice_no)").order("created_at", { ascending: false }).limit(1000)).data ?? [],
+  });
 
+  const inRange = (iso: string) => {
+    const d = new Date(iso);
+    if (fromDate) { const f = new Date(fromDate); f.setHours(0, 0, 0, 0); if (d < f) return false; }
+    if (toDate) { const t = new Date(toDate); t.setHours(23, 59, 59, 999); if (d > t) return false; }
+    return true;
+  };
+
+  const sales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at)), [allSales, fromDate, toDate]);
+  const returns = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at)), [allReturns, fromDate, toDate]);
 
   const rangeTotal = sales.reduce((s: number, x: any) => s + Number(x.total), 0);
   const rangeProfit = sales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+  const rangeReturns = returns.reduce((s: number, x: any) => s + Number(x.total), 0);
+  const netRevenue = rangeTotal - rangeReturns;
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
+
 
 
   const confirmVoid = async () => {
