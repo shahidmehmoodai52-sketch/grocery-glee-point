@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { Trash2 } from "lucide-react";
 
@@ -25,6 +26,29 @@ function toLocalInputValue(iso?: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+const PAYMENT_SOURCE_PRESETS = ["Cash in hand", "Bank", "EasyPaisa", "JazzCash", "Card"];
+
+function guessAccountType(name: string) {
+  const s = name.toLowerCase();
+  if (s.includes("bank")) return "bank";
+  if (s.includes("card")) return "card";
+  if (s.includes("easy") || s.includes("jazz") || s.includes("wallet")) return "wallet";
+  return "cash";
+}
+
+function useCashAccounts() {
+  return useQuery({
+    queryKey: ["cash-accounts", "payment-dialog"],
+    queryFn: async () =>
+      (await supabase
+        .from("cash_accounts")
+        .select("id,name,type,is_active")
+        .eq("is_active", true)
+        .order("sort_order")
+        .order("name")).data ?? [],
+  });
+}
+
 export function AddPaymentDialog({
   open, onOpenChange, party, partyId, party_name, defaultAmount = 0, onDone,
 }: {
@@ -35,16 +59,55 @@ export function AddPaymentDialog({
   const qc = useQueryClient();
   const [amount, setAmount] = useState(defaultAmount);
   const [method, setMethod] = useState("cash");
+  const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  useEffect(() => { if (open) { setAmount(defaultAmount); setMethod("cash"); setNote(""); } }, [open, defaultAmount]);
+  const cashAccountsQ = useCashAccounts();
+  const cashAccounts = cashAccountsQ.data ?? [];
+  const sourceOptions = [
+    ...cashAccounts.map((a: any) => ({ id: a.id as string, name: a.name as string, preset: false })),
+    ...PAYMENT_SOURCE_PRESETS
+      .filter((p) => !cashAccounts.some((a: any) => a.name.toLowerCase() === p.toLowerCase()))
+      .map((p) => ({ id: `preset:${p}`, name: p, preset: true })),
+  ];
+
+  useEffect(() => {
+    if (open) {
+      setAmount(defaultAmount);
+      setMethod("Cash in hand");
+      setAccountId("");
+      setNote("");
+    }
+  }, [open, defaultAmount]);
+
+  const resolveAccount = async () => {
+    const selected = sourceOptions.find((a) => a.id === accountId)
+      ?? sourceOptions.find((a) => a.name.toLowerCase() === method.toLowerCase())
+      ?? sourceOptions[0];
+    if (!selected) return { id: null as string | null, name: method || "cash" };
+    if (!selected.preset) return { id: selected.id, name: selected.name };
+    const { data, error } = await supabase
+      .from("cash_accounts")
+      .insert({ name: selected.name, type: guessAccountType(selected.name), opening_balance: 0, is_active: true })
+      .select("id,name")
+      .single();
+    if (error) throw error;
+    return { id: data.id as string, name: data.name as string };
+  };
 
   const save = async () => {
     if (!amount || amount <= 0) return toast.error("Amount must be positive");
     setSaving(true);
-    const { error } = await supabase.rpc("record_payment", {
-      p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: method, p_note: note || "",
-    });
+    let error: any = null;
+    try {
+      const account = await resolveAccount();
+      const res = await supabase.rpc("record_payment", {
+        p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id,
+      });
+      error = res.error;
+    } catch (e: any) {
+      error = e;
+    }
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Payment recorded");
@@ -59,7 +122,25 @@ export function AddPaymentDialog({
         <DialogHeader><DialogTitle>Add payment{party_name ? ` — ${party_name}` : ""}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
-          <div><Label>Method</Label><Input value={method} onChange={(e) => setMethod(e.target.value)} /></div>
+          <div>
+            <Label>{party === "supplier" ? "Pay from" : "Receive in"}</Label>
+            <Select
+              value={accountId}
+              onValueChange={(value) => {
+                setAccountId(value);
+                const selected = sourceOptions.find((a) => a.id === value);
+                if (selected) setMethod(selected.name);
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Choose Cash, Bank, EasyPaisa…" /></SelectTrigger>
+              <SelectContent>
+                {sourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              This account is updated in Cash Flow and reports.
+            </p>
+          </div>
           <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
         <DialogFooter>
@@ -81,13 +162,17 @@ export function EditPaymentDialog({
   const qc = useQueryClient();
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState("cash");
+  const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
   const [when, setWhen] = useState("");
   const [saving, setSaving] = useState(false);
+  const cashAccountsQ = useCashAccounts();
+  const cashAccounts = cashAccountsQ.data ?? [];
   useEffect(() => {
     if (payment) {
       setAmount(Number(payment.amount));
       setMethod(payment.method || "cash");
+      setAccountId("");
       setNote(payment.note || "");
       setWhen(toLocalInputValue(payment.created_at));
     }
@@ -97,9 +182,11 @@ export function EditPaymentDialog({
     if (!payment) return;
     if (!amount || amount <= 0) return toast.error("Amount must be positive");
     setSaving(true);
+    const selected = cashAccounts.find((a: any) => a.id === accountId);
     const { error } = await supabase.rpc("update_party_payment", {
-      _id: payment.id, _amount: amount, _method: method, _note: note || "",
+      _id: payment.id, _amount: amount, _method: selected?.name ?? method, _note: note || "",
       _created_at: when ? new Date(when).toISOString() : payment.created_at,
+      _account_id: accountId || undefined,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -129,7 +216,22 @@ export function EditPaymentDialog({
         <div className="grid gap-3">
           <div><Label>Date & time</Label><Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
           <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
-          <div><Label>Method</Label><Input value={method} onChange={(e) => setMethod(e.target.value)} /></div>
+          <div>
+            <Label>Payment source</Label>
+            <Select
+              value={accountId}
+              onValueChange={(value) => {
+                setAccountId(value);
+                const selected = cashAccounts.find((a: any) => a.id === value);
+                if (selected) setMethod(selected.name);
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder={method || "Keep current source"} /></SelectTrigger>
+              <SelectContent>
+                {cashAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
         <DialogFooter className="justify-between sm:justify-between">
