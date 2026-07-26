@@ -33,7 +33,7 @@ type ProductForm = {
   preferred_supplier_id: string;
   batch_no: string; expiry_date: string; rack_location: string; allow_negative_stock: boolean;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: false };
+const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true };
 
 function ProductsPage() {
   const qc = useQueryClient();
