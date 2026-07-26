@@ -77,15 +77,32 @@ function Page() {
         .gte("created_at", range.from).lte("created_at", range.to)
         .order("created_at", { ascending: false })).data ?? [],
   });
+  const { data: saleReturns = [] } = useQuery({
+    queryKey: ["report-sale-returns", from, to],
+    queryFn: async () =>
+      (await supabase.from("sale_returns")
+        .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
+        .gte("created_at", range.from).lte("created_at", range.to)
+        .order("created_at", { ascending: false })).data ?? [],
+  });
 
-  // ---- aggregates
-  const revenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
-  const cogs = sales.reduce((s, x: any) => s + Number(x.cost_total), 0);
+  // ---- aggregates (net of sale returns)
+  const grossRevenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
+  const returnsSubtotal = saleReturns.reduce((s, x: any) => s + Number(x.subtotal ?? 0), 0);
+  const returnsTax = saleReturns.reduce((s, x: any) => s + Number(x.tax ?? 0), 0);
+  const returnsTotal = saleReturns.reduce((s, x: any) => s + Number(x.total ?? 0), 0);
+  const returnsRefund = saleReturns.reduce((s, x: any) => s + Number(x.refund_amount ?? 0), 0);
+  const returnsCogs = saleReturns.reduce(
+    (s, x: any) => s + (x.sale_return_items ?? []).reduce((a: number, i: any) => a + Number(i.qty) * Number(i.cost ?? 0), 0),
+    0,
+  );
+  const revenue = grossRevenue - returnsSubtotal;
+  const cogs = sales.reduce((s, x: any) => s + Number(x.cost_total), 0) - returnsCogs;
   const grossProfit = revenue - cogs;
-  const taxCollected = sales.reduce((s, x: any) => s + Number(x.tax), 0);
-  const totalSales = sales.reduce((s, x: any) => s + Number(x.total), 0);
+  const taxCollected = sales.reduce((s, x: any) => s + Number(x.tax), 0) - returnsTax;
+  const totalSales = sales.reduce((s, x: any) => s + Number(x.total), 0) - returnsTotal;
   const totalPurchases = purchases.reduce((s, x: any) => s + Number(x.total), 0);
-  const cashIn = sales.reduce((s, x: any) => s + Number(x.paid), 0);
+  const cashIn = sales.reduce((s, x: any) => s + Number(x.paid), 0) - returnsRefund;
   const creditOut = sales.filter((x: any) => x.status === "credit").reduce((s, x: any) => s + (Number(x.total) - Number(x.paid)), 0);
   const expensesPeriod = expenses.reduce((s, x: any) => s + Number(x.amount), 0);
   const netProfit = grossProfit - expensesPeriod;
