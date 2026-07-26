@@ -130,12 +130,206 @@ function Page() {
     },
   });
 
+  // --- Auto-derived cash movements from POS / purchases / expenses / party payments ---
+  const salesQ = useQuery({
+    queryKey: ["cf-sales"],
+    queryFn: async () => (await supabase.from("sales")
+      .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const saleReturnsQ = useQuery({
+    queryKey: ["cf-sale-returns"],
+    queryFn: async () => (await supabase.from("sale_returns")
+      .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const purchasesQ = useQuery({
+    queryKey: ["cf-purchases"],
+    queryFn: async () => (await supabase.from("purchases")
+      .select("id,invoice_no,total,paid,status,created_at,suppliers(name)")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const purchaseReturnsQ = useQuery({
+    queryKey: ["cf-purchase-returns"],
+    queryFn: async () => (await supabase.from("purchase_returns")
+      .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const expensesQ = useQuery({
+    queryKey: ["cf-expenses"],
+    queryFn: async () => (await supabase.from("expenses")
+      .select("id,amount,method,category,description,expense_date,created_at")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const partyPaymentsQ = useQuery({
+    queryKey: ["cf-party-payments"],
+    queryFn: async () => (await supabase.from("party_payments")
+      .select("id,party_type,party_id,amount,method,note,created_at")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+
   const accounts = accountsQ.data ?? [];
-  const txs = txQ.data ?? [];
+  const rawTxs = txQ.data ?? [];
+
+  // Resolve a payment-method string to an existing account, else a virtual bucket id
+  const methodBuckets = useMemo(() => {
+    const norm = (s: string) => (s || "").toLowerCase().trim();
+    const typeGuess = (m: string): string => {
+      const s = norm(m);
+      if (!s || s === "cash") return "cash";
+      if (s.includes("card")) return "card";
+      if (s.includes("bank") || s.includes("online") || s.includes("transfer") || s.includes("cheque") || s.includes("check")) return "bank";
+      if (s.includes("easy") || s.includes("jazz") || s.includes("wallet") || s.includes("upi") || s.includes("mobile")) return "mobile_wallet";
+      return "other";
+    };
+    const resolve = (method: string): { id: string; name: string; type: string; auto: boolean } => {
+      const m = norm(method) || "cash";
+      // exact name match
+      const byName = accounts.find(a => norm(a.name) === m);
+      if (byName) return { id: byName.id, name: byName.name, type: byName.type, auto: false };
+      // type match — take first active of guessed type
+      const t = typeGuess(m);
+      const byType = accounts.find(a => a.type === t && a.is_active);
+      if (byType) return { id: byType.id, name: byType.name, type: byType.type, auto: false };
+      // virtual bucket
+      const pretty = m.charAt(0).toUpperCase() + m.slice(1);
+      return { id: `auto:${m}`, name: `${pretty} (auto)`, type: t, auto: true };
+    };
+    return { resolve, typeGuess };
+  }, [accounts]);
+
+  const autoTxs = useMemo<Tx[]>(() => {
+    const out: Tx[] = [];
+    const dateOf = (iso: string) => (iso || "").slice(0, 10);
+
+    // Sales — cash inflow of paid amount (skip voided; skip credit-only with 0 paid)
+    for (const s of (salesQ.data ?? []) as any[]) {
+      if (s.status === "voided") continue;
+      const paid = Number(s.paid) || 0;
+      if (paid <= 0) continue;
+      const method = s.payment_method === "credit" ? "cash" : (s.payment_method || "cash");
+      const acc = methodBuckets.resolve(method);
+      out.push({
+        id: `auto:sale:${s.id}`,
+        account_id: acc.id,
+        direction: "in",
+        amount: paid,
+        occurred_on: dateOf(s.created_at),
+        category: "sale",
+        reference: s.invoice_no ? `Invoice ${s.invoice_no}` : null,
+        notes: `${s.customers?.name ?? "Walk-in"} · ${s.payment_method}`,
+        transfer_group_id: null,
+        created_at: s.created_at,
+      });
+    }
+    // Sale returns — cash out
+    for (const r of (saleReturnsQ.data ?? []) as any[]) {
+      const amt = Number(r.refund_amount) || 0;
+      if (amt <= 0) continue;
+      const acc = methodBuckets.resolve(r.refund_method || "cash");
+      out.push({
+        id: `auto:sret:${r.id}`,
+        account_id: acc.id, direction: "out", amount: amt,
+        occurred_on: dateOf(r.created_at), category: "sale_return",
+        reference: r.return_no ? `Return ${r.return_no}` : null,
+        notes: `${r.customers?.name ?? "Walk-in"} refund`,
+        transfer_group_id: null, created_at: r.created_at,
+      });
+    }
+    // Purchases — cash out (paid portion; no method column → cash bucket)
+    for (const p of (purchasesQ.data ?? []) as any[]) {
+      const paid = Number(p.paid) || 0;
+      if (paid <= 0) continue;
+      const acc = methodBuckets.resolve("cash");
+      out.push({
+        id: `auto:pur:${p.id}`,
+        account_id: acc.id, direction: "out", amount: paid,
+        occurred_on: dateOf(p.created_at), category: "purchase",
+        reference: p.invoice_no ? `Purchase ${p.invoice_no}` : null,
+        notes: `${p.suppliers?.name ?? "Supplier"}`,
+        transfer_group_id: null, created_at: p.created_at,
+      });
+    }
+    // Purchase returns — cash in
+    for (const r of (purchaseReturnsQ.data ?? []) as any[]) {
+      const amt = Number(r.refund_amount) || 0;
+      if (amt <= 0) continue;
+      const acc = methodBuckets.resolve(r.refund_method || "cash");
+      out.push({
+        id: `auto:pret:${r.id}`,
+        account_id: acc.id, direction: "in", amount: amt,
+        occurred_on: dateOf(r.created_at), category: "purchase_return",
+        reference: r.return_no ? `Return ${r.return_no}` : null,
+        notes: `${r.suppliers?.name ?? "Supplier"} refund`,
+        transfer_group_id: null, created_at: r.created_at,
+      });
+    }
+    // Expenses — cash out
+    for (const e of (expensesQ.data ?? []) as any[]) {
+      const amt = Number(e.amount) || 0;
+      if (amt <= 0) continue;
+      const acc = methodBuckets.resolve(e.method || "cash");
+      out.push({
+        id: `auto:exp:${e.id}`,
+        account_id: acc.id, direction: "out", amount: amt,
+        occurred_on: dateOf(e.expense_date || e.created_at), category: "expense",
+        reference: e.category || null,
+        notes: e.description || null,
+        transfer_group_id: null, created_at: e.created_at,
+      });
+    }
+    // Party payments — customer=in, supplier=out
+    for (const pp of (partyPaymentsQ.data ?? []) as any[]) {
+      const amt = Number(pp.amount) || 0;
+      if (amt <= 0) continue;
+      const acc = methodBuckets.resolve(pp.method || "cash");
+      const isCustomer = pp.party_type === "customer";
+      out.push({
+        id: `auto:pp:${pp.id}`,
+        account_id: acc.id,
+        direction: isCustomer ? "in" : "out",
+        amount: amt,
+        occurred_on: dateOf(pp.created_at),
+        category: isCustomer ? "customer_payment" : "supplier_payment",
+        reference: null,
+        notes: pp.note || null,
+        transfer_group_id: null, created_at: pp.created_at,
+      });
+    }
+    return out;
+  }, [salesQ.data, saleReturnsQ.data, purchasesQ.data, purchaseReturnsQ.data, expensesQ.data, partyPaymentsQ.data, methodBuckets]);
+
+  // Virtual accounts referenced by autoTxs but not present in real accounts
+  const virtualAccounts = useMemo<Account[]>(() => {
+    const realIds = new Set(accounts.map(a => a.id));
+    const seen = new Map<string, Account>();
+    for (const t of autoTxs) {
+      if (realIds.has(t.account_id) || seen.has(t.account_id)) continue;
+      const parts = t.account_id.split(":");
+      const method = parts[1] || "cash";
+      const type = methodBuckets.typeGuess(method);
+      const pretty = method.charAt(0).toUpperCase() + method.slice(1);
+      seen.set(t.account_id, {
+        id: t.account_id,
+        name: `${pretty} (auto)`,
+        type,
+        opening_balance: 0,
+        notes: "Auto bucket — create a matching account to customize.",
+        is_active: true,
+        sort_order: 9999,
+      });
+    }
+    return Array.from(seen.values());
+  }, [autoTxs, accounts, methodBuckets]);
+
+  const allAccounts = useMemo(() => [...accounts, ...virtualAccounts], [accounts, virtualAccounts]);
+  const txs = useMemo(() => [...rawTxs, ...autoTxs], [rawTxs, autoTxs]);
+  const isAutoTx = (id: string) => id.startsWith("auto:");
+  const isAutoAcc = (id: string) => id.startsWith("auto:");
 
   const balances = useMemo(() => {
     const map = new Map<string, { inSum: number; outSum: number }>();
-    for (const a of accounts) map.set(a.id, { inSum: 0, outSum: 0 });
+    for (const a of allAccounts) map.set(a.id, { inSum: 0, outSum: 0 });
     for (const t of txs) {
       const b = map.get(t.account_id);
       if (!b) continue;
@@ -143,17 +337,36 @@ function Page() {
       else b.outSum += Number(t.amount);
     }
     return map;
-  }, [accounts, txs]);
+  }, [allAccounts, txs]);
 
   const totals = useMemo(() => {
     let opening = 0, inSum = 0, outSum = 0;
-    for (const a of accounts) {
+    for (const a of allAccounts) {
       opening += Number(a.opening_balance);
       const b = balances.get(a.id);
       if (b) { inSum += b.inSum; outSum += b.outSum; }
     }
     return { opening, inSum, outSum, balance: opening + inSum - outSum };
-  }, [accounts, balances]);
+  }, [allAccounts, balances]);
+
+  // Receivables (credit sales unpaid) / Payables (purchases unpaid)
+  const receivables = useMemo(() => {
+    let sum = 0;
+    for (const s of (salesQ.data ?? []) as any[]) {
+      if (s.status === "voided") continue;
+      const due = Number(s.total) - Number(s.paid);
+      if (due > 0.001) sum += due;
+    }
+    return sum;
+  }, [salesQ.data]);
+  const payables = useMemo(() => {
+    let sum = 0;
+    for (const p of (purchasesQ.data ?? []) as any[]) {
+      const due = Number(p.total) - Number(p.paid);
+      if (due > 0.001) sum += due;
+    }
+    return sum;
+  }, [purchasesQ.data]);
 
   const filteredTx = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -166,8 +379,9 @@ function Page() {
         if (!hay.includes(term)) return false;
       }
       return true;
-    });
+    }).sort((a, b) => (b.occurred_on > a.occurred_on ? 1 : b.occurred_on < a.occurred_on ? -1 : (b.created_at > a.created_at ? 1 : -1)));
   }, [txs, search, dateFrom, dateTo, filterAcc]);
+
 
   const openAccCreate = () => { setEditingAccId(null); setAccForm({ ...emptyAcc }); setAccOpen(true); };
   const openAccEdit = (a: Account) => {
@@ -262,12 +476,12 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
   };
 
-  const accById = (id: string) => accounts.find((a) => a.id === id);
+  const accById = (id: string) => allAccounts.find((a) => a.id === id);
   const fmt = (n: number) => fmtMoney(n, sym);
 
   const reportRows = useMemo(() => {
     // In current filter window, per-account totals
-    return accounts.map((a) => {
+    return allAccounts.map((a) => {
       let inSum = 0, outSum = 0;
       for (const t of filteredTx) {
         if (t.account_id !== a.id) continue;
@@ -316,9 +530,9 @@ function Page() {
           onClick={() => setDetails({ kind: "in" })}
           className="p-4 cursor-pointer hover:shadow-md hover:border-emerald-500/40 transition"
         >
-          <div className="text-xs text-muted-foreground">Total received</div>
+          <div className="text-xs text-muted-foreground">Total received (POS + manual)</div>
           <div className="text-2xl font-bold mt-1 text-emerald-600">{fmt(totals.inSum)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Click to see every payment received</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Sales, customer payments & manual receipts</div>
         </Card>
         <Card
           role="button"
@@ -328,7 +542,7 @@ function Page() {
         >
           <div className="text-xs text-muted-foreground">Total paid out</div>
           <div className="text-2xl font-bold mt-1 text-rose-600">{fmt(totals.outSum)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Click to see every payment sent</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Purchases, expenses, supplier payments & refunds</div>
         </Card>
         <Card
           role="button"
@@ -340,7 +554,28 @@ function Page() {
           <div className="text-2xl font-bold mt-1">{fmt(totals.balance)}</div>
           <div className="text-[11px] text-muted-foreground mt-1">Click to see per-account balance</div>
         </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Receivables (credit sales unpaid)</div>
+          <div className="text-2xl font-bold mt-1 text-amber-600">{fmt(receivables)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Money customers owe you</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Payables (purchases unpaid)</div>
+          <div className="text-2xl font-bold mt-1 text-amber-600">{fmt(payables)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Money you owe suppliers</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Net position</div>
+          <div className="text-2xl font-bold mt-1">{fmt(totals.balance + receivables - payables)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Cash + receivables − payables</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Auto-synced from POS</div>
+          <div className="text-2xl font-bold mt-1">{autoTxs.length}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Sales, returns, purchases, expenses & party payments</div>
+        </Card>
       </div>
+
 
       <Tabs defaultValue="accounts" className="w-full">
         <TabsList>
@@ -351,16 +586,17 @@ function Page() {
 
         {/* Accounts */}
         <TabsContent value="accounts" className="mt-4">
-          {accounts.length === 0 ? (
+          {allAccounts.length === 0 ? (
             <Card className="p-8 text-center text-muted-foreground">
               No accounts yet. Add your Till, Bank, Card terminal, EasyPaisa or JazzCash to get started.
             </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {accounts.map((a) => {
+              {allAccounts.map((a) => {
                 const Icon = iconFor(a.type);
                 const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
                 const bal = Number(a.opening_balance) + b.inSum - b.outSum;
+                const auto = isAutoAcc(a.id);
                 return (
                   <Card
                     key={a.id}
@@ -379,7 +615,7 @@ function Page() {
                           <div className="text-xs text-muted-foreground">{labelFor(a.type)}</div>
                         </div>
                       </div>
-                      {!a.is_active && <Badge variant="secondary">Inactive</Badge>}
+                      {auto ? <Badge variant="outline">Auto</Badge> : !a.is_active && <Badge variant="secondary">Inactive</Badge>}
                     </div>
                     <div className="mt-3 text-2xl font-bold">{fmt(bal)}</div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -387,7 +623,7 @@ function Page() {
                       <span className="text-emerald-600">In {fmt(b.inSum)}</span>
                       <span className="text-rose-600">Out {fmt(b.outSum)}</span>
                     </div>
-                    {isAdmin && (
+                    {isAdmin && !auto && (
                       <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button size="sm" variant="secondary" onClick={() => openTxCreate("in", a.id)}>Receive</Button>
                         <Button size="sm" variant="outline" onClick={() => openTxCreate("out", a.id)}>Pay</Button>
@@ -395,12 +631,16 @@ function Page() {
                         <Button size="sm" variant="ghost" onClick={() => deleteAcc(a.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                       </div>
                     )}
+                    {auto && (
+                      <div className="mt-3 text-[11px] text-muted-foreground">Auto bucket from POS. Create a matching account (same name/type) to customize opening balance.</div>
+                    )}
                   </Card>
                 );
               })}
             </div>
           )}
         </TabsContent>
+
 
         {/* Transactions */}
         <TabsContent value="transactions" className="mt-4 space-y-3">
@@ -415,7 +655,7 @@ function Page() {
                 <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All accounts</SelectItem>
-                  {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  {allAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}{isAutoAcc(a.id) ? " · Auto" : ""}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -447,11 +687,15 @@ function Page() {
                 )}
                 {filteredTx.map((t) => {
                   const acc = accById(t.account_id);
+                  const auto = isAutoTx(t.id);
                   return (
                     <TableRow key={t.id}>
                       <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
                       <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>
-                      <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
+                      <TableCell className="capitalize">
+                        {t.category.replace(/_/g, " ")}
+                        {auto && <Badge variant="outline" className="ml-2 text-[10px]">Auto</Badge>}
+                      </TableCell>
                       <TableCell className="max-w-[300px] truncate">
                         {t.reference && <span className="font-medium">{t.reference}</span>}
                         {t.reference && t.notes && <span> — </span>}
@@ -461,10 +705,14 @@ function Page() {
                       <TableCell className="text-right text-rose-600">{t.direction === "out" ? fmt(Number(t.amount)) : ""}</TableCell>
                       {isAdmin && (
                         <TableCell>
-                          <div className="flex gap-1">
-                            <Button size="icon" variant="ghost" onClick={() => openTxEdit(t)}><Pencil className="h-4 w-4" /></Button>
-                            <Button size="icon" variant="ghost" onClick={() => deleteTx(t.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
-                          </div>
+                          {!auto ? (
+                            <div className="flex gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => openTxEdit(t)}><Pencil className="h-4 w-4" /></Button>
+                              <Button size="icon" variant="ghost" onClick={() => deleteTx(t.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">from POS</span>
+                          )}
                         </TableCell>
                       )}
                     </TableRow>
@@ -697,7 +945,7 @@ function Page() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {accounts.map((a) => {
+                        {allAccounts.map((a) => {
                           const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
                           const bal = Number(a.opening_balance) + b.inSum - b.outSum;
                           return (
