@@ -356,12 +356,39 @@ function Page() {
 
       {/* Period summary footer */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Mini label="Revenue 30d" value={fmtMoney(rev30, sym)} icon={TrendingUp} />
-        <Mini label="Profit 30d" value={fmtMoney(profit30, sym)} icon={Wallet} accent />
-        <Mini label="Purchases today" value={fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} icon={TrendingDown} accent />
-        <Mini label="Purchases 30d" value={fmtMoney(purch30, sym)} icon={TrendingDown} />
-        <Mini label="Invoices 30d" value={String(sales.length)} icon={Users} />
+        <Mini onClick={() => setDetailKey("rev-30")} label="Revenue 30d" value={fmtMoney(rev30, sym)} icon={TrendingUp} />
+        <Mini onClick={() => setDetailKey("profit-30")} label="Profit 30d" value={fmtMoney(profit30, sym)} icon={Wallet} accent />
+        <Mini onClick={() => setDetailKey("purch-today")} label="Purchases today" value={fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} icon={TrendingDown} accent />
+        <Mini onClick={() => setDetailKey("purch-30")} label="Purchases 30d" value={fmtMoney(purch30, sym)} icon={TrendingDown} />
+        <Mini onClick={() => setDetailKey("invoices-30")} label="Invoices 30d" value={String(sales.length)} icon={Users} />
       </div>
+
+      <Dialog open={!!detailKey} onOpenChange={(o) => !o && setDetailKey(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{detail?.title}</DialogTitle>
+            <DialogDescription>Total: <span className="font-semibold text-foreground">{detail?.total}</span> · {detail?.rows.length ?? 0} record(s)</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto border rounded-md">
+            {detail && detail.rows.length > 0 ? (
+              <table className="w-full text-sm">
+                <thead className="bg-muted sticky top-0">
+                  <tr>{detail.cols.map((c) => <th key={c} className="text-left px-3 py-2 font-medium">{c}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {detail.rows.map((r, i) => (
+                    <tr key={i} className="border-t">
+                      {r.map((cell, j) => <td key={j} className="px-3 py-2">{cell}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-8 text-center text-sm text-muted-foreground">No records</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
