@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Printer, Undo2, Ban, CalendarIcon } from "lucide-react";
+import { Eye, Printer, Undo2, Ban, CalendarIcon, ArrowUpRight, ArrowDownRight, Receipt as ReceiptIcon, Wallet, TrendingUp, TrendingDown } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { format } from "date-fns";
