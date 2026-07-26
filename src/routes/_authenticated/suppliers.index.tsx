@@ -46,7 +46,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", balance: 0 });
   const [payOpen, setPayOpen] = useState<any>(null);
-  const [pay, setPay] = useState({ amount: 0, method: "cash", note: "", account_id: "" });
+  const [pay, setPay] = useState({ amount: 0, method: "Cash in hand", note: "", account_id: "" });
   const [search, setSearch] = useState("");
   const [editRow, setEditRow] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", address: "", opening_balance: 0 });
@@ -137,7 +137,7 @@ function Page() {
     toast.success("Payment sent");
 
     setPayOpen(null);
-    setPay({ amount: 0, method: "cash", note: "", account_id: "" });
+    setPay({ amount: 0, method: "Cash in hand", note: "", account_id: "" });
     qc.invalidateQueries();
   };
 
@@ -235,7 +235,7 @@ function Page() {
                       <Button size="sm" variant="ghost" asChild>
                         <Link to="/suppliers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "", account_id: "" }); }}>
+                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "Cash in hand", note: "", account_id: "" }); }}>
                         <HandCoins className="h-3.5 w-3.5 mr-1" />Pay
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title="Edit supplier">
