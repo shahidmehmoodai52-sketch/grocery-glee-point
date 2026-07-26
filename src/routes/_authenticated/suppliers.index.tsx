@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,7 +46,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", balance: 0 });
   const [payOpen, setPayOpen] = useState<any>(null);
-  const [pay, setPay] = useState({ amount: 0, method: "cash", note: "" });
+  const [pay, setPay] = useState({ amount: 0, method: "cash", note: "", account_id: "" });
   const [search, setSearch] = useState("");
   const [editRow, setEditRow] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", address: "", opening_balance: 0 });
@@ -78,6 +79,11 @@ function Page() {
       async () => (await db().suppliers.orderBy("name").toArray()) as any[],
       cacheSuppliers,
     ),
+  });
+
+  const { data: cashAccounts = [] } = useQuery({
+    queryKey: ["cash-accounts", "supplier-pay"],
+    queryFn: async () => (await supabase.from("cash_accounts").select("id,name,type,is_active").eq("is_active", true).order("sort_order").order("name")).data ?? [],
   });
 
   const filtered = useMemo(() => {
@@ -114,15 +120,17 @@ function Page() {
 
   const recordPayment = async () => {
     if (!payOpen || pay.amount <= 0) return;
+    const acc = (cashAccounts as any[]).find((a) => a.id === pay.account_id);
+    const method = acc ? acc.name : (pay.method || "cash");
     const { error } = await supabase.rpc("record_payment", {
-      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
+      p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: method, p_note: pay.note,
     });
     if (error) return toast.error(error.message);
     toast.success("Payment sent");
 
     setPayOpen(null);
-    setPay({ amount: 0, method: "cash", note: "" });
-    qc.invalidateQueries({ queryKey: ["suppliers"] });
+    setPay({ amount: 0, method: "cash", note: "", account_id: "" });
+    qc.invalidateQueries();
   };
 
   return (
@@ -219,7 +227,7 @@ function Page() {
                       <Button size="sm" variant="ghost" asChild>
                         <Link to="/suppliers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "" }); }}>
+                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "", account_id: "" }); }}>
                         <HandCoins className="h-3.5 w-3.5 mr-1" />Pay
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title="Edit supplier">
@@ -239,7 +247,22 @@ function Page() {
           <DialogHeader><DialogTitle>Pay supplier — {payOpen?.name}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Amount</Label><Input type="number" step="0.01" value={pay.amount || ""} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></div>
-            <div><Label>Method</Label><Input value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })} /></div>
+            <div>
+              <Label>Payment source (cash in hand, bank, wallet…)</Label>
+              <Select value={pay.account_id} onValueChange={(v) => {
+                const acc = (cashAccounts as any[]).find((a) => a.id === v);
+                setPay({ ...pay, account_id: v, method: acc?.name ?? pay.method });
+              }}>
+                <SelectTrigger><SelectValue placeholder={cashAccounts.length ? "Choose account" : "No cash accounts — add one in Cash Flow"} /></SelectTrigger>
+                <SelectContent>
+                  {(cashAccounts as any[]).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground mt-1">Deducts from this account in Cash Flow.</p>
+            </div>
+            <div><Label>Method label (optional)</Label><Input value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })} placeholder="cash / bank / easypaisa…" /></div>
             <div><Label>Note</Label><Input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
           </div>
           <DialogFooter>

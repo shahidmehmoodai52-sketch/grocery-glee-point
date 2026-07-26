@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Wallet, Banknote, CreditCard, Smartphone,
-  Building2, ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Search, Coins,
+  Building2, ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Search, Coins, Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,7 @@ const emptyAcc = { name: "", type: "cash", opening_balance: 0, notes: "", is_act
 const today = () => new Date().toISOString().slice(0, 10);
 const emptyTx = { account_id: "", direction: "in" as "in" | "out", amount: 0, occurred_on: today(), category: "other", reference: "", notes: "" };
 const emptyTransfer = { from_id: "", to_id: "", amount: 0, occurred_on: today(), notes: "" };
+const emptySupplierPay = { supplier_id: "", from_id: "", amount: 0, occurred_on: today(), note: "" };
 
 function Page() {
   const qc = useQueryClient();
@@ -91,6 +92,9 @@ function Page() {
 
   const [tfOpen, setTfOpen] = useState(false);
   const [tfForm, setTfForm] = useState<any>({ ...emptyTransfer });
+
+  const [spOpen, setSpOpen] = useState(false);
+  const [spForm, setSpForm] = useState<any>({ ...emptySupplierPay });
 
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -166,6 +170,10 @@ function Page() {
     queryFn: async () => (await supabase.from("party_payments")
       .select("id,party_type,party_id,amount,method,note,created_at")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const suppliersQ = useQuery({
+    queryKey: ["cf-suppliers"],
+    queryFn: async () => (await supabase.from("suppliers").select("id,name,balance").order("name")).data ?? [],
   });
 
   const accounts = accountsQ.data ?? [];
@@ -459,21 +467,74 @@ function Page() {
   };
 
   const openTransfer = () => { setTfForm({ ...emptyTransfer }); setTfOpen(true); };
+  const openSupplierPay = () => { setSpForm({ ...emptySupplierPay }); setSpOpen(true); };
+
+  // Turn an "auto:<method>" bucket into a real cash_accounts row so it can be referenced by FK
+  const materializeAccount = async (id: string): Promise<{ id: string; name: string } | null> => {
+    if (!id) return null;
+    if (!id.startsWith("auto:")) {
+      const a = accounts.find(x => x.id === id);
+      return a ? { id: a.id, name: a.name } : null;
+    }
+    const method = id.slice(5);
+    const type = methodBuckets.typeGuess(method);
+    const name = method.charAt(0).toUpperCase() + method.slice(1);
+    const existing = accounts.find(a => a.name.toLowerCase() === name.toLowerCase());
+    if (existing) return { id: existing.id, name: existing.name };
+    const { data, error } = await supabase.from("cash_accounts")
+      .insert({ name, type, opening_balance: 0, is_active: true, notes: "Auto-created from POS bucket" })
+      .select("id,name").single();
+    if (error) throw error;
+    await qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    return { id: data.id as string, name: data.name as string };
+  };
+
   const saveTransfer = async () => {
     if (!tfForm.from_id || !tfForm.to_id) { toast.error("Pick both accounts"); return; }
     if (tfForm.from_id === tfForm.to_id) { toast.error("Choose two different accounts"); return; }
     const amt = Number(tfForm.amount);
     if (!amt || amt <= 0) { toast.error("Amount must be greater than zero"); return; }
-    const groupId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    const rows = [
-      { account_id: tfForm.from_id, direction: "out", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
-      { account_id: tfForm.to_id, direction: "in", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
-    ];
-    const { error } = await supabase.from("cash_transactions").insert(rows);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Transfer recorded");
-    setTfOpen(false);
-    qc.invalidateQueries({ queryKey: ["cash-transactions"] });
+    try {
+      const from = await materializeAccount(tfForm.from_id);
+      const to = await materializeAccount(tfForm.to_id);
+      if (!from || !to) { toast.error("Could not resolve accounts"); return; }
+      const groupId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+      const rows = [
+        { account_id: from.id, direction: "out", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
+        { account_id: to.id, direction: "in", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
+      ];
+      const { error } = await supabase.from("cash_transactions").insert(rows);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Transfer recorded");
+      setTfOpen(false);
+      qc.invalidateQueries({ queryKey: ["cash-transactions"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Transfer failed");
+    }
+  };
+
+  const saveSupplierPay = async () => {
+    if (!spForm.supplier_id) { toast.error("Choose a supplier"); return; }
+    if (!spForm.from_id) { toast.error("Choose a payment source account"); return; }
+    const amt = Number(spForm.amount);
+    if (!amt || amt <= 0) { toast.error("Amount must be greater than zero"); return; }
+    try {
+      const from = await materializeAccount(spForm.from_id);
+      if (!from) { toast.error("Could not resolve source account"); return; }
+      const { error } = await supabase.rpc("record_payment", {
+        p_party_type: "supplier",
+        p_party_id: spForm.supplier_id,
+        p_amount: amt,
+        p_method: from.name,
+        p_note: spForm.note || "",
+      });
+      if (error) { toast.error(error.message); return; }
+      toast.success("Supplier paid");
+      setSpOpen(false);
+      qc.invalidateQueries();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Payment failed");
+    }
   };
 
   const accById = (id: string) => allAccounts.find((a) => a.id === id);
@@ -505,6 +566,7 @@ function Page() {
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={openTransfer}><ArrowLeftRight className="h-4 w-4 mr-2" />Transfer</Button>
+            <Button variant="outline" onClick={openSupplierPay}><Truck className="h-4 w-4 mr-2" />Pay supplier</Button>
             <Button variant="outline" onClick={() => openTxCreate("out")}><ArrowUpCircle className="h-4 w-4 mr-2" />Pay out</Button>
             <Button onClick={() => openTxCreate("in")}><ArrowDownCircle className="h-4 w-4 mr-2" />Receive</Button>
             <Button variant="secondary" onClick={openAccCreate}><Plus className="h-4 w-4 mr-2" />New account</Button>
@@ -880,22 +942,35 @@ function Page() {
         <DialogContent>
           <DialogHeader><DialogTitle>Transfer between accounts</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {allAccounts.length < 2 && (
+              <div className="text-xs rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-amber-700">
+                You need at least two accounts to transfer. Add one from "New account", or start using POS to auto-create buckets.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>From</Label>
                 <Select value={tfForm.from_id} onValueChange={(v) => setTfForm((f: any) => ({ ...f, from_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Source" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Source account" /></SelectTrigger>
                   <SelectContent>
-                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    {allAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}{isAutoAcc(a.id) ? " · Auto" : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>To</Label>
                 <Select value={tfForm.to_id} onValueChange={(v) => setTfForm((f: any) => ({ ...f, to_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Destination" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Destination account" /></SelectTrigger>
                   <SelectContent>
-                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    {allAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}{isAutoAcc(a.id) ? " · Auto" : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -914,6 +989,19 @@ function Page() {
               <Label>Notes</Label>
               <Textarea value={tfForm.notes} onChange={(e) => setTfForm((f: any) => ({ ...f, notes: e.target.value }))} />
             </div>
+            <div className="pt-2 border-t">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { setTfOpen(false); openSupplierPay(); }}
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                Pay a supplier instead
+              </Button>
+              <p className="text-[11px] text-muted-foreground mt-1 text-center">
+                Deducts from the chosen account and reduces the supplier's ledger balance.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTfOpen(false)}>Cancel</Button>
@@ -921,6 +1009,64 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Supplier payment dialog */}
+      <Dialog open={spOpen} onOpenChange={setSpOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Pay a supplier</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Supplier</Label>
+              <Select value={spForm.supplier_id} onValueChange={(v) => {
+                const s = (suppliersQ.data ?? []).find((x: any) => x.id === v);
+                const owed = Math.max(Number(s?.balance ?? 0), 0);
+                setSpForm((f: any) => ({ ...f, supplier_id: v, amount: f.amount || owed }));
+              }}>
+                <SelectTrigger><SelectValue placeholder="Choose supplier" /></SelectTrigger>
+                <SelectContent>
+                  {(suppliersQ.data ?? []).map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}{Number(s.balance) > 0 ? ` · owed ${fmt(Number(s.balance))}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Payment source (cash in hand, bank, wallet…)</Label>
+              <Select value={spForm.from_id} onValueChange={(v) => setSpForm((f: any) => ({ ...f, from_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Choose account" /></SelectTrigger>
+                <SelectContent>
+                  {allAccounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}{isAutoAcc(a.id) ? " · Auto" : ""} — {labelFor(a.type)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Amount</Label>
+                <Input type="number" step="0.01" value={spForm.amount} onChange={(e) => setSpForm((f: any) => ({ ...f, amount: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Input type="date" value={spForm.occurred_on} onChange={(e) => setSpForm((f: any) => ({ ...f, occurred_on: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label>Note</Label>
+              <Input value={spForm.note} onChange={(e) => setSpForm((f: any) => ({ ...f, note: e.target.value }))} placeholder="Optional reference" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSpOpen(false)}>Cancel</Button>
+            <Button onClick={saveSupplierPay}>Pay supplier</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Details dialog */}
       <Dialog open={!!details} onOpenChange={(o) => !o && setDetails(null)}>
