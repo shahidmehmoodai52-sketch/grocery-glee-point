@@ -362,7 +362,13 @@ function Page() {
                 const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
                 const bal = Number(a.opening_balance) + b.inSum - b.outSum;
                 return (
-                  <Card key={a.id} className="p-4">
+                  <Card
+                    key={a.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetails({ kind: "account", accountId: a.id })}
+                    className="p-4 cursor-pointer hover:shadow-md hover:border-primary/40 transition"
+                  >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
                         <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
@@ -382,7 +388,7 @@ function Page() {
                       <span className="text-rose-600">Out {fmt(b.outSum)}</span>
                     </div>
                     {isAdmin && (
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button size="sm" variant="secondary" onClick={() => openTxCreate("in", a.id)}>Receive</Button>
                         <Button size="sm" variant="outline" onClick={() => openTxCreate("out", a.id)}>Pay</Button>
                         <Button size="sm" variant="ghost" onClick={() => openAccEdit(a)}><Pencil className="h-4 w-4" /></Button>
