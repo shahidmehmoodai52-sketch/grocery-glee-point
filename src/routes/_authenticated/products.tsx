@@ -153,6 +153,10 @@ function ProductsPage() {
       stock: Number(p.stock), tax_rate: Number(p.tax_rate), is_active: p.is_active,
       low_stock_threshold: Number(p.low_stock_threshold ?? 5),
       preferred_supplier_id: p.preferred_supplier_id ?? "",
+      batch_no: p.batch_no ?? "",
+      expiry_date: p.expiry_date ?? "",
+      rack_location: p.rack_location ?? "",
+      allow_negative_stock: !!p.allow_negative_stock,
     });
     setOpen(true);
   };
