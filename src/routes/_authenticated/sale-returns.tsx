@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Eye, Printer, Undo2 } from "lucide-react";
+import { Plus, Trash2, Eye, Printer, Undo2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
@@ -15,11 +16,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { Receipt, printReceipt } from "@/components/receipt";
-import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/sale-returns")({ component: Page });
 
-type Line = { product_id: string | null; name: string; qty: number; price: number };
+type ItemRow = {
+  product_id: string | null;
+  name: string;
+  qty: number;      // return qty
+  price: number;
+  max?: number;     // original sold qty (when from an invoice)
+  selected: boolean;
+};
 
 function Page() {
   const qc = useQueryClient();
@@ -28,8 +35,9 @@ function Page() {
 
   const [open, setOpen] = useState(false);
   const [saleId, setSaleId] = useState<string>("none");
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [customer, setCustomer] = useState<string>("none");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [items, setItems] = useState<ItemRow[]>([]);
   const [tax, setTax] = useState(0);
   const [refund, setRefund] = useState(0);
   const [method, setMethod] = useState("cash");
@@ -44,55 +52,78 @@ function Page() {
   const { data: sales = [] } = useQuery({
     queryKey: ["sales-for-return"],
     queryFn: async () =>
-      (await supabase.from("sales").select("id,invoice_no,customer_id,total,created_at,sale_items(*)").order("created_at", { ascending: false }).limit(100)).data ?? [],
+      (await supabase.from("sales").select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
   });
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
     queryFn: async () => (await supabase.from("customers").select("id,name").order("name")).data ?? [],
   });
-  const { data: products = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,sell_price").order("name").range(from, to)),
-  });
 
-  // Auto-load lines from selected sale
+  // Load items from selected invoice — pre-checked, editable qty capped at sold qty
   useEffect(() => {
-    if (saleId === "none") return;
+    if (saleId === "none") {
+      setItems([]);
+      return;
+    }
     const s = sales.find((x: any) => x.id === saleId);
     if (!s) return;
     setCustomer(s.customer_id ?? "none");
-    setLines(
+    setItems(
       (s.sale_items ?? []).map((it: any) => ({
         product_id: it.product_id,
         name: it.name,
         qty: Number(it.qty),
         price: Number(it.price),
+        max: Number(it.qty),
+        selected: true,
       })),
     );
   }, [saleId, sales]);
 
-  const subtotal = useMemo(() => lines.reduce((s, l) => s + l.qty * l.price, 0), [lines]);
+  // Auto-refund the full selected total when items/tax change
+  const subtotal = useMemo(
+    () => items.filter((l) => l.selected).reduce((s, l) => s + l.qty * l.price, 0),
+    [items],
+  );
   const total = subtotal + Number(tax || 0);
+  useEffect(() => { setRefund(+total.toFixed(2)); }, [total]);
 
-  const addLine = () => setLines((l) => [...l, { product_id: null, name: "", qty: 1, price: 0 }]);
-  const setLine = (i: number, patch: Partial<Line>) =>
-    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const filteredSales = useMemo(() => {
+    const q = invoiceSearch.trim().toLowerCase();
+    if (!q) return sales as any[];
+    return (sales as any[]).filter((s) =>
+      String(s.invoice_no ?? "").toLowerCase().includes(q) ||
+      String(s.customers?.name ?? "").toLowerCase().includes(q) ||
+      String(Number(s.total).toFixed(2)).includes(q),
+    );
+  }, [sales, invoiceSearch]);
+
+  const setItem = (i: number, patch: Partial<ItemRow>) =>
+    setItems((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+
+  const addAdhoc = () =>
+    setItems((l) => [...l, { product_id: null, name: "", qty: 1, price: 0, selected: true }]);
 
   const reset = () => {
-    setOpen(false); setLines([]); setSaleId("none"); setCustomer("none");
+    setOpen(false); setItems([]); setSaleId("none"); setInvoiceSearch(""); setCustomer("none");
     setTax(0); setRefund(0); setMethod("cash"); setNote("");
   };
 
   const submit = async () => {
-    const items = lines.filter((l) => l.name && l.qty > 0);
-    if (!items.length) return toast.error("Add at least one item");
-    if (refund > total) return toast.error("Refund cannot exceed total");
+    const picked = items.filter((l) => l.selected && l.name && l.qty > 0);
+    if (!picked.length) return toast.error("Select at least one item to return");
+    for (const l of picked) {
+      if (l.max != null && l.qty > l.max) {
+        return toast.error(`${l.name}: return qty ${l.qty} exceeds sold qty ${l.max}`);
+      }
+    }
+    if (refund > total + 0.001) return toast.error("Refund cannot exceed total");
     const { error } = await supabase.rpc("complete_sale_return" as any, {
       payload: {
         sale_id: saleId === "none" ? null : saleId,
         customer_id: customer === "none" ? null : customer,
         tax, refund_amount: refund, refund_method: method, note,
-        items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
+        items: picked.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
       },
     });
     if (error) return toast.error(error.message);
@@ -101,7 +132,12 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["sale-returns"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["customers"] });
+    qc.invalidateQueries({ queryKey: ["report-sales-full"] });
+    qc.invalidateQueries({ queryKey: ["report-sale-returns"] });
+    qc.invalidateQueries({ queryKey: ["dash-sale-returns"] });
   };
+
+  const selectedSale = saleId !== "none" ? (sales as any[]).find((s) => s.id === saleId) : null;
 
   return (
     <div className="p-6 space-y-4">
@@ -112,72 +148,135 @@ function Page() {
         </div>
         <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New return</Button></DialogTrigger>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>New sale return</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              {/* Step 1: pick invoice */}
+              <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <Label>Original invoice (optional)</Label>
-                  <Select value={saleId} onValueChange={setSaleId}>
-                    <SelectTrigger><SelectValue placeholder="Pick a sale to copy items" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {sales.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.invoice_no} · {fmtMoney(s.total, sym)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Search invoice</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={invoiceSearch}
+                      onChange={(e) => setInvoiceSearch(e.target.value)}
+                      placeholder="Invoice #, customer, amount…"
+                      className="pl-8"
+                    />
+                  </div>
+                  <div className="mt-2 max-h-40 overflow-y-auto border rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => setSaleId("none")}
+                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent ${saleId === "none" ? "bg-accent" : ""}`}
+                    >
+                      — Ad-hoc return (no invoice) —
+                    </button>
+                    {filteredSales.slice(0, 50).map((s: any) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSaleId(s.id)}
+                        className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex justify-between ${saleId === s.id ? "bg-accent font-medium" : ""}`}
+                      >
+                        <span className="font-mono">{s.invoice_no}</span>
+                        <span className="text-muted-foreground truncate mx-2">{s.customers?.name ?? "Walk-in"}</span>
+                        <span>{fmtMoney(s.total, sym)}</span>
+                      </button>
+                    ))}
+                    {filteredSales.length === 0 && (
+                      <div className="text-center text-xs text-muted-foreground py-3">No invoices found</div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <Label>Customer</Label>
-                  <Select value={customer} onValueChange={setCustomer}>
-                    <SelectTrigger><SelectValue placeholder="Walk-in" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— Walk-in —</SelectItem>
-                      {customers.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {selectedSale && (
+                  <div className="text-xs bg-muted/40 rounded p-2">
+                    Invoice <span className="font-mono">{selectedSale.invoice_no}</span> ·{" "}
+                    {new Date(selectedSale.created_at).toLocaleString()} · Total {fmtMoney(selectedSale.total, sym)} ·{" "}
+                    {selectedSale.customers?.name ?? "Walk-in"}
+                  </div>
+                )}
+
+                {saleId === "none" && (
+                  <div>
+                    <Label>Customer</Label>
+                    <Select value={customer} onValueChange={setCustomer}>
+                      <SelectTrigger><SelectValue placeholder="Walk-in" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Walk-in —</SelectItem>
+                        {customers.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
+              {/* Step 2: pick items */}
               <div className="border rounded-md">
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead>Product</TableHead><TableHead>Name</TableHead>
-                    <TableHead className="w-24">Qty</TableHead><TableHead className="w-28">Price</TableHead>
-                    <TableHead className="text-right w-28">Total</TableHead><TableHead className="w-10"></TableHead>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead className="w-28">Return qty</TableHead>
+                    <TableHead className="w-28">Price</TableHead>
+                    <TableHead className="text-right w-28">Line total</TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {lines.map((l, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <Select
-                            value={l.product_id ?? "new"}
-                            onValueChange={(v) => {
-                              if (v === "new") { setLine(i, { product_id: null }); return; }
-                              const p = products.find((p: any) => p.id === v);
-                              setLine(i, { product_id: v, name: p?.name ?? "", price: Number(p?.sell_price ?? 0) });
-                            }}
-                          >
-                            <SelectTrigger className="h-8"><SelectValue placeholder="Pick…" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="new">— Ad-hoc —</SelectItem>
-                              {products.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                    {items.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-4 text-sm">
+                          {saleId === "none" ? "Add items below" : "Pick an invoice to load its items"}
                         </TableCell>
-                        <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8" /></TableCell>
-                        <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} className="h-8" /></TableCell>
-                        <TableCell><Input type="number" step="0.01" value={l.price} onChange={(e) => setLine(i, { price: Number(e.target.value) })} className="h-8" /></TableCell>
+                      </TableRow>
+                    )}
+                    {items.map((l, i) => (
+                      <TableRow key={i} className={!l.selected ? "opacity-50" : ""}>
+                        <TableCell>
+                          <Checkbox
+                            checked={l.selected}
+                            onCheckedChange={(v) => setItem(i, { selected: !!v })}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {l.max != null ? (
+                            <div>
+                              <div className="text-sm">{l.name}</div>
+                              <div className="text-xs text-muted-foreground">sold: {l.max}</div>
+                            </div>
+                          ) : (
+                            <Input value={l.name} onChange={(e) => setItem(i, { name: e.target.value })} className="h-8" placeholder="Item name" />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number" step="0.001" min={0} max={l.max}
+                            value={l.qty}
+                            onChange={(e) => setItem(i, { qty: Number(e.target.value) })}
+                            className="h-8"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input type="number" step="0.01" value={l.price} onChange={(e) => setItem(i, { price: Number(e.target.value) })} className="h-8" />
+                        </TableCell>
                         <TableCell className="text-right font-medium">{fmtMoney(l.qty * l.price, sym)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" onClick={() => setLines(lines.filter((_, x) => x !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                        <TableCell>
+                          {l.max == null && (
+                            <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, x) => x !== i))}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-                <div className="p-2"><Button variant="outline" size="sm" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" />Add row</Button></div>
+                <div className="p-2">
+                  <Button variant="outline" size="sm" onClick={addAdhoc}>
+                    <Plus className="h-3.5 w-3.5 mr-1" />Add ad-hoc item
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-4 gap-3">
