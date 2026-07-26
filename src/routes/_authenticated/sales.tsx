@@ -316,3 +316,55 @@ function Page() {
     </div>
   );
 }
+
+function KpiCard({
+  icon: Icon, label, value, delta, deltaInverse, sub, tone,
+}: {
+  icon: any; label: string; value: string; delta?: number; deltaInverse?: boolean; sub?: string;
+  tone: "primary" | "success" | "info" | "warning" | "destructive";
+}) {
+  const ring: Record<string, string> = {
+    primary: "from-primary/15 to-primary/0 text-primary",
+    success: "from-success/15 to-success/0 text-success",
+    info: "from-chart-5/20 to-chart-5/0 text-foreground",
+    warning: "from-warning/20 to-warning/0 text-accent-foreground",
+    destructive: "from-destructive/15 to-destructive/0 text-destructive",
+  };
+  const hasDelta = delta !== undefined && Number.isFinite(delta);
+  const positive = hasDelta ? (deltaInverse ? (delta as number) < 0 : (delta as number) >= 0) : true;
+  const deltaClass = !hasDelta
+    ? ""
+    : (delta === 0
+        ? "bg-muted text-muted-foreground"
+        : positive
+          ? "bg-success/10 text-success"
+          : "bg-destructive/10 text-destructive");
+  return (
+    <Card className="p-4 relative overflow-hidden">
+      <div className={`absolute inset-0 bg-gradient-to-br ${ring[tone]} pointer-events-none`} />
+      <div className="relative">
+        <div className="flex items-start justify-between">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
+          <div className={`h-8 w-8 rounded-lg bg-background/70 backdrop-blur flex items-center justify-center shadow-sm ${ring[tone].split(" ").pop()}`}>
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+        <div className="text-2xl font-bold mt-2 tracking-tight tabular-nums">{value}</div>
+        <div className="flex items-center justify-between mt-2 gap-2">
+          {hasDelta ? (
+            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-semibold ${deltaClass}`}>
+              {(delta as number) === 0
+                ? "—"
+                : (delta as number) > 0
+                  ? <ArrowUpRight className="h-3 w-3" />
+                  : <ArrowDownRight className="h-3 w-3" />}
+              {Math.abs(delta as number).toFixed(1)}%
+            </span>
+          ) : <span />}
+          {sub && <span className="text-[11px] text-muted-foreground truncate text-right">{sub}</span>}
+        </div>
+        {hasDelta && <div className="text-[10px] text-muted-foreground mt-1">vs previous period</div>}
+      </div>
+    </Card>
+  );
+}
