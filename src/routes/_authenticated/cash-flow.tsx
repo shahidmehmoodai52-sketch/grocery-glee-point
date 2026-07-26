@@ -530,9 +530,9 @@ function Page() {
           onClick={() => setDetails({ kind: "in" })}
           className="p-4 cursor-pointer hover:shadow-md hover:border-emerald-500/40 transition"
         >
-          <div className="text-xs text-muted-foreground">Total received</div>
+          <div className="text-xs text-muted-foreground">Total received (POS + manual)</div>
           <div className="text-2xl font-bold mt-1 text-emerald-600">{fmt(totals.inSum)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Click to see every payment received</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Sales, customer payments & manual receipts</div>
         </Card>
         <Card
           role="button"
@@ -542,7 +542,7 @@ function Page() {
         >
           <div className="text-xs text-muted-foreground">Total paid out</div>
           <div className="text-2xl font-bold mt-1 text-rose-600">{fmt(totals.outSum)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Click to see every payment sent</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Purchases, expenses, supplier payments & refunds</div>
         </Card>
         <Card
           role="button"
@@ -554,7 +554,28 @@ function Page() {
           <div className="text-2xl font-bold mt-1">{fmt(totals.balance)}</div>
           <div className="text-[11px] text-muted-foreground mt-1">Click to see per-account balance</div>
         </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Receivables (credit sales unpaid)</div>
+          <div className="text-2xl font-bold mt-1 text-amber-600">{fmt(receivables)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Money customers owe you</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Payables (purchases unpaid)</div>
+          <div className="text-2xl font-bold mt-1 text-amber-600">{fmt(payables)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Money you owe suppliers</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Net position</div>
+          <div className="text-2xl font-bold mt-1">{fmt(totals.balance + receivables - payables)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Cash + receivables − payables</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">Auto-synced from POS</div>
+          <div className="text-2xl font-bold mt-1">{autoTxs.length}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Sales, returns, purchases, expenses & party payments</div>
+        </Card>
       </div>
+
 
       <Tabs defaultValue="accounts" className="w-full">
         <TabsList>
