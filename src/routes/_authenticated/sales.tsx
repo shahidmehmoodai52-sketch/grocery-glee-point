@@ -86,6 +86,7 @@ function Page() {
     toast.success(`Sale ${voidTarget.invoice_no} voided`);
     setVoidTarget(null); setVoidReason("");
     qc.invalidateQueries({ queryKey: ["sales"] });
+    qc.invalidateQueries({ queryKey: ["sale-returns-on-sales"] });
     qc.invalidateQueries({ queryKey: ["products"] });
   };
 
