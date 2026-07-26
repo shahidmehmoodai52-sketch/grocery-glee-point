@@ -1304,6 +1304,7 @@ export type Database = {
       party_payments: {
         Row: {
           amount: number
+          cash_transaction_id: string | null
           created_at: string
           id: string
           method: string
@@ -1315,6 +1316,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cash_transaction_id?: string | null
           created_at?: string
           id?: string
           method?: string
@@ -1326,6 +1328,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cash_transaction_id?: string | null
           created_at?: string
           id?: string
           method?: string
@@ -1336,6 +1339,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "party_payments_cash_transaction_id_fkey"
+            columns: ["cash_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "cash_transactions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "party_payments_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -4048,6 +4058,7 @@ export type Database = {
       }
       record_payment: {
         Args: {
+          p_account_id?: string
           p_amount: number
           p_method: string
           p_note: string
@@ -4116,6 +4127,7 @@ export type Database = {
       undo_last_sale: { Args: { _sale_id: string }; Returns: Json }
       update_party_payment: {
         Args: {
+          _account_id?: string
           _amount: number
           _created_at: string
           _id: string

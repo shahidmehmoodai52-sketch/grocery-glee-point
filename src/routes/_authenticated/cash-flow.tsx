@@ -168,7 +168,7 @@ function Page() {
   const partyPaymentsQ = useQuery({
     queryKey: ["cf-party-payments"],
     queryFn: async () => (await supabase.from("party_payments")
-      .select("id,party_type,party_id,amount,method,note,created_at")
+      .select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
   });
   const suppliersQ = useQuery({
@@ -288,6 +288,7 @@ function Page() {
     }
     // Party payments — customer=in, supplier=out
     for (const pp of (partyPaymentsQ.data ?? []) as any[]) {
+      if (pp.cash_transaction_id) continue;
       const amt = Number(pp.amount) || 0;
       if (amt <= 0) continue;
       const acc = methodBuckets.resolve(pp.method || "cash");
@@ -527,6 +528,7 @@ function Page() {
         p_amount: amt,
         p_method: from.name,
         p_note: spForm.note || "",
+        p_account_id: from.id,
       });
       if (error) { toast.error(error.message); return; }
       toast.success("Supplier paid");
