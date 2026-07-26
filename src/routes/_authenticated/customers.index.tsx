@@ -45,7 +45,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", balance: 0 });
   const [payOpen, setPayOpen] = useState<any>(null);
-  const [pay, setPay] = useState({ amount: 0, method: "cash", note: "" });
+  const [pay, setPay] = useState({ amount: 0, method: "Cash in hand", note: "", account_id: "" });
   const [search, setSearch] = useState("");
   const [editRow, setEditRow] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", address: "", opening_balance: 0 });
@@ -78,6 +78,11 @@ function Page() {
       async () => (await db().customers.orderBy("name").toArray()) as any[],
       cacheCustomers,
     ),
+  });
+
+  const { data: cashAccounts = [] } = useQuery({
+    queryKey: ["cash-accounts", "customer-receive"],
+    queryFn: async () => (await supabase.from("cash_accounts").select("id,name,type,is_active").eq("is_active", true).order("sort_order").order("name")).data ?? [],
   });
 
   const filtered = useMemo(() => {
@@ -113,16 +118,25 @@ function Page() {
   };
 
   const recordPayment = async () => {
-    if (!payOpen || pay.amount <= 0) return;
+    if (!payOpen || pay.amount <= 0) return toast.error("Enter amount");
+    if (!pay.method) return toast.error("Pick a payment source");
+    let account = (cashAccounts as any[]).find((a) => a.name.toLowerCase() === pay.method.toLowerCase());
+    if (!account) {
+      const t = pay.method.toLowerCase();
+      const type = t.includes("bank") ? "bank" : t.includes("card") ? "card" : (t.includes("easy") || t.includes("jazz") || t.includes("wallet")) ? "mobile_wallet" : "cash";
+      const { data, error: accErr } = await supabase.from("cash_accounts").insert({ name: pay.method, type, opening_balance: 0, is_active: true }).select("id,name").single();
+      if (accErr) return toast.error(accErr.message);
+      account = data;
+    }
     const { error } = await supabase.rpc("record_payment", {
-      p_party_type: "customer", p_party_id: payOpen.id, p_amount: pay.amount, p_method: pay.method, p_note: pay.note,
+      p_party_type: "customer", p_party_id: payOpen.id, p_amount: pay.amount, p_method: account.name, p_note: pay.note, p_account_id: account.id,
     });
     if (error) return toast.error(error.message);
     toast.success("Payment recorded");
 
     setPayOpen(null);
-    setPay({ amount: 0, method: "cash", note: "" });
-    qc.invalidateQueries({ queryKey: ["customers"] });
+    setPay({ amount: 0, method: "Cash in hand", note: "", account_id: "" });
+    qc.invalidateQueries();
   };
 
   return (
@@ -219,7 +233,7 @@ function Page() {
                       <Button size="sm" variant="ghost" asChild>
                         <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "" }); }}>
+                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "Cash in hand", note: "", account_id: "" }); }}>
                         <HandCoins className="h-3.5 w-3.5 mr-1" />Receive
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title="Edit customer">
@@ -239,7 +253,34 @@ function Page() {
           <DialogHeader><DialogTitle>Receive payment — {payOpen?.name}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Amount</Label><Input type="number" step="0.01" value={pay.amount || ""} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></div>
-            <div><Label>Method</Label><Input value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })} /></div>
+            <div>
+              <Label>Receive in</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {(() => {
+                  const presets = ["Cash in hand", "Bank", "EasyPaisa", "JazzCash", "Card"];
+                  const names = new Set((cashAccounts as any[]).map((a) => a.name));
+                  const merged = [
+                    ...(cashAccounts as any[]).map((a) => ({ id: a.id, name: a.name })),
+                    ...presets.filter((p) => !names.has(p)).map((p) => ({ id: `preset:${p}`, name: p })),
+                  ];
+                  return merged.map((a) => {
+                    const active = pay.account_id === a.id || (!pay.account_id && pay.method.toLowerCase() === a.name.toLowerCase());
+                    return (
+                      <Button
+                        key={a.id}
+                        type="button"
+                        size="sm"
+                        variant={active ? "default" : "outline"}
+                        onClick={() => setPay({ ...pay, account_id: a.id, method: a.name })}
+                      >
+                        {a.name}
+                      </Button>
+                    );
+                  });
+                })()}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-2">Adds to this account in Cash Flow. New sources are created automatically.</p>
+            </div>
             <div><Label>Note</Label><Input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
           </div>
           <DialogFooter>
