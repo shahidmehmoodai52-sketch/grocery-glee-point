@@ -130,12 +130,206 @@ function Page() {
     },
   });
 
+  // --- Auto-derived cash movements from POS / purchases / expenses / party payments ---
+  const salesQ = useQuery({
+    queryKey: ["cf-sales"],
+    queryFn: async () => (await supabase.from("sales")
+      .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const saleReturnsQ = useQuery({
+    queryKey: ["cf-sale-returns"],
+    queryFn: async () => (await supabase.from("sale_returns")
+      .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const purchasesQ = useQuery({
+    queryKey: ["cf-purchases"],
+    queryFn: async () => (await supabase.from("purchases")
+      .select("id,invoice_no,total,paid,status,created_at,suppliers(name)")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const purchaseReturnsQ = useQuery({
+    queryKey: ["cf-purchase-returns"],
+    queryFn: async () => (await supabase.from("purchase_returns")
+      .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const expensesQ = useQuery({
+    queryKey: ["cf-expenses"],
+    queryFn: async () => (await supabase.from("expenses")
+      .select("id,amount,method,category,description,expense_date,created_at")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+  const partyPaymentsQ = useQuery({
+    queryKey: ["cf-party-payments"],
+    queryFn: async () => (await supabase.from("party_payments")
+      .select("id,party_type,party_id,amount,method,note,created_at")
+      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+  });
+
   const accounts = accountsQ.data ?? [];
-  const txs = txQ.data ?? [];
+  const rawTxs = txQ.data ?? [];
+
+  // Resolve a payment-method string to an existing account, else a virtual bucket id
+  const methodBuckets = useMemo(() => {
+    const norm = (s: string) => (s || "").toLowerCase().trim();
+    const typeGuess = (m: string): string => {
+      const s = norm(m);
+      if (!s || s === "cash") return "cash";
+      if (s.includes("card")) return "card";
+      if (s.includes("bank") || s.includes("online") || s.includes("transfer") || s.includes("cheque") || s.includes("check")) return "bank";
+      if (s.includes("easy") || s.includes("jazz") || s.includes("wallet") || s.includes("upi") || s.includes("mobile")) return "mobile_wallet";
+      return "other";
+    };
+    const resolve = (method: string): { id: string; name: string; type: string; auto: boolean } => {
+      const m = norm(method) || "cash";
+      // exact name match
+      const byName = accounts.find(a => norm(a.name) === m);
+      if (byName) return { id: byName.id, name: byName.name, type: byName.type, auto: false };
+      // type match — take first active of guessed type
+      const t = typeGuess(m);
+      const byType = accounts.find(a => a.type === t && a.is_active);
+      if (byType) return { id: byType.id, name: byType.name, type: byType.type, auto: false };
+      // virtual bucket
+      const pretty = m.charAt(0).toUpperCase() + m.slice(1);
+      return { id: `auto:${m}`, name: `${pretty} (auto)`, type: t, auto: true };
+    };
+    return { resolve, typeGuess };
+  }, [accounts]);
+
+  const autoTxs = useMemo<Tx[]>(() => {
+    const out: Tx[] = [];
+    const dateOf = (iso: string) => (iso || "").slice(0, 10);
+
+    // Sales — cash inflow of paid amount (skip voided; skip credit-only with 0 paid)
+    for (const s of (salesQ.data ?? []) as any[]) {
+      if (s.status === "voided") continue;
+      const paid = Number(s.paid) || 0;
+      if (paid <= 0) continue;
+      const method = s.payment_method === "credit" ? "cash" : (s.payment_method || "cash");
+      const acc = methodBuckets.resolve(method);
+      out.push({
+        id: `auto:sale:${s.id}`,
+        account_id: acc.id,
+        direction: "in",
+        amount: paid,
+        occurred_on: dateOf(s.created_at),
+        category: "sale",
+        reference: s.invoice_no ? `Invoice ${s.invoice_no}` : null,
+        notes: `${s.customers?.name ?? "Walk-in"} · ${s.payment_method}`,
+        transfer_group_id: null,
+        created_at: s.created_at,
+      });
+    }
+    // Sale returns — cash out
+    for (const r of (saleReturnsQ.data ?? []) as any[]) {
+      const amt = Number(r.refund_amount) || 0;
+      if (amt <= 0) continue;
+      const acc = methodBuckets.resolve(r.refund_method || "cash");
+      out.push({
+        id: `auto:sret:${r.id}`,
+        account_id: acc.id, direction: "out", amount: amt,
+        occurred_on: dateOf(r.created_at), category: "sale_return",
+        reference: r.return_no ? `Return ${r.return_no}` : null,
+        notes: `${r.customers?.name ?? "Walk-in"} refund`,
+        transfer_group_id: null, created_at: r.created_at,
+      });
+    }
+    // Purchases — cash out (paid portion; no method column → cash bucket)
+    for (const p of (purchasesQ.data ?? []) as any[]) {
+      const paid = Number(p.paid) || 0;
+      if (paid <= 0) continue;
+      const acc = methodBuckets.resolve("cash");
+      out.push({
+        id: `auto:pur:${p.id}`,
+        account_id: acc.id, direction: "out", amount: paid,
+        occurred_on: dateOf(p.created_at), category: "purchase",
+        reference: p.invoice_no ? `Purchase ${p.invoice_no}` : null,
+        notes: `${p.suppliers?.name ?? "Supplier"}`,
+        transfer_group_id: null, created_at: p.created_at,
+      });
+    }
+    // Purchase returns — cash in
+    for (const r of (purchaseReturnsQ.data ?? []) as any[]) {
+      const amt = Number(r.refund_amount) || 0;
+      if (amt <= 0) continue;
+      const acc = methodBuckets.resolve(r.refund_method || "cash");
+      out.push({
+        id: `auto:pret:${r.id}`,
+        account_id: acc.id, direction: "in", amount: amt,
+        occurred_on: dateOf(r.created_at), category: "purchase_return",
+        reference: r.return_no ? `Return ${r.return_no}` : null,
+        notes: `${r.suppliers?.name ?? "Supplier"} refund`,
+        transfer_group_id: null, created_at: r.created_at,
+      });
+    }
+    // Expenses — cash out
+    for (const e of (expensesQ.data ?? []) as any[]) {
+      const amt = Number(e.amount) || 0;
+      if (amt <= 0) continue;
+      const acc = methodBuckets.resolve(e.method || "cash");
+      out.push({
+        id: `auto:exp:${e.id}`,
+        account_id: acc.id, direction: "out", amount: amt,
+        occurred_on: dateOf(e.expense_date || e.created_at), category: "expense",
+        reference: e.category || null,
+        notes: e.description || null,
+        transfer_group_id: null, created_at: e.created_at,
+      });
+    }
+    // Party payments — customer=in, supplier=out
+    for (const pp of (partyPaymentsQ.data ?? []) as any[]) {
+      const amt = Number(pp.amount) || 0;
+      if (amt <= 0) continue;
+      const acc = methodBuckets.resolve(pp.method || "cash");
+      const isCustomer = pp.party_type === "customer";
+      out.push({
+        id: `auto:pp:${pp.id}`,
+        account_id: acc.id,
+        direction: isCustomer ? "in" : "out",
+        amount: amt,
+        occurred_on: dateOf(pp.created_at),
+        category: isCustomer ? "customer_payment" : "supplier_payment",
+        reference: null,
+        notes: pp.note || null,
+        transfer_group_id: null, created_at: pp.created_at,
+      });
+    }
+    return out;
+  }, [salesQ.data, saleReturnsQ.data, purchasesQ.data, purchaseReturnsQ.data, expensesQ.data, partyPaymentsQ.data, methodBuckets]);
+
+  // Virtual accounts referenced by autoTxs but not present in real accounts
+  const virtualAccounts = useMemo<Account[]>(() => {
+    const realIds = new Set(accounts.map(a => a.id));
+    const seen = new Map<string, Account>();
+    for (const t of autoTxs) {
+      if (realIds.has(t.account_id) || seen.has(t.account_id)) continue;
+      const parts = t.account_id.split(":");
+      const method = parts[1] || "cash";
+      const type = methodBuckets.typeGuess(method);
+      const pretty = method.charAt(0).toUpperCase() + method.slice(1);
+      seen.set(t.account_id, {
+        id: t.account_id,
+        name: `${pretty} (auto)`,
+        type,
+        opening_balance: 0,
+        notes: "Auto bucket — create a matching account to customize.",
+        is_active: true,
+        sort_order: 9999,
+      });
+    }
+    return Array.from(seen.values());
+  }, [autoTxs, accounts, methodBuckets]);
+
+  const allAccounts = useMemo(() => [...accounts, ...virtualAccounts], [accounts, virtualAccounts]);
+  const txs = useMemo(() => [...rawTxs, ...autoTxs], [rawTxs, autoTxs]);
+  const isAutoTx = (id: string) => id.startsWith("auto:");
+  const isAutoAcc = (id: string) => id.startsWith("auto:");
 
   const balances = useMemo(() => {
     const map = new Map<string, { inSum: number; outSum: number }>();
-    for (const a of accounts) map.set(a.id, { inSum: 0, outSum: 0 });
+    for (const a of allAccounts) map.set(a.id, { inSum: 0, outSum: 0 });
     for (const t of txs) {
       const b = map.get(t.account_id);
       if (!b) continue;
@@ -143,17 +337,36 @@ function Page() {
       else b.outSum += Number(t.amount);
     }
     return map;
-  }, [accounts, txs]);
+  }, [allAccounts, txs]);
 
   const totals = useMemo(() => {
     let opening = 0, inSum = 0, outSum = 0;
-    for (const a of accounts) {
+    for (const a of allAccounts) {
       opening += Number(a.opening_balance);
       const b = balances.get(a.id);
       if (b) { inSum += b.inSum; outSum += b.outSum; }
     }
     return { opening, inSum, outSum, balance: opening + inSum - outSum };
-  }, [accounts, balances]);
+  }, [allAccounts, balances]);
+
+  // Receivables (credit sales unpaid) / Payables (purchases unpaid)
+  const receivables = useMemo(() => {
+    let sum = 0;
+    for (const s of (salesQ.data ?? []) as any[]) {
+      if (s.status === "voided") continue;
+      const due = Number(s.total) - Number(s.paid);
+      if (due > 0.001) sum += due;
+    }
+    return sum;
+  }, [salesQ.data]);
+  const payables = useMemo(() => {
+    let sum = 0;
+    for (const p of (purchasesQ.data ?? []) as any[]) {
+      const due = Number(p.total) - Number(p.paid);
+      if (due > 0.001) sum += due;
+    }
+    return sum;
+  }, [purchasesQ.data]);
 
   const filteredTx = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -166,8 +379,9 @@ function Page() {
         if (!hay.includes(term)) return false;
       }
       return true;
-    });
+    }).sort((a, b) => (b.occurred_on > a.occurred_on ? 1 : b.occurred_on < a.occurred_on ? -1 : (b.created_at > a.created_at ? 1 : -1)));
   }, [txs, search, dateFrom, dateTo, filterAcc]);
+
 
   const openAccCreate = () => { setEditingAccId(null); setAccForm({ ...emptyAcc }); setAccOpen(true); };
   const openAccEdit = (a: Account) => {
