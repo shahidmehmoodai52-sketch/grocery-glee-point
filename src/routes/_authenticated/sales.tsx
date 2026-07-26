@@ -56,15 +56,29 @@ function Page() {
       (await supabase.from("sale_returns").select("*, customers(name), sale_return_items(*), sales(invoice_no)").order("created_at", { ascending: false }).limit(1000)).data ?? [],
   });
 
-  const inRange = (iso: string) => {
+  const inRange = (iso: string, f?: Date, t?: Date) => {
     const d = new Date(iso);
-    if (fromDate) { const f = new Date(fromDate); f.setHours(0, 0, 0, 0); if (d < f) return false; }
-    if (toDate) { const t = new Date(toDate); t.setHours(23, 59, 59, 999); if (d > t) return false; }
+    if (f) { const x = new Date(f); x.setHours(0, 0, 0, 0); if (d < x) return false; }
+    if (t) { const x = new Date(t); x.setHours(23, 59, 59, 999); if (d > x) return false; }
     return true;
   };
 
-  const sales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at)), [allSales, fromDate, toDate]);
-  const returns = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at)), [allReturns, fromDate, toDate]);
+  const sales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at, fromDate, toDate)), [allSales, fromDate, toDate]);
+  const returns = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at, fromDate, toDate)), [allReturns, fromDate, toDate]);
+
+  // Previous comparable range
+  const { prevFrom, prevTo } = useMemo(() => {
+    if (!fromDate || !toDate) return { prevFrom: undefined, prevTo: undefined };
+    const f = new Date(fromDate); f.setHours(0, 0, 0, 0);
+    const t = new Date(toDate); t.setHours(0, 0, 0, 0);
+    const spanDays = Math.max(1, Math.round((t.getTime() - f.getTime()) / 86400000) + 1);
+    const pTo = new Date(f.getTime() - 86400000);
+    const pFrom = new Date(pTo.getTime() - (spanDays - 1) * 86400000);
+    return { prevFrom: pFrom, prevTo: pTo };
+  }, [fromDate, toDate]);
+
+  const prevSales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at, prevFrom, prevTo)), [allSales, prevFrom, prevTo]);
+  const prevReturnsArr = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at, prevFrom, prevTo)), [allReturns, prevFrom, prevTo]);
 
   const rangeTotal = sales.reduce((s: number, x: any) => s + Number(x.total), 0);
   const salesProfit = sales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
@@ -76,6 +90,28 @@ function Page() {
   }, 0);
   const netRevenue = rangeTotal - rangeReturns;
   const rangeProfit = salesProfit - returnsProfit;
+
+  const prevRangeTotal = prevSales.reduce((s: number, x: any) => s + Number(x.total), 0);
+  const prevSalesProfit = prevSales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+  const prevRangeReturns = prevReturnsArr.reduce((s: number, x: any) => s + Number(x.total), 0);
+  const prevReturnsProfit = prevReturnsArr.reduce((s: number, r: any) => {
+    const items = r.sale_return_items ?? [];
+    const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
+    return s + (Number(r.subtotal ?? r.total) - itemsCost);
+  }, 0);
+  const prevNetRevenue = prevRangeTotal - prevRangeReturns;
+  const prevProfit = prevSalesProfit - prevReturnsProfit;
+
+  const pct = (curr: number, prev: number) => {
+    if (!prev) return curr ? 100 : 0;
+    return ((curr - prev) / Math.abs(prev)) * 100;
+  };
+  const dCount = pct(sales.length, prevSales.length);
+  const dRev = pct(netRevenue, prevNetRevenue);
+  const dGross = pct(rangeTotal, prevRangeTotal);
+  const dRet = pct(rangeReturns, prevRangeReturns);
+  const dProf = pct(rangeProfit, prevProfit);
+
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
 
