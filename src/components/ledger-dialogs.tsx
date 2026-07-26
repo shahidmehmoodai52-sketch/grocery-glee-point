@@ -70,20 +70,23 @@ export function AddPaymentDialog({
       .filter((p) => !cashAccounts.some((a: any) => a.name.toLowerCase() === p.toLowerCase()))
       .map((p) => ({ id: `preset:${p}`, name: p, preset: true })),
   ];
+  const defaultSource = sourceOptions.find((a) => a.name.toLowerCase() === "cash in hand")
+    ?? sourceOptions.find((a) => a.name.toLowerCase() === "cash")
+    ?? sourceOptions[0];
 
   useEffect(() => {
     if (open) {
       setAmount(defaultAmount);
-      setMethod("Cash in hand");
-      setAccountId("");
+      setMethod(defaultSource?.name ?? "Cash in hand");
+      setAccountId(defaultSource?.id ?? "");
       setNote("");
     }
-  }, [open, defaultAmount]);
+  }, [open, defaultAmount, cashAccounts.length]);
 
   const resolveAccount = async () => {
     const selected = sourceOptions.find((a) => a.id === accountId)
       ?? sourceOptions.find((a) => a.name.toLowerCase() === method.toLowerCase())
-      ?? sourceOptions[0];
+      ?? defaultSource;
     if (!selected) return { id: null as string | null, name: method || "cash" };
     if (!selected.preset) return { id: selected.id, name: selected.name };
     const { data, error } = await supabase
