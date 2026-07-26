@@ -168,7 +168,7 @@ function ProductsPage() {
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />New product</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{form.id ? "Edit" : "New"} product</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
