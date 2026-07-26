@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Printer, Undo2, Ban, CalendarIcon } from "lucide-react";
+import { Eye, Printer, Undo2, Ban, CalendarIcon, ArrowUpRight, ArrowDownRight, Receipt as ReceiptIcon, Wallet, TrendingUp, TrendingDown } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -56,15 +56,29 @@ function Page() {
       (await supabase.from("sale_returns").select("*, customers(name), sale_return_items(*), sales(invoice_no)").order("created_at", { ascending: false }).limit(1000)).data ?? [],
   });
 
-  const inRange = (iso: string) => {
+  const inRange = (iso: string, f?: Date, t?: Date) => {
     const d = new Date(iso);
-    if (fromDate) { const f = new Date(fromDate); f.setHours(0, 0, 0, 0); if (d < f) return false; }
-    if (toDate) { const t = new Date(toDate); t.setHours(23, 59, 59, 999); if (d > t) return false; }
+    if (f) { const x = new Date(f); x.setHours(0, 0, 0, 0); if (d < x) return false; }
+    if (t) { const x = new Date(t); x.setHours(23, 59, 59, 999); if (d > x) return false; }
     return true;
   };
 
-  const sales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at)), [allSales, fromDate, toDate]);
-  const returns = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at)), [allReturns, fromDate, toDate]);
+  const sales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at, fromDate, toDate)), [allSales, fromDate, toDate]);
+  const returns = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at, fromDate, toDate)), [allReturns, fromDate, toDate]);
+
+  // Previous comparable range
+  const { prevFrom, prevTo } = useMemo(() => {
+    if (!fromDate || !toDate) return { prevFrom: undefined, prevTo: undefined };
+    const f = new Date(fromDate); f.setHours(0, 0, 0, 0);
+    const t = new Date(toDate); t.setHours(0, 0, 0, 0);
+    const spanDays = Math.max(1, Math.round((t.getTime() - f.getTime()) / 86400000) + 1);
+    const pTo = new Date(f.getTime() - 86400000);
+    const pFrom = new Date(pTo.getTime() - (spanDays - 1) * 86400000);
+    return { prevFrom: pFrom, prevTo: pTo };
+  }, [fromDate, toDate]);
+
+  const prevSales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at, prevFrom, prevTo)), [allSales, prevFrom, prevTo]);
+  const prevReturnsArr = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at, prevFrom, prevTo)), [allReturns, prevFrom, prevTo]);
 
   const rangeTotal = sales.reduce((s: number, x: any) => s + Number(x.total), 0);
   const salesProfit = sales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
@@ -76,6 +90,28 @@ function Page() {
   }, 0);
   const netRevenue = rangeTotal - rangeReturns;
   const rangeProfit = salesProfit - returnsProfit;
+
+  const prevRangeTotal = prevSales.reduce((s: number, x: any) => s + Number(x.total), 0);
+  const prevSalesProfit = prevSales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+  const prevRangeReturns = prevReturnsArr.reduce((s: number, x: any) => s + Number(x.total), 0);
+  const prevReturnsProfit = prevReturnsArr.reduce((s: number, r: any) => {
+    const items = r.sale_return_items ?? [];
+    const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
+    return s + (Number(r.subtotal ?? r.total) - itemsCost);
+  }, 0);
+  const prevNetRevenue = prevRangeTotal - prevRangeReturns;
+  const prevProfit = prevSalesProfit - prevReturnsProfit;
+
+  const pct = (curr: number, prev: number) => {
+    if (!prev) return curr ? 100 : 0;
+    return ((curr - prev) / Math.abs(prev)) * 100;
+  };
+  const dCount = pct(sales.length, prevSales.length);
+  const dRev = pct(netRevenue, prevNetRevenue);
+  const dGross = pct(rangeTotal, prevRangeTotal);
+  const dRet = pct(rangeReturns, prevRangeReturns);
+  const dProf = pct(rangeProfit, prevProfit);
+
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
 
@@ -145,30 +181,13 @@ function Page() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · sales</div>
-          <div className="text-2xl font-semibold mt-1">{sales.length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · revenue</div>
-          <div className="text-2xl font-semibold mt-1 text-primary">{fmtMoney(netRevenue, sym)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">After returns</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · gross sales</div>
-          <div className="text-2xl font-semibold mt-1">{fmtMoney(rangeTotal, sym)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Before returns</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · returns</div>
-          <div className="text-2xl font-semibold mt-1 text-destructive">-{fmtMoney(rangeReturns, sym)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">{returns.length} refund{returns.length === 1 ? "" : "s"}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · profit</div>
-          <div className="text-2xl font-semibold mt-1 text-success">{fmtMoney(rangeProfit, sym)}</div>
-        </Card>
+        <KpiCard icon={ReceiptIcon} tone="info" label={`${presetLabel} · invoices`} value={String(sales.length)} delta={dCount} sub={`${prevSales.length} last period`} />
+        <KpiCard icon={TrendingUp} tone="primary" label={`${presetLabel} · revenue`} value={fmtMoney(netRevenue, sym)} delta={dRev} sub="After returns" />
+        <KpiCard icon={TrendingUp} tone="info" label={`${presetLabel} · gross sales`} value={fmtMoney(rangeTotal, sym)} delta={dGross} sub="Before returns" />
+        <KpiCard icon={Undo2} tone="destructive" label={`${presetLabel} · returns`} value={`-${fmtMoney(rangeReturns, sym)}`} delta={dRet} deltaInverse sub={`${returns.length} refund${returns.length === 1 ? "" : "s"}`} />
+        <KpiCard icon={Wallet} tone="success" label={`${presetLabel} · profit`} value={fmtMoney(rangeProfit, sym)} delta={dProf} sub="Net of returns" />
       </div>
+
 
 
       <Card className="p-3">
@@ -295,5 +314,57 @@ function Page() {
       </Dialog>
 
     </div>
+  );
+}
+
+function KpiCard({
+  icon: Icon, label, value, delta, deltaInverse, sub, tone,
+}: {
+  icon: any; label: string; value: string; delta?: number; deltaInverse?: boolean; sub?: string;
+  tone: "primary" | "success" | "info" | "warning" | "destructive";
+}) {
+  const ring: Record<string, string> = {
+    primary: "from-primary/15 to-primary/0 text-primary",
+    success: "from-success/15 to-success/0 text-success",
+    info: "from-chart-5/20 to-chart-5/0 text-foreground",
+    warning: "from-warning/20 to-warning/0 text-accent-foreground",
+    destructive: "from-destructive/15 to-destructive/0 text-destructive",
+  };
+  const hasDelta = delta !== undefined && Number.isFinite(delta);
+  const positive = hasDelta ? (deltaInverse ? (delta as number) < 0 : (delta as number) >= 0) : true;
+  const deltaClass = !hasDelta
+    ? ""
+    : (delta === 0
+        ? "bg-muted text-muted-foreground"
+        : positive
+          ? "bg-success/10 text-success"
+          : "bg-destructive/10 text-destructive");
+  return (
+    <Card className="p-4 relative overflow-hidden">
+      <div className={`absolute inset-0 bg-gradient-to-br ${ring[tone]} pointer-events-none`} />
+      <div className="relative">
+        <div className="flex items-start justify-between">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
+          <div className={`h-8 w-8 rounded-lg bg-background/70 backdrop-blur flex items-center justify-center shadow-sm ${ring[tone].split(" ").pop()}`}>
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+        <div className="text-2xl font-bold mt-2 tracking-tight tabular-nums">{value}</div>
+        <div className="flex items-center justify-between mt-2 gap-2">
+          {hasDelta ? (
+            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-semibold ${deltaClass}`}>
+              {(delta as number) === 0
+                ? "—"
+                : (delta as number) > 0
+                  ? <ArrowUpRight className="h-3 w-3" />
+                  : <ArrowDownRight className="h-3 w-3" />}
+              {Math.abs(delta as number).toFixed(1)}%
+            </span>
+          ) : <span />}
+          {sub && <span className="text-[11px] text-muted-foreground truncate text-right">{sub}</span>}
+        </div>
+        {hasDelta && <div className="text-[10px] text-muted-foreground mt-1">vs previous period</div>}
+      </div>
+    </Card>
   );
 }

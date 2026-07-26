@@ -74,7 +74,7 @@ function Page() {
   const { data: prevSales = [] } = useQuery({
     queryKey: ["dash-sales-prev", prevFromISO, prevToISO],
     queryFn: async () =>
-      (await supabase.from("sales").select("total,created_at")
+      (await supabase.from("sales").select("total,cost_total,tax,created_at")
         .gte("created_at", prevFromISO).lte("created_at", prevToISO)).data ?? [],
   });
   const { data: purchases = [] } = useQuery({
@@ -83,11 +83,23 @@ function Page() {
       (await supabase.from("purchases").select("total,paid,created_at")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
   });
+  const { data: prevPurchases = [] } = useQuery({
+    queryKey: ["dash-purchases-prev", prevFromISO, prevToISO],
+    queryFn: async () =>
+      (await supabase.from("purchases").select("total,created_at")
+        .gte("created_at", prevFromISO).lte("created_at", prevToISO)).data ?? [],
+  });
   const { data: saleReturns = [] } = useQuery({
     queryKey: ["dash-sale-returns", fromISO, toISO],
     queryFn: async () =>
       (await supabase.from("sale_returns").select("total,subtotal,refund_amount,created_at,sale_return_items(qty,cost)")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+  });
+  const { data: prevReturns = [] } = useQuery({
+    queryKey: ["dash-sale-returns-prev", prevFromISO, prevToISO],
+    queryFn: async () =>
+      (await supabase.from("sale_returns").select("total,subtotal,created_at,sale_return_items(qty,cost)")
+        .gte("created_at", prevFromISO).lte("created_at", prevToISO)).data ?? [],
   });
   const { data: products = [] } = useQuery({
     queryKey: ["dash-products"],
@@ -114,18 +126,39 @@ function Page() {
     (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
     0,
   );
+  const prevSalesProfit = prevSales.reduce(
+    (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
+    0,
+  );
   const purchTotal = sum(purchases, "total");
+  const prevPurchTotal = sum(prevPurchases, "total");
   const returnsTotal = sum(saleReturns, "total");
+  const prevReturnsTotal = sum(prevReturns, "total");
   const refundsTotal = sum(saleReturns, "refund_amount");
   const returnsProfit = saleReturns.reduce((s: number, r: any) => {
     const items = r.sale_return_items ?? [];
     const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
     return s + (Number(r.subtotal ?? r.total) - itemsCost);
   }, 0);
+  const prevReturnsProfit = prevReturns.reduce((s: number, r: any) => {
+    const items = r.sale_return_items ?? [];
+    const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
+    return s + (Number(r.subtotal ?? r.total) - itemsCost);
+  }, 0);
   const netRevenue = revenue - returnsTotal;
+  const prevNetRevenue = prevRevenue - prevReturnsTotal;
   const profit = salesProfit - returnsProfit;
+  const prevProfit = prevSalesProfit - prevReturnsProfit;
 
-  const delta = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
+  const pct = (curr: number, prev: number) => {
+    if (!prev) return curr ? 100 : 0;
+    return ((curr - prev) / Math.abs(prev)) * 100;
+  };
+  const dNet = pct(netRevenue, prevNetRevenue);
+  const dRevenue = pct(revenue, prevRevenue);
+  const dReturns = pct(returnsTotal, prevReturnsTotal);
+  const dProfit = pct(profit, prevProfit);
+  const dPurch = pct(purchTotal, prevPurchTotal);
 
   // Time series over selected range. For a single day, bucket by hour so the chart has multiple points.
   const series = useMemo(() => {
@@ -297,29 +330,30 @@ function Page() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <Kpi onClick={() => setDetailKey("net")}
           icon={TrendingUp} label="Revenue" value={fmtMoney(netRevenue, sym)}
-          delta={delta} sub={`${sales.length} invoices · after returns`} tone="primary"
+          delta={dNet} sub={`${sales.length} invoices · after returns`} tone="primary"
         />
         <Kpi onClick={() => setDetailKey("revenue")}
           icon={Receipt} label="Gross sales" value={fmtMoney(revenue, sym)}
-          sub="Before returns" tone="info"
+          delta={dRevenue} sub="Before returns" tone="info"
         />
         <Kpi onClick={() => setDetailKey("returns")}
           icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
-          sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
+          delta={dReturns} deltaInverse sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
         />
         <Kpi onClick={() => setDetailKey("profit")}
           icon={Wallet} label="Profit" value={fmtMoney(profit, sym)}
-          sub="Net of returns" tone="success"
+          delta={dProfit} sub="Net of returns" tone="success"
         />
         <Kpi onClick={() => setDetailKey("purch")}
           icon={TrendingDown} label="Purchases" value={fmtMoney(purchTotal, sym)}
-          sub={`${purchases.length} entries`} tone="warning"
+          delta={dPurch} deltaInverse sub={`${purchases.length} entries`} tone="warning"
         />
         <Kpi onClick={() => setDetailKey("inventory")}
           icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
           sub={`${products.length} active SKUs`} tone="info"
         />
       </div>
+
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -490,34 +524,50 @@ function Page() {
 }
 
 function Kpi({
-  icon: Icon, label, value, delta, sub, tone, onClick,
-}: { icon: any; label: string; value: string; delta?: number; sub?: string; tone: string; onClick?: () => void }) {
+  icon: Icon, label, value, delta, deltaInverse, sub, tone, onClick,
+}: { icon: any; label: string; value: string; delta?: number; deltaInverse?: boolean; sub?: string; tone: string; onClick?: () => void }) {
   const ring: Record<string, string> = {
     primary: "from-primary/15 to-primary/0 text-primary",
     success: "from-success/15 to-success/0 text-success",
     warning: "from-warning/20 to-warning/0 text-accent-foreground",
     info: "from-chart-5/20 to-chart-5/0 text-foreground",
   };
+  const hasDelta = delta !== undefined && Number.isFinite(delta);
+  const positive = hasDelta ? (deltaInverse ? (delta as number) < 0 : (delta as number) >= 0) : true;
+  const deltaClass = !hasDelta
+    ? ""
+    : (delta === 0
+        ? "bg-muted text-muted-foreground"
+        : positive
+          ? "bg-success/10 text-success"
+          : "bg-destructive/10 text-destructive");
   return (
-    <Card onClick={onClick} className={`p-5 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
+    <Card onClick={onClick} className={`p-5 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200" : ""}`}>
       <div className={`absolute inset-0 bg-gradient-to-br ${ring[tone]} pointer-events-none`} />
       <div className="relative">
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-muted-foreground uppercase tracking-wider">{label}</div>
-          <div className={`h-8 w-8 rounded-md bg-background/60 backdrop-blur flex items-center justify-center ${ring[tone].split(" ").pop()}`}>
+        <div className="flex items-start justify-between">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
+          <div className={`h-8 w-8 rounded-lg bg-background/70 backdrop-blur flex items-center justify-center shadow-sm ${ring[tone].split(" ").pop()}`}>
             <Icon className="h-4 w-4" />
           </div>
         </div>
-        <div className="text-3xl font-bold mt-2">{value}</div>
-        <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-          <span>{sub}</span>
-          {delta !== undefined && delta !== 0 && (
-            <span className={`flex items-center gap-0.5 font-medium ${delta >= 0 ? "text-success" : "text-destructive"}`}>
-              {delta >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-              {Math.abs(delta).toFixed(1)}%
+        <div className="text-2xl md:text-[1.7rem] font-bold mt-2 tracking-tight tabular-nums">{value}</div>
+        <div className="flex items-center justify-between mt-2 gap-2">
+          {hasDelta ? (
+            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-semibold ${deltaClass}`}>
+              {(delta as number) === 0
+                ? "—"
+                : (delta as number) > 0
+                  ? <ArrowUpRight className="h-3 w-3" />
+                  : <ArrowDownRight className="h-3 w-3" />}
+              {Math.abs(delta as number).toFixed(1)}%
             </span>
-          )}
+          ) : <span />}
+          <span className="text-[11px] text-muted-foreground truncate text-right">{sub}</span>
         </div>
+        {hasDelta && (
+          <div className="text-[10px] text-muted-foreground mt-1">vs previous period</div>
+        )}
       </div>
     </Card>
   );
