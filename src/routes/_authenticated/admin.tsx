@@ -343,31 +343,33 @@ function TenantsTab() {
                         <Eye className="h-4 w-4" />
                       </Link>
                     </Button>
-                    {t.status !== "active" && (
+                    {t.status !== "active" && has("shops.approve") && (
                       <Button size="sm" variant="outline" onClick={() => setStatus(t.id, "active")}>
                         <CheckCircle2 className="h-4 w-4 mr-1" /> {t.status === "pending" ? "Approve" : "Activate"}
                       </Button>
                     )}
-                    {t.status === "active" && (
+                    {t.status === "active" && has("shops.suspend") && (
                       <Button size="sm" variant="ghost" onClick={() => suspend(t.id, t.name)}>
                         <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
                       </Button>
                     )}
-                    {t.status !== "archived" && (
+                    {t.status !== "archived" && has("shops.suspend") && (
                       <Button size="icon" variant="ghost" title="Archive" onClick={() => {
                         if (confirm(`Archive "${t.name}"? Owner loses access.`)) setStatus(t.id, "archived");
                       }}>
                         <Archive className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title="Delete shop permanently"
-                      onClick={() => removeShop(t.id, t.name)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    {has("shops.delete") && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Delete shop permanently"
+                        onClick={() => removeShop(t.id, t.name)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
