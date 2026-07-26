@@ -205,6 +205,24 @@ function ProductsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div><Label>Batch #</Label><Input value={form.batch_no} onChange={(e) => setForm({ ...form, batch_no: e.target.value })} placeholder="e.g. B-2026-01" /></div>
+                <div><Label>Expiry date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
+                <div className="col-span-2"><Label>Rack / Shelf location</Label><Input value={form.rack_location} onChange={(e) => setForm({ ...form, rack_location: e.target.value })} placeholder="e.g. A-3, Shelf 2" /></div>
+                <div className="col-span-2 flex items-start gap-2 rounded-md border p-3 bg-muted/30">
+                  <input
+                    id="allow-neg-stock"
+                    type="checkbox"
+                    className="mt-1 h-4 w-4"
+                    checked={form.allow_negative_stock}
+                    onChange={(e) => setForm({ ...form, allow_negative_stock: e.target.checked })}
+                  />
+                  <label htmlFor="allow-neg-stock" className="text-sm cursor-pointer">
+                    <div className="font-medium">Allow negative stock</div>
+                    <div className="text-xs text-muted-foreground">
+                      If checked, POS will keep selling this item even after stock is zero. If unchecked, POS blocks the sale when stock is insufficient.
+                    </div>
+                  </label>
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
