@@ -756,6 +756,8 @@ function POSPage() {
     const isCredit = due > 0;
     if (isCredit && !tab.customer_id && !tab.expense_person_id) return toast.error("Select a customer or a staff/owner for credit sale");
     // Negative-stock guard: block sale if any line would push a non-negative-allowed product below zero.
+    // Skip guard when editing an existing invoice — the edit_sale RPC restores original stock before re-decrementing.
+    if (tab.editing_sale_id) { await doSale(); return; }
     try {
       const ids = Array.from(new Set(tab.items.map((i) => i.product_id).filter(Boolean)));
       if (ids.length) {
