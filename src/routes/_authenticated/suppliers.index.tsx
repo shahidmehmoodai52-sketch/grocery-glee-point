@@ -122,7 +122,7 @@ function Page() {
     toast.success("Payment sent");
 
     setPayOpen(null);
-    setPay({ amount: 0, method: "cash", note: "" });
+    setPay({ amount: 0, method: "cash", note: "", account_id: "" });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
   };
 
@@ -220,7 +220,7 @@ function Page() {
                       <Button size="sm" variant="ghost" asChild>
                         <Link to="/suppliers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "" }); }}>
+                      <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "cash", note: "", account_id: "" }); }}>
                         <HandCoins className="h-3.5 w-3.5 mr-1" />Pay
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title="Edit supplier">
