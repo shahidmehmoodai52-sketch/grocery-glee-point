@@ -74,7 +74,7 @@ function Page() {
   const { data: prevSales = [] } = useQuery({
     queryKey: ["dash-sales-prev", prevFromISO, prevToISO],
     queryFn: async () =>
-      (await supabase.from("sales").select("total,created_at")
+      (await supabase.from("sales").select("total,cost_total,tax,created_at")
         .gte("created_at", prevFromISO).lte("created_at", prevToISO)).data ?? [],
   });
   const { data: purchases = [] } = useQuery({
@@ -83,11 +83,23 @@ function Page() {
       (await supabase.from("purchases").select("total,paid,created_at")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
   });
+  const { data: prevPurchases = [] } = useQuery({
+    queryKey: ["dash-purchases-prev", prevFromISO, prevToISO],
+    queryFn: async () =>
+      (await supabase.from("purchases").select("total,created_at")
+        .gte("created_at", prevFromISO).lte("created_at", prevToISO)).data ?? [],
+  });
   const { data: saleReturns = [] } = useQuery({
     queryKey: ["dash-sale-returns", fromISO, toISO],
     queryFn: async () =>
       (await supabase.from("sale_returns").select("total,subtotal,refund_amount,created_at,sale_return_items(qty,cost)")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+  });
+  const { data: prevReturns = [] } = useQuery({
+    queryKey: ["dash-sale-returns-prev", prevFromISO, prevToISO],
+    queryFn: async () =>
+      (await supabase.from("sale_returns").select("total,subtotal,created_at,sale_return_items(qty,cost)")
+        .gte("created_at", prevFromISO).lte("created_at", prevToISO)).data ?? [],
   });
   const { data: products = [] } = useQuery({
     queryKey: ["dash-products"],
@@ -114,18 +126,39 @@ function Page() {
     (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
     0,
   );
+  const prevSalesProfit = prevSales.reduce(
+    (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
+    0,
+  );
   const purchTotal = sum(purchases, "total");
+  const prevPurchTotal = sum(prevPurchases, "total");
   const returnsTotal = sum(saleReturns, "total");
+  const prevReturnsTotal = sum(prevReturns, "total");
   const refundsTotal = sum(saleReturns, "refund_amount");
   const returnsProfit = saleReturns.reduce((s: number, r: any) => {
     const items = r.sale_return_items ?? [];
     const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
     return s + (Number(r.subtotal ?? r.total) - itemsCost);
   }, 0);
+  const prevReturnsProfit = prevReturns.reduce((s: number, r: any) => {
+    const items = r.sale_return_items ?? [];
+    const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
+    return s + (Number(r.subtotal ?? r.total) - itemsCost);
+  }, 0);
   const netRevenue = revenue - returnsTotal;
+  const prevNetRevenue = prevRevenue - prevReturnsTotal;
   const profit = salesProfit - returnsProfit;
+  const prevProfit = prevSalesProfit - prevReturnsProfit;
 
-  const delta = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
+  const pct = (curr: number, prev: number) => {
+    if (!prev) return curr ? 100 : 0;
+    return ((curr - prev) / Math.abs(prev)) * 100;
+  };
+  const dNet = pct(netRevenue, prevNetRevenue);
+  const dRevenue = pct(revenue, prevRevenue);
+  const dReturns = pct(returnsTotal, prevReturnsTotal);
+  const dProfit = pct(profit, prevProfit);
+  const dPurch = pct(purchTotal, prevPurchTotal);
 
   // Time series over selected range. For a single day, bucket by hour so the chart has multiple points.
   const series = useMemo(() => {
