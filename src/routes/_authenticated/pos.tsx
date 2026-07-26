@@ -707,6 +707,30 @@ function POSPage() {
     if (!tab.items.length) return toast.error("Cart is empty");
     const isCredit = due > 0;
     if (isCredit && !tab.customer_id && !tab.expense_person_id) return toast.error("Select a customer or a staff/owner for credit sale");
+    // Negative-stock guard: block sale if any line would push a non-negative-allowed product below zero.
+    try {
+      const ids = Array.from(new Set(tab.items.map((i) => i.product_id).filter(Boolean)));
+      if (ids.length) {
+        const { data: stockRows } = await supabase
+          .from("products")
+          .select("id,name,stock,allow_negative_stock" as any)
+          .in("id", ids as string[]);
+        const byId = new Map((stockRows ?? []).map((r: any) => [r.id, r]));
+        const totals = new Map<string, number>();
+        for (const it of tab.items) {
+          if (!it.product_id) continue;
+          totals.set(it.product_id, (totals.get(it.product_id) ?? 0) + Number(it.qty || 0));
+        }
+        for (const [pid, qty] of totals) {
+          const row: any = byId.get(pid);
+          if (!row) continue;
+          if (row.allow_negative_stock) continue;
+          if (Number(row.stock ?? 0) < qty) {
+            return toast.error(`Insufficient stock for ${row.name} (have ${row.stock}, need ${qty}). Enable "Allow negative stock" on the product to override.`);
+          }
+        }
+      }
+    } catch { /* if the check itself fails, fall through to sale so we don't block cashiers when offline */ }
     await doSale();
   };
 
