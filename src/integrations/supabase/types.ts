@@ -1524,10 +1524,13 @@ export type Database = {
       products: {
         Row: {
           abc_period_days: number | null
+          allow_negative_stock: boolean
           barcode: string | null
+          batch_no: string | null
           category: string | null
           cost_price: number
           created_at: string
+          expiry_date: string | null
           id: string
           import_batch_id: string | null
           is_active: boolean
@@ -1537,6 +1540,7 @@ export type Database = {
           min_stock: number | null
           name: string
           preferred_supplier_id: string | null
+          rack_location: string | null
           reorder_qty: number | null
           safety_stock: number | null
           sell_price: number
@@ -1551,10 +1555,13 @@ export type Database = {
         }
         Insert: {
           abc_period_days?: number | null
+          allow_negative_stock?: boolean
           barcode?: string | null
+          batch_no?: string | null
           category?: string | null
           cost_price?: number
           created_at?: string
+          expiry_date?: string | null
           id?: string
           import_batch_id?: string | null
           is_active?: boolean
@@ -1564,6 +1571,7 @@ export type Database = {
           min_stock?: number | null
           name: string
           preferred_supplier_id?: string | null
+          rack_location?: string | null
           reorder_qty?: number | null
           safety_stock?: number | null
           sell_price?: number
@@ -1578,10 +1586,13 @@ export type Database = {
         }
         Update: {
           abc_period_days?: number | null
+          allow_negative_stock?: boolean
           barcode?: string | null
+          batch_no?: string | null
           category?: string | null
           cost_price?: number
           created_at?: string
+          expiry_date?: string | null
           id?: string
           import_batch_id?: string | null
           is_active?: boolean
@@ -1591,6 +1602,7 @@ export type Database = {
           min_stock?: number | null
           name?: string
           preferred_supplier_id?: string | null
+          rack_location?: string | null
           reorder_qty?: number | null
           safety_stock?: number | null
           sell_price?: number

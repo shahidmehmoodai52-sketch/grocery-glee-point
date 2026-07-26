@@ -1,0 +1,5 @@
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS batch_no TEXT,
+  ADD COLUMN IF NOT EXISTS expiry_date DATE,
+  ADD COLUMN IF NOT EXISTS rack_location TEXT,
+  ADD COLUMN IF NOT EXISTS allow_negative_stock BOOLEAN NOT NULL DEFAULT false;
