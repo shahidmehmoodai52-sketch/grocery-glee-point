@@ -2,6 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -9,10 +12,10 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Wallet, Users, ShoppingCart, Package,
-  AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt,
+  AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt, CalendarIcon,
 } from "lucide-react";
+import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -20,85 +23,115 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
+import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
 
-function startOfDay(d = new Date()) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
-function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return startOfDay(d); }
+function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function endOfDay(d: Date) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
+function diffDays(a: Date, b: Date) {
+  return Math.max(1, Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / 86400000) + 1);
+}
 
 function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
-  const since = daysAgo(29).toISOString();
+
+  const [preset, setPreset] = useState<DatePreset | "custom">("today");
+  const [from, setFrom] = useState<Date>(startOfDay(new Date()));
+  const [to, setTo] = useState<Date>(startOfDay(new Date()));
+
+  const applyPreset = (p: DatePreset) => {
+    setPreset(p);
+    const r = rangeFor(p);
+    if (p === "all") {
+      const now = new Date();
+      setFrom(new Date(2000, 0, 1));
+      setTo(startOfDay(now));
+    } else {
+      setFrom(startOfDay(new Date(r.from)));
+      setTo(startOfDay(new Date(r.to)));
+    }
+  };
+
+  const fromISO = startOfDay(from).toISOString();
+  const toISO = endOfDay(to).toISOString();
+  const spanDays = diffDays(from, to);
+
+  // Previous period for comparison
+  const prevTo = new Date(startOfDay(from).getTime() - 1);
+  const prevFrom = new Date(startOfDay(prevTo).getTime() - (spanDays - 1) * 86400000);
+  const prevFromISO = startOfDay(prevFrom).toISOString();
+  const prevToISO = endOfDay(prevTo).toISOString();
 
   const { data: sales = [] } = useQuery({
-    queryKey: ["dash-sales", since],
+    queryKey: ["dash-sales", fromISO, toISO],
     queryFn: async () =>
       (await supabase.from("sales").select("total,cost_total,discount,tax,paid,status,created_at,payment_method")
-        .gte("created_at", since)).data ?? [],
+        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+  });
+  const { data: prevSales = [] } = useQuery({
+    queryKey: ["dash-sales-prev", prevFromISO, prevToISO],
+    queryFn: async () =>
+      (await supabase.from("sales").select("total,created_at")
+        .gte("created_at", prevFromISO).lte("created_at", prevToISO)).data ?? [],
   });
   const { data: purchases = [] } = useQuery({
-    queryKey: ["dash-purchases", since],
+    queryKey: ["dash-purchases", fromISO, toISO],
     queryFn: async () =>
-      (await supabase.from("purchases").select("total,paid,created_at").gte("created_at", since)).data ?? [],
+      (await supabase.from("purchases").select("total,paid,created_at")
+        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
   });
   const { data: saleReturns = [] } = useQuery({
-    queryKey: ["dash-sale-returns", since],
+    queryKey: ["dash-sale-returns", fromISO, toISO],
     queryFn: async () =>
-      (await supabase.from("sale_returns").select("total,refund_amount,created_at").gte("created_at", since)).data ?? [],
+      (await supabase.from("sale_returns").select("total,refund_amount,created_at")
+        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
   });
   const { data: products = [] } = useQuery({
     queryKey: ["dash-products"],
     queryFn: async () =>
-      fetchAll<any>((from, to) =>
+      fetchAll<any>((f, t) =>
         supabase
           .from("products")
           .select("id,name,stock,sell_price,cost_price,is_active")
           .eq("is_active", true)
-          .range(from, to),
+          .range(f, t),
       ),
   });
   const { data: topItemsRaw = [] } = useQuery({
-    queryKey: ["dash-top-items", since],
+    queryKey: ["dash-top-items", fromISO, toISO],
     queryFn: async () =>
       (await supabase.from("sale_items").select("name,qty,line_total,sales!inner(created_at)")
-        .gte("sales.created_at", since).limit(2000)).data ?? [],
-  });
-
-  const today = startOfDay().getTime();
-  const yest = daysAgo(1).getTime();
-
-  const todaySales = sales.filter((s: any) => new Date(s.created_at).getTime() >= today);
-  const yestSales = sales.filter((s: any) => {
-    const t = new Date(s.created_at).getTime();
-    return t >= yest && t < today;
+        .gte("sales.created_at", fromISO).lte("sales.created_at", toISO).limit(2000)).data ?? [],
   });
 
   const sum = (arr: any[], k: string) => arr.reduce((a, x) => a + Number(x[k] ?? 0), 0);
-  const revToday = sum(todaySales, "total");
-  const revYest = sum(yestSales, "total");
-  const profitToday = todaySales.reduce(
+  const revenue = sum(sales, "total");
+  const prevRevenue = sum(prevSales, "total");
+  const profit = sales.reduce(
     (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
     0,
   );
-  const profit30 = sales.reduce(
-    (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
-    0,
-  );
-  const rev30 = sum(sales, "total");
-  const purch30 = sum(purchases, "total");
-  const returns30 = sum(saleReturns, "total");
-  const refunds30 = sum(saleReturns, "refund_amount");
+  const purchTotal = sum(purchases, "total");
+  const returnsTotal = sum(saleReturns, "total");
+  const refundsTotal = sum(saleReturns, "refund_amount");
+  const netRevenue = revenue - returnsTotal;
 
-  const dayDelta = revYest > 0 ? ((revToday - revYest) / revYest) * 100 : 0;
+  const delta = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
 
-  // 30-day series
+  // Time series over selected range
   const series = useMemo(() => {
     const map = new Map<string, { day: string; sales: number; profit: number; returns: number }>();
-    for (let i = 29; i >= 0; i--) {
-      const d = daysAgo(i);
-      const k = d.toISOString().slice(0, 10);
-      map.set(k, { day: k.slice(5), sales: 0, profit: 0, returns: 0 });
+    const totalDays = Math.min(spanDays, 90); // cap chart buckets
+    const stepBucket = spanDays <= 90;
+    if (stepBucket) {
+      for (let i = 0; i < spanDays; i++) {
+        const d = new Date(startOfDay(from).getTime() + i * 86400000);
+        const k = d.toISOString().slice(0, 10);
+        map.set(k, { day: k.slice(5), sales: 0, profit: 0, returns: 0 });
+      }
     }
     sales.forEach((s: any) => {
       const k = new Date(s.created_at).toISOString().slice(0, 10);
@@ -114,7 +147,7 @@ function Page() {
       row.returns += Number(r.total);
     });
     return Array.from(map.values());
-  }, [sales, saleReturns]);
+  }, [sales, saleReturns, from, spanDays]);
 
   const methodMix = useMemo(() => {
     const m = new Map<string, number>();
@@ -140,57 +173,52 @@ function Page() {
 
   const [detailKey, setDetailKey] = useState<string | null>(null);
 
+  const rangeLabel = preset === "custom"
+    ? `${format(from, "MMM d")} – ${format(to, "MMM d, yyyy")}`
+    : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
+
   const detail = useMemo(() => {
     if (!detailKey) return null;
     const fmtDate = (d: string) => new Date(d).toLocaleString();
-    const purchToday = purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today);
     const withProfit = (arr: any[]) => arr.map((s:any)=>({...s, profit: Number(s.total)-Number(s.tax)-Number(s.cost_total)}));
     switch (detailKey) {
-      case "rev-today":
-        return { title: "Today's revenue", cols: ["Date", "Method", "Status", "Total"],
-          rows: todaySales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
-          total: fmtMoney(revToday, sym) };
-      case "profit-today":
-        return { title: "Today's profit", cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
-          rows: withProfit(todaySales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
-          total: fmtMoney(profitToday, sym) };
-      case "purch-30":
-        return { title: "Purchases (30 days)", cols: ["Date", "Total", "Paid"],
+      case "revenue":
+        return { title: `Revenue · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total"],
+          rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
+          total: fmtMoney(revenue, sym) };
+      case "profit":
+        return { title: `Profit · ${rangeLabel}`, cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
+          rows: withProfit(sales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
+          total: fmtMoney(profit, sym) };
+      case "purch":
+        return { title: `Purchases · ${rangeLabel}`, cols: ["Date", "Total", "Paid"],
           rows: purchases.map((p:any)=>[fmtDate(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
-          total: fmtMoney(purch30, sym) };
-      case "purch-today":
-        return { title: "Purchases today", cols: ["Date", "Total", "Paid"],
-          rows: purchToday.map((p:any)=>[fmtDate(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
-          total: fmtMoney(purchToday.reduce((s:number,p:any)=>s+Number(p.total),0), sym) };
+          total: fmtMoney(purchTotal, sym) };
       case "inventory":
         return { title: "Inventory value", cols: ["Product", "Stock", "Cost", "Value"],
           rows: [...products].sort((a:any,b:any)=>Number(b.stock)*Number(b.cost_price)-Number(a.stock)*Number(a.cost_price)).map((p:any)=>[p.name, String(p.stock), fmtMoney(Number(p.cost_price), sym), fmtMoney(Number(p.stock)*Number(p.cost_price), sym)]),
           total: fmtMoney(inventoryValue, sym) };
-      case "returns-30":
-        return { title: "Returns (30 days)", cols: ["Date", "Total", "Refunded"],
+      case "returns":
+        return { title: `Returns · ${rangeLabel}`, cols: ["Date", "Total", "Refunded"],
           rows: saleReturns.map((r:any)=>[fmtDate(r.created_at), fmtMoney(Number(r.total), sym), fmtMoney(Number(r.refund_amount), sym)]),
-          total: fmtMoney(returns30, sym) };
-      case "rev-30":
-        return { title: "Revenue (30 days)", cols: ["Date", "Method", "Total"],
-          rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", fmtMoney(Number(s.total), sym)]),
-          total: fmtMoney(rev30, sym) };
-      case "profit-30":
-        return { title: "Profit (30 days)", cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
-          rows: withProfit(sales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
-          total: fmtMoney(profit30, sym) };
-      case "invoices-30":
-        return { title: "Invoices (30 days)", cols: ["Date", "Method", "Status", "Total", "Paid"],
+          total: fmtMoney(returnsTotal, sym) };
+      case "invoices":
+        return { title: `Invoices · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total", "Paid"],
           rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
           total: `${sales.length} invoices` };
+      case "net":
+        return { title: `Net revenue · ${rangeLabel}`, cols: ["Metric", "Amount"],
+          rows: [["Revenue", fmtMoney(revenue, sym)], ["Returns", `- ${fmtMoney(returnsTotal, sym)}`], ["Net", fmtMoney(netRevenue, sym)]],
+          total: fmtMoney(netRevenue, sym) };
     }
     return null;
-  }, [detailKey, sales, purchases, saleReturns, products, todaySales, revToday, profitToday, purch30, returns30, refunds30, rev30, profit30, inventoryValue, sym, today]);
+  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, refundsTotal, netRevenue, inventoryValue, sym, rangeLabel]);
 
   return (
     <div className="p-6 space-y-6">
       <PageHeader
         title="Dashboard"
-        description={`Overview of the last 30 days · ${new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`}
+        description={`${rangeLabel} · ${new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`}
         icon={<TrendingUp className="h-5 w-5" />}
         actions={
           <>
@@ -200,28 +228,68 @@ function Page() {
         }
       />
 
+      {/* Range selector */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={preset} onValueChange={(v) => applyPreset(v as DatePreset)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select period" />
+          </SelectTrigger>
+          <SelectContent>
+            {PRESETS.map((p) => (
+              <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+            ))}
+            {preset === "custom" && <SelectItem value="custom">Custom</SelectItem>}
+          </SelectContent>
+        </Select>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className={cn("justify-start text-left font-normal min-w-[220px]")}>
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              {format(from, "MMM d, yyyy")} – {format(to, "MMM d, yyyy")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="range"
+              selected={{ from, to }}
+              onSelect={(r: any) => {
+                if (r?.from) setFrom(startOfDay(r.from));
+                if (r?.to) setTo(startOfDay(r.to));
+                else if (r?.from) setTo(startOfDay(r.from));
+                setPreset("custom");
+              }}
+              numberOfMonths={2}
+              initialFocus
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Button variant="ghost" size="sm" onClick={() => applyPreset("today")}>Reset to Today</Button>
+      </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Kpi onClick={() => setDetailKey("rev-today")}
-          icon={TrendingUp} label="Today's revenue" value={fmtMoney(revToday, sym)}
-          delta={dayDelta} sub={`${todaySales.length} invoices`} tone="primary"
+        <Kpi onClick={() => setDetailKey("revenue")}
+          icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)}
+          delta={delta} sub={`${sales.length} invoices`} tone="primary"
         />
-        <Kpi onClick={() => setDetailKey("profit-today")}
-          icon={Wallet} label="Today's profit" value={fmtMoney(profitToday, sym)}
+        <Kpi onClick={() => setDetailKey("profit")}
+          icon={Wallet} label="Profit" value={fmtMoney(profit, sym)}
           sub="After cost & tax" tone="success"
         />
-        <Kpi onClick={() => setDetailKey("purch-30")}
-          icon={TrendingDown} label="Purchases (30d)" value={fmtMoney(purch30, sym)}
-          sub={`${fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} today`} tone="warning"
+        <Kpi onClick={() => setDetailKey("purch")}
+          icon={TrendingDown} label="Purchases" value={fmtMoney(purchTotal, sym)}
+          sub={`${purchases.length} entries`} tone="warning"
         />
         <Kpi onClick={() => setDetailKey("inventory")}
           icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
           sub={`${products.length} active SKUs`} tone="info"
         />
-        <Kpi onClick={() => setDetailKey("returns-30")}
-          icon={Undo2} label="Returns (30d)" value={fmtMoney(returns30, sym)}
-          sub={`${fmtMoney(refunds30, sym)} refunded`} tone="warning"
+        <Kpi onClick={() => setDetailKey("returns")}
+          icon={Undo2} label="Returns" value={fmtMoney(returnsTotal, sym)}
+          sub={`${fmtMoney(refundsTotal, sym)} refunded`} tone="warning"
         />
       </div>
 
@@ -231,7 +299,7 @@ function Page() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="font-semibold">Revenue & profit</h2>
-              <p className="text-xs text-muted-foreground">Last 30 days</p>
+              <p className="text-xs text-muted-foreground">{rangeLabel}</p>
             </div>
             <div className="flex gap-3 text-xs text-muted-foreground">
               <Legend2 color="var(--chart-1)" label="Sales" />
@@ -272,7 +340,7 @@ function Page() {
 
         <Card className="p-5">
           <h2 className="font-semibold">Payment mix</h2>
-          <p className="text-xs text-muted-foreground mb-2">By revenue (30d)</p>
+          <p className="text-xs text-muted-foreground mb-2">By revenue · {rangeLabel}</p>
           <div className="h-64">
             {methodMix.length === 0 ? (
               <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No data</div>
@@ -302,7 +370,7 @@ function Page() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="font-semibold">Top selling items</h2>
-              <p className="text-xs text-muted-foreground">Last 30 days</p>
+              <p className="text-xs text-muted-foreground">{rangeLabel}</p>
             </div>
           </div>
           <div className="h-64">
@@ -356,11 +424,11 @@ function Page() {
 
       {/* Period summary footer */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Mini onClick={() => setDetailKey("rev-30")} label="Revenue 30d" value={fmtMoney(rev30, sym)} icon={TrendingUp} />
-        <Mini onClick={() => setDetailKey("profit-30")} label="Profit 30d" value={fmtMoney(profit30, sym)} icon={Wallet} accent />
-        <Mini onClick={() => setDetailKey("purch-today")} label="Purchases today" value={fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} icon={TrendingDown} accent />
-        <Mini onClick={() => setDetailKey("purch-30")} label="Purchases 30d" value={fmtMoney(purch30, sym)} icon={TrendingDown} />
-        <Mini onClick={() => setDetailKey("invoices-30")} label="Invoices 30d" value={String(sales.length)} icon={Users} />
+        <Mini onClick={() => setDetailKey("revenue")} label={`Revenue · ${rangeLabel}`} value={fmtMoney(revenue, sym)} icon={TrendingUp} />
+        <Mini onClick={() => setDetailKey("net")} label="Net revenue" value={fmtMoney(netRevenue, sym)} icon={TrendingUp} accent />
+        <Mini onClick={() => setDetailKey("profit")} label="Profit" value={fmtMoney(profit, sym)} icon={Wallet} accent />
+        <Mini onClick={() => setDetailKey("purch")} label="Purchases" value={fmtMoney(purchTotal, sym)} icon={TrendingDown} />
+        <Mini onClick={() => setDetailKey("invoices")} label="Invoices" value={String(sales.length)} icon={Users} />
       </div>
 
       <Dialog open={!!detailKey} onOpenChange={(o) => !o && setDetailKey(null)}>
