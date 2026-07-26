@@ -86,7 +86,7 @@ function Page() {
   const { data: saleReturns = [] } = useQuery({
     queryKey: ["dash-sale-returns", fromISO, toISO],
     queryFn: async () =>
-      (await supabase.from("sale_returns").select("total,refund_amount,created_at")
+      (await supabase.from("sale_returns").select("total,subtotal,refund_amount,created_at,sale_return_items(qty,cost)")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
   });
   const { data: products = [] } = useQuery({
@@ -110,14 +110,20 @@ function Page() {
   const sum = (arr: any[], k: string) => arr.reduce((a, x) => a + Number(x[k] ?? 0), 0);
   const revenue = sum(sales, "total");
   const prevRevenue = sum(prevSales, "total");
-  const profit = sales.reduce(
+  const salesProfit = sales.reduce(
     (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
     0,
   );
   const purchTotal = sum(purchases, "total");
   const returnsTotal = sum(saleReturns, "total");
   const refundsTotal = sum(saleReturns, "refund_amount");
+  const returnsProfit = saleReturns.reduce((s: number, r: any) => {
+    const items = r.sale_return_items ?? [];
+    const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
+    return s + (Number(r.subtotal ?? r.total) - itemsCost);
+  }, 0);
   const netRevenue = revenue - returnsTotal;
+  const profit = salesProfit - returnsProfit;
 
   const delta = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
 
@@ -187,8 +193,8 @@ function Page() {
           rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
           total: fmtMoney(revenue, sym) };
       case "profit":
-        return { title: `Profit · ${rangeLabel}`, cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
-          rows: withProfit(sales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
+        return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
+          rows: [["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)], ["Returns profit reversed", `- ${fmtMoney(returnsProfit, sym)}`], ["Net profit", fmtMoney(profit, sym)]],
           total: fmtMoney(profit, sym) };
       case "purch":
         return { title: `Purchases · ${rangeLabel}`, cols: ["Date", "Total", "Paid"],
@@ -270,14 +276,22 @@ function Page() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <Kpi onClick={() => setDetailKey("revenue")}
           icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)}
           delta={delta} sub={`${sales.length} invoices`} tone="primary"
         />
+        <Kpi onClick={() => setDetailKey("returns")}
+          icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
+          sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
+        />
+        <Kpi onClick={() => setDetailKey("net")}
+          icon={Receipt} label="Net revenue" value={fmtMoney(netRevenue, sym)}
+          sub="Revenue − Returns" tone="info"
+        />
         <Kpi onClick={() => setDetailKey("profit")}
           icon={Wallet} label="Profit" value={fmtMoney(profit, sym)}
-          sub="After cost & tax" tone="success"
+          sub="Net of returns" tone="success"
         />
         <Kpi onClick={() => setDetailKey("purch")}
           icon={TrendingDown} label="Purchases" value={fmtMoney(purchTotal, sym)}
@@ -286,10 +300,6 @@ function Page() {
         <Kpi onClick={() => setDetailKey("inventory")}
           icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
           sub={`${products.length} active SKUs`} tone="info"
-        />
-        <Kpi onClick={() => setDetailKey("returns")}
-          icon={Undo2} label="Returns" value={fmtMoney(returnsTotal, sym)}
-          sub={`${fmtMoney(refundsTotal, sym)} refunded`} tone="warning"
         />
       </div>
 
