@@ -127,31 +127,49 @@ function Page() {
 
   const delta = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
 
-  // Time series over selected range
+  // Time series over selected range. For a single day, bucket by hour so the chart has multiple points.
   const series = useMemo(() => {
     const map = new Map<string, { day: string; sales: number; profit: number; returns: number }>();
-    const totalDays = Math.min(spanDays, 90); // cap chart buckets
-    const stepBucket = spanDays <= 90;
-    if (stepBucket) {
-      for (let i = 0; i < spanDays; i++) {
+    const hourly = spanDays <= 1;
+    if (hourly) {
+      const base = startOfDay(from).getTime();
+      for (let h = 0; h < 24; h++) {
+        const k = `H${h}`;
+        map.set(k, { day: `${String(h).padStart(2, "0")}:00`, sales: 0, profit: 0, returns: 0 });
+      }
+      const bucketOf = (iso: string) => {
+        const t = new Date(iso).getTime();
+        const h = Math.floor((t - base) / 3600000);
+        return h >= 0 && h < 24 ? `H${h}` : null;
+      };
+      sales.forEach((s: any) => {
+        const k = bucketOf(s.created_at); if (!k) return;
+        const row = map.get(k)!;
+        row.sales += Number(s.total);
+        row.profit += Number(s.total) - Number(s.tax) - Number(s.cost_total);
+      });
+      saleReturns.forEach((r: any) => {
+        const k = bucketOf(r.created_at); if (!k) return;
+        map.get(k)!.returns += Number(r.total);
+      });
+    } else {
+      for (let i = 0; i < Math.min(spanDays, 180); i++) {
         const d = new Date(startOfDay(from).getTime() + i * 86400000);
         const k = d.toISOString().slice(0, 10);
         map.set(k, { day: k.slice(5), sales: 0, profit: 0, returns: 0 });
       }
+      sales.forEach((s: any) => {
+        const k = new Date(s.created_at).toISOString().slice(0, 10);
+        const row = map.get(k); if (!row) return;
+        row.sales += Number(s.total);
+        row.profit += Number(s.total) - Number(s.tax) - Number(s.cost_total);
+      });
+      saleReturns.forEach((r: any) => {
+        const k = new Date(r.created_at).toISOString().slice(0, 10);
+        const row = map.get(k); if (!row) return;
+        row.returns += Number(r.total);
+      });
     }
-    sales.forEach((s: any) => {
-      const k = new Date(s.created_at).toISOString().slice(0, 10);
-      const row = map.get(k);
-      if (!row) return;
-      row.sales += Number(s.total);
-      row.profit += Number(s.total) - Number(s.tax) - Number(s.cost_total);
-    });
-    saleReturns.forEach((r: any) => {
-      const k = new Date(r.created_at).toISOString().slice(0, 10);
-      const row = map.get(k);
-      if (!row) return;
-      row.returns += Number(r.total);
-    });
     return Array.from(map.values());
   }, [sales, saleReturns, from, spanDays]);
 
