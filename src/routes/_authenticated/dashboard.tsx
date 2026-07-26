@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -137,6 +138,54 @@ function Page() {
     .sort((a: any, b: any) => Number(a.stock) - Number(b.stock)).slice(0, 6);
   const inventoryValue = products.reduce((s: number, p: any) => s + Number(p.stock) * Number(p.cost_price), 0);
 
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+
+  const detail = useMemo(() => {
+    if (!detailKey) return null;
+    const fmtDate = (d: string) => new Date(d).toLocaleString();
+    const purchToday = purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today);
+    const withProfit = (arr: any[]) => arr.map((s:any)=>({...s, profit: Number(s.total)-Number(s.tax)-Number(s.cost_total)}));
+    switch (detailKey) {
+      case "rev-today":
+        return { title: "Today's revenue", cols: ["Date", "Method", "Status", "Total"],
+          rows: todaySales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
+          total: fmtMoney(revToday, sym) };
+      case "profit-today":
+        return { title: "Today's profit", cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
+          rows: withProfit(todaySales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
+          total: fmtMoney(profitToday, sym) };
+      case "purch-30":
+        return { title: "Purchases (30 days)", cols: ["Date", "Total", "Paid"],
+          rows: purchases.map((p:any)=>[fmtDate(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
+          total: fmtMoney(purch30, sym) };
+      case "purch-today":
+        return { title: "Purchases today", cols: ["Date", "Total", "Paid"],
+          rows: purchToday.map((p:any)=>[fmtDate(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
+          total: fmtMoney(purchToday.reduce((s:number,p:any)=>s+Number(p.total),0), sym) };
+      case "inventory":
+        return { title: "Inventory value", cols: ["Product", "Stock", "Cost", "Value"],
+          rows: [...products].sort((a:any,b:any)=>Number(b.stock)*Number(b.cost_price)-Number(a.stock)*Number(a.cost_price)).map((p:any)=>[p.name, String(p.stock), fmtMoney(Number(p.cost_price), sym), fmtMoney(Number(p.stock)*Number(p.cost_price), sym)]),
+          total: fmtMoney(inventoryValue, sym) };
+      case "returns-30":
+        return { title: "Returns (30 days)", cols: ["Date", "Total", "Refunded"],
+          rows: saleReturns.map((r:any)=>[fmtDate(r.created_at), fmtMoney(Number(r.total), sym), fmtMoney(Number(r.refund_amount), sym)]),
+          total: fmtMoney(returns30, sym) };
+      case "rev-30":
+        return { title: "Revenue (30 days)", cols: ["Date", "Method", "Total"],
+          rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", fmtMoney(Number(s.total), sym)]),
+          total: fmtMoney(rev30, sym) };
+      case "profit-30":
+        return { title: "Profit (30 days)", cols: ["Date", "Sale total", "Cost", "Tax", "Profit"],
+          rows: withProfit(sales).map((s:any)=>[fmtDate(s.created_at), fmtMoney(Number(s.total), sym), fmtMoney(Number(s.cost_total), sym), fmtMoney(Number(s.tax), sym), fmtMoney(s.profit, sym)]),
+          total: fmtMoney(profit30, sym) };
+      case "invoices-30":
+        return { title: "Invoices (30 days)", cols: ["Date", "Method", "Status", "Total", "Paid"],
+          rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
+          total: `${sales.length} invoices` };
+    }
+    return null;
+  }, [detailKey, sales, purchases, saleReturns, products, todaySales, revToday, profitToday, purch30, returns30, refunds30, rev30, profit30, inventoryValue, sym, today]);
+
   return (
     <div className="p-6 space-y-6">
       <PageHeader
@@ -154,23 +203,23 @@ function Page() {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Kpi
+        <Kpi onClick={() => setDetailKey("rev-today")}
           icon={TrendingUp} label="Today's revenue" value={fmtMoney(revToday, sym)}
           delta={dayDelta} sub={`${todaySales.length} invoices`} tone="primary"
         />
-        <Kpi
+        <Kpi onClick={() => setDetailKey("profit-today")}
           icon={Wallet} label="Today's profit" value={fmtMoney(profitToday, sym)}
           sub="After cost & tax" tone="success"
         />
-        <Kpi
+        <Kpi onClick={() => setDetailKey("purch-30")}
           icon={TrendingDown} label="Purchases (30d)" value={fmtMoney(purch30, sym)}
           sub={`${fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} today`} tone="warning"
         />
-        <Kpi
+        <Kpi onClick={() => setDetailKey("inventory")}
           icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
           sub={`${products.length} active SKUs`} tone="info"
         />
-        <Kpi
+        <Kpi onClick={() => setDetailKey("returns-30")}
           icon={Undo2} label="Returns (30d)" value={fmtMoney(returns30, sym)}
           sub={`${fmtMoney(refunds30, sym)} refunded`} tone="warning"
         />
@@ -307,19 +356,46 @@ function Page() {
 
       {/* Period summary footer */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Mini label="Revenue 30d" value={fmtMoney(rev30, sym)} icon={TrendingUp} />
-        <Mini label="Profit 30d" value={fmtMoney(profit30, sym)} icon={Wallet} accent />
-        <Mini label="Purchases today" value={fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} icon={TrendingDown} accent />
-        <Mini label="Purchases 30d" value={fmtMoney(purch30, sym)} icon={TrendingDown} />
-        <Mini label="Invoices 30d" value={String(sales.length)} icon={Users} />
+        <Mini onClick={() => setDetailKey("rev-30")} label="Revenue 30d" value={fmtMoney(rev30, sym)} icon={TrendingUp} />
+        <Mini onClick={() => setDetailKey("profit-30")} label="Profit 30d" value={fmtMoney(profit30, sym)} icon={Wallet} accent />
+        <Mini onClick={() => setDetailKey("purch-today")} label="Purchases today" value={fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} icon={TrendingDown} accent />
+        <Mini onClick={() => setDetailKey("purch-30")} label="Purchases 30d" value={fmtMoney(purch30, sym)} icon={TrendingDown} />
+        <Mini onClick={() => setDetailKey("invoices-30")} label="Invoices 30d" value={String(sales.length)} icon={Users} />
       </div>
+
+      <Dialog open={!!detailKey} onOpenChange={(o) => !o && setDetailKey(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{detail?.title}</DialogTitle>
+            <DialogDescription>Total: <span className="font-semibold text-foreground">{detail?.total}</span> · {detail?.rows.length ?? 0} record(s)</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto border rounded-md">
+            {detail && detail.rows.length > 0 ? (
+              <table className="w-full text-sm">
+                <thead className="bg-muted sticky top-0">
+                  <tr>{detail.cols.map((c) => <th key={c} className="text-left px-3 py-2 font-medium">{c}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {detail.rows.map((r, i) => (
+                    <tr key={i} className="border-t">
+                      {r.map((cell, j) => <td key={j} className="px-3 py-2">{cell}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-8 text-center text-sm text-muted-foreground">No records</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function Kpi({
-  icon: Icon, label, value, delta, sub, tone,
-}: { icon: any; label: string; value: string; delta?: number; sub?: string; tone: string }) {
+  icon: Icon, label, value, delta, sub, tone, onClick,
+}: { icon: any; label: string; value: string; delta?: number; sub?: string; tone: string; onClick?: () => void }) {
   const ring: Record<string, string> = {
     primary: "from-primary/15 to-primary/0 text-primary",
     success: "from-success/15 to-success/0 text-success",
@@ -327,7 +403,7 @@ function Kpi({
     info: "from-chart-5/20 to-chart-5/0 text-foreground",
   };
   return (
-    <Card className="p-5 relative overflow-hidden">
+    <Card onClick={onClick} className={`p-5 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
       <div className={`absolute inset-0 bg-gradient-to-br ${ring[tone]} pointer-events-none`} />
       <div className="relative">
         <div className="flex items-center justify-between">
@@ -351,9 +427,9 @@ function Kpi({
   );
 }
 
-function Mini({ label, value, icon: Icon, accent }: { label: string; value: string; icon: any; accent?: boolean }) {
+function Mini({ label, value, icon: Icon, accent, onClick }: { label: string; value: string; icon: any; accent?: boolean; onClick?: () => void }) {
   return (
-    <Card className="p-4 flex items-center gap-3">
+    <Card onClick={onClick} className={`p-4 flex items-center gap-3 ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
       <div className={`h-9 w-9 rounded-md flex items-center justify-center ${accent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
         <Icon className="h-4 w-4" />
       </div>
