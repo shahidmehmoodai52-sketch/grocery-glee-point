@@ -476,12 +476,12 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
   };
 
-  const accById = (id: string) => accounts.find((a) => a.id === id);
+  const accById = (id: string) => allAccounts.find((a) => a.id === id);
   const fmt = (n: number) => fmtMoney(n, sym);
 
   const reportRows = useMemo(() => {
     // In current filter window, per-account totals
-    return accounts.map((a) => {
+    return allAccounts.map((a) => {
       let inSum = 0, outSum = 0;
       for (const t of filteredTx) {
         if (t.account_id !== a.id) continue;
