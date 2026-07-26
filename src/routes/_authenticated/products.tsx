@@ -216,17 +216,6 @@ function ProductsPage() {
                 )}
                 <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
                 <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
-                <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
-                <div className="col-span-2">
-                  <Label>Supplier</Label>
-                  <Select value={form.preferred_supplier_id || "none"} onValueChange={(v) => setForm({ ...form, preferred_supplier_id: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div><Label>Batch #</Label><Input value={form.batch_no} onChange={(e) => setForm({ ...form, batch_no: e.target.value })} placeholder="e.g. B-2026-01" /></div>
                 <div><Label>Expiry date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
                 <div className="col-span-2"><Label>Rack / Shelf location</Label><Input value={form.rack_location} onChange={(e) => setForm({ ...form, rack_location: e.target.value })} placeholder="e.g. A-3, Shelf 2" /></div>
