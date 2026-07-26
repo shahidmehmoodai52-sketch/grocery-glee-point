@@ -1258,7 +1258,12 @@ function POSPage() {
             <Badge variant="secondary" className="h-5 px-1.5 text-[11px] shrink-0">
               {tab.items.length} item{tab.items.length === 1 ? "" : "s"}
             </Badge>
-            {tab.restored && (
+            {tab.editing_sale_id && (
+              <Badge className="bg-primary/15 text-primary border border-primary/30 text-[11px] shrink-0 rounded-full">
+                <Pencil className="h-3 w-3 mr-1" /> EDITING {tab.editing_invoice_no ?? ""}
+              </Badge>
+            )}
+            {tab.restored && !tab.editing_sale_id && (
               <Badge className="bg-warning text-warning-foreground text-[11px] shrink-0 rounded-full">
                 ↩ RESTORED SALE
               </Badge>
