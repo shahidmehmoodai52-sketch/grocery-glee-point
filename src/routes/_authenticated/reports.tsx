@@ -272,7 +272,9 @@ function Page() {
             <h2 className="font-semibold mb-3">Profit &amp; Loss Statement</h2>
             <Table>
               <TableBody>
-                <Row label="Sales (net of discount)" value={fmtMoney(revenue, sym)} />
+                <Row label="Gross sales (before returns)" value={fmtMoney(grossRevenue, sym)} muted />
+                <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted />
+                <Row label="Sales (net of returns & discount)" value={fmtMoney(revenue, sym)} />
                 <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} />
                 <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold />
                 <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
