@@ -9,6 +9,7 @@ export const ADMIN_PERMS = [
   { key: "shops.set_expiry", label: "Set shop expiry date" },
   { key: "shops.reset_password", label: "Reset shop owner password" },
   { key: "shops.delete", label: "Delete shops (destructive)" },
+  { key: "library.manage", label: "Manage global product library (approve, edit, remove)" },
 ] as const;
 
 export function useAdminAccess() {
