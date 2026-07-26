@@ -67,9 +67,15 @@ function Page() {
   const returns = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at)), [allReturns, fromDate, toDate]);
 
   const rangeTotal = sales.reduce((s: number, x: any) => s + Number(x.total), 0);
-  const rangeProfit = sales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
+  const salesProfit = sales.reduce((s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)), 0);
   const rangeReturns = returns.reduce((s: number, x: any) => s + Number(x.total), 0);
+  const returnsProfit = returns.reduce((s: number, r: any) => {
+    const items = r.sale_return_items ?? [];
+    const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
+    return s + (Number(r.subtotal ?? r.total) - itemsCost);
+  }, 0);
   const netRevenue = rangeTotal - rangeReturns;
+  const rangeProfit = salesProfit - returnsProfit;
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
 
