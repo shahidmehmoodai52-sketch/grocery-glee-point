@@ -171,6 +171,10 @@ function Page() {
       .select("id,party_type,party_id,amount,method,note,created_at")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
   });
+  const suppliersQ = useQuery({
+    queryKey: ["cf-suppliers"],
+    queryFn: async () => (await supabase.from("suppliers").select("id,name,balance").order("name")).data ?? [],
+  });
 
   const accounts = accountsQ.data ?? [];
   const rawTxs = txQ.data ?? [];
