@@ -945,7 +945,7 @@ function Page() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {accounts.map((a) => {
+                        {allAccounts.map((a) => {
                           const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
                           const bal = Number(a.opening_balance) + b.inSum - b.outSum;
                           return (
