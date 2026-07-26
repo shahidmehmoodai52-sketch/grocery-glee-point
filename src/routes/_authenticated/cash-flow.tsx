@@ -687,11 +687,15 @@ function Page() {
                 )}
                 {filteredTx.map((t) => {
                   const acc = accById(t.account_id);
+                  const auto = isAutoTx(t.id);
                   return (
                     <TableRow key={t.id}>
                       <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
                       <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>
-                      <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
+                      <TableCell className="capitalize">
+                        {t.category.replace(/_/g, " ")}
+                        {auto && <Badge variant="outline" className="ml-2 text-[10px]">Auto</Badge>}
+                      </TableCell>
                       <TableCell className="max-w-[300px] truncate">
                         {t.reference && <span className="font-medium">{t.reference}</span>}
                         {t.reference && t.notes && <span> — </span>}
@@ -701,10 +705,14 @@ function Page() {
                       <TableCell className="text-right text-rose-600">{t.direction === "out" ? fmt(Number(t.amount)) : ""}</TableCell>
                       {isAdmin && (
                         <TableCell>
-                          <div className="flex gap-1">
-                            <Button size="icon" variant="ghost" onClick={() => openTxEdit(t)}><Pencil className="h-4 w-4" /></Button>
-                            <Button size="icon" variant="ghost" onClick={() => deleteTx(t.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
-                          </div>
+                          {!auto ? (
+                            <div className="flex gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => openTxEdit(t)}><Pencil className="h-4 w-4" /></Button>
+                              <Button size="icon" variant="ghost" onClick={() => deleteTx(t.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">from POS</span>
+                          )}
                         </TableCell>
                       )}
                     </TableRow>
