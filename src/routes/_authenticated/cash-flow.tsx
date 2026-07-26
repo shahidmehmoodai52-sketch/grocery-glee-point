@@ -673,6 +673,118 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Details dialog */}
+      <Dialog open={!!details} onOpenChange={(o) => !o && setDetails(null)}>
+        <DialogContent className="max-w-3xl">
+          {(() => {
+            if (!details) return null;
+            if (details.kind === "opening" || details.kind === "balance") {
+              const title = details.kind === "opening" ? "Opening balance — per account" : "Cash on hand — per account";
+              return (
+                <>
+                  <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+                  <div className="max-h-[60vh] overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead className="text-right">Opening</TableHead>
+                          <TableHead className="text-right">In</TableHead>
+                          <TableHead className="text-right">Out</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accounts.map((a) => {
+                          const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
+                          const bal = Number(a.opening_balance) + b.inSum - b.outSum;
+                          return (
+                            <TableRow key={a.id}>
+                              <TableCell className="font-medium">{a.name}</TableCell>
+                              <TableCell className="text-muted-foreground">{labelFor(a.type)}</TableCell>
+                              <TableCell className="text-right">{fmt(Number(a.opening_balance))}</TableCell>
+                              <TableCell className="text-right text-emerald-600">{fmt(b.inSum)}</TableCell>
+                              <TableCell className="text-right text-rose-600">{fmt(b.outSum)}</TableCell>
+                              <TableCell className="text-right font-bold">{fmt(bal)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              );
+            }
+            const dir = details.kind === "in" ? "in" : details.kind === "out" ? "out" : null;
+            const accId = details.kind === "account" ? details.accountId : null;
+            const list = txs.filter((t) => {
+              if (dir && t.direction !== dir) return false;
+              if (accId && t.account_id !== accId) return false;
+              return true;
+            });
+            const inTot = list.filter((t) => t.direction === "in").reduce((s, t) => s + Number(t.amount), 0);
+            const outTot = list.filter((t) => t.direction === "out").reduce((s, t) => s + Number(t.amount), 0);
+            const title =
+              details.kind === "in" ? "Every payment received"
+              : details.kind === "out" ? "Every payment sent"
+              : `${accById(accId!)?.name ?? "Account"} — full history`;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{title}</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <span>Entries: <b>{list.length}</b></span>
+                  <span className="text-emerald-600">In: <b>{fmt(inTot)}</b></span>
+                  <span className="text-rose-600">Out: <b>{fmt(outTot)}</b></span>
+                  <span>Net: <b>{fmt(inTot - outTot)}</b></span>
+                </div>
+                <div className="max-h-[60vh] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        {!accId && <TableHead>Account</TableHead>}
+                        <TableHead>Category</TableHead>
+                        <TableHead>Reference / Notes</TableHead>
+                        <TableHead className="text-right">In</TableHead>
+                        <TableHead className="text-right">Out</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {list.length === 0 && (
+                        <TableRow><TableCell colSpan={accId ? 5 : 6} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                      )}
+                      {list.map((t) => {
+                        const acc = accById(t.account_id);
+                        return (
+                          <TableRow key={t.id}>
+                            <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
+                            {!accId && <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>}
+                            <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
+                            <TableCell className="max-w-[280px] truncate">
+                              {t.reference && <span className="font-medium">{t.reference}</span>}
+                              {t.reference && t.notes && <span> — </span>}
+                              {t.notes && <span className="text-muted-foreground">{t.notes}</span>}
+                            </TableCell>
+                            <TableCell className="text-right text-emerald-600">{t.direction === "in" ? fmt(Number(t.amount)) : ""}</TableCell>
+                            <TableCell className="text-right text-rose-600">{t.direction === "out" ? fmt(Number(t.amount)) : ""}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetails(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
