@@ -33,7 +33,7 @@ type ProductForm = {
   preferred_supplier_id: string;
   batch_no: string; expiry_date: string; rack_location: string; allow_negative_stock: boolean;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: false };
+const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true };
 
 function ProductsPage() {
   const qc = useQueryClient();
@@ -177,6 +177,16 @@ function ProductsPage() {
               <DialogHeader><DialogTitle>{form.id ? "Edit" : "New"} product</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                <div className="col-span-2">
+                  <Label>Supplier</Label>
+                  <Select value={form.preferred_supplier_id || "none"} onValueChange={(v) => setForm({ ...form, preferred_supplier_id: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— None —</SelectItem>
+                      {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
                 <div><Label>Primary barcode <span className="text-destructive">*</span></Label><Input required value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
                 <div className="col-span-2">
@@ -207,16 +217,6 @@ function ProductsPage() {
                 <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} /></div>
                 <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} /></div>
                 <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
-                <div className="col-span-2">
-                  <Label>Supplier</Label>
-                  <Select value={form.preferred_supplier_id || "none"} onValueChange={(v) => setForm({ ...form, preferred_supplier_id: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div><Label>Batch #</Label><Input value={form.batch_no} onChange={(e) => setForm({ ...form, batch_no: e.target.value })} placeholder="e.g. B-2026-01" /></div>
                 <div><Label>Expiry date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
                 <div className="col-span-2"><Label>Rack / Shelf location</Label><Input value={form.rack_location} onChange={(e) => setForm({ ...form, rack_location: e.target.value })} placeholder="e.g. A-3, Shelf 2" /></div>
