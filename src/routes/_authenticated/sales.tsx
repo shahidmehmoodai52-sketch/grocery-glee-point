@@ -151,16 +151,18 @@ function Page() {
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{presetLabel} · revenue</div>
-          <div className="text-2xl font-semibold mt-1 text-primary">{fmtMoney(rangeTotal, sym)}</div>
+          <div className="text-2xl font-semibold mt-1 text-primary">{fmtMoney(netRevenue, sym)}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">After returns</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">{presetLabel} · gross sales</div>
+          <div className="text-2xl font-semibold mt-1">{fmtMoney(rangeTotal, sym)}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Before returns</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{presetLabel} · returns</div>
           <div className="text-2xl font-semibold mt-1 text-destructive">-{fmtMoney(rangeReturns, sym)}</div>
           <div className="text-xs text-muted-foreground mt-0.5">{returns.length} refund{returns.length === 1 ? "" : "s"}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · net revenue</div>
-          <div className="text-2xl font-semibold mt-1">{fmtMoney(netRevenue, sym)}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{presetLabel} · profit</div>
