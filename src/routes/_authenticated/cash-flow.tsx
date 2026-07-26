@@ -97,6 +97,12 @@ function Page() {
   const [dateTo, setDateTo] = useState("");
   const [filterAcc, setFilterAcc] = useState<string>("all");
 
+  const [details, setDetails] = useState<
+    | { kind: "opening" | "in" | "out" | "balance" }
+    | { kind: "account"; accountId: string }
+    | null
+  >(null);
+
   const accountsQ = useQuery({
     queryKey: ["cash-accounts"],
     queryFn: async () => {
@@ -294,21 +300,45 @@ function Page() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-4">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setDetails({ kind: "opening" })}
+          className="p-4 cursor-pointer hover:shadow-md hover:border-primary/40 transition"
+        >
           <div className="text-xs text-muted-foreground">Opening balance</div>
           <div className="text-2xl font-bold mt-1">{fmt(totals.opening)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Click to see per-account opening</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setDetails({ kind: "in" })}
+          className="p-4 cursor-pointer hover:shadow-md hover:border-emerald-500/40 transition"
+        >
           <div className="text-xs text-muted-foreground">Total received</div>
           <div className="text-2xl font-bold mt-1 text-emerald-600">{fmt(totals.inSum)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Click to see every payment received</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setDetails({ kind: "out" })}
+          className="p-4 cursor-pointer hover:shadow-md hover:border-rose-500/40 transition"
+        >
           <div className="text-xs text-muted-foreground">Total paid out</div>
           <div className="text-2xl font-bold mt-1 text-rose-600">{fmt(totals.outSum)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Click to see every payment sent</div>
         </Card>
-        <Card className="p-4 border-primary/40">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setDetails({ kind: "balance" })}
+          className="p-4 cursor-pointer hover:shadow-md border-primary/40 hover:border-primary transition"
+        >
           <div className="text-xs text-muted-foreground">Cash on hand (all accounts)</div>
           <div className="text-2xl font-bold mt-1">{fmt(totals.balance)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Click to see per-account balance</div>
         </Card>
       </div>
 
@@ -332,7 +362,13 @@ function Page() {
                 const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
                 const bal = Number(a.opening_balance) + b.inSum - b.outSum;
                 return (
-                  <Card key={a.id} className="p-4">
+                  <Card
+                    key={a.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetails({ kind: "account", accountId: a.id })}
+                    className="p-4 cursor-pointer hover:shadow-md hover:border-primary/40 transition"
+                  >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
                         <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
@@ -352,7 +388,7 @@ function Page() {
                       <span className="text-rose-600">Out {fmt(b.outSum)}</span>
                     </div>
                     {isAdmin && (
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button size="sm" variant="secondary" onClick={() => openTxCreate("in", a.id)}>Receive</Button>
                         <Button size="sm" variant="outline" onClick={() => openTxCreate("out", a.id)}>Pay</Button>
                         <Button size="sm" variant="ghost" onClick={() => openAccEdit(a)}><Pencil className="h-4 w-4" /></Button>
@@ -634,6 +670,118 @@ function Page() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setTfOpen(false)}>Cancel</Button>
             <Button onClick={saveTransfer}>Record transfer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Details dialog */}
+      <Dialog open={!!details} onOpenChange={(o) => !o && setDetails(null)}>
+        <DialogContent className="max-w-3xl">
+          {(() => {
+            if (!details) return null;
+            if (details.kind === "opening" || details.kind === "balance") {
+              const title = details.kind === "opening" ? "Opening balance — per account" : "Cash on hand — per account";
+              return (
+                <>
+                  <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+                  <div className="max-h-[60vh] overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead className="text-right">Opening</TableHead>
+                          <TableHead className="text-right">In</TableHead>
+                          <TableHead className="text-right">Out</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accounts.map((a) => {
+                          const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
+                          const bal = Number(a.opening_balance) + b.inSum - b.outSum;
+                          return (
+                            <TableRow key={a.id}>
+                              <TableCell className="font-medium">{a.name}</TableCell>
+                              <TableCell className="text-muted-foreground">{labelFor(a.type)}</TableCell>
+                              <TableCell className="text-right">{fmt(Number(a.opening_balance))}</TableCell>
+                              <TableCell className="text-right text-emerald-600">{fmt(b.inSum)}</TableCell>
+                              <TableCell className="text-right text-rose-600">{fmt(b.outSum)}</TableCell>
+                              <TableCell className="text-right font-bold">{fmt(bal)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              );
+            }
+            const dir = details.kind === "in" ? "in" : details.kind === "out" ? "out" : null;
+            const accId = details.kind === "account" ? details.accountId : null;
+            const list = txs.filter((t) => {
+              if (dir && t.direction !== dir) return false;
+              if (accId && t.account_id !== accId) return false;
+              return true;
+            });
+            const inTot = list.filter((t) => t.direction === "in").reduce((s, t) => s + Number(t.amount), 0);
+            const outTot = list.filter((t) => t.direction === "out").reduce((s, t) => s + Number(t.amount), 0);
+            const title =
+              details.kind === "in" ? "Every payment received"
+              : details.kind === "out" ? "Every payment sent"
+              : `${accById(accId!)?.name ?? "Account"} — full history`;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{title}</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <span>Entries: <b>{list.length}</b></span>
+                  <span className="text-emerald-600">In: <b>{fmt(inTot)}</b></span>
+                  <span className="text-rose-600">Out: <b>{fmt(outTot)}</b></span>
+                  <span>Net: <b>{fmt(inTot - outTot)}</b></span>
+                </div>
+                <div className="max-h-[60vh] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        {!accId && <TableHead>Account</TableHead>}
+                        <TableHead>Category</TableHead>
+                        <TableHead>Reference / Notes</TableHead>
+                        <TableHead className="text-right">In</TableHead>
+                        <TableHead className="text-right">Out</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {list.length === 0 && (
+                        <TableRow><TableCell colSpan={accId ? 5 : 6} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                      )}
+                      {list.map((t) => {
+                        const acc = accById(t.account_id);
+                        return (
+                          <TableRow key={t.id}>
+                            <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
+                            {!accId && <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>}
+                            <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
+                            <TableCell className="max-w-[280px] truncate">
+                              {t.reference && <span className="font-medium">{t.reference}</span>}
+                              {t.reference && t.notes && <span> — </span>}
+                              {t.notes && <span className="text-muted-foreground">{t.notes}</span>}
+                            </TableCell>
+                            <TableCell className="text-right text-emerald-600">{t.direction === "in" ? fmt(Number(t.amount)) : ""}</TableCell>
+                            <TableCell className="text-right text-rose-600">{t.direction === "out" ? fmt(Number(t.amount)) : ""}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetails(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
