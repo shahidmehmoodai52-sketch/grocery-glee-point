@@ -181,30 +181,13 @@ function Page() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · sales</div>
-          <div className="text-2xl font-semibold mt-1">{sales.length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · revenue</div>
-          <div className="text-2xl font-semibold mt-1 text-primary">{fmtMoney(netRevenue, sym)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">After returns</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · gross sales</div>
-          <div className="text-2xl font-semibold mt-1">{fmtMoney(rangeTotal, sym)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Before returns</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · returns</div>
-          <div className="text-2xl font-semibold mt-1 text-destructive">-{fmtMoney(rangeReturns, sym)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">{returns.length} refund{returns.length === 1 ? "" : "s"}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{presetLabel} · profit</div>
-          <div className="text-2xl font-semibold mt-1 text-success">{fmtMoney(rangeProfit, sym)}</div>
-        </Card>
+        <KpiCard icon={ReceiptIcon} tone="info" label={`${presetLabel} · invoices`} value={String(sales.length)} delta={dCount} sub={`${prevSales.length} last period`} />
+        <KpiCard icon={TrendingUp} tone="primary" label={`${presetLabel} · revenue`} value={fmtMoney(netRevenue, sym)} delta={dRev} sub="After returns" />
+        <KpiCard icon={TrendingUp} tone="info" label={`${presetLabel} · gross sales`} value={fmtMoney(rangeTotal, sym)} delta={dGross} sub="Before returns" />
+        <KpiCard icon={Undo2} tone="destructive" label={`${presetLabel} · returns`} value={`-${fmtMoney(rangeReturns, sym)}`} delta={dRet} deltaInverse sub={`${returns.length} refund${returns.length === 1 ? "" : "s"}`} />
+        <KpiCard icon={Wallet} tone="success" label={`${presetLabel} · profit`} value={fmtMoney(rangeProfit, sym)} delta={dProf} sub="Net of returns" />
       </div>
+
 
 
       <Card className="p-3">
