@@ -304,10 +304,12 @@ function Page() {
         tax: taxAmt, paid, note,
         items: items.map((l) => {
           const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
-          const share = sub > 0 ? taxAmt * (lineNet / sub) : 0;
-          const effCost = l.qty > 0 ? (lineNet + share) / l.qty : l.cost;
+          const taxShare = sub > 0 ? taxAmt * (lineNet / sub) : 0;
+          const discShare = sub > 0 ? billDiscountAmt * (lineNet / sub) : 0;
+          const effCost = l.qty > 0 ? Math.max(0, lineNet + taxShare - discShare) / l.qty : l.cost;
           return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
         }),
+
       },
     });
     setSaving(false);
