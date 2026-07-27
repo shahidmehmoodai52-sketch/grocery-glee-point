@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library, ShieldCheck, Box, Coins,
+  BarChart3, Settings, LogOut, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library, ShieldCheck, Box, Coins, Scale,
 } from "lucide-react";
 
 
@@ -16,7 +16,7 @@ import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { OfflineStatusBadge } from "@/components/offline-status";
 
 
-type Item = { title: string; url: string; icon: any; perm: string; adminOnly?: boolean };
+type Item = { title: string; url: string; icon: any; perm: string; adminOnly?: boolean; search?: Record<string, any> };
 const groups: { label: string; items: Item[] }[] = [
   {
     label: "Overview",
@@ -49,6 +49,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Bulk import", url: "/import", icon: Upload, perm: "import" },
       { title: "Stock count", url: "/stock-count", icon: ClipboardCheck, perm: "stock-count" },
       { title: "Expiry & waste", url: "/expiry", icon: CalendarClock, perm: "expiry" },
+      { title: "Short & Excess", url: "/expiry", icon: Scale, perm: "expiry", search: { tab: "shortexcess" } },
       { title: "Intelligence", url: "/intelligence", icon: Brain, perm: "intelligence" },
       { title: "Global library", url: "/library", icon: Library, perm: "library" },
       { title: "Assets", url: "/assets", icon: Box, perm: "assets" },
@@ -127,7 +128,7 @@ export function AppSidebar() {
                 {g.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                      <Link to={item.url} className="flex items-center gap-2">
+                      <Link to={item.url} search={item.search as any} className="flex items-center gap-2">
                         <item.icon className="h-4 w-4" />
                         {!collapsed && <span>{item.title}</span>}
                       </Link>

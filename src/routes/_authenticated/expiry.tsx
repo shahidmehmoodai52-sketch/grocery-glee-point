@@ -59,6 +59,9 @@ import { PageHeader } from "@/components/ui/page-header";
 
 export const Route = createFileRoute("/_authenticated/expiry")({
   component: ExpiryPage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    tab: (typeof s.tab === "string" ? s.tab : "batches") as string,
+  }),
 });
 
 type Batch = {
@@ -96,6 +99,8 @@ function ExpiryPage() {
   const { isAdmin, can } = usePermissions();
   const sym = settings?.currency_symbol ?? "Rs";
   const canWrite = isAdmin || can("products");
+  const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
 
   const batchesQ = useQuery({
     queryKey: ["batches-status"],
@@ -145,7 +150,7 @@ function ExpiryPage() {
         <StatCard label="Products at risk" value={String(stats.atRisk)} tone="amber" icon={AlertTriangle} />
       </div>
 
-      <Tabs defaultValue="batches" className="mt-4">
+      <Tabs value={tab} onValueChange={(v) => navigate({ search: { tab: v }, replace: true })} className="mt-4">
         <TabsList>
           <TabsTrigger value="batches">Batches</TabsTrigger>
           <TabsTrigger value="damage">Damage log</TabsTrigger>
