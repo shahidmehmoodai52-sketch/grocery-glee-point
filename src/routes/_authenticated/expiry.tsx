@@ -150,6 +150,7 @@ function ExpiryPage() {
           <TabsTrigger value="batches">Batches</TabsTrigger>
           <TabsTrigger value="damage">Damage log</TabsTrigger>
           <TabsTrigger value="waste">Waste log</TabsTrigger>
+          <TabsTrigger value="shortexcess">Short & Excess</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
@@ -161,6 +162,9 @@ function ExpiryPage() {
         </TabsContent>
         <TabsContent value="waste" className="mt-4">
           <WasteTab sym={sym} canWrite={canWrite} />
+        </TabsContent>
+        <TabsContent value="shortexcess" className="mt-4">
+          <ShortExcessTab sym={sym} />
         </TabsContent>
         <TabsContent value="reports" className="mt-4">
           <ReportsTab sym={sym} />
