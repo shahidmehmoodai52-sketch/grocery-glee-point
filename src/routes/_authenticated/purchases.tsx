@@ -527,6 +527,17 @@ function Page() {
                                 <Input
                                   type="number"
                                   step="0.01"
+                                  value={l.discount ? l.discount : ""}
+                                  placeholder="0"
+                                  onChange={(e) => setLine(i, { discount: Number(e.target.value) })}
+                                  className="h-8 text-right text-sm"
+                                  title="Discount amount on this line (subtracted before tax)"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
                                   value={totalDisplay ? totalDisplay : ""}
                                   placeholder="0"
                                   onChange={(e) => {
