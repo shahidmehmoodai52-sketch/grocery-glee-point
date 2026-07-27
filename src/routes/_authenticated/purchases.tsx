@@ -29,10 +29,13 @@ type Draft = {
   lines: Line[];
   tax: number;
   taxMode: "amt" | "pct";
+  discount: number;
+  discountMode: "amt" | "pct";
   paid: number;
   note: string;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", paid: 0, note: "" };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "" };
+
 
 const normalizeItemCode = (value: string | null | undefined) => {
   const raw = String(value ?? "").trim().toLowerCase();
@@ -48,14 +51,19 @@ function Page() {
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
   const { open, supplier, lines, tax, paid, note } = draft;
   const taxMode: "amt" | "pct" = draft.taxMode ?? "amt";
+  const billDiscount = Number(draft.discount ?? 0);
+  const discountMode: "amt" | "pct" = draft.discountMode ?? "amt";
   const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
     setDraft((d) => ({ ...d, lines: typeof updater === "function" ? (updater as any)(d.lines) : updater }));
   const setTax = (v: number) => setDraft((d) => ({ ...d, tax: v }));
   const setTaxMode = (v: "amt" | "pct") => setDraft((d) => ({ ...d, taxMode: v }));
+  const setBillDiscount = (v: number) => setDraft((d) => ({ ...d, discount: v }));
+  const setDiscountMode = (v: "amt" | "pct") => setDraft((d) => ({ ...d, discountMode: v }));
   const setPaid = (v: number) => setDraft((d) => ({ ...d, paid: v }));
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
+
 
   const [search, setSearch] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -274,7 +282,12 @@ function Page() {
   const discountTotal = lines.reduce((s, l) => s + Number(l.discount || 0), 0);
   const subtotal = lines.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
   const taxAmt = taxMode === "pct" ? +(subtotal * (Number(tax || 0) / 100)).toFixed(2) : Number(tax || 0);
-  const total = subtotal + taxAmt;
+  const billDiscountAmt = Math.min(
+    subtotal + taxAmt,
+    Math.max(0, discountMode === "pct" ? +(subtotal * (billDiscount / 100)).toFixed(2) : billDiscount),
+  );
+  const total = Math.max(0, subtotal + taxAmt - billDiscountAmt);
+
 
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -291,10 +304,12 @@ function Page() {
         tax: taxAmt, paid, note,
         items: items.map((l) => {
           const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
-          const share = sub > 0 ? taxAmt * (lineNet / sub) : 0;
-          const effCost = l.qty > 0 ? (lineNet + share) / l.qty : l.cost;
+          const taxShare = sub > 0 ? taxAmt * (lineNet / sub) : 0;
+          const discShare = sub > 0 ? billDiscountAmt * (lineNet / sub) : 0;
+          const effCost = l.qty > 0 ? Math.max(0, lineNet + taxShare - discShare) / l.qty : l.cost;
           return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
         }),
+
       },
     });
     setSaving(false);
@@ -308,7 +323,7 @@ function Page() {
   };
 
 
-  const hasDraft = lines.length > 0 || !!note || tax > 0 || paid > 0 || supplier !== "none";
+  const hasDraft = lines.length > 0 || !!note || tax > 0 || billDiscount > 0 || paid > 0 || supplier !== "none";
 
   return (
     <div className="p-6 space-y-4">
@@ -579,7 +594,7 @@ function Page() {
                 <div className="px-4 py-3 border-b">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{discountTotal > 0 ? ` · Discount −${fmtMoney(discountTotal, sym)}` : ""}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · Tax +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · Bill disc −${fmtMoney(billDiscountAmt, sym)}` : ""}{discountTotal > 0 ? ` · Line disc −${fmtMoney(discountTotal, sym)}` : ""}</div>
                 </div>
                 <div className="px-4 py-3 space-y-3">
                 <div>
@@ -613,6 +628,39 @@ function Page() {
                     </div>
                   )}
                 </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-xs">Discount</Label>
+                    <div className="inline-flex rounded-md border overflow-hidden text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setDiscountMode("amt")}
+                        className={`px-2 py-0.5 ${discountMode === "amt" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                      >{sym}</button>
+                      <button
+                        type="button"
+                        onClick={() => setDiscountMode("pct")}
+                        className={`px-2 py-0.5 border-l ${discountMode === "pct" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                      >%</button>
+                    </div>
+                  </div>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={billDiscount || ""}
+                    onChange={(e) => setBillDiscount(Number(e.target.value))}
+                    className="h-9"
+                    placeholder={discountMode === "pct" ? "e.g. 2" : "0.00"}
+                  />
+                  {billDiscountAmt > 0 && (
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      Bill discount: <span className="font-medium text-foreground">−{fmtMoney(billDiscountAmt, sym)}</span>
+                      {discountMode === "pct" ? ` (${Number(billDiscount || 0)}% of subtotal)` : ""} — distributed across all items.
+                    </div>
+                  )}
+                </div>
+
+
                 <div>
                   <Label className="text-xs">Paid</Label>
                   <Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} className="h-9" />
