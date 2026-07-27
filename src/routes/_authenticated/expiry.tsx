@@ -774,3 +774,220 @@ function ReportsTab({ sym }: { sym: string }) {
     </div>
   );
 }
+
+// ----------------- SHORT & EXCESS TAB -----------------
+type SEItem = {
+  product_id: string;
+  product_name: string;
+  sku: string | null;
+  unit: string | null;
+  cost_price: number;
+  system_qty: number;
+  actual_qty: number;
+  diff: number;
+  variance_value: number;
+  session_id: string;
+  session_ref: string | null;
+  counted_at: string;
+};
+
+function ShortExcessTab({ sym }: { sym: string }) {
+  const [days, setDays] = useState("30");
+  const [filter, setFilter] = useState<"all" | "short" | "excess">("all");
+  const [search, setSearch] = useState("");
+
+  const q = useQuery({
+    queryKey: ["short-excess", days],
+    queryFn: async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - Number(days));
+
+      // Pull completed sessions in window
+      const { data: sessions, error: sErr } = await supabase
+        .from("stock_count_sessions" as any)
+        .select("id, ref, status, completed_at, created_at")
+        .eq("status", "completed")
+        .gte("completed_at", since.toISOString())
+        .order("completed_at", { ascending: false });
+      if (sErr) throw sErr;
+      const sIds = (sessions ?? []).map((s: any) => s.id);
+      if (sIds.length === 0) return [] as SEItem[];
+
+      const { data: items, error: iErr } = await supabase
+        .from("stock_count_items" as any)
+        .select("session_id, product_id, system_qty, actual_qty, counted_at")
+        .in("session_id", sIds);
+      if (iErr) throw iErr;
+
+      const pIds = Array.from(new Set((items ?? []).map((i: any) => i.product_id)));
+      const { data: products, error: pErr } = await supabase
+        .from("products")
+        .select("id, name, sku, unit, cost_price")
+        .in("id", pIds);
+      if (pErr) throw pErr;
+
+      const pMap = new Map((products ?? []).map((p: any) => [p.id, p]));
+      const sMap = new Map((sessions ?? []).map((s: any) => [s.id, s]));
+
+      const rows: SEItem[] = (items ?? [])
+        .map((it: any) => {
+          const p: any = pMap.get(it.product_id);
+          const s: any = sMap.get(it.session_id);
+          const diff = Number(it.actual_qty ?? 0) - Number(it.system_qty ?? 0);
+          const cost = Number(p?.cost_price ?? 0);
+          return {
+            product_id: it.product_id,
+            product_name: p?.name ?? "Unknown",
+            sku: p?.sku ?? null,
+            unit: p?.unit ?? null,
+            cost_price: cost,
+            system_qty: Number(it.system_qty ?? 0),
+            actual_qty: Number(it.actual_qty ?? 0),
+            diff,
+            variance_value: diff * cost,
+            session_id: it.session_id,
+            session_ref: s?.ref ?? null,
+            counted_at: it.counted_at,
+          };
+        })
+        .filter((r: SEItem) => r.diff !== 0);
+
+      rows.sort((a, b) => Math.abs(b.variance_value) - Math.abs(a.variance_value));
+      return rows;
+    },
+  });
+
+  const rows = q.data ?? [];
+  const filtered = useMemo(() => {
+    return rows.filter((r) => {
+      if (filter === "short" && r.diff >= 0) return false;
+      if (filter === "excess" && r.diff <= 0) return false;
+      if (search.trim()) {
+        const s = search.trim().toLowerCase();
+        return r.product_name.toLowerCase().includes(s) || (r.sku ?? "").toLowerCase().includes(s);
+      }
+      return true;
+    });
+  }, [rows, filter, search]);
+
+  const totals = useMemo(() => {
+    let shortQty = 0, shortVal = 0, exQty = 0, exVal = 0;
+    for (const r of rows) {
+      if (r.diff < 0) { shortQty += -r.diff; shortVal += -r.variance_value; }
+      else { exQty += r.diff; exVal += r.variance_value; }
+    }
+    return { shortQty, shortVal, exQty, exVal, net: exVal - shortVal, count: rows.length };
+  }, [rows]);
+
+  const exportCsv = () => {
+    const header = ["Product", "SKU", "System", "Actual", "Diff", "Cost", "Variance value", "Session", "Counted at"];
+    const csvRows = [header, ...filtered.map((r) => [
+      r.product_name, r.sku ?? "", r.system_qty, r.actual_qty, r.diff, r.cost_price, r.variance_value,
+      r.session_ref ?? r.session_id, r.counted_at,
+    ])];
+    const csv = csvRows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `short-excess-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Short qty (missing)" value={fmtQty(totals.shortQty)} tone="red" icon={TrendingDown} />
+        <StatCard label="Short value" value={fmtMoney(totals.shortVal, sym)} tone="red" icon={TrendingDown} />
+        <StatCard label="Excess qty (over)" value={fmtQty(totals.exQty)} tone="green" icon={TrendingUp} />
+        <StatCard label="Net variance" value={fmtMoney(totals.net, sym)} tone={totals.net < 0 ? "red" : "green"} icon={Scale} />
+      </div>
+
+      <Card className="overflow-hidden">
+        <div className="p-3 border-b flex flex-wrap items-center gap-2">
+          <Input placeholder="Search product / SKU…" className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All variances</SelectItem>
+              <SelectItem value="short">Short only</SelectItem>
+              <SelectItem value="excess">Excess only</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={days} onValueChange={setDays}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+              <SelectItem value="365">Last 12 months</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportCsv}>
+              <FileDown className="h-4 w-4 mr-1" /> Export
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/stock-count">Open stock count</Link>
+            </Button>
+          </div>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Product</TableHead>
+              <TableHead className="text-right">System</TableHead>
+              <TableHead className="text-right">Actual</TableHead>
+              <TableHead className="text-right">Diff</TableHead>
+              <TableHead className="text-right">Variance value</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Session</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {q.isLoading && <TableRow><TableCell colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</TableCell></TableRow>}
+            {!q.isLoading && filtered.length === 0 && (
+              <TableRow><TableCell colSpan={7} className="p-6 text-center text-muted-foreground">
+                No variances in this window. Complete a stock count to see shortages and excesses here.
+              </TableCell></TableRow>
+            )}
+            {filtered.map((r, i) => (
+              <TableRow key={`${r.session_id}-${r.product_id}-${i}`}>
+                <TableCell>
+                  <div className="font-medium">{r.product_name}</div>
+                  <div className="text-xs text-muted-foreground">{r.sku ?? "—"}</div>
+                </TableCell>
+                <TableCell className="text-right">{fmtQty(r.system_qty)} {r.unit ?? ""}</TableCell>
+                <TableCell className="text-right">{fmtQty(r.actual_qty)} {r.unit ?? ""}</TableCell>
+                <TableCell className={`text-right font-medium ${r.diff < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                  {r.diff > 0 ? "+" : ""}{fmtQty(r.diff)}
+                </TableCell>
+                <TableCell className={`text-right ${r.variance_value < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                  {fmtMoney(r.variance_value, sym)}
+                </TableCell>
+                <TableCell>
+                  {r.diff < 0 ? (
+                    <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/30">
+                      <TrendingDown className="h-3 w-3 mr-1" /> Short
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30">
+                      <TrendingUp className="h-3 w-3 mr-1" /> Excess
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-xs">
+                  <Link to="/stock-count/$id" params={{ id: r.session_id }} className="underline text-primary">
+                    {r.session_ref ?? r.session_id.slice(0, 8)}
+                  </Link>
+                  <div className="text-muted-foreground">{format(new Date(r.counted_at), "PP")}</div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
+  );
+}
