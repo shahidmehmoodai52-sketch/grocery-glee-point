@@ -282,7 +282,12 @@ function Page() {
   const discountTotal = lines.reduce((s, l) => s + Number(l.discount || 0), 0);
   const subtotal = lines.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
   const taxAmt = taxMode === "pct" ? +(subtotal * (Number(tax || 0) / 100)).toFixed(2) : Number(tax || 0);
-  const total = subtotal + taxAmt;
+  const billDiscountAmt = Math.min(
+    subtotal + taxAmt,
+    Math.max(0, discountMode === "pct" ? +(subtotal * (billDiscount / 100)).toFixed(2) : billDiscount),
+  );
+  const total = Math.max(0, subtotal + taxAmt - billDiscountAmt);
+
 
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
