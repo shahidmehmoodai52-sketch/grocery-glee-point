@@ -190,11 +190,18 @@ function Page() {
       if (s.includes("easy") || s.includes("jazz") || s.includes("wallet") || s.includes("upi") || s.includes("mobile")) return "mobile_wallet";
       return "other";
     };
+    const slugify = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
     const resolve = (method: string): { id: string; name: string; type: string; auto: boolean } => {
       const m = norm(method) || "cash";
       // exact name match
       const byName = accounts.find(a => norm(a.name) === m);
       if (byName) return { id: byName.id, name: byName.name, type: byName.type, auto: false };
+      // slug match — POS stores payment_method as slug(name), e.g. "mybank" for "My Bank"
+      const ms = slugify(method);
+      if (ms) {
+        const bySlug = accounts.find(a => slugify(a.name) === ms);
+        if (bySlug) return { id: bySlug.id, name: bySlug.name, type: bySlug.type, auto: false };
+      }
       // type match — take first active of guessed type
       const t = typeGuess(m);
       const byType = accounts.find(a => a.type === t && a.is_active);
