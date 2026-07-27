@@ -323,7 +323,7 @@ function Page() {
   };
 
 
-  const hasDraft = lines.length > 0 || !!note || tax > 0 || paid > 0 || supplier !== "none";
+  const hasDraft = lines.length > 0 || !!note || tax > 0 || billDiscount > 0 || paid > 0 || supplier !== "none";
 
   return (
     <div className="p-6 space-y-4">
