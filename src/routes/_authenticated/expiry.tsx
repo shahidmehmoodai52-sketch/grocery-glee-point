@@ -150,7 +150,7 @@ function ExpiryPage() {
         <StatCard label="Products at risk" value={String(stats.atRisk)} tone="amber" icon={AlertTriangle} />
       </div>
 
-      <Tabs defaultValue="batches" className="mt-4">
+      <Tabs value={tab} onValueChange={(v) => navigate({ search: { tab: v }, replace: true })} className="mt-4">
         <TabsList>
           <TabsTrigger value="batches">Batches</TabsTrigger>
           <TabsTrigger value="damage">Damage log</TabsTrigger>
