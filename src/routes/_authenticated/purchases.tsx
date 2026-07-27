@@ -554,9 +554,9 @@ function Page() {
                                   title="Base total — cost auto-calculates as total ÷ qty. Tax is added below."
                                   className="h-8 text-right text-sm font-medium"
                                 />
-                                {taxShare > 0 && (
-                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Line total including distributed tax">
-                                    +tax = <span className="font-medium text-foreground">{fmtMoney(totalDisplay + taxShare, sym)}</span>
+                                {(taxShare > 0 || lineDiscount > 0) && (
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Net line total: gross − discount + tax">
+                                    net = <span className="font-medium text-foreground">{fmtMoney(Math.max(0, totalDisplay - lineDiscount) + taxShare, sym)}</span>
                                   </div>
                                 )}
                               </TableCell>
