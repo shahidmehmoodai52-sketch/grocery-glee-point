@@ -579,7 +579,7 @@ function Page() {
                 <div className="px-4 py-3 border-b">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{discountTotal > 0 ? ` · Discount −${fmtMoney(discountTotal, sym)}` : ""}</div>
                 </div>
                 <div className="px-4 py-3 space-y-3">
                 <div>
