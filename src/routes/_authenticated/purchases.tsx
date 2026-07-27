@@ -29,10 +29,13 @@ type Draft = {
   lines: Line[];
   tax: number;
   taxMode: "amt" | "pct";
+  discount: number;
+  discountMode: "amt" | "pct";
   paid: number;
   note: string;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", paid: 0, note: "" };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "" };
+
 
 const normalizeItemCode = (value: string | null | undefined) => {
   const raw = String(value ?? "").trim().toLowerCase();
