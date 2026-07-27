@@ -658,6 +658,8 @@ function Page() {
                       {discountMode === "pct" ? ` (${Number(billDiscount || 0)}% of subtotal)` : ""} — distributed across all items.
                     </div>
                   )}
+                </div>
+
 
                 <div>
                   <Label className="text-xs">Paid</Label>
