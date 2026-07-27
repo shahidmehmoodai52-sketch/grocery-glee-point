@@ -2045,53 +2045,96 @@ function POSPage() {
 
 
 
-const ONLINE_METHODS_KEY = "pos:online_pay_methods";
-const DEFAULT_ONLINE_METHODS: { v: string; label: string }[] = [
-  { v: "bank", label: "Bank" },
-  { v: "jazzcash", label: "JazzCash" },
-  { v: "easypaisa", label: "EasyPaisa" },
+const DEFAULT_ONLINE_METHODS: { name: string; type: string }[] = [
+  { name: "Bank", type: "bank" },
+  { name: "JazzCash", type: "mobile_wallet" },
+  { name: "EasyPaisa", type: "mobile_wallet" },
 ];
 
-function loadOnlineMethods(): { v: string; label: string }[] {
-  try {
-    const raw = localStorage.getItem(ONLINE_METHODS_KEY);
-    if (raw) {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length) return arr;
-    }
-  } catch {/* noop */}
-  return DEFAULT_ONLINE_METHODS;
+function guessAccType(name: string) {
+  const s = name.toLowerCase();
+  if (s.includes("bank")) return "bank";
+  if (s.includes("card")) return "card";
+  if (s.includes("easy") || s.includes("jazz") || s.includes("wallet") || s.includes("upi") || s.includes("mobile")) return "mobile_wallet";
+  if (s === "cash") return "cash";
+  return "other";
 }
 
 function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [online, setOnline] = useState<{ v: string; label: string }[]>(() => loadOnlineMethods());
+  const qc = useQueryClient();
+  const accQ = useQuery({
+    queryKey: ["cash-accounts", "pos-payment-methods"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cash_accounts")
+        .select("id,name,type,is_active")
+        .eq("is_active", true)
+        .order("sort_order")
+        .order("name");
+      return data ?? [];
+    },
+  });
+  const accounts = accQ.data ?? [];
 
-  const saveOnline = (list: { v: string; label: string }[]) => {
-    setOnline(list);
-    try { localStorage.setItem(ONLINE_METHODS_KEY, JSON.stringify(list)); } catch {/* noop */}
-  };
+  // Seed defaults (Cash, Card, Bank, JazzCash, EasyPaisa) once per tenant.
+  useEffect(() => {
+    if (accQ.isLoading || !accQ.isFetched) return;
+    const have = new Set(accounts.map((a: any) => a.name.toLowerCase()));
+    const missing: { name: string; type: string }[] = [];
+    for (const seed of [{ name: "Cash", type: "cash" }, { name: "Card", type: "card" }, ...DEFAULT_ONLINE_METHODS]) {
+      if (!have.has(seed.name.toLowerCase())) missing.push(seed);
+    }
+    if (!missing.length) return;
+    (async () => {
+      await supabase.from("cash_accounts").insert(
+        missing.map((m) => ({ name: m.name, type: m.type, opening_balance: 0, is_active: true })),
+      );
+      qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accQ.isFetched]);
+
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const online = accounts
+    .filter((a: any) => a.type !== "cash" && a.type !== "card")
+    .map((a: any) => ({ v: slug(a.name), label: a.name, id: a.id }));
 
   const isOnline = online.some((o) => o.v === value);
   const activeOnline = online.find((o) => o.v === value);
 
-  const addHead = () => {
+  const addHead = async () => {
     const name = window.prompt("New online payment head (e.g. NayaPay)");
     if (!name) return;
     const label = name.trim();
     if (!label) return;
-    const v = label.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const v = slug(label);
     if (!v) return;
-    if (online.some((o) => o.v === v)) { onChange(v); return; }
-    const next = [...online, { v, label }];
-    saveOnline(next);
+    const existing = online.find((o) => o.v === v);
+    if (existing) { onChange(v); return; }
+    const { error } = await supabase
+      .from("cash_accounts")
+      .insert({ name: label, type: guessAccType(label), opening_balance: 0, is_active: true });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${label} added to Cash Flow`);
+    await qc.invalidateQueries({ queryKey: ["cash-accounts"] });
     onChange(v);
   };
 
-  const removeHead = (v: string) => {
-    const next = online.filter((o) => o.v !== v);
-    if (!next.length) return;
-    saveOnline(next);
-    if (value === v) onChange(next[0].v);
+  const removeHead = async (v: string) => {
+    const target = online.find((o) => o.v === v);
+    if (!target) return;
+    if (online.length <= 1) return;
+    if (!confirm(`Hide "${target.label}" from POS? The Cash Flow card is kept.`)) return;
+    const { error } = await supabase
+      .from("cash_accounts")
+      .update({ is_active: false })
+      .eq("id", target.id);
+    if (error) { toast.error(error.message); return; }
+    await qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    if (value === v) {
+      const next = online.filter((o) => o.v !== v);
+      if (next.length) onChange(next[0].v);
+    }
   };
 
   const btn = (active: boolean) =>
