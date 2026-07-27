@@ -271,7 +271,8 @@ function Page() {
   });
 
 
-  const subtotal = lines.reduce((s, l) => s + l.qty * l.cost, 0);
+  const discountTotal = lines.reduce((s, l) => s + Number(l.discount || 0), 0);
+  const subtotal = lines.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
   const taxAmt = taxMode === "pct" ? +(subtotal * (Number(tax || 0) / 100)).toFixed(2) : Number(tax || 0);
   const total = subtotal + taxAmt;
 
