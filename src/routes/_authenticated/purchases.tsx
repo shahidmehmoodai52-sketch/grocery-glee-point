@@ -437,6 +437,7 @@ function Page() {
                           <TableHead className="w-16 text-right">New Avg</TableHead>
                           <TableHead className="w-12 text-right">Δ%</TableHead>
                           <TableHead className="w-[90px] text-right">Tax</TableHead>
+                          <TableHead className="w-[100px] text-right">Discount</TableHead>
                           <TableHead className="w-[120px]">Total</TableHead>
                           <TableHead className="w-9"></TableHead>
                         </TableRow>
