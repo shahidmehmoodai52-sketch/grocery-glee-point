@@ -21,7 +21,7 @@ import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
 
 type Draft = {
   open: boolean;
@@ -271,7 +271,8 @@ function Page() {
   });
 
 
-  const subtotal = lines.reduce((s, l) => s + l.qty * l.cost, 0);
+  const discountTotal = lines.reduce((s, l) => s + Number(l.discount || 0), 0);
+  const subtotal = lines.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
   const taxAmt = taxMode === "pct" ? +(subtotal * (Number(tax || 0) / 100)).toFixed(2) : Number(tax || 0);
   const total = subtotal + taxAmt;
 
@@ -282,15 +283,16 @@ function Page() {
     if (!supplier || supplier === "none") return toast.error("Supplier is required");
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
-    const sub = items.reduce((s, l) => s + l.qty * l.cost, 0);
+    const sub = items.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
     setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier,
         tax: taxAmt, paid, note,
         items: items.map((l) => {
-          const share = sub > 0 ? taxAmt * ((l.qty * l.cost) / sub) : 0;
-          const effCost = l.qty > 0 ? l.cost + share / l.qty : l.cost;
+          const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
+          const share = sub > 0 ? taxAmt * (lineNet / sub) : 0;
+          const effCost = l.qty > 0 ? (lineNet + share) / l.qty : l.cost;
           return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
         }),
       },
@@ -435,6 +437,7 @@ function Page() {
                           <TableHead className="w-16 text-right">New Avg</TableHead>
                           <TableHead className="w-12 text-right">Δ%</TableHead>
                           <TableHead className="w-[90px] text-right">Tax</TableHead>
+                          <TableHead className="w-[100px] text-right">Discount</TableHead>
                           <TableHead className="w-[120px]">Total</TableHead>
                           <TableHead className="w-9"></TableHead>
                         </TableRow>
@@ -446,15 +449,17 @@ function Page() {
                           const qty = Number(l.qty || 0);
                           const cost = Number(l.cost || 0);
                           const hasProduct = !!l.product_id;
-                          const lineSub = qty * cost;
+                          const lineDiscount = Number(l.discount || 0);
+                          const lineGross = qty * cost;
+                          const lineSub = Math.max(0, lineGross - lineDiscount);
                           const taxShare = subtotal > 0 ? taxAmt * (lineSub / subtotal) : 0;
-                          const effCost = qty > 0 ? cost + taxShare / qty : cost;
+                          const effCost = qty > 0 ? (lineSub + taxShare) / qty : cost;
                           const newAvg = hasProduct
                             ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
                             : effCost;
                           const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
                           const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
-                          const totalDisplay = l._total != null ? l._total : (qty && cost ? +(qty * cost).toFixed(2) : 0);
+                          const totalDisplay = l._total != null ? l._total : (qty && cost ? +lineGross.toFixed(2) : 0);
                           return (
                             <TableRow key={i}>
                               <TableCell>
@@ -522,6 +527,17 @@ function Page() {
                                 <Input
                                   type="number"
                                   step="0.01"
+                                  value={l.discount ? l.discount : ""}
+                                  placeholder="0"
+                                  onChange={(e) => setLine(i, { discount: Number(e.target.value) })}
+                                  className="h-8 text-right text-sm"
+                                  title="Discount amount on this line (subtracted before tax)"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
                                   value={totalDisplay ? totalDisplay : ""}
                                   placeholder="0"
                                   onChange={(e) => {
@@ -538,9 +554,9 @@ function Page() {
                                   title="Base total — cost auto-calculates as total ÷ qty. Tax is added below."
                                   className="h-8 text-right text-sm font-medium"
                                 />
-                                {taxShare > 0 && (
-                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Line total including distributed tax">
-                                    +tax = <span className="font-medium text-foreground">{fmtMoney(totalDisplay + taxShare, sym)}</span>
+                                {(taxShare > 0 || lineDiscount > 0) && (
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Net line total: gross − discount + tax">
+                                    net = <span className="font-medium text-foreground">{fmtMoney(Math.max(0, totalDisplay - lineDiscount) + taxShare, sym)}</span>
                                   </div>
                                 )}
                               </TableCell>
@@ -563,7 +579,7 @@ function Page() {
                 <div className="px-4 py-3 border-b">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{discountTotal > 0 ? ` · Discount −${fmtMoney(discountTotal, sym)}` : ""}</div>
                 </div>
                 <div className="px-4 py-3 space-y-3">
                 <div>
