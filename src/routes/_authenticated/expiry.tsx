@@ -99,6 +99,8 @@ function ExpiryPage() {
   const { isAdmin, can } = usePermissions();
   const sym = settings?.currency_symbol ?? "Rs";
   const canWrite = isAdmin || can("products");
+  const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
 
   const batchesQ = useQuery({
     queryKey: ["batches-status"],
