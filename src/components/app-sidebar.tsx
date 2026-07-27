@@ -49,7 +49,7 @@ const groups: { label: string; items: Item[] }[] = [
       { title: "Bulk import", url: "/import", icon: Upload, perm: "import" },
       { title: "Stock count", url: "/stock-count", icon: ClipboardCheck, perm: "stock-count" },
       { title: "Expiry & waste", url: "/expiry", icon: CalendarClock, perm: "expiry" },
-      { title: "Short & Excess", url: "/expiry?tab=shortexcess", icon: Scale, perm: "expiry" },
+      { title: "Short & Excess", url: "/expiry", icon: Scale, perm: "expiry", search: { tab: "shortexcess" } },
       { title: "Intelligence", url: "/intelligence", icon: Brain, perm: "intelligence" },
       { title: "Global library", url: "/library", icon: Library, perm: "library" },
       { title: "Assets", url: "/assets", icon: Box, perm: "assets" },
