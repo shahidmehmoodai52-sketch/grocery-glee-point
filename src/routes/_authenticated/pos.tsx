@@ -2102,6 +2102,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
 
   const isOnline = online.some((o) => o.v === value);
   const activeOnline = online.find((o) => o.v === value);
+  const [pendingRemove, setPendingRemove] = useState<{ v: string; label: string; id: string } | null>(null);
 
   const addHead = async () => {
     const name = window.prompt("New online payment head (e.g. NayaPay)");
@@ -2121,21 +2122,21 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
     onChange(v);
   };
 
-  const removeHead = async (v: string) => {
-    const target = online.find((o) => o.v === v);
-    if (!target) return;
-    if (online.length <= 1) return;
-    if (!confirm(`Hide "${target.label}" from POS? The Cash Flow card is kept.`)) return;
+  const confirmRemove = async () => {
+    if (!pendingRemove) return;
+    const target = pendingRemove;
     const { error } = await supabase
       .from("cash_accounts")
       .update({ is_active: false })
       .eq("id", target.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); setPendingRemove(null); return; }
     await qc.invalidateQueries({ queryKey: ["cash-accounts"] });
-    if (value === v) {
-      const next = online.filter((o) => o.v !== v);
+    if (value === target.v) {
+      const next = online.filter((o) => o.v !== target.v);
       if (next.length) onChange(next[0].v);
     }
+    toast.success(`${target.label} removed from POS`);
+    setPendingRemove(null);
   };
 
   const btn = (active: boolean) =>
@@ -2152,7 +2153,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" className={`${btn(isOnline)} flex items-center justify-center gap-1 px-1`}>
-            <span className="truncate">{isOnline ? activeOnline!.label : "Online"}</span>
+            <span className="truncate">{isOnline ? activeOnline!.label : "Bank"}</span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
           </button>
         </DropdownMenuTrigger>
@@ -2167,7 +2168,11 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
               {online.length > 1 && (
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeHead(o.v); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPendingRemove({ v: o.v, label: o.label, id: o.id });
+                  }}
                   className="ml-2 opacity-40 hover:opacity-100"
                   title="Remove"
                 >
@@ -2183,6 +2188,21 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
         </DropdownMenuContent>
       </DropdownMenu>
       <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>Credit</button>
+
+      <AlertDialog open={!!pendingRemove} onOpenChange={(o) => { if (!o) setPendingRemove(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove "{pendingRemove?.label}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will hide "{pendingRemove?.label}" from POS payment options. The Cash Flow card and its history stay intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemove}>Yes, remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
