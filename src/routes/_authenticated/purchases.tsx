@@ -629,6 +629,37 @@ function Page() {
                   )}
                 </div>
                 <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-xs">Discount</Label>
+                    <div className="inline-flex rounded-md border overflow-hidden text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setDiscountMode("amt")}
+                        className={`px-2 py-0.5 ${discountMode === "amt" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                      >{sym}</button>
+                      <button
+                        type="button"
+                        onClick={() => setDiscountMode("pct")}
+                        className={`px-2 py-0.5 border-l ${discountMode === "pct" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                      >%</button>
+                    </div>
+                  </div>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={billDiscount || ""}
+                    onChange={(e) => setBillDiscount(Number(e.target.value))}
+                    className="h-9"
+                    placeholder={discountMode === "pct" ? "e.g. 2" : "0.00"}
+                  />
+                  {billDiscountAmt > 0 && (
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      Bill discount: <span className="font-medium text-foreground">−{fmtMoney(billDiscountAmt, sym)}</span>
+                      {discountMode === "pct" ? ` (${Number(billDiscount || 0)}% of subtotal)` : ""} — distributed across all items.
+                    </div>
+                  )}
+
+                <div>
                   <Label className="text-xs">Paid</Label>
                   <Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} className="h-9" />
                   <div className="text-[10px] text-muted-foreground mt-1">
