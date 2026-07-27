@@ -59,6 +59,9 @@ import { PageHeader } from "@/components/ui/page-header";
 
 export const Route = createFileRoute("/_authenticated/expiry")({
   component: ExpiryPage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    tab: (typeof s.tab === "string" ? s.tab : "batches") as string,
+  }),
 });
 
 type Batch = {
