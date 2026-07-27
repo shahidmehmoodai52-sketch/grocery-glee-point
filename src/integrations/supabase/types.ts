@@ -2276,6 +2276,7 @@ export type Database = {
           tax: number
           tenant_id: string
           total: number
+          updated_at: string
         }
         Insert: {
           cashier_id?: string | null
@@ -2295,6 +2296,7 @@ export type Database = {
           tax?: number
           tenant_id?: string
           total?: number
+          updated_at?: string
         }
         Update: {
           cashier_id?: string | null
@@ -2314,6 +2316,7 @@ export type Database = {
           tax?: number
           tenant_id?: string
           total?: number
+          updated_at?: string
         }
         Relationships: [
           {
