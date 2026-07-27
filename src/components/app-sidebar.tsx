@@ -16,7 +16,7 @@ import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { OfflineStatusBadge } from "@/components/offline-status";
 
 
-type Item = { title: string; url: string; icon: any; perm: string; adminOnly?: boolean };
+type Item = { title: string; url: string; icon: any; perm: string; adminOnly?: boolean; search?: Record<string, any> };
 const groups: { label: string; items: Item[] }[] = [
   {
     label: "Overview",
