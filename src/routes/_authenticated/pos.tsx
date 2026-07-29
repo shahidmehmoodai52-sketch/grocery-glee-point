@@ -157,6 +157,10 @@ function POSPage() {
   const [heldOpen, setHeldOpen] = useState(false);
   const [holding, setHolding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Synchronous lock: React state updates are async, so rapid Enter presses /
+  // double clicks could fire handleSale twice before `submitting` flipped and
+  // create duplicate invoices. This ref closes that window.
+  const saleLockRef = useRef(false);
   const [undoCandidate, setUndoCandidate] = useState<{
     sale_id: string; invoice_no: string; total: number; item_count: number; created_at: string;
   } | null>(null);
@@ -753,6 +757,18 @@ function POSPage() {
   }, []);
 
   const handleSale = async () => {
+    if (saleLockRef.current) return; // already submitting — ignore repeat Enter/click
+    saleLockRef.current = true;
+    setSubmitting(true);
+    try {
+      await handleSaleInner();
+    } finally {
+      saleLockRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaleInner = async () => {
     if (!tab.items.length) return toast.error("Cart is empty");
     const isCredit = due > 0;
     if (isCredit && !tab.customer_id && !tab.expense_person_id) return toast.error("Select a customer or a staff/owner for credit sale");

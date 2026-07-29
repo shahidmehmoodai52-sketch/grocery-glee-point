@@ -6,6 +6,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       className="toaster group"
+      // Keep toasts above every dialog/sheet/popover layer (all use z-50).
+      style={{ zIndex: 2147483647 }}
       toastOptions={{
         classNames: {
           toast:
