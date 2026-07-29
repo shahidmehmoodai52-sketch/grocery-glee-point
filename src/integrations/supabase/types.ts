@@ -4135,6 +4135,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       tenant_category_allowed: {
         Args: { _category: string; _tenant: string }
         Returns: boolean
