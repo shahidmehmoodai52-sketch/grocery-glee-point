@@ -757,6 +757,18 @@ function POSPage() {
   }, []);
 
   const handleSale = async () => {
+    if (saleLockRef.current) return; // already submitting — ignore repeat Enter/click
+    saleLockRef.current = true;
+    setSubmitting(true);
+    try {
+      await handleSaleInner();
+    } finally {
+      saleLockRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaleInner = async () => {
     if (!tab.items.length) return toast.error("Cart is empty");
     const isCredit = due > 0;
     if (isCredit && !tab.customer_id && !tab.expense_person_id) return toast.error("Select a customer or a staff/owner for credit sale");
