@@ -181,7 +181,7 @@ export function LowStockAlerts() {
   const primary = activeOOS.length > 0;
 
   return (
-    <div className={`no-print relative rounded-md ${primary ? "bg-destructive/10" : "bg-amber-500/10"}`}>
+    <div className={`no-print relative z-[80] rounded-md ${primary ? "bg-destructive/10" : "bg-amber-500/10"}`}>
       <div className="px-2 py-1 flex items-center gap-2 flex-wrap">
         {primary
           ? <XCircle className="h-4 w-4 text-destructive shrink-0" />
@@ -207,7 +207,7 @@ export function LowStockAlerts() {
       </div>
 
       {expanded && (
-        <div className={`absolute left-0 right-0 top-full mt-1 z-40 rounded-md border shadow-lg ${primary ? "bg-destructive/10 border-destructive/30" : "bg-amber-500/10 border-amber-500/30"} px-3 pb-3 pt-2 max-h-80 overflow-auto space-y-1`}>
+        <div className={`absolute left-0 right-0 top-full mt-1 z-[90] rounded-md border bg-popover shadow-2xl ${primary ? "border-destructive/30" : "border-amber-500/30"} px-3 pb-3 pt-2 max-h-80 overflow-auto space-y-1`}>
 
           {activeOOS.map((p) => (
             <AlertRow key={p.id} p={p} kind="oos" sym={sym} onDismiss={() => dismissOne(p)} />
