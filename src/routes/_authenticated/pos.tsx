@@ -2062,23 +2062,7 @@ function POSPage() {
 
 
 
-const DEFAULT_ONLINE_METHODS: { name: string; type: string }[] = [
-  { name: "Bank", type: "bank" },
-  { name: "JazzCash", type: "mobile_wallet" },
-  { name: "EasyPaisa", type: "mobile_wallet" },
-];
-
-function guessAccType(name: string) {
-  const s = name.toLowerCase();
-  if (s.includes("bank")) return "bank";
-  if (s.includes("card")) return "card";
-  if (s.includes("easy") || s.includes("jazz") || s.includes("wallet") || s.includes("upi") || s.includes("mobile")) return "mobile_wallet";
-  if (s === "cash") return "cash";
-  return "other";
-}
-
 function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const qc = useQueryClient();
   const accQ = useQuery({
     queryKey: ["cash-accounts", "pos-payment-methods"],
     queryFn: async () => {
@@ -2093,67 +2077,14 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
   });
   const accounts = accQ.data ?? [];
 
-  // Seed defaults (Cash, Card, Bank, JazzCash, EasyPaisa) once per tenant.
-  useEffect(() => {
-    if (accQ.isLoading || !accQ.isFetched) return;
-    const have = new Set(accounts.map((a: any) => a.name.toLowerCase()));
-    const missing: { name: string; type: string }[] = [];
-    for (const seed of [{ name: "Cash", type: "cash" }, { name: "Card", type: "card" }, ...DEFAULT_ONLINE_METHODS]) {
-      if (!have.has(seed.name.toLowerCase())) missing.push(seed);
-    }
-    if (!missing.length) return;
-    (async () => {
-      await supabase.from("cash_accounts").insert(
-        missing.map((m) => ({ name: m.name, type: m.type, opening_balance: 0, is_active: true })),
-      );
-      qc.invalidateQueries({ queryKey: ["cash-accounts"] });
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accQ.isFetched]);
-
   const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  // Only accounts (cards) created in Cash Flow are offered here.
   const online = accounts
     .filter((a: any) => a.type !== "cash" && a.type !== "card")
     .map((a: any) => ({ v: slug(a.name), label: a.name, id: a.id }));
 
   const isOnline = online.some((o) => o.v === value);
   const activeOnline = online.find((o) => o.v === value);
-  const [pendingRemove, setPendingRemove] = useState<{ v: string; label: string; id: string } | null>(null);
-
-  const addHead = async () => {
-    const name = window.prompt("New online payment head (e.g. NayaPay)");
-    if (!name) return;
-    const label = name.trim();
-    if (!label) return;
-    const v = slug(label);
-    if (!v) return;
-    const existing = online.find((o) => o.v === v);
-    if (existing) { onChange(v); return; }
-    const { error } = await supabase
-      .from("cash_accounts")
-      .insert({ name: label, type: guessAccType(label), opening_balance: 0, is_active: true });
-    if (error) { toast.error(error.message); return; }
-    toast.success(`${label} added to Cash Flow`);
-    await qc.invalidateQueries({ queryKey: ["cash-accounts"] });
-    onChange(v);
-  };
-
-  const confirmRemove = async () => {
-    if (!pendingRemove) return;
-    const target = pendingRemove;
-    const { error } = await supabase
-      .from("cash_accounts")
-      .update({ is_active: false })
-      .eq("id", target.id);
-    if (error) { toast.error(error.message); setPendingRemove(null); return; }
-    await qc.invalidateQueries({ queryKey: ["cash-accounts"] });
-    if (value === target.v) {
-      const next = online.filter((o) => o.v !== target.v);
-      if (next.length) onChange(next[0].v);
-    }
-    toast.success(`${target.label} removed from POS`);
-    setPendingRemove(null);
-  };
 
   const btn = (active: boolean) =>
     `h-9 rounded-lg text-sm font-medium transition-all ${
@@ -2173,52 +2104,21 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          {online.map((o) => (
-            <DropdownMenuItem
-              key={o.v}
-              onSelect={() => onChange(o.v)}
-              className="flex items-center justify-between"
-            >
-              <span className={value === o.v ? "font-semibold" : ""}>{o.label}</span>
-              {online.length > 1 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setPendingRemove({ v: o.v, label: o.label, id: o.id });
-                  }}
-                  className="ml-2 opacity-40 hover:opacity-100"
-                  title="Remove"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); addHead(); }}>
-            <Plus className="h-3.5 w-3.5 mr-2" /> Add new head
-          </DropdownMenuItem>
+        <DropdownMenuContent align="end" className="w-48">
+          {online.length === 0 ? (
+            <div className="px-2 py-3 text-xs text-muted-foreground">
+              No accounts yet. Create a card in Cash Flow — it will appear here automatically.
+            </div>
+          ) : (
+            online.map((o) => (
+              <DropdownMenuItem key={o.v} onSelect={() => onChange(o.v)}>
+                <span className={value === o.v ? "font-semibold" : ""}>{o.label}</span>
+              </DropdownMenuItem>
+            ))
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>Credit</button>
-
-      <AlertDialog open={!!pendingRemove} onOpenChange={(o) => { if (!o) setPendingRemove(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove "{pendingRemove?.label}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will hide "{pendingRemove?.label}" from POS payment options. The Cash Flow card and its history stay intact.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRemove}>Yes, remove</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
