@@ -157,6 +157,10 @@ function POSPage() {
   const [heldOpen, setHeldOpen] = useState(false);
   const [holding, setHolding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Synchronous lock: React state updates are async, so rapid Enter presses /
+  // double clicks could fire handleSale twice before `submitting` flipped and
+  // create duplicate invoices. This ref closes that window.
+  const saleLockRef = useRef(false);
   const [undoCandidate, setUndoCandidate] = useState<{
     sale_id: string; invoice_no: string; total: number; item_count: number; created_at: string;
   } | null>(null);
