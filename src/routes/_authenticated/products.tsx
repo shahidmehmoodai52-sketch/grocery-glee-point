@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Search, History, Package } from "lucide-react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { Plus, Pencil, Trash2, Search, History, Package, ArrowUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,6 @@ import { useSettings } from "@/hooks/use-settings";
 import { usePriceVisibility } from "@/hooks/use-price-visibility";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
-import { fetchAll } from "@/lib/supabase-page";
 
 
 export const Route = createFileRoute("/_authenticated/products")({
@@ -35,6 +34,25 @@ type ProductForm = {
 };
 const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true };
 
+const PAGE_SIZE = 50;
+
+type SortKey = "name" | "sku" | "category" | "cost_price" | "sell_price" | "stock" | "created_at";
+type StockFilter = "all" | "low" | "out" | "in";
+
+function useDebounced<T>(value: T, ms: number) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
+// Escape PostgREST `or()` filter separators inside a user-supplied term.
+function safeTerm(q: string) {
+  return q.replace(/[(),]/g, " ").trim();
+}
+
 function ProductsPage() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
@@ -44,16 +62,71 @@ function ProductsPage() {
   const showSell = priceVisibility?.showSell ?? true;
   const tableColCount = 5 + (showCost ? 1 : 0) + (showSell ? 1 : 0);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search.trim(), 250);
+  const [category, setCategory] = useState("all");
+  const [stockFilter, setStockFilter] = useState<StockFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortAsc, setSortAsc] = useState(true);
+  const [page, setPage] = useState(1);
   const [open, setOpen, clearOpen] = usePersistentState<boolean>("product-entry-open", false);
   const [form, setForm, clearForm] = usePersistentState<ProductForm>("product-entry-form", empty);
 
+  useEffect(() => { setPage(1); }, [debouncedSearch, category, stockFilter, sortKey, sortAsc]);
 
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () =>
-      fetchAll<any>((from, to) =>
-        supabase.from("products").select("*").order("name").range(from, to),
-      ),
+  // ---- Server-side paginated list ------------------------------------------
+  // Never pull the whole catalogue: one page of rows + an exact count.
+  const listKey = ["products", "list", { q: debouncedSearch, category, stockFilter, sortKey, sortAsc, page }] as const;
+  const { data: listData, isLoading, isFetching } = useQuery({
+    queryKey: listKey,
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      let q = supabase
+        .from("products")
+        .select("*", { count: "exact" })
+        .order(sortKey, { ascending: sortAsc, nullsFirst: false })
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+
+      const term = safeTerm(debouncedSearch);
+      if (term) {
+        q = q.or(`name.ilike.%${term}%,sku.ilike.${term}%,barcode.ilike.${term}%`);
+      }
+      if (category !== "all") q = q.eq("category", category);
+      if (stockFilter === "out") q = q.lte("stock", 0);
+      if (stockFilter === "in") q = q.gt("stock", 0);
+      if (stockFilter === "low") q = q.gt("stock", 0).lte("stock", 5);
+
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return { rows: (data ?? []) as any[], total: count ?? 0 };
+    },
+  });
+  const pageRows = listData?.rows ?? [];
+  const total = listData?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // ---- Lightweight aggregates (counts only, no rows) ------------------------
+  const { data: counts } = useQuery({
+    queryKey: ["products", "counts"],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const [all, allowed] = await Promise.all([
+        supabase.from("products").select("id", { count: "exact", head: true }),
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("allow_negative_stock", true),
+      ]);
+      return { total: all.count ?? 0, allowed: allowed.count ?? 0 };
+    },
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["products", "categories"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("category").not("category", "is", null).limit(2000);
+      return Array.from(new Set((data ?? []).map((r: any) => r.category).filter(Boolean))).sort() as string[];
+    },
   });
 
   const { data: suppliers = [] } = useQuery({
@@ -61,29 +134,23 @@ function ProductsPage() {
     queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
   });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.sku ?? "").toLowerCase().includes(q) ||
-        (p.barcode ?? "").toLowerCase().includes(q),
-    );
-  }, [products, search]);
-
-  const PAGE_SIZE = 50;
-  const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageSafe = Math.min(page, totalPages);
-  const pageRows = useMemo(
-    () => filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE),
-    [filtered, pageSafe],
+  const sortBtn = (key: SortKey) => () => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(true); }
+  };
+  const SortHead = ({ k, children, className }: { k: SortKey; children: React.ReactNode; className?: string }) => (
+    <TableHead className={className}>
+      <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={sortBtn(k)}>
+        {children}
+        <ArrowUpDown className={`h-3 w-3 ${sortKey === k ? "opacity-100" : "opacity-30"}`} />
+      </button>
+    </TableHead>
   );
 
   const parseBarcodes = (text: string) =>
     Array.from(new Set(text.split(/[\s,;\n]+/).map((s) => s.trim()).filter(Boolean)));
+
+  const invalidateProducts = () => qc.invalidateQueries({ queryKey: ["products"] });
 
   const save = async () => {
     if (!form.name) return toast.error("Name is required");
@@ -97,8 +164,9 @@ function ProductsPage() {
       // Update all non-stock fields directly
       const { error } = await supabase.from("products").update(payload).eq("id", form.id);
       if (error) return toast.error(error.message);
-      // Route stock changes through the adjustment RPC so a movement is recorded
-      const existing = products.find((p) => p.id === form.id);
+      // Route stock changes through the adjustment RPC so a movement is recorded.
+      // Read the current stock from the server (the row may not be on this page).
+      const { data: existing } = await supabase.from("products").select("stock").eq("id", form.id).maybeSingle();
       const oldStock = Number(existing?.stock ?? 0);
       if (Number(newStock) !== oldStock) {
         const { error: adjErr } = await supabase.rpc("adjust_product_stock", {
@@ -130,7 +198,7 @@ function ProductsPage() {
     clearOpen();
     clearForm();
 
-    qc.invalidateQueries({ queryKey: ["products"] });
+    invalidateProducts();
     qc.invalidateQueries({ queryKey: ["product_barcodes"] });
   };
 
@@ -139,7 +207,7 @@ function ProductsPage() {
     const { error } = await supabase.from("products").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Deleted");
-    qc.invalidateQueries({ queryKey: ["products"] });
+    invalidateProducts();
   };
 
   const edit = async (p: any) => {
@@ -161,12 +229,17 @@ function ProductsPage() {
     setOpen(true);
   };
 
+  const rangeLabel = useMemo(() => {
+    if (total === 0) return "0";
+    const start = (page - 1) * PAGE_SIZE + 1;
+    return `${start}–${Math.min(page * PAGE_SIZE, total)} of ${total.toLocaleString()}`;
+  }, [page, total]);
 
   return (
     <div className="p-6 space-y-4">
       <PageHeader
         title="Products"
-        description={`${products.length} items in catalog`}
+        description={`${(counts?.total ?? total).toLocaleString()} items in catalog`}
         icon={<Package className="h-5 w-5" />}
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
@@ -252,11 +325,27 @@ function ProductsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search by name, SKU, barcode…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All stock</SelectItem>
+              <SelectItem value="in">In stock</SelectItem>
+              <SelectItem value="low">Low stock</SelectItem>
+              <SelectItem value="out">Out of stock</SelectItem>
+            </SelectContent>
+          </Select>
           {(() => {
-            const total = products.length;
-            const allowedCount = products.filter((p: any) => p.allow_negative_stock).length;
-            const allChecked = total > 0 && allowedCount === total;
-            const someChecked = allowedCount > 0 && allowedCount < total;
+            const totalAll = counts?.total ?? 0;
+            const allowedCount = counts?.allowed ?? 0;
+            const allChecked = totalAll > 0 && allowedCount === totalAll;
+            const someChecked = allowedCount > 0 && allowedCount < totalAll;
             return (
               <label className="flex items-start gap-2 rounded-md border p-2 px-3 bg-muted/30 cursor-pointer">
                 <input
@@ -266,19 +355,19 @@ function ProductsPage() {
                   ref={(el) => { if (el) el.indeterminate = someChecked; }}
                   onChange={async (e) => {
                     const next = e.target.checked;
-                    if (!confirm(`${next ? "Enable" : "Disable"} negative stock for ALL ${total} products?`)) return;
+                    if (!confirm(`${next ? "Enable" : "Disable"} negative stock for ALL ${totalAll} products?`)) return;
                     const { error } = await supabase
                       .from("products")
                       .update({ allow_negative_stock: next })
                       .not("id", "is", null);
                     if (error) return toast.error(error.message);
                     toast.success(`Negative stock ${next ? "enabled" : "disabled"} for all products`);
-                    qc.invalidateQueries({ queryKey: ["products"] });
+                    invalidateProducts();
                   }}
                 />
                 <span className="text-sm">
                   <div className="font-medium leading-tight">Allow negative stock (all products)</div>
-                  <div className="text-xs text-muted-foreground">{allowedCount}/{total} currently allow negative stock</div>
+                  <div className="text-xs text-muted-foreground">{allowedCount}/{totalAll} currently allow negative stock</div>
                 </span>
               </label>
             );
@@ -287,12 +376,12 @@ function ProductsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Category</TableHead>
-              {showCost && <TableHead className="text-right">Cost</TableHead>}
-              {showSell && <TableHead className="text-right">Price</TableHead>}
-              <TableHead className="text-right">Stock</TableHead>
+              <SortHead k="name">Name</SortHead>
+              <SortHead k="sku">SKU</SortHead>
+              <SortHead k="category">Category</SortHead>
+              {showCost && <SortHead k="cost_price" className="text-right">Cost</SortHead>}
+              {showSell && <SortHead k="sell_price" className="text-right">Price</SortHead>}
+              <SortHead k="stock" className="text-right">Stock</SortHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -300,9 +389,9 @@ function ProductsPage() {
             {isLoading && (
               <TableRow><TableCell colSpan={tableColCount} className="py-4"><TableSkeleton rows={5} columns={tableColCount} /></TableCell></TableRow>
             )}
-            {!isLoading && filtered.length === 0 && (
+            {!isLoading && pageRows.length === 0 && (
               <TableRow><TableCell colSpan={tableColCount} className="py-8">
-                <EmptyState icon={Package} title="No products yet" description="Add a new product to start selling." />
+                <EmptyState icon={Package} title="No products found" description="Try a different search or filter, or add a new product." />
               </TableCell></TableRow>
             )}
             {pageRows.map((p) => (
@@ -334,18 +423,16 @@ function ProductsPage() {
             ))}
           </TableBody>
         </Table>
-        {!isLoading && filtered.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-3 text-sm">
-            <div className="text-muted-foreground">
-              Showing {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, filtered.length)} of {filtered.length}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage(pageSafe - 1)}>Prev</Button>
-              <span className="px-2 py-1">Page {pageSafe} / {totalPages}</span>
-              <Button variant="outline" size="sm" disabled={pageSafe >= totalPages} onClick={() => setPage(pageSafe + 1)}>Next</Button>
-            </div>
+        <div className="flex items-center justify-between mt-3 text-sm">
+          <div className="text-muted-foreground">
+            Showing {rangeLabel}{isFetching && !isLoading ? " · updating…" : ""}
           </div>
-        )}
+          <div className="flex gap-2 items-center">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
+            <span className="px-2 py-1">Page {page} / {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
       </Card>
     </div>
   );
