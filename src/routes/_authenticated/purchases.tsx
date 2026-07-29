@@ -43,7 +43,7 @@ const normalizeItemCode = (value: string | null | undefined) => {
   return raw.replace(/^0+/, "") || "0";
 };
 
-const PICKER_COLUMNS = "id,name,sku,barcode,cost_price,stock";
+const PICKER_COLUMNS = "id,name,sku,barcode,cost_price,sell_price,stock";
 
 function useDebounced<T>(value: T, ms: number) {
   const [v, setV] = useState(value);
@@ -389,7 +389,7 @@ function Page() {
     setSaving(true);
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
-        supplier_id: supplier,
+        supplier_id: supplier && supplier !== "none" ? supplier : null,
         tax: taxAmt, paid, note,
         items: items.map((l) => {
           const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
@@ -485,7 +485,8 @@ function Page() {
                           </span>
                           <span className="shrink-0 text-right text-xs text-muted-foreground">
                             <span className="block">stock {Number(p.stock ?? 0)}</span>
-                            <span className="block">{fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
+                            <span className="block">P {fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
+                            <span className="block">S {fmtMoney(Number(p.sell_price ?? 0), sym)}</span>
                           </span>
                         </button>
                       ))}
@@ -501,6 +502,7 @@ function Page() {
                       <SelectValue placeholder="Select supplier *" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">— None —</SelectItem>
                       {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -1112,5 +1114,5 @@ function Page() {
   );
 }
 
-type PickerProduct = { id: string; name: string; sku?: string | null; barcode?: string | null; cost_price?: number | null; stock?: number | null };
+type PickerProduct = { id: string; name: string; sku?: string | null; barcode?: string | null; cost_price?: number | null; sell_price?: number | null; stock?: number | null };
 

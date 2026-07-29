@@ -156,9 +156,8 @@ function ProductsPage() {
     if (!form.name) return toast.error("Name is required");
     const allBarcodes = parseBarcodes(form.barcodes_text);
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
-    if (!primary) return toast.error("Barcode is required");
     const { barcodes_text: _bt, stock: newStock, ...rest } = form;
-    const payload = { ...rest, sku: form.sku || null, barcode: primary, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null, batch_no: form.batch_no || null, expiry_date: form.expiry_date || null, rack_location: form.rack_location || null, allow_negative_stock: form.allow_negative_stock };
+    const payload = { ...rest, sku: form.sku || null, barcode: primary || null, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null, batch_no: form.batch_no || null, expiry_date: form.expiry_date || null, rack_location: form.rack_location || null, allow_negative_stock: form.allow_negative_stock };
     let productId = form.id;
     if (form.id) {
       // Update all non-stock fields directly
@@ -261,7 +260,7 @@ function ProductsPage() {
                   </Select>
                 </div>
                 <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
-                <div><Label>Primary barcode <span className="text-destructive">*</span></Label><Input required value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
+                <div><Label>Primary barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="Optional" /></div>
                 <div className="col-span-2">
                   <Label>Additional barcodes (one per line — for different versions/packs of the same item)</Label>
                   <textarea

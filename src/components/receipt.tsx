@@ -111,6 +111,18 @@ function setReceiptPrintPageSize(
   `;
 }
 
+async function tryDirectPrint(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  const printApi = (window as Window & typeof globalThis & { pos?: { print?: (options?: Record<string, unknown>) => Promise<boolean> | boolean } }).pos?.print;
+  if (typeof printApi !== "function") return false;
+  try {
+    const result = await printApi({ silent: true, printBackground: true });
+    return result !== false;
+  } catch {
+    return false;
+  }
+}
+
 export function printReceipt() {
   if (typeof document === "undefined" || typeof window === "undefined") return;
   document.querySelector(".receipt-print-root")?.remove();
@@ -139,7 +151,11 @@ export function printReceipt() {
   };
   window.addEventListener("afterprint", cleanup);
   setReceiptPrintPageSize(styleEl, "80mm", printRoot);
-  requestAnimationFrame(() => window.print());
+  requestAnimationFrame(() => {
+    void tryDirectPrint().then((printed) => {
+      if (!printed) window.print();
+    });
+  });
 }
 
 /** Print an invoice directly without opening a preview dialog.

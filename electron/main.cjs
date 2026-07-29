@@ -111,6 +111,17 @@ ipcMain.handle('pos:app-info', () => ({
   userDir: app.getPath('userData'),
 }));
 ipcMain.handle('pos:check-updates', () => checkForUpdatesNow());
+ipcMain.handle('pos:print', async (_event, options = {}) => {
+  const target = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getFocusedWindow();
+  if (!target) return false;
+  return await new Promise((resolve) => {
+    target.webContents.print({
+      silent: options.silent ?? true,
+      printBackground: options.printBackground ?? true,
+      deviceName: options.deviceName,
+    }, (success) => resolve(Boolean(success)));
+  });
+});
 ipcMain.handle('pos:quit-and-install', () => {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.quitAndInstall();
