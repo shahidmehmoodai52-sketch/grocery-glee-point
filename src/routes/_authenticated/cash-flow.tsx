@@ -856,12 +856,15 @@ function Page() {
             </div>
             <div>
               <Label>Type</Label>
-              <Select value={accForm.type} onValueChange={(v) => setAccForm((f: any) => ({ ...f, type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ACC_TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <select
+                value={accForm.type}
+                onChange={(e) => setAccForm((f: any) => ({ ...f, type: e.target.value }))}
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {ACC_TYPES.map((t) => (
+                  <option key={t.v} value={t.v}>{t.label}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label>Opening balance</Label>

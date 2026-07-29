@@ -2078,10 +2078,10 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
   const accounts = accQ.data ?? [];
 
   const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  // Only accounts (cards) created in Cash Flow are offered here.
+  // Only accounts created in Cash Flow are offered here, including card/bank/mobile wallets.
   const online = accounts
-    .filter((a: any) => a.type !== "cash" && a.type !== "card")
-    .map((a: any) => ({ v: slug(a.name), label: a.name, id: a.id }));
+    .filter((a: any) => a.type !== "cash")
+    .map((a: any) => ({ v: a.name, label: a.name, id: a.id }));
 
   const isOnline = online.some((o) => o.v === value);
   const activeOnline = online.find((o) => o.v === value);
