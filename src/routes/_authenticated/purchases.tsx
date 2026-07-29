@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Search, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
-import { fetchAll } from "@/lib/supabase-page";
-import { offlineFirst, cacheProducts, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
+import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
+
 import { db } from "@/lib/offline/db";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
@@ -42,6 +42,70 @@ const normalizeItemCode = (value: string | null | undefined) => {
   if (!/^\d{1,4}$/.test(raw)) return raw;
   return raw.replace(/^0+/, "") || "0";
 };
+
+const PICKER_COLUMNS = "id,name,sku,barcode,cost_price,stock";
+
+function useDebounced<T>(value: T, ms: number) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
+/**
+ * Server-side product lookup for the purchase entry box.
+ * Runs a handful of narrow indexed queries instead of pulling the whole
+ * catalogue into the browser, so 2-4 letters return results immediately.
+ */
+async function searchPurchaseProducts(term: string): Promise<{ products: PickerProduct[]; barcodes: { product_id: string; barcode: string }[] }> {
+  const q = term.trim().replace(/\s+/g, " ");
+  if (!q) return { products: [], barcodes: [] };
+  const like = `%${q}%`;
+  const prefix = `${q}%`;
+
+  const online = typeof navigator === "undefined" || navigator.onLine;
+  if (!online) {
+    // Offline: fall back to the local Dexie mirror.
+    const t = q.toLowerCase();
+    const rows = await db().products.toArray();
+    const hits = rows
+      .filter((p: any) =>
+        (p.name ?? "").toLowerCase().includes(t) ||
+        (p.sku ?? "").toLowerCase().includes(t) ||
+        (p.barcode ?? "").toLowerCase().includes(t))
+      .slice(0, 25);
+    return { products: hits as PickerProduct[], barcodes: [] };
+  }
+
+  const [nameRes, namePrefixRes, skuRes, barcodeRes, extraBcRes] = await Promise.all([
+    supabase.from("products").select(PICKER_COLUMNS).ilike("name", like).order("name").limit(25),
+    supabase.from("products").select(PICKER_COLUMNS).ilike("name", prefix).order("name").limit(25),
+    supabase.from("products").select(PICKER_COLUMNS).ilike("sku", prefix).order("sku").limit(25),
+    supabase.from("products").select(PICKER_COLUMNS).ilike("barcode", prefix).order("name").limit(25),
+    supabase.from("product_barcodes").select("product_id,barcode").ilike("barcode", prefix).limit(25),
+  ]);
+
+  const barcodes = (extraBcRes.data ?? []) as { product_id: string; barcode: string }[];
+  const extraIds = barcodes.map((b) => b.product_id);
+  const extraRes = extraIds.length
+    ? await supabase.from("products").select(PICKER_COLUMNS).in("id", extraIds).limit(25)
+    : { data: [] as any[] };
+
+  const merged = new Map<string, PickerProduct>();
+  for (const p of [
+    ...(namePrefixRes.data ?? []),
+    ...(skuRes.data ?? []),
+    ...(barcodeRes.data ?? []),
+    ...(extraRes.data ?? []),
+    ...(nameRes.data ?? []),
+  ]) merged.set((p as any).id, p as PickerProduct);
+
+  return { products: [...merged.values()], barcodes };
+}
+
+
 
 function Page() {
   const qc = useQueryClient();
@@ -167,29 +231,48 @@ function Page() {
     setEntryIndex(0);
     focusCell("cost", newIndex);
   };
-  const addFromSearch = () => {
+  const addFromSearch = async () => {
     const term = entrySearch.trim();
     if (!term) return;
     const t = term.toLowerCase();
     const normalizedItemCode = normalizeItemCode(term);
-    const prods = products as PickerProduct[];
+    // Candidates from the debounced server search. When the user (or a barcode
+    // scanner) types+Enters faster than the debounce, this list can still be
+    // stale, so we fall back to a direct awaited lookup below.
+    let prods = products as PickerProduct[];
     const isFourDigitItemCode = /^\d{4}$/.test(term);
-    // Item Code/SKU is different from barcode. In purchases, manual 4-digit codes
-    // should resolve by item_code first, then scanner barcodes.
-    let exact = prods.find((p) => normalizeItemCode(p.sku) === normalizedItemCode);
-    if (!exact && isFourDigitItemCode) {
-      exact = prods.find((p) => (p.sku ?? "").toLowerCase().startsWith(t));
+
+    const findExact = (list: PickerProduct[], barcodeRows: { product_id: string; barcode: string }[]) => {
+      // Item Code/SKU is different from barcode. In purchases, manual 4-digit codes
+      // should resolve by item_code first, then scanner barcodes.
+      let hit = list.find((p) => normalizeItemCode(p.sku) === normalizedItemCode);
+      if (!hit && isFourDigitItemCode) hit = list.find((p) => (p.sku ?? "").toLowerCase().startsWith(t));
+      // 2) exact match on primary barcode
+      if (!hit) hit = list.find((p) => (p.barcode ?? "").toLowerCase() === t);
+      // 3) exact match on extra barcodes (product_barcodes table)
+      if (!hit) {
+        const bcRow = barcodeRows.find((b) => (b.barcode ?? "").toLowerCase() === t);
+        if (bcRow) hit = list.find((p) => p.id === bcRow.product_id);
+      }
+      // 4) exact match on name
+      if (!hit) hit = list.find((p) => (p.name ?? "").toLowerCase() === t);
+      return hit;
+    };
+
+    let exact = findExact(prods, extraBarcodes as { product_id: string; barcode: string }[]);
+
+    // Search results for this exact term aren't in yet (debounce race) — resolve
+    // synchronously against the server so scanning never drops an item.
+    if (!exact && debouncedEntry !== term) {
+      const fresh = await searchPurchaseProducts(term);
+      prods = fresh.products;
+      exact = findExact(fresh.products, fresh.barcodes);
+      if (!exact && fresh.products.length) {
+        addProductLine(fresh.products[0]);
+        return;
+      }
     }
-    // 2) exact match on primary barcode
-    if (!exact) exact = prods.find((p) => (p.barcode ?? "").toLowerCase() === t);
-    // 3) exact match on extra barcodes (product_barcodes table)
-    if (!exact) {
-      const bcRow = (extraBarcodes as { product_id: string; barcode: string }[])
-        .find((b) => (b.barcode ?? "").toLowerCase() === t);
-      if (bcRow) exact = prods.find((p) => p.id === bcRow.product_id);
-    }
-    // 4) exact match on name
-    if (!exact) exact = prods.find((p) => (p.name ?? "").toLowerCase() === t);
+
     // If the term looks like a code (digits) but has no exact match, prompt to create a new product
     const looksLikeCode = /^\d+$/.test(term);
     if (!exact && looksLikeCode) {
@@ -207,6 +290,7 @@ function Page() {
 
 
 
+
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
     staleTime: 60_000,
@@ -216,23 +300,21 @@ function Page() {
       cacheSuppliers,
     ),
   });
-  const { data: products = [] } = useQuery({
-    queryKey: ["products", "purchase-picker", "with-item-code"],
-    staleTime: 60_000,
-    queryFn: async () => offlineFirst<any[]>(
-      async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,sku,barcode,cost_price,stock").order("name").range(from, to)),
-      async () => (await db().products.orderBy("name").toArray()).map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, barcode: p.barcode, cost_price: p.cost_price, stock: p.stock })),
-      cacheProducts,
-    ),
+  // Server-side product search. Previously this downloaded every product row
+  // (49k+ on real tenants) before the first result could render, so typing a
+  // few letters showed nothing for minutes. Now we ask Postgres for a small
+  // ranked candidate set per keystroke (debounced).
+  const debouncedEntry = useDebounced(entrySearch.trim(), 180);
+  const { data: searchResult } = useQuery({
+    queryKey: ["products", "purchase-search", debouncedEntry],
+    enabled: debouncedEntry.length > 0,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+    queryFn: () => searchPurchaseProducts(debouncedEntry),
   });
-  const { data: extraBarcodes = [] } = useQuery({
-    queryKey: ["product_barcodes"],
-    staleTime: 60_000,
-    queryFn: async () => {
-      const { data } = await supabase.from("product_barcodes").select("product_id,barcode");
-      return data ?? [];
-    },
-  });
+  const products = searchResult?.products ?? [];
+  const extraBarcodes = searchResult?.barcodes ?? [];
+
   const entryMatches = useMemo(() => {
     const term = entrySearch.trim().toLowerCase();
     if (!term) return [] as PickerProduct[];
