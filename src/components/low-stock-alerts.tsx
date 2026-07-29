@@ -207,7 +207,7 @@ export function LowStockAlerts() {
       </div>
 
       {expanded && (
-        <div className={`absolute left-0 right-0 top-full mt-1 z-[2147483646] rounded-md border bg-popover shadow-2xl ${primary ? "border-destructive/30" : "border-amber-500/30"} px-3 pb-3 pt-2 max-h-80 overflow-auto space-y-1`}>
+        <div className={`absolute left-0 right-0 top-full mt-1 z-[90] rounded-md border bg-popover shadow-2xl ${primary ? "border-destructive/30" : "border-amber-500/30"} px-3 pb-3 pt-2 max-h-80 overflow-auto space-y-1`}>
 
           {activeOOS.map((p) => (
             <AlertRow key={p.id} p={p} kind="oos" sym={sym} onDismiss={() => dismissOne(p)} />
