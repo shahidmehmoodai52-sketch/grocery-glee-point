@@ -242,27 +242,34 @@ function Page() {
         .filter((b) => (b.barcode ?? "").toLowerCase().includes(term))
         .map((b) => b.product_id)
     );
+    // Multi-word name search: "co mi" should match "Coca Cola Mini".
+    const tokens = term.split(/\s+/).filter(Boolean);
     return (products as PickerProduct[])
       .map((p) => {
         const sku = (p.sku ?? "").toLowerCase();
         const normalizedSku = normalizeItemCode(p.sku);
         const name = (p.name ?? "").toLowerCase();
+        const words = name.split(/\s+/);
         const barcode = (p.barcode ?? "").toLowerCase();
         const extraBarcodeMatch = bcProductIds.has(p.id);
+        const allTokensMatch = tokens.length > 1 && tokens.every((t) => name.includes(t));
         let rank = Number.POSITIVE_INFINITY;
         if (normalizedSku === normalizedTermItemCode) rank = 0;
         else if (sku === term) rank = 1;
         else if (sku.startsWith(term)) rank = 2;
-        else if (sku.includes(term)) rank = 3;
-        else if (name.includes(term)) rank = 3;
-        else if (barcode === term) rank = 4;
-        else if (barcode.includes(term) || extraBarcodeMatch) rank = 5;
+        else if (name.startsWith(term)) rank = 3;                       // "chi" → "Chips…"
+        else if (words.some((w) => w.startsWith(term))) rank = 4;       // word-prefix match
+        else if (sku.includes(term)) rank = 5;
+        else if (name.includes(term)) rank = 6;
+        else if (allTokensMatch) rank = 7;
+        else if (barcode === term) rank = 8;
+        else if (barcode.includes(term) || extraBarcodeMatch) rank = 9;
         return { p, rank };
       })
       .filter(({ rank }) => Number.isFinite(rank))
       .sort((a, b) => a.rank - b.rank || (a.p.name ?? "").localeCompare(b.p.name ?? ""))
       .map(({ p }) => p)
-      .slice(0, 8);
+      .slice(0, 25);
   }, [entrySearch, products, extraBarcodes]);
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases"],
