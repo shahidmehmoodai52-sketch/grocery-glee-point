@@ -489,10 +489,10 @@ function AuthPage() {
                   autoComplete="new-password"
                   className={fieldErrors.regPwd ? "border-red-500 focus:border-red-500" : ""}
                 />
-                {fieldErrors.regPwd && (
+                <p className="text-[11px] text-muted-foreground">8+ chars with uppercase, lowercase, and a number.</p>
+                 {fieldErrors.regPwd && (
                   <p className="text-xs text-red-500 mt-1">{fieldErrors.regPwd}</p>
                 )}
-                <p className="text-[11px] text-muted-foreground">8+ chars with uppercase, lowercase, and a number.</p>
               </div>
               <div className="rounded-md border p-3 space-y-3 bg-muted/30">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shop details</p>
