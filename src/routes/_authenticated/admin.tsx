@@ -134,8 +134,8 @@ function AdminPanelPage() {
     <div className="p-6 space-y-4">
       <NeedsInternetBanner section="Admin panel" />
       <PageHeader
-        title="Developer control panel"
-        description="Managed by Shahid Mehmood (Developer) · shahidmehmoodai52@gmail.com"
+        title="Control Panel"
+        description="Managed by tillix.co support · info@tillix.co"
         icon={<ShieldCheck className="h-5 w-5" />}
       />
       <Tabs defaultValue="tenants">

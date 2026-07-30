@@ -48,7 +48,7 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {isExpired
-              ? "Your shop's subscription has expired. Please contact the developer (Shahid Mehmood · 0304-4604659) to renew your plan and restore access."
+              ? "Your shop's subscription has expired. Please contact the tillix.co support (info@tillix.co · +923096431377) to renew your plan and restore access."
               : `Your shop has been ${status === "archived" ? "archived" : "suspended"} by the platform administrator. Please contact support to restore access.`}
           </p>
           <Button

@@ -936,23 +936,23 @@ function LandingPage() {
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
-                name: "Shahid Mehmood",
-                role: "Developer",
-                phone: "0304-4604659",
-                initials: "SM",
+                name: "Abdullah Iftikhar",
+                role: "Founder & CEO",
+                phone: "+92309 6431 377",
+                initials: "AI",
                 gradient: "from-emerald-500 to-teal-600",
               },
               {
-                name: "Abdullah Iftekhar",
-                role: "I.T. Manager",
-                phone: "0301-7160701",
-                initials: "AI",
+                name: "Shahid Mehmood",
+                role: "Co-Founder & CTO",
+                phone: "+92309 6431 377",
+                initials: "SM",
                 gradient: "from-indigo-500 to-blue-600",
               },
               {
                 name: "Babar Hussain",
-                role: "Technical Support",
-                phone: "0333-4950141",
+                role: "COO & Head of Operations",
+                phone: "+92309 6431 377",
                 initials: "BH",
                 gradient: "from-amber-500 to-orange-600",
               },

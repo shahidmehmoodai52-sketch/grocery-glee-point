@@ -82,7 +82,7 @@ export function ExpiryCountdown() {
               {" "}Renew now to avoid interruption.
             </span>
             <span className="mt-3 block rounded-md bg-muted px-3 py-2 text-xs">
-              Contact: <strong>Shahid Mehmood</strong> · 0304-4604659
+              Contact: <strong>info@tillix.co</strong> · +923096431377
             </span>
           </DialogDescription>
         </DialogHeader>
