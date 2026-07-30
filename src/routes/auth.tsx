@@ -32,8 +32,6 @@ function checkStrongPassword(pw: string): string | null {
   return null;
 }
 
-
-
 function AuthPage() {
   const navigate = useNavigate();
   const { next } = Route.useSearch();
@@ -63,6 +61,9 @@ function AuthPage() {
 
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  
+  // Track field-specific errors
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const goToApp = useCallback(async () => {
     await navigate({ to: target, replace: true });
@@ -70,19 +71,40 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      // Only auto-forward if we're not in the middle of a signup flow
       if (data.session) void goToApp();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goToApp]);
 
-  const showErr = (msg: string) => { setFormError(msg); toast.error(msg); };
+  const showErr = (msg: string) => { 
+    setFormError(msg); 
+    toast.error(msg); 
+  };
+
+  // Clear field errors when user types
+  const clearFieldError = (field: string) => {
+    setFieldErrors(prev => ({ ...prev, [field]: "" }));
+  };
 
   // ---------- Owner sign-in ----------
   const handleOwnerSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true); setFormError(null);
+    setBusy(true); 
+    setFormError(null);
+    setFieldErrors({});
+    
     const cleanEmail = email.trim().toLowerCase();
+    const errors: Record<string, string> = {};
+    
+    if (!cleanEmail) errors.email = "Email is required";
+    if (!password) errors.password = "Password is required";
+    
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setBusy(false);
+      return;
+    }
+    
     try {
       if (await isBlocked(cleanEmail)) {
         await logSecurityEvent("blocked_attempt", { severity: "warning", email: cleanEmail });
@@ -92,7 +114,7 @@ function AuthPage() {
       const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (error) {
         void logSecurityEvent("failed_login", { severity: "warning", email: cleanEmail });
-        showErr(error.message || "Invalid email or password");
+        setFieldErrors({ password: "Invalid email or password" });
         return;
       }
       void logSecurityEvent("successful_login", { severity: "info", email: cleanEmail });
@@ -119,19 +141,38 @@ function AuthPage() {
   // ---------- Staff sign-in ----------
   const handleStaffSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true); setFormError(null);
+    setBusy(true); 
+    setFormError(null);
+    setFieldErrors({});
+    
+    const code = cleanCode(shopCode);
+    const user = cleanUsername(staffUser);
+    const errors: Record<string, string> = {};
+    
+    if (!shopCode.trim()) errors.shopCode = "Shop code is required";
+    if (!staffUser.trim()) errors.staffUser = "Username is required";
+    if (!staffPwd) errors.staffPwd = "Password is required";
+    
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setBusy(false);
+      return;
+    }
+    
     try {
-      const code = cleanCode(shopCode);
-      const user = cleanUsername(staffUser);
-      if (!code) { showErr("Enter your shop code."); return; }
-      if (!user) { showErr("Enter your username."); return; }
-      if (!staffPwd) { showErr("Enter your password."); return; }
       const syntheticEmail = `${user}@shop-${code}.local`;
-      if (await isBlocked(syntheticEmail)) { showErr("Access blocked. Contact your owner."); return; }
+      if (await isBlocked(syntheticEmail)) { 
+        showErr("Access blocked. Contact your owner."); 
+        return; 
+      }
       const { error } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password: staffPwd });
       if (error) {
         void logSecurityEvent("failed_login", { severity: "warning", email: syntheticEmail });
-        showErr("Wrong shop code, username or password.");
+        setFieldErrors({ 
+          shopCode: "Invalid credentials", 
+          staffUser: "Invalid credentials", 
+          staffPwd: "Invalid credentials" 
+        });
         return;
       }
       void logSecurityEvent("successful_login", { severity: "info", email: syntheticEmail });
@@ -143,21 +184,36 @@ function AuthPage() {
     }
   };
 
-  // ---------- Register (simple: email + password + shop details) ----------
+  // ---------- Register ----------
   const handleFinishRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true); setFormError(null);
-    try {
-      const cleanEmail = regEmail.trim().toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { showErr("Please enter a valid email address."); return; }
-      const pwErr = checkStrongPassword(regPwd);
-      if (pwErr) { showErr(pwErr); return; }
-      if (shopName.trim().length < 2) { showErr("Shop name is required."); return; }
-      if (!shopPhone.trim() || !shopAddress.trim() || !shopCity.trim()) {
-        showErr("Please enter shop phone, address and city."); return;
-      }
+    setBusy(true); 
+    setFormError(null);
+    setFieldErrors({});
+    
+    const cleanEmail = regEmail.trim().toLowerCase();
+    const errors: Record<string, string> = {};
+    
+    if (!cleanEmail) errors.regEmail = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) errors.regEmail = "Please enter a valid email address";
+    
+    if (!fullName.trim()) errors.fullName = "Full name is required";
+    
+    const pwErr = checkStrongPassword(regPwd);
+    if (pwErr) errors.regPwd = pwErr;
+    
+    if (shopName.trim().length < 2) errors.shopName = "Shop name is required";
+    if (!shopPhone.trim()) errors.shopPhone = "Phone number is required";
+    if (!shopAddress.trim()) errors.shopAddress = "Address is required";
+    if (!shopCity.trim()) errors.shopCity = "City is required";
+    
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setBusy(false);
+      return;
+    }
 
-      // Sign up (email verification disabled → session issued immediately)
+    try {
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: cleanEmail,
         password: regPwd,
@@ -166,22 +222,29 @@ function AuthPage() {
           data: { full_name: fullName.trim() || undefined },
         },
       });
-      if (signUpErr) { showErr(signUpErr.message); return; }
-
-      // If no session (rare — e.g. email confirm re-enabled), try password sign-in
-      if (!signUpData.session) {
-        const { error: siErr } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: regPwd });
-        if (siErr) { showErr(siErr.message); return; }
+      if (signUpErr) { 
+        setFieldErrors({ regEmail: signUpErr.message });
+        return; 
       }
 
-      // Register the shop for this user
+      if (!signUpData.session) {
+        const { error: siErr } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: regPwd });
+        if (siErr) { 
+          setFieldErrors({ regEmail: siErr.message });
+          return; 
+        }
+      }
+
       const { error: rpcErr } = await supabase.rpc("register_shop" as any, {
         _name: shopName.trim(),
         _phone: shopPhone.trim(),
         _address: shopAddress.trim(),
         _city: shopCity.trim(),
       } as any);
-      if (rpcErr) { showErr(`Shop registration failed: ${rpcErr.message}`); return; }
+      if (rpcErr) { 
+        showErr(`Shop registration failed: ${rpcErr.message}`); 
+        return; 
+      }
 
       toast.success("Shop registered! Awaiting admin approval — limited access until approved.");
       await goToApp();
@@ -194,6 +257,7 @@ function AuthPage() {
 
   const resetRegister = () => {
     setRegPwd(""); setShopName(""); setShopPhone(""); setShopAddress(""); setShopCity(""); setFullName(""); setRegEmail("");
+    setFieldErrors({});
   };
 
   return (
@@ -236,7 +300,21 @@ function AuthPage() {
                 <form onSubmit={handleOwnerSignIn} className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      value={email} 
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        clearFieldError("email");
+                      }} 
+                      required 
+                      autoComplete="email"
+                      className={fieldErrors.email ? "border-red-500 focus:border-red-500" : ""}
+                    />
+                    {fieldErrors.email && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.email}</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
@@ -245,7 +323,21 @@ function AuthPage() {
                         Forgot password?
                       </button>
                     </div>
-                    <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      value={password} 
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        clearFieldError("password");
+                      }} 
+                      required 
+                      autoComplete="current-password"
+                      className={fieldErrors.password ? "border-red-500 focus:border-red-500" : ""}
+                    />
+                    {fieldErrors.password && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.password}</p>
+                    )}
                   </div>
                   {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
                   <Button type="submit" className="w-full" disabled={busy}>
@@ -282,16 +374,59 @@ function AuthPage() {
               <form onSubmit={handleStaffSignIn} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="shop_code">Shop code</Label>
-                  <Input id="shop_code" value={shopCode} onChange={(e) => setShopCode(e.target.value)} placeholder="e.g. ali-store" autoCapitalize="none" required />
+                  <Input 
+                    id="shop_code" 
+                    value={shopCode} 
+                    onChange={(e) => {
+                      setShopCode(e.target.value);
+                      clearFieldError("shopCode");
+                    }} 
+                    placeholder="e.g. ali-store" 
+                    autoCapitalize="none" 
+                    required
+                    className={fieldErrors.shopCode ? "border-red-500 focus:border-red-500" : ""}
+                  />
+                  {fieldErrors.shopCode && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.shopCode}</p>
+                  )}
                   <p className="text-[11px] text-muted-foreground">Ask your shop owner for the code.</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="staff_user">Username</Label>
-                  <Input id="staff_user" value={staffUser} onChange={(e) => setStaffUser(e.target.value)} placeholder="e.g. raza" autoCapitalize="none" required autoComplete="username" />
+                  <Input 
+                    id="staff_user" 
+                    value={staffUser} 
+                    onChange={(e) => {
+                      setStaffUser(e.target.value);
+                      clearFieldError("staffUser");
+                    }} 
+                    placeholder="e.g. raza" 
+                    autoCapitalize="none" 
+                    required 
+                    autoComplete="username"
+                    className={fieldErrors.staffUser ? "border-red-500 focus:border-red-500" : ""}
+                  />
+                  {fieldErrors.staffUser && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.staffUser}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="staff_pwd">Password</Label>
-                  <Input id="staff_pwd" type="password" value={staffPwd} onChange={(e) => setStaffPwd(e.target.value)} required autoComplete="current-password" />
+                  <Input 
+                    id="staff_pwd" 
+                    type="password" 
+                    value={staffPwd} 
+                    onChange={(e) => {
+                      setStaffPwd(e.target.value);
+                      clearFieldError("staffPwd");
+                    }} 
+                    required 
+                    autoComplete="current-password"
+                    className={fieldErrors.staffPwd ? "border-red-500 focus:border-red-500" : ""}
+                  />
+                  {fieldErrors.staffPwd && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.staffPwd}</p>
+                  )}
                 </div>
                 {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
                 <Button type="submit" className="w-full" disabled={busy}>
@@ -306,36 +441,130 @@ function AuthPage() {
             <form onSubmit={handleFinishRegister} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="reg_email">Email</Label>
-                <Input id="reg_email" type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required autoComplete="email" placeholder="you@example.com" />
+                <Input 
+                  id="reg_email" 
+                  type="email" 
+                  value={regEmail} 
+                  onChange={(e) => {
+                    setRegEmail(e.target.value);
+                    clearFieldError("regEmail");
+                  }} 
+                  required 
+                  autoComplete="email" 
+                  placeholder="you@example.com"
+                  className={fieldErrors.regEmail ? "border-red-500 focus:border-red-500" : ""}
+                />
+                {fieldErrors.regEmail && (
+                  <p className="text-xs text-red-500 mt-1">{fieldErrors.regEmail}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="full_name">Your full name</Label>
-                <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                <Input 
+                  id="full_name" 
+                  value={fullName} 
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    clearFieldError("fullName");
+                  }} 
+                  required
+                  className={fieldErrors.fullName ? "border-red-500 focus:border-red-500" : ""}
+                />
+                {fieldErrors.fullName && (
+                  <p className="text-xs text-red-500 mt-1">{fieldErrors.fullName}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="reg_pwd">Password</Label>
-                <Input id="reg_pwd" type="password" value={regPwd} onChange={(e) => setRegPwd(e.target.value)} required minLength={8} autoComplete="new-password" />
+                <Input 
+                  id="reg_pwd" 
+                  type="password" 
+                  value={regPwd} 
+                  onChange={(e) => {
+                    setRegPwd(e.target.value);
+                    clearFieldError("regPwd");
+                  }} 
+                  required 
+                  minLength={8} 
+                  autoComplete="new-password"
+                  className={fieldErrors.regPwd ? "border-red-500 focus:border-red-500" : ""}
+                />
+                {fieldErrors.regPwd && (
+                  <p className="text-xs text-red-500 mt-1">{fieldErrors.regPwd}</p>
+                )}
                 <p className="text-[11px] text-muted-foreground">8+ chars with uppercase, lowercase, and a number.</p>
               </div>
               <div className="rounded-md border p-3 space-y-3 bg-muted/30">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shop details</p>
                 <div className="space-y-1.5">
                   <Label htmlFor="shop_name">Shop name</Label>
-                  <Input id="shop_name" value={shopName} onChange={(e) => setShopName(e.target.value)} required placeholder="e.g. Ali General Store" />
+                  <Input 
+                    id="shop_name" 
+                    value={shopName} 
+                    onChange={(e) => {
+                      setShopName(e.target.value);
+                      clearFieldError("shopName");
+                    }} 
+                    required 
+                    placeholder="e.g. Store Name"
+                    className={fieldErrors.shopName ? "border-red-500 focus:border-red-500" : ""}
+                  />
+                  {fieldErrors.shopName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.shopName}</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="shop_phone">Phone</Label>
-                    <Input id="shop_phone" value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} required placeholder="03xx-xxxxxxx" />
+                    <Input 
+                      id="shop_phone" 
+                      value={shopPhone} 
+                      onChange={(e) => {
+                        setShopPhone(e.target.value);
+                        clearFieldError("shopPhone");
+                      }} 
+                      required 
+                      placeholder="xxxx-xxxxxxx"
+                      className={fieldErrors.shopPhone ? "border-red-500 focus:border-red-500" : ""}
+                    />
+                    {fieldErrors.shopPhone && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.shopPhone}</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="shop_city">City</Label>
-                    <Input id="shop_city" value={shopCity} onChange={(e) => setShopCity(e.target.value)} required placeholder="Lahore" />
+                    <Input 
+                      id="shop_city" 
+                      value={shopCity} 
+                      onChange={(e) => {
+                        setShopCity(e.target.value);
+                        clearFieldError("shopCity");
+                      }} 
+                      required 
+                      placeholder=""
+                      className={fieldErrors.shopCity ? "border-red-500 focus:border-red-500" : ""}
+                    />
+                    {fieldErrors.shopCity && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.shopCity}</p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="shop_address">Address</Label>
-                  <Input id="shop_address" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} required placeholder="Shop # / Street / Area" />
+                  <Input 
+                    id="shop_address" 
+                    value={shopAddress} 
+                    onChange={(e) => {
+                      setShopAddress(e.target.value);
+                      clearFieldError("shopAddress");
+                    }} 
+                    required 
+                    placeholder="Shop # / Street / Area"
+                    className={fieldErrors.shopAddress ? "border-red-500 focus:border-red-500" : ""}
+                  />
+                  {fieldErrors.shopAddress && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.shopAddress}</p>
+                  )}
                 </div>
               </div>
               {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
