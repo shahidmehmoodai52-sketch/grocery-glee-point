@@ -497,15 +497,14 @@ function Page() {
                   <Plus className="h-4 w-4 mr-1" /> New item
                 </Button>
                 <div className="w-[240px] shrink-0">
-                  <Select value={supplier} onValueChange={(v) => { setSupplier(v); focusSearch(); }}>
-                    <SelectTrigger className={`h-9 ${supplier === "none" ? "border-destructive" : ""}`}>
-                      <SelectValue placeholder="Select supplier *" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={supplier}
+                    onChange={(e) => { setSupplier(e.target.value); focusSearch(); }}
+                    className={`flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${supplier === "none" ? "border-destructive" : ""}`}
+                  >
+                    <option value="none">— None —</option>
+                    {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                 </div>
               </div>
             </div>
@@ -833,13 +832,14 @@ function Page() {
               </div>
               <div>
                 <Label>Supplier</Label>
-                <Select value={newProd.supplier_id || "none"} onValueChange={(v) => setNewProd((prev) => ({ ...prev, supplier_id: v === "none" ? "" : v }))}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— None —</SelectItem>
-                    {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <select
+                  value={newProd.supplier_id || "none"}
+                  onChange={(e) => setNewProd((prev) => ({ ...prev, supplier_id: e.target.value === "none" ? "" : e.target.value }))}
+                  className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="none">— None —</option>
+                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
               </div>
               <p className="text-xs text-muted-foreground">Opening stock stays 0 — this purchase will add the actual quantity.</p>
             </div>
@@ -864,13 +864,14 @@ function Page() {
                   </div>
                   <div>
                     <Label>Supplier</Label>
-                    <Select value={editRow.supplier_id ?? "none"} onValueChange={(v) => setEditRow({ ...editRow, supplier_id: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— None —</SelectItem>
-                        {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <select
+                      value={editRow.supplier_id ?? "none"}
+                      onChange={(e) => setEditRow({ ...editRow, supplier_id: e.target.value })}
+                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="none">— None —</option>
+                      {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
                   </div>
                 </div>
 

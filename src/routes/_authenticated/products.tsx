@@ -251,13 +251,14 @@ function ProductsPage() {
                 <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div className="col-span-2">
                   <Label>Supplier</Label>
-                  <Select value={form.preferred_supplier_id || "none"} onValueChange={(v) => setForm((prev) => ({ ...prev, preferred_supplier_id: v === "none" ? "" : v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={form.preferred_supplier_id || "none"}
+                    onChange={(e) => setForm((prev) => ({ ...prev, preferred_supplier_id: e.target.value === "none" ? "" : e.target.value }))}
+                    className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="none">— None —</option>
+                    {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                 </div>
                 <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
                 <div><Label>Primary barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="Optional" /></div>
