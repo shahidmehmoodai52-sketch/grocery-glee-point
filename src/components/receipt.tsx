@@ -113,14 +113,30 @@ function setReceiptPrintPageSize(
 
 async function tryDirectPrint(): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  const printApi = (window as Window & typeof globalThis & { pos?: { print?: (options?: Record<string, unknown>) => Promise<boolean> | boolean } }).pos?.print;
-  if (typeof printApi !== "function") return false;
-  try {
-    const result = await printApi({ silent: true, printBackground: true });
-    return result !== false;
-  } catch {
-    return false;
+  const getPrintApi = () => {
+    const win = window as Window & typeof globalThis & {
+      pos?: { print?: (options?: Record<string, unknown>) => Promise<boolean> | boolean };
+      electron?: { print?: (options?: Record<string, unknown>) => Promise<boolean> | boolean };
+    };
+    return win.pos?.print ?? win.electron?.print;
+  };
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const printApi = getPrintApi();
+    if (typeof printApi === "function") {
+      try {
+        const result = await printApi({ silent: true, printBackground: true });
+        if (result !== false) return true;
+      } catch {
+        // Keep retrying a few times for the desktop bridge to become ready.
+      }
+    }
+    if (attempt < 2) {
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
   }
+
+  return false;
 }
 
 export function printReceipt() {
