@@ -2238,7 +2238,7 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
         </div>
         <DialogFooter className="no-print">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={printReceipt}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          <Button onClick={() => { printInvoiceDirect(invoice, settings, "sale"); onClose(); }}><Printer className="h-4 w-4 mr-2" />Print</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
