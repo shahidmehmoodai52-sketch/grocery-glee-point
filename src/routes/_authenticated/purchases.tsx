@@ -485,8 +485,8 @@ function Page() {
                           </span>
                           <span className="shrink-0 text-right text-xs text-muted-foreground">
                             <span className="block">stock {Number(p.stock ?? 0)}</span>
-                            <span className="block">P {fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
-                            <span className="block">S {fmtMoney(Number(p.sell_price ?? 0), sym)}</span>
+                            <span className="block">P: {fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
+                            <span className="block">S: {fmtMoney(Number(p.sell_price ?? 0), sym)}</span>
                           </span>
                         </button>
                       ))}
@@ -833,7 +833,7 @@ function Page() {
               </div>
               <div>
                 <Label>Supplier</Label>
-                <Select value={newProd.supplier_id || "none"} onValueChange={(v) => setNewProd({ ...newProd, supplier_id: v === "none" ? "" : v })}>
+                <Select value={newProd.supplier_id || "none"} onValueChange={(v) => setNewProd((prev) => ({ ...prev, supplier_id: v === "none" ? "" : v }))}>
                   <SelectTrigger className="h-9"><SelectValue placeholder="Select supplier" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">— None —</SelectItem>

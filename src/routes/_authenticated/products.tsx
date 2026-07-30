@@ -251,7 +251,7 @@ function ProductsPage() {
                 <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div className="col-span-2">
                   <Label>Supplier</Label>
-                  <Select value={form.preferred_supplier_id || "none"} onValueChange={(v) => setForm({ ...form, preferred_supplier_id: v === "none" ? "" : v })}>
+                  <Select value={form.preferred_supplier_id || "none"} onValueChange={(v) => setForm((prev) => ({ ...prev, preferred_supplier_id: v === "none" ? "" : v }))}>
                     <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">— None —</SelectItem>
