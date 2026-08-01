@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, FileDown, Eye, Pencil, DollarSign, Plus, Save } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, FileDown, Eye, Pencil, DollarSign, Plus, Save, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +45,7 @@ function Page() {
   const [openInvoice, setOpenInvoice] = useState<any>(null);
   const [pdfPrompt, setPdfPrompt] = useState(false);
   const [addPayOpen, setAddPayOpen] = useState(false);
+  const [voiding, setVoiding] = useState(false);
   const [payDefault, setPayDefault] = useState(0);
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
@@ -59,7 +60,7 @@ function Page() {
     queryKey: ["customer-sales", id],
     queryFn: async () =>
       (await supabase.from("sales")
-        .select("id,invoice_no,subtotal,tax,discount,total,paid,change_due,payment_method,created_at,note,sale_items(id,name,qty,price,line_total)")
+        .select("id,invoice_no,subtotal,tax,discount,total,paid,change_due,payment_method,status,created_at,note,sale_items(id,name,qty,price,line_total)")
         .eq("customer_id", id).order("created_at", { ascending: true })).data ?? [],
   });
   const { data: payments = [] } = useQuery({
@@ -152,6 +153,17 @@ function Page() {
     opening, totalDebit: totalIn, totalCredit: totalOut,
     owedLabel: "Outstanding (they owe)", advanceLabel: "Advance (credit)",
   });
+
+  const voidSale = async (sale: any) => {
+    if (!sale) return;
+    if (!confirm(`Void invoice ${sale.invoice_no ?? sale.id}?`)) return;
+    setVoiding(true);
+    const { error } = await supabase.rpc("void_sale", { _sale_id: sale.id, _reason: "Voided from customer page" });
+    setVoiding(false);
+    if (error) return toast.error(error.message);
+    toast.success("Invoice voided");
+    qc.invalidateQueries();
+  };
 
   const downloadPdf = (includeItems: boolean) => {
     const blob = buildPdf(includeItems);
@@ -249,7 +261,7 @@ function Page() {
             <TableHead className="text-right">In (+)</TableHead>
             <TableHead className="text-right">Out (−)</TableHead>
             <TableHead className="text-right">Balance</TableHead>
-            <TableHead className="text-right no-print w-40">Actions</TableHead>
+            <TableHead className="text-right no-print w-52">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             <TableRow className="bg-muted/40 font-medium">
@@ -284,9 +296,16 @@ function Page() {
                 <TableCell className="text-right no-print">
                   <div className="flex justify-end gap-1">
                     {x.type === "sale" && x.sale && (
-                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
+                      <>
+                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        {x.sale.status !== "voided" && (
+                          <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => voidSale(x.sale)} disabled={voiding}>
+                            <Ban className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </>
                     )}
                     {x.entity === "sale" && due > 0 && (
                       <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, HandCoins, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet, Pencil } from "lucide-react";
+import { Plus, HandCoins, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,6 +68,14 @@ function Page() {
     if (error) return toast.error(error.message);
     toast.success("Customer updated");
     setEditRow(null);
+    qc.invalidateQueries();
+  };
+
+  const deleteCustomer = async (customer: any) => {
+    if (!confirm(`Delete customer ${customer.name ?? "this customer"}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("customers").delete().eq("id", customer.id);
+    if (error) return toast.error(error.message);
+    toast.success("Customer deleted");
     qc.invalidateQueries();
   };
 
@@ -238,6 +246,9 @@ function Page() {
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title="Edit customer">
                         <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => deleteCustomer(c)} title="Delete customer">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>
