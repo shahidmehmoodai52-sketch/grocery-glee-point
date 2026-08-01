@@ -118,6 +118,7 @@ function Page() {
       if (error) throw error;
       return (data ?? []) as Account[];
     },
+    staleTime: 30_000,
   });
 
   const txQ = useQuery({
@@ -132,6 +133,7 @@ function Page() {
       if (error) throw error;
       return (data ?? []) as Tx[];
     },
+    staleTime: 30_000,
   });
 
   // --- Auto-derived cash movements from POS / purchases / expenses / party payments ---
@@ -140,18 +142,21 @@ function Page() {
     queryFn: async () => (await supabase.from("sales")
       .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    staleTime: 30_000,
   });
   const saleReturnsQ = useQuery({
     queryKey: ["cf-sale-returns"],
     queryFn: async () => (await supabase.from("sale_returns")
       .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    staleTime: 30_000,
   });
   const purchasesQ = useQuery({
     queryKey: ["cf-purchases"],
     queryFn: async () => (await supabase.from("purchases")
       .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    staleTime: 30_000,
   });
 
   const purchaseReturnsQ = useQuery({
@@ -159,22 +164,26 @@ function Page() {
     queryFn: async () => (await supabase.from("purchase_returns")
       .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    staleTime: 30_000,
   });
   const expensesQ = useQuery({
     queryKey: ["cf-expenses"],
     queryFn: async () => (await supabase.from("expenses")
       .select("id,amount,method,category,description,expense_date,created_at")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    staleTime: 30_000,
   });
   const partyPaymentsQ = useQuery({
     queryKey: ["cf-party-payments"],
     queryFn: async () => (await supabase.from("party_payments")
       .select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    staleTime: 30_000,
   });
   const suppliersQ = useQuery({
     queryKey: ["cf-suppliers"],
     queryFn: async () => (await supabase.from("suppliers").select("id,name,balance").order("name")).data ?? [],
+    staleTime: 30_000,
   });
 
   const accounts = accountsQ.data ?? [];
