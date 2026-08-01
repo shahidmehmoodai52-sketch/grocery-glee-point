@@ -58,7 +58,7 @@ function Layout() {
           <PendingBanner />
           <ExpiryCountdown />
 
-          <header className="h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print gap-2">
+          <header className="relative z-[500] h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print gap-2">
             <SidebarTrigger />
             <div className="flex-1 min-w-0">
               <LowStockAlerts />
