@@ -53,8 +53,68 @@ async function finalizeImportBatch(
   }).eq("id", id);
 }
 
+// ---------- Resilient bulk insert ----------
+// A single bad row used to fail an entire 200-row chunk ("kuch items fail ho jati
+// hain"). This retries failing chunks by splitting them in half down to single
+// rows, so only the genuinely bad rows are reported.
+function friendlyError(msg: string): string {
+  if (/product limit reached/i.test(msg)) return "Plan ka product limit poora ho gaya — plan upgrade karen.";
+  if (/duplicate key/i.test(msg) && /barcode/i.test(msg)) return "Ye barcode pehle se kisi product par mojood hai (skip kiya gaya).";
+  if (/duplicate key/i.test(msg) && /sku/i.test(msg)) return "Ye item code pehle se mojood hai (skip kiya gaya).";
+  if (/violates not-null/i.test(msg)) return "Zaroori column khali hai (item name required hai).";
+  if (/row-level security/i.test(msg)) return "Permission nahi — shop owner/admin se import karwaen.";
+  return msg;
+}
+
+async function insertResilient(
+  table: "products" | "product_barcodes" | "customers" | "suppliers",
+  rows: any[],
+  opts: { chunkSize?: number; onProgress?: (ok: number, failed: number) => void } = {},
+): Promise<{ ok: number; failed: number; errors: string[] }> {
+  const chunkSize = opts.chunkSize ?? 200;
+  let ok = 0, failed = 0;
+  const errors: string[] = [];
+
+  const push = async (batch: any[]): Promise<void> => {
+    if (!batch.length) return;
+    const { error } = await supabase.from(table).insert(batch as any);
+    if (!error) { ok += batch.length; opts.onProgress?.(ok, failed); return; }
+    if (batch.length === 1) {
+      failed += 1;
+      errors.push(friendlyError(error.message));
+      opts.onProgress?.(ok, failed);
+      return;
+    }
+    const mid = Math.ceil(batch.length / 2);
+    await push(batch.slice(0, mid));
+    await push(batch.slice(mid));
+  };
+
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    await push(rows.slice(i, i + chunkSize));
+  }
+  return { ok, failed, errors: [...new Set(errors)].slice(0, 6) };
+}
+
+// Values that already exist for this tenant, so imports can skip duplicates
+// instead of failing with unique-violation errors.
+async function existingValues(
+  table: "products" | "product_barcodes",
+  column: "sku" | "barcode",
+  values: string[],
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  const list = [...new Set(values.filter(Boolean))];
+  for (let i = 0; i < list.length; i += 300) {
+    const slice = list.slice(i, i + 300);
+    const { data } = await supabase.from(table).select(column).in(column, slice);
+    (data ?? []).forEach((r: any) => { if (r[column]) out.add(String(r[column])); });
+  }
+  return out;
+}
 
 type EntityKey = "products" | "customers" | "suppliers";
+
 
 const SCHEMAS: Record<EntityKey, { fields: { key: string; label: string; required?: boolean; type?: "number" | "bool" }[]; sample: any[][]; onConflict?: string }> = {
   products: {
@@ -600,19 +660,17 @@ function SmartMerge() {
     const batchId = await createImportBatch(batchName, "smart_merge");
     const tag = (p: any) => (batchId ? { ...p, import_batch_id: batchId } : p);
 
-    // 1) Upsert products by SKU (when present)
-    const chunkSize = 200;
-    const withSku = merged.filter((p) => p.sku).map(tag);
-    const noSku = merged.filter((p) => !p.sku).map(tag);
-    for (let i = 0; i < withSku.length; i += chunkSize) {
-      const chunk = withSku.slice(i, i + chunkSize);
-      const { error } = await supabase.from("products").insert(chunk as any);
-      if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
-    }
-    for (let i = 0; i < noSku.length; i += chunkSize) {
-      const chunk = noSku.slice(i, i + chunkSize);
-      const { error } = await supabase.from("products").insert(chunk as any);
-      if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
+    // 1) Insert products by SKU (when present) — skip codes already in the shop
+    const existingSkus = await existingValues("products", "sku", merged.map((p) => p.sku).filter(Boolean));
+    const fresh = merged.filter((p) => !(p.sku && existingSkus.has(p.sku)));
+    const skippedExisting = merged.length - fresh.length;
+    if (skippedExisting) errors.push(`${skippedExisting} items pehle se mojood thay (skip kiye gaye).`);
+    const withSku = fresh.filter((p) => p.sku).map(tag);
+    const noSku = fresh.filter((p) => !p.sku).map(tag);
+    for (const bucket of [withSku, noSku]) {
+      if (!bucket.length) continue;
+      const res = await insertResilient("products", bucket);
+      ok += res.ok; failed += res.failed; errors.push(...res.errors);
     }
 
     // 2) Handle extra barcodes — need product IDs via SKU lookup
@@ -620,20 +678,21 @@ function SmartMerge() {
     if (extraBarcodes.length > 0) {
       const uniqueSkus = [...new Set(extraBarcodes.map((x) => x.sku))];
       const skuToId: Record<string, string> = {};
-      for (let i = 0; i < uniqueSkus.length; i += 500) {
-        const slice = uniqueSkus.slice(i, i + 500);
+      for (let i = 0; i < uniqueSkus.length; i += 300) {
+        const slice = uniqueSkus.slice(i, i + 300);
         const { data } = await supabase.from("products").select("id, sku").in("sku", slice);
         (data ?? []).forEach((p: any) => { if (p.sku) skuToId[p.sku] = p.id; });
       }
+      const seen = new Set<string>();
       const rows = extraBarcodes
         .map((x) => tag({ product_id: skuToId[x.sku], barcode: x.barcode }))
-        .filter((x) => x.product_id);
-      for (let i = 0; i < rows.length; i += chunkSize) {
-        const chunk = rows.slice(i, i + chunkSize);
-        const { error } = await supabase.from("product_barcodes").insert(chunk as any);
-        if (error) errors.push(error.message); else bcOk += chunk.length;
-      }
+        .filter((x) => x.product_id && !(seen.has(x.barcode) ? true : (seen.add(x.barcode), false)));
+      const existingBC = await existingValues("product_barcodes", "barcode", rows.map((r: any) => r.barcode));
+      const newBC = rows.filter((r: any) => !existingBC.has(r.barcode));
+      const res = await insertResilient("product_barcodes", newBC);
+      bcOk = res.ok; errors.push(...res.errors);
     }
+
 
     await finalizeImportBatch(batchId, { products: ok, barcodes: bcOk, failed });
     notifyBatchChanged();
@@ -832,20 +891,21 @@ function Importer({ entity }: { entity: EntityKey }) {
     if (mapped.length === 0) return toast.error("No rows to import");
     setBusy(true); setResult({ ok: 0, failed: 0, errors: [] });
     const errors: string[] = []; let ok = 0, failed = 0;
-    const chunkSize = 200;
     const batchId = await createImportBatch(filename || `${entity}-upload`, entity);
     const tag = (r: any) => (batchId ? { ...r, import_batch_id: batchId } : r);
-    for (let i = 0; i < mapped.length; i += chunkSize) {
-      const chunk = mapped.slice(i, i + chunkSize).map(tag);
-      if (entity === "products") {
-        const { error } = await supabase.from("products").insert(chunk as any);
-        if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
-      } else {
-        const { error } = await supabase.from(entity).insert(chunk as any);
-        if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
-      }
-      setResult({ ok, failed, errors: [...new Set(errors)].slice(0, 5) });
+    let rows = mapped.map(tag);
+    if (entity === "products") {
+      const existingSkus = await existingValues("products", "sku", rows.map((r: any) => r.sku).filter(Boolean));
+      const before = rows.length;
+      rows = rows.filter((r: any) => !(r.sku && existingSkus.has(r.sku)));
+      if (before - rows.length) errors.push(`${before - rows.length} items pehle se mojood thay (skip kiye gaye).`);
     }
+    const res = await insertResilient(entity, rows, {
+      onProgress: (o, f) => setResult({ ok: o, failed: f, errors: [...new Set(errors)].slice(0, 6) }),
+    });
+    ok = res.ok; failed = res.failed; errors.push(...res.errors);
+    setResult({ ok, failed, errors: [...new Set(errors)].slice(0, 6) });
+
     await finalizeImportBatch(batchId, {
       products: entity === "products" ? ok : 0,
       customers: entity === "customers" ? ok : 0,
@@ -1085,17 +1145,25 @@ function SingleMergedFile() {
     setBusy(true); setResult({ products: 0, barcodes: 0, failed: 0, errors: [] });
     const errors: string[] = [];
     let prodOk = 0, prodFail = 0, bcOk = 0;
-    const chunkSize = 200;
 
     // Track this upload as a batch so it appears in "Uploaded files"
     // and can be deleted later along with its imported rows.
     const batchId = await createImportBatch(file?.name ?? "merged-upload", "single_merged");
 
-    // Split by whether SKU present
-    const withSku = grouped.filter((g) => g.sku);
-    const noSku = grouped.filter((g) => !g.sku);
+    // Skip item codes that already exist in this shop — inserting them would
+    // fail with a unique violation and take the whole chunk down with it.
+    const existingSkus = await existingValues(
+      "products", "sku", grouped.map((g) => g.sku).filter(Boolean) as string[],
+    );
+    const fresh = grouped.filter((g) => !(g.sku && existingSkus.has(g.sku)));
+    const skippedExisting = grouped.length - fresh.length;
+    if (skippedExisting) errors.push(`${skippedExisting} items pehle se mojood thay (skip kiye gaye).`);
 
-    // Prepare product rows (drop barcodes array; set primary barcode = first)
+    const withSku = fresh.filter((g) => g.sku);
+    const noSku = fresh.filter((g) => !g.sku);
+
+    // Prepare product rows (drop barcodes array; set primary barcode = first).
+    // Barcode is optional — items without barcode still import fine.
     const toProduct = (g: any) => ({
       name: g.name, sku: g.sku, category: g.category, unit: g.unit || "pcs",
       cost_price: g.cost_price, sell_price: g.sell_price, stock: g.stock, tax_rate: g.tax_rate,
@@ -1103,67 +1171,76 @@ function SingleMergedFile() {
       ...(batchId ? { import_batch_id: batchId } : {}),
     });
 
-    // 1) Upsert products with SKU (grouped so no dupes in one batch)
-    for (let i = 0; i < withSku.length; i += chunkSize) {
-      const chunk = withSku.slice(i, i + chunkSize).map(toProduct);
-      const { error } = await supabase.from("products").insert(chunk as any);
-      if (error) { prodFail += chunk.length; errors.push(error.message); } else prodOk += chunk.length;
-      setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
-    }
-    // 2) Insert products without SKU
-    for (let i = 0; i < noSku.length; i += chunkSize) {
-      const chunk = noSku.slice(i, i + chunkSize).map(toProduct);
-      const { error } = await supabase.from("products").insert(chunk as any);
-      if (error) { prodFail += chunk.length; errors.push(error.message); } else prodOk += chunk.length;
-      setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
+    const progress = () =>
+      setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 6) });
+
+    for (const bucket of [withSku, noSku]) {
+      if (!bucket.length) continue;
+      const res = await insertResilient("products", bucket.map(toProduct), {
+        onProgress: (ok, failed) => {
+          setResult({
+            products: prodOk + ok, barcodes: bcOk, failed: prodFail + failed,
+            errors: [...new Set(errors)].slice(0, 6),
+          });
+        },
+      });
+      prodOk += res.ok; prodFail += res.failed; errors.push(...res.errors);
+      progress();
     }
 
-    // 3) Resolve product IDs — lookup by SKU (bulk) and by name (bulk) for no-SKU items
-    const skuList = withSku.map((g) => g.sku!).filter(Boolean);
+    // Resolve product IDs — lookup by SKU (bulk) and by name (bulk) for no-SKU items
     const skuToId: Record<string, string> = {};
-    for (let i = 0; i < skuList.length; i += 500) {
-      const slice = skuList.slice(i, i + 500);
+    const skuList = grouped.map((g) => g.sku!).filter(Boolean);
+    for (let i = 0; i < skuList.length; i += 300) {
+      const slice = skuList.slice(i, i + 300);
       const { data } = await supabase.from("products").select("id, sku").in("sku", slice);
       (data ?? []).forEach((p: any) => { if (p.sku) skuToId[p.sku] = p.id; });
     }
     const nameToId: Record<string, string> = {};
-    if (noSku.length) {
-      const names = [...new Set(noSku.map((g) => g.name))];
-      for (let i = 0; i < names.length; i += 500) {
-        const slice = names.slice(i, i + 500);
-        const { data } = await supabase.from("products").select("id, name").in("name", slice);
-        (data ?? []).forEach((p: any) => { nameToId[p.name] = p.id; });
-      }
+    const noSkuNames = [...new Set(grouped.filter((g) => !g.sku).map((g) => g.name))];
+    for (let i = 0; i < noSkuNames.length; i += 300) {
+      const slice = noSkuNames.slice(i, i + 300);
+      const { data } = await supabase.from("products").select("id, name").in("name", slice);
+      (data ?? []).forEach((p: any) => { nameToId[p.name] = p.id; });
     }
 
-    // 4) Upsert all barcodes
-    const bcRows: { product_id: string; barcode: string; import_batch_id?: string }[] = [];
+    // Link every barcode (multi-barcode items included)
+    const bcRows: { product_id: string; barcode: string; label?: string; import_batch_id?: string }[] = [];
     for (const g of grouped) {
       const pid = g.sku ? skuToId[g.sku] : nameToId[g.name];
       if (!pid) continue;
-      for (const b of g.barcodes) bcRows.push({
-        product_id: pid, barcode: b,
+      g.barcodes.forEach((b: string, idx: number) => bcRows.push({
+        product_id: pid, barcode: b, label: idx === 0 ? "Primary" : "Alt",
         ...(batchId ? { import_batch_id: batchId } : {}),
-      });
+      }));
     }
-    // De-dupe by barcode
+    // De-dupe inside the file, then drop barcodes already present in the shop
     const seen = new Set<string>();
     const uniqueBC = bcRows.filter((r) => (seen.has(r.barcode) ? false : (seen.add(r.barcode), true)));
-    for (let i = 0; i < uniqueBC.length; i += chunkSize) {
-      const chunk = uniqueBC.slice(i, i + chunkSize);
-      const { error } = await supabase.from("product_barcodes").insert(chunk as any);
-      if (error) errors.push(`barcodes: ${error.message}`); else bcOk += chunk.length;
-      setResult({ products: prodOk, barcodes: bcOk, failed: prodFail, errors: [...new Set(errors)].slice(0, 5) });
-    }
+    const existingBC = await existingValues("product_barcodes", "barcode", uniqueBC.map((r) => r.barcode));
+    const newBC = uniqueBC.filter((r) => !existingBC.has(r.barcode));
 
-    await finalizeImportBatch(batchId, { products: prodOk, barcodes: bcOk, failed: prodFail });
+    const bcRes = await insertResilient("product_barcodes", newBC, {
+      onProgress: (ok) => {
+        setResult({ products: prodOk, barcodes: ok, failed: prodFail, errors: [...new Set(errors)].slice(0, 6) });
+      },
+    });
+    bcOk = bcRes.ok;
+    errors.push(...bcRes.errors);
+    progress();
+
+    await finalizeImportBatch(batchId, {
+      products: prodOk, barcodes: bcOk, failed: prodFail,
+      notes: skippedExisting ? `${skippedExisting} already existed` : undefined,
+    });
     notifyBatchChanged();
     invalidateAfterImport(qc);
 
     setBusy(false);
     if (prodFail === 0) toast.success(`Imported ${prodOk} items · ${bcOk} barcodes linked`);
-    else toast.error(`${prodOk} imported, ${prodFail} failed`);
+    else toast.error(`${prodOk} imported, ${prodFail} failed — details neeche dekhen`);
   };
+
 
   // Auto-save: as soon as file is parsed and required "name" column is mapped,
   // run the import once automatically (unless user turned auto-save off).
