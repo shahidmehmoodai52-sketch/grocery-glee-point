@@ -472,6 +472,10 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
+    qc.invalidateQueries({ queryKey: ["cf-purchases"] });
+    qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    qc.invalidateQueries({ queryKey: ["cash-transactions"] });
+
   };
 
 
