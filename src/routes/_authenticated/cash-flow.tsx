@@ -150,9 +150,10 @@ function Page() {
   const purchasesQ = useQuery({
     queryKey: ["cf-purchases"],
     queryFn: async () => (await supabase.from("purchases")
-      .select("id,invoice_no,total,paid,status,created_at,suppliers(name)")
+      .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
   });
+
   const purchaseReturnsQ = useQuery({
     queryKey: ["cf-purchase-returns"],
     queryFn: async () => (await supabase.from("purchase_returns")
