@@ -4046,6 +4046,7 @@ export type Database = {
       }
       owner_alerts: { Args: never; Returns: Json }
       owner_recommendations: { Args: never; Returns: Json }
+      prune_audit_logs: { Args: { _days?: number }; Returns: number }
       record_cash_event: {
         Args: {
           _amount: number
