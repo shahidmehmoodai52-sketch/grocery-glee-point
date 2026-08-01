@@ -99,10 +99,10 @@ async function searchProducts(term: string) {
 
   const like = `%${q}%`;
   const [nameRes, skuRes, barcodeRes, extraBarcodeRes] = await Promise.all([
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("name", like).order("name").limit(12),
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("sku", like).order("name").limit(12),
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("barcode", like).order("name").limit(12),
-    supabase.from("product_barcodes").select("product_id,barcode").ilike("barcode", like).limit(24),
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("name", like).order("name").limit(200),
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("sku", like).order("name").limit(50),
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("barcode", like).order("name").limit(50),
+    supabase.from("product_barcodes").select("product_id,barcode").ilike("barcode", like).limit(50),
   ]);
 
   const firstError = nameRes.error ?? skuRes.error ?? barcodeRes.error ?? extraBarcodeRes.error;
@@ -442,7 +442,7 @@ function POSPage() {
       if (s >= 0) scored.push({ p, s });
     }
     scored.sort((a, b) => a.s - b.s || a.p.name.localeCompare(b.p.name));
-    return scored.slice(0, 12).map((x) => x.p);
+    return scored.slice(0, 200).map((x) => x.p);
   }, [searchableProducts, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
