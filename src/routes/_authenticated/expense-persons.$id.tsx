@@ -15,7 +15,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtDate } from "@/lib/format";
-import { Receipt } from "@/components/receipt";
+import { Receipt, printReceipt } from "@/components/receipt";
 import { rangeFor, type DatePreset } from "@/lib/date-presets";
 
 export const Route = createFileRoute("/_authenticated/expense-persons/$id")({ component: Page });
@@ -105,7 +105,7 @@ function Page() {
           </div>
           <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset("custom" as any); }} className="h-9" /></div>
           <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset("custom" as any); }} className="h-9" /></div>
-          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Print</Button>
+          <Button variant="outline" size="sm" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />Print</Button>
         </div>
       </div>
 
@@ -174,7 +174,7 @@ function Page() {
           {view && <Receipt invoice={view} settings={settings} />}
           <div className="flex justify-end gap-2 no-print">
             <Button variant="outline" onClick={() => setView(null)}>Close</Button>
-            <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Print</Button>
+            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />Print</Button>
           </div>
           <div className="text-xs text-muted-foreground">{view?.created_at && fmtDate(view.created_at)}</div>
         </DialogContent>

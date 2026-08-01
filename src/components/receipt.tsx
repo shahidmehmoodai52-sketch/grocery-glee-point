@@ -139,17 +139,18 @@ async function tryDirectPrint(): Promise<boolean> {
   return false;
 }
 
-export function printReceipt() {
+export function printReceipt(sourceElement?: HTMLElement | null) {
   if (typeof document === "undefined" || typeof window === "undefined") return;
   document.querySelector(".receipt-print-root")?.remove();
-  const source = document.querySelector<HTMLElement>(".print-area");
+  const source = sourceElement ?? document.querySelector<HTMLElement>(".print-area");
   if (!source) {
-    window.print();
+    void tryDirectPrint();
     return;
   }
   const printRoot = document.createElement("div");
   printRoot.className = "receipt-print-root";
-  printRoot.appendChild(source.cloneNode(true));
+  const clonedSource = source.cloneNode(true) as HTMLElement;
+  printRoot.appendChild(clonedSource);
   document.body.appendChild(printRoot);
   document.documentElement.classList.add("receipt-printing");
 
@@ -168,9 +169,7 @@ export function printReceipt() {
   window.addEventListener("afterprint", cleanup);
   setReceiptPrintPageSize(styleEl, "80mm", printRoot);
   requestAnimationFrame(() => {
-    void tryDirectPrint().then((printed) => {
-      if (!printed) window.print();
-    });
+    void tryDirectPrint();
   });
 }
 
@@ -197,7 +196,7 @@ export function printInvoiceDirect(invoice: ReceiptInvoice, settings: ReceiptSet
   window.addEventListener("afterprint", done);
   // Give React a frame to commit before printing.
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    printReceipt();
+    printReceipt(wrapper);
     // Safety cleanup in case afterprint doesn't fire (some browsers).
     setTimeout(done, 5000);
   }));
