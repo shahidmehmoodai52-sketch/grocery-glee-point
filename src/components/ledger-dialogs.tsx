@@ -129,6 +129,7 @@ export function AddPaymentDialog({
       setMethod(defaultSource?.name ?? "Cash in hand");
       setAccountId(defaultSource?.id ?? "");
       setNote("");
+      setWhen(toLocalInputValue(new Date().toISOString()));
     }
   }, [open, defaultAmount, cashAccounts.length]);
 
