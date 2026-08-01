@@ -413,16 +413,47 @@ function Page() {
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
+  const defaultPaySource =
+    paySourceOptions.find((a) => a.name.toLowerCase() === "cash in hand")
+    ?? paySourceOptions.find((a) => a.name.toLowerCase().includes("cash"))
+    ?? paySourceOptions[0];
+  const effectivePaySource = paySource || defaultPaySource?.id || "";
+
+  /** Turn the selected option into a real cash_accounts row (creating presets on demand). */
+  const resolvePayAccount = async (): Promise<{ id: string | null; name: string }> => {
+    const selected = paySourceOptions.find((a) => a.id === effectivePaySource) ?? defaultPaySource;
+    if (!selected) return { id: null, name: "cash" };
+    if (!selected.preset) return { id: selected.id, name: selected.name };
+    const { data, error } = await supabase
+      .from("cash_accounts")
+      .insert({ name: selected.name, type: guessAccountType(selected.name), opening_balance: 0, is_active: true })
+      .select("id,name")
+      .single();
+    if (error) throw error;
+    qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    return { id: data.id as string, name: data.name as string };
+  };
+
   const submit = async () => {
     if (!supplier || supplier === "none") return toast.error("Supplier is required");
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
     const sub = items.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
     setSaving(true);
+    let account: { id: string | null; name: string };
+    try {
+      account = await resolvePayAccount();
+    } catch (e: any) {
+      setSaving(false);
+      return toast.error(e?.message ?? "Could not resolve payment account");
+    }
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier && supplier !== "none" ? supplier : null,
         tax: taxAmt, paid, note,
+        payment_method: account.name,
+        account_id: account.id ?? undefined,
+
         items: items.map((l) => {
           const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
           const taxShare = sub > 0 ? taxAmt * (lineNet / sub) : 0;
