@@ -150,9 +150,10 @@ function Page() {
   const purchasesQ = useQuery({
     queryKey: ["cf-purchases"],
     queryFn: async () => (await supabase.from("purchases")
-      .select("id,invoice_no,total,paid,status,created_at,suppliers(name)")
+      .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
       .order("created_at", { ascending: false }).limit(2000)).data ?? [],
   });
+
   const purchaseReturnsQ = useQuery({
     queryKey: ["cf-purchase-returns"],
     queryFn: async () => (await supabase.from("purchase_returns")
@@ -251,20 +252,24 @@ function Page() {
         transfer_group_id: null, created_at: r.created_at,
       });
     }
-    // Purchases — cash out (paid portion; no method column → cash bucket)
+    // Purchases — cash out of the account chosen at purchase time
     for (const p of (purchasesQ.data ?? []) as any[]) {
       const paid = Number(p.paid) || 0;
       if (paid <= 0) continue;
-      const acc = methodBuckets.resolve("cash");
+      const real = p.account_id ? accounts.find(a => a.id === p.account_id) : undefined;
+      const acc = real
+        ? { id: real.id, name: real.name, type: real.type, auto: false }
+        : methodBuckets.resolve(p.payment_method || "cash");
       out.push({
         id: `auto:pur:${p.id}`,
         account_id: acc.id, direction: "out", amount: paid,
         occurred_on: dateOf(p.created_at), category: "purchase",
         reference: p.invoice_no ? `Purchase ${p.invoice_no}` : null,
-        notes: `${p.suppliers?.name ?? "Supplier"}`,
+        notes: `${p.suppliers?.name ?? "Supplier"} · ${acc.name}`,
         transfer_group_id: null, created_at: p.created_at,
       });
     }
+
     // Purchase returns — cash in
     for (const r of (purchaseReturnsQ.data ?? []) as any[]) {
       const amt = Number(r.refund_amount) || 0;

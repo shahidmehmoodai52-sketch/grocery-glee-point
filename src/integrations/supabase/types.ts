@@ -1876,11 +1876,13 @@ export type Database = {
       }
       purchases: {
         Row: {
+          account_id: string | null
           created_at: string
           id: string
           invoice_no: string
           note: string | null
           paid: number
+          payment_method: string
           status: string
           subtotal: number
           supplier_id: string | null
@@ -1890,11 +1892,13 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          account_id?: string | null
           created_at?: string
           id?: string
           invoice_no?: string
           note?: string | null
           paid?: number
+          payment_method?: string
           status?: string
           subtotal?: number
           supplier_id?: string | null
@@ -1904,11 +1908,13 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          account_id?: string | null
           created_at?: string
           id?: string
           invoice_no?: string
           note?: string | null
           paid?: number
+          payment_method?: string
           status?: string
           subtotal?: number
           supplier_id?: string | null
@@ -1918,6 +1924,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "purchases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "cash_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]

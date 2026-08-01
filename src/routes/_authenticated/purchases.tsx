@@ -33,8 +33,22 @@ type Draft = {
   discountMode: "amt" | "pct";
   paid: number;
   note: string;
+  paySource?: string;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "" };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", paySource: "" };
+
+// Presets offered when the shop hasn't created these heads in Cash Flow yet.
+// Selecting one creates the matching cash account so purchase payments always
+// land on a real account (and show up in Cash Flow / reports).
+const PAY_SOURCE_PRESETS = ["Cash in hand", "Cheque", "Bank", "Online"];
+function guessAccountType(name: string) {
+  const s = (name || "").toLowerCase();
+  if (s.includes("bank") || s.includes("cheque") || s.includes("check") || s.includes("online")) return "bank";
+  if (s.includes("card")) return "card";
+  if (s.includes("easy") || s.includes("jazz") || s.includes("wallet")) return "mobile_wallet";
+  return "cash";
+}
+
 
 
 const normalizeItemCode = (value: string | null | undefined) => {
@@ -127,6 +141,9 @@ function Page() {
   const setDiscountMode = (v: "amt" | "pct") => setDraft((d) => ({ ...d, discountMode: v }));
   const setPaid = (v: number) => setDraft((d) => ({ ...d, paid: v }));
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
+  const paySource = draft.paySource ?? "";
+  const setPaySource = (v: string) => setDraft((d) => ({ ...d, paySource: v }));
+
 
 
   const [search, setSearch] = useState("");
@@ -290,8 +307,23 @@ function Page() {
 
 
 
+  // Payment heads come from Cash Flow accounts so both screens stay in sync.
+  const { data: cashAccounts = [] } = useQuery({
+    queryKey: ["cash-accounts", "purchase-pay"],
+    staleTime: 30_000,
+    queryFn: async () =>
+      (await supabase.from("cash_accounts").select("id,name,type,is_active")
+        .eq("is_active", true).order("sort_order").order("name")).data ?? [],
+  });
+  const paySourceOptions = useMemo(() => [
+    ...(cashAccounts as any[]).map((a) => ({ id: a.id as string, name: a.name as string, preset: false })),
+    ...PAY_SOURCE_PRESETS
+      .filter((p) => !(cashAccounts as any[]).some((a) => String(a.name).toLowerCase() === p.toLowerCase()))
+      .map((p) => ({ id: `preset:${p}`, name: p, preset: true })),
+  ], [cashAccounts]);
 
   const { data: suppliers = [] } = useQuery({
+
     queryKey: ["suppliers"],
     staleTime: 60_000,
     queryFn: async () => offlineFirst<any[]>(
@@ -381,16 +413,47 @@ function Page() {
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
+  const defaultPaySource =
+    paySourceOptions.find((a) => a.name.toLowerCase() === "cash in hand")
+    ?? paySourceOptions.find((a) => a.name.toLowerCase().includes("cash"))
+    ?? paySourceOptions[0];
+  const effectivePaySource = paySource || defaultPaySource?.id || "";
+
+  /** Turn the selected option into a real cash_accounts row (creating presets on demand). */
+  const resolvePayAccount = async (): Promise<{ id: string | null; name: string }> => {
+    const selected = paySourceOptions.find((a) => a.id === effectivePaySource) ?? defaultPaySource;
+    if (!selected) return { id: null, name: "cash" };
+    if (!selected.preset) return { id: selected.id, name: selected.name };
+    const { data, error } = await supabase
+      .from("cash_accounts")
+      .insert({ name: selected.name, type: guessAccountType(selected.name), opening_balance: 0, is_active: true })
+      .select("id,name")
+      .single();
+    if (error) throw error;
+    qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    return { id: data.id as string, name: data.name as string };
+  };
+
   const submit = async () => {
     if (!supplier || supplier === "none") return toast.error("Supplier is required");
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
     const sub = items.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
     setSaving(true);
+    let account: { id: string | null; name: string };
+    try {
+      account = await resolvePayAccount();
+    } catch (e: any) {
+      setSaving(false);
+      return toast.error(e?.message ?? "Could not resolve payment account");
+    }
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier && supplier !== "none" ? supplier : null,
         tax: taxAmt, paid, note,
+        payment_method: account.name,
+        account_id: account.id ?? undefined,
+
         items: items.map((l) => {
           const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
           const taxShare = sub > 0 ? taxAmt * (lineNet / sub) : 0;
@@ -409,6 +472,10 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
+    qc.invalidateQueries({ queryKey: ["cf-purchases"] });
+    qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    qc.invalidateQueries({ queryKey: ["cash-transactions"] });
+
   };
 
 
@@ -758,6 +825,20 @@ function Page() {
                     Due: <span className="font-medium text-foreground">{fmtMoney(Math.max(0, total - Number(paid || 0)), sym)}</span>
                   </div>
                 </div>
+
+                <div>
+                  <Label className="text-xs">Pay from</Label>
+                  <Select value={effectivePaySource} onValueChange={setPaySource}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Cash / Cheque / Bank…" /></SelectTrigger>
+                    <SelectContent>
+                      {paySourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Paid amount is deducted from this account in Cash Flow.
+                  </div>
+                </div>
+
                   <div>
                     <Label className="text-xs">Note</Label>
                     <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
