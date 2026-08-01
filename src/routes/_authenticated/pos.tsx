@@ -25,6 +25,9 @@ import {
   completeSaleOfflineAware,
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
+import { enqueueWrite } from "@/lib/offline/sync";
+import { isOfflineNow } from "@/lib/offline/session";
+import { searchProductsLocal } from "@/lib/offline/pos";
 
 
 
@@ -98,6 +101,18 @@ const newTab = (n: number): Tab => ({
 async function searchProducts(term: string) {
   const q = term.trim().replace(/\s+/g, " ");
   if (!q) return [];
+  // Offline (or flaky network): search the local mirror instead.
+  if (isOfflineNow()) return searchProductsLocal(q);
+  try {
+    return await searchProductsOnline(q);
+  } catch (e: any) {
+    const local = await searchProductsLocal(q);
+    if (local.length) return local;
+    throw e;
+  }
+}
+
+async function searchProductsOnline(q: string) {
 
   const like = `%${q}%`;
   const [nameRes, skuRes, barcodeRes, extraBarcodeRes] = await Promise.all([
@@ -621,15 +636,25 @@ function POSPage() {
   const { data: heldBills = [], refetch: refetchHeld } = useQuery({
     queryKey: ["held_bills", "pos"],
     enabled: holdBillsEnabled,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("held_bills")
-        .select("id,label,total,item_count,created_at,customer_id,payload,customers(name)")
-        .eq("status", "held")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data as any[]) ?? [];
-    },
+    queryFn: () =>
+      offlineFirst(
+        async () => {
+          const { data, error } = await supabase
+            .from("held_bills")
+            .select("id,label,total,item_count,created_at,customer_id,payload,customers(name)")
+            .eq("status", "held")
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          return (data as any[]) ?? [];
+        },
+        async () =>
+          (await offlineDb().held_bills.where("status").equals("held").reverse().sortBy("created_at")) as any[],
+        async (rows) => {
+          try {
+            await offlineDb().held_bills.bulkPut((rows as any[]).map((r) => ({ ...r, status: "held" })));
+          } catch {}
+        },
+      ),
     staleTime: 30_000,
   });
 
@@ -714,9 +739,19 @@ function POSPage() {
 
 
   const resumeHeld = async (id: string) => {
-    const { data, error } = await supabase.rpc("resume_bill", { _id: id });
-    if (error) return toast.error(error.message);
-    restorePayloadIntoNewTab(data as any, "↺");
+    let payload: any = null;
+    if (isOfflineNow()) {
+      const local = await offlineDb().held_bills.get(id);
+      if (!local) return toast.error("Held bill not available offline");
+      payload = local.payload;
+      await offlineDb().held_bills.put({ ...local, status: "resumed" });
+      await enqueueWrite({ op: "rpc", table: "resume_bill", payload: { _id: id } });
+    } else {
+      const { data, error } = await supabase.rpc("resume_bill", { _id: id });
+      if (error) return toast.error(error.message);
+      payload = data;
+    }
+    restorePayloadIntoNewTab(payload as any, "↺");
     setHeldOpen(false);
     refetchHeld();
     toast.success("Bill resumed");
@@ -724,8 +759,13 @@ function POSPage() {
 
   const discardHeld = async (id: string) => {
     if (!confirm("Discard this held bill?")) return;
-    const { error } = await (supabase.rpc as any)("discard_held_bill", { _id: id, _reason: null });
-    if (error) return toast.error(error.message);
+    if (isOfflineNow()) {
+      await offlineDb().held_bills.delete(id);
+      await enqueueWrite({ op: "rpc", table: "discard_held_bill", payload: { _id: id, _reason: null } });
+    } else {
+      const { error } = await (supabase.rpc as any)("discard_held_bill", { _id: id, _reason: null });
+      if (error) return toast.error(error.message);
+    }
     refetchHeld();
     toast.success("Discarded");
   };
@@ -748,17 +788,36 @@ function POSPage() {
         editing_sale_id: tab.editing_sale_id ?? null,
         editing_invoice_no: tab.editing_invoice_no ?? null,
       };
-      const { error } = await supabase.rpc("hold_bill", {
+      const label = tab.editing_sale_id
+        ? `✎ Edit ${tab.editing_invoice_no ?? tab.name}`
+        : tab.name;
+      const args = {
         _customer: tab.customer_id as any,
         _item_count: tab.items.length,
-        _label: tab.editing_sale_id
-          ? `✎ Edit ${tab.editing_invoice_no ?? tab.name}`
-          : tab.name,
+        _label: label,
         _payload: payload as any,
         _total: total,
-      });
-      if (error) throw error;
-      toast.success("Bill held");
+      };
+      if (isOfflineNow()) {
+        const localId = crypto.randomUUID();
+        await offlineDb().held_bills.put({
+          id: localId,
+          label,
+          total,
+          item_count: tab.items.length,
+          customer_id: tab.customer_id,
+          payload,
+          status: "held",
+          created_at: new Date().toISOString(),
+          _offline_pending: true,
+        });
+        await enqueueWrite({ op: "rpc", table: "hold_bill", payload: args });
+        toast.success("Bill held offline");
+      } else {
+        const { error } = await supabase.rpc("hold_bill", args);
+        if (error) throw error;
+        toast.success("Bill held");
+      }
       closeTab(active);
       refetchHeld();
     } catch (err: any) {
@@ -2328,15 +2387,34 @@ function ReprintDialog({
   const { data: sales = [], isFetching } = useQuery({
     queryKey: ["sales", "reprint"],
     enabled: open,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales")
-        .select("*, customers(name), sale_items(*)")
-        .order("created_at", { ascending: false })
-        .limit(300);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () =>
+      offlineFirst(
+        async () => {
+          const { data, error } = await supabase
+            .from("sales")
+            .select("*, customers(name), sale_items(*)")
+            .order("created_at", { ascending: false })
+            .limit(300);
+          if (error) throw error;
+          return data ?? [];
+        },
+        async () => {
+          const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(300).toArray();
+          return Promise.all(
+            rows.map(async (r: any) => ({
+              ...r,
+              sale_items: r.sale_items ?? (await offlineDb().sale_items.where("sale_id").equals(r.id).toArray()),
+            })),
+          ) as any;
+        },
+        async (rows) => {
+          try {
+            await offlineDb().sales.bulkPut(rows as any[]);
+            const items = (rows as any[]).flatMap((r: any) => r.sale_items ?? []);
+            if (items.length) await offlineDb().sale_items.bulkPut(items);
+          } catch {}
+        },
+      ),
   });
 
   const filtered = useMemo(() => {

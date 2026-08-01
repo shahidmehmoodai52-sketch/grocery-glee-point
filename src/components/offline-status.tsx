@@ -11,9 +11,11 @@ export function OfflineStatusBadge({ className }: { className?: string }) {
   if (!s.enabled) return null;
 
   const label = !s.online
-    ? `Offline${s.pending ? ` · ${s.pending} pending` : ""}`
+    ? `Offline Mode${s.pending ? ` · ${s.pending} pending` : ""}`
     : s.phase === "syncing"
-      ? "Syncing…"
+      ? s.progressTotal
+        ? `Syncing ${s.progressDone ?? 0}/${s.progressTotal}…`
+        : "Syncing…"
       : s.phase === "error"
         ? "Sync error"
         : s.pending

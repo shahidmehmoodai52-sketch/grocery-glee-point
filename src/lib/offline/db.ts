@@ -1,6 +1,5 @@
 // Offline-first local mirror using Dexie (IndexedDB).
 // Tables mirror cloud schema — sync engine keeps them fresh via `updated_at` watermark.
-// Turn 1: schema + basic accessors. Wiring into POS/purchases/etc. happens in later turns.
 
 import Dexie, { type Table } from "dexie";
 
@@ -17,10 +16,19 @@ export interface QueuedWrite {
   op: "insert" | "update" | "delete" | "rpc";
   table: string;              // or rpc name
   payload: any;
+  /** Client-generated idempotency key — prevents duplicate cloud writes on retry. */
+  client_uuid: string;
+  device_id: string;
   local_created_at: string;   // ISO
   attempts: number;
   last_error: string | null;
   status: "pending" | "syncing" | "failed" | "done";
+}
+
+/** Arbitrary key/value meta (device id, active tenant, sale counters…). */
+export interface MetaRow {
+  key: string;
+  value: any;
 }
 
 class PosOfflineDB extends Dexie {
@@ -30,13 +38,18 @@ class PosOfflineDB extends Dexie {
   suppliers!: Table<any, string>;
   sales!: Table<any, string>;
   sale_items!: Table<any, string>;
+  sale_returns!: Table<any, string>;
+  sale_return_items!: Table<any, string>;
   purchases!: Table<any, string>;
   purchase_items!: Table<any, string>;
   expenses!: Table<any, string>;
+  held_bills!: Table<any, string>;
+  cash_accounts!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   _sync_state!: Table<SyncState, string>;
   _queue!: Table<QueuedWrite, number>;
+  _meta!: Table<MetaRow, string>;
 
   constructor() {
     super("pos_offline");
@@ -57,6 +70,15 @@ class PosOfflineDB extends Dexie {
       _sync_state: "table",
       _queue: "++id, status, table, local_created_at",
     });
+    // v2 — held bills + cash accounts mirror, meta store, richer product indexes
+    // (sku / item_code / category) so offline search stays instant at 100k+ rows.
+    this.version(2).stores({
+      products: "id, name, barcode, sku, item_code, category, updated_at",
+      held_bills: "id, status, created_at",
+      cash_accounts: "id, name, slug",
+      _meta: "key",
+      _queue: "++id, status, table, local_created_at, client_uuid",
+    });
   }
 }
 
@@ -74,6 +96,7 @@ export function db(): PosOfflineDB {
 export const MIRRORED_TABLES = [
   "products", "product_barcodes", "customers", "suppliers",
   "sales", "sale_items", "sale_returns", "sale_return_items",
-  "purchases", "purchase_items", "expenses", "store_settings", "user_roles",
+  "purchases", "purchase_items", "expenses", "held_bills",
+  "cash_accounts", "store_settings", "user_roles",
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];

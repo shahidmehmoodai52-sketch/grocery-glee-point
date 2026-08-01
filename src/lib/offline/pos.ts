@@ -255,3 +255,58 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
 
   return { sale: { ...sale, sale_items }, offline: true };
 }
+
+/** Indexed offline product search — designed to stay instant at 100k+ rows.
+ *  Uses Dexie indexes for exact barcode/sku/item-code hits and a bounded
+ *  prefix/substring scan for names. */
+export async function searchProductsLocal(term: string, limit = 200): Promise<any[]> {
+  const q = term.trim().replace(/\s+/g, " ");
+  if (!q) return [];
+  const lower = q.toLowerCase();
+  const d = db();
+  const merged = new Map<string, any>();
+  const add = (rows: any[]) => {
+    for (const p of rows) {
+      if (p && p.is_active !== false && !merged.has(p.id)) {
+        merged.set(p.id, { ...p, _matched_barcodes: [] });
+      }
+    }
+  };
+
+  // 1. Exact code hits first (barcode scanning must be instant).
+  try { add(await d.products.where("barcode").equals(q).toArray()); } catch {}
+  try { add(await d.products.where("sku").equalsIgnoreCase(q).toArray()); } catch {}
+  try { add(await d.products.where("item_code").equalsIgnoreCase(q).toArray()); } catch {}
+  try {
+    const links = await d.product_barcodes.where("barcode").equals(q).toArray();
+    const ids = links.map((l: any) => l.product_id).filter(Boolean);
+    if (ids.length) {
+      const rows = await d.products.where("id").anyOf(ids).toArray();
+      for (const p of rows) {
+        merged.set(p.id, {
+          ...p,
+          _matched_barcodes: links.filter((l: any) => l.product_id === p.id).map((l: any) => l.barcode),
+        });
+      }
+    }
+  } catch {}
+
+  // 2. Indexed name prefix match (fast, uses the `name` index).
+  try {
+    add(await d.products.where("name").startsWithIgnoreCase(q).limit(limit).toArray());
+  } catch {}
+
+  // 3. Bounded substring fallback for mid-word matches.
+  if (merged.size < limit) {
+    try {
+      const rest = limit - merged.size;
+      const extra = await d.products
+        .filter((p: any) => String(p.name ?? "").toLowerCase().includes(lower))
+        .limit(rest)
+        .toArray();
+      add(extra);
+    } catch {}
+  }
+
+  return Array.from(merged.values()).slice(0, limit);
+}

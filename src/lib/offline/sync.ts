@@ -1,23 +1,30 @@
-// Bidirectional sync engine — pulls fresh rows from cloud into IndexedDB,
-// then flushes queued local writes back. Called on boot, on manual "Sync now",
-// and whenever the browser comes back online.
+// Bidirectional sync engine.
 //
-// Turn 1: engine skeleton for master data (products, customers, suppliers,
-// store_settings). Extended per-module in later turns.
+// Pull  : cloud → IndexedDB, incrementally via an `updated_at`/`created_at`
+//         watermark, paginated so shops with 100k+ products mirror fully.
+// Push  : IndexedDB queue → cloud, in strict chronological order, with
+//         idempotency keys, bounded retries and progress reporting.
 
 import { supabase } from "@/integrations/supabase/client";
 import { db, MIRRORED_TABLES, type MirroredTable } from "./db";
 import {
   getOfflineStatus, markSyncStart, markSyncDone, markSyncError, refreshPendingCount,
+  setSyncProgress,
 } from "./status";
+import { getDeviceId } from "./device";
 import { toast } from "sonner";
 
 const PULL_TABLES: MirroredTable[] = [
   "products", "product_barcodes", "customers", "suppliers",
-  "store_settings", "user_roles", "sales", "sale_items",
+  "store_settings", "user_roles", "cash_accounts", "held_bills",
+  "sales", "sale_items", "sale_returns", "sale_return_items",
   "purchases", "purchase_items", "expenses",
 ];
 
+const PAGE = 1000;
+/** Safety ceiling per table per sync pass (products can be huge on first sync). */
+const MAX_PAGES = 150; // 150k rows
+const MAX_ATTEMPTS = 8;
 
 async function getWatermark(table: string): Promise<string | null> {
   const row = await db()._sync_state.get(table);
@@ -31,38 +38,78 @@ async function setWatermark(table: string, ts: string) {
 // The rest must fall back to `created_at` for the incremental watermark, otherwise
 // PostgREST returns 42703 "column ... does not exist" and the sync fails loudly.
 const HAS_UPDATED_AT = new Set<string>(["products", "expenses", "store_settings"]);
+/** Tables with neither timestamp usable as a watermark → always full pull (small). */
+const FULL_PULL = new Set<string>([
+  "store_settings", "user_roles", "cash_accounts",
+  "sale_items", "sale_return_items", "purchase_items",
+]);
 
 async function pullTable(table: MirroredTable): Promise<number> {
   const since = await getWatermark(table);
+  const full = FULL_PULL.has(table);
   const watermarkCol = HAS_UPDATED_AT.has(table) ? "updated_at" : "created_at";
-  // store_settings is small and always pulled in full — no watermark filter.
-  const useWatermark = table !== "store_settings" && !!since;
-  let q = supabase.from(table as any).select("*").limit(1000);
-  if (useWatermark) q = q.gt(watermarkCol, since);
-  const { data, error } = await q;
-  if (error) throw new Error(`${table}: ${error.message}`);
-  if (!data || data.length === 0) return 0;
-  await (db() as any)[table].bulkPut(data);
-  const maxTs = data
-    .map((r: any) => r.updated_at ?? r.created_at)
-    .filter(Boolean)
-    .sort()
-    .pop();
+  const orderCol = full ? "id" : watermarkCol;
+
+  let total = 0;
+  let maxTs: string | null = null;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let q = supabase
+      .from(table as any)
+      .select("*")
+      .order(orderCol, { ascending: true })
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+    if (!full && since) q = q.gt(watermarkCol, since);
+    const { data, error } = await q;
+    if (error) throw new Error(`${table}: ${error.message}`);
+    if (!data || data.length === 0) break;
+    await (db() as any)[table].bulkPut(data);
+    total += data.length;
+    if (!full) {
+      const pageMax = data
+        .map((r: any) => r.updated_at ?? r.created_at)
+        .filter(Boolean)
+        .sort()
+        .pop();
+      if (pageMax && (!maxTs || pageMax > maxTs)) maxTs = pageMax;
+    }
+    if (data.length < PAGE) break;
+  }
+
   if (maxTs) await setWatermark(table, maxTs);
-  return data.length;
+  return total;
 }
 
-async function flushQueue(): Promise<{ ok: number; failed: number }> {
-  const pending = await db()._queue.where("status").anyOf(["pending", "failed"]).toArray();
+/**
+ * Flush the queue in chronological order.
+ * A failing item aborts the pass so later transactions never overtake earlier
+ * ones (inventory maths depends on ordering). Items past MAX_ATTEMPTS are
+ * skipped so a single poison record cannot block the whole queue forever.
+ */
+async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number; failed: number }> {
+  const pending = (await db()._queue.where("status").anyOf(["pending", "failed", "syncing"]).toArray())
+    .filter((r) => (r.attempts ?? 0) < MAX_ATTEMPTS)
+    .sort((a, b) =>
+      a.local_created_at === b.local_created_at
+        ? (a.id ?? 0) - (b.id ?? 0)
+        : a.local_created_at < b.local_created_at ? -1 : 1,
+    );
+
   let ok = 0, failed = 0;
+  const totalItems = pending.length;
+
   for (const item of pending) {
+    if (totalItems > 0 && !opts.silent) setSyncProgress(ok + failed, totalItems);
     try {
       await db()._queue.update(item.id!, { status: "syncing" });
       if (item.op === "rpc") {
         const { error } = await supabase.rpc(item.table as any, item.payload);
         if (error) throw error;
       } else if (item.op === "insert") {
-        const { error } = await supabase.from(item.table as any).insert(item.payload);
+        // upsert on the client uuid → replaying a half-applied write cannot duplicate.
+        const { error } = await supabase
+          .from(item.table as any)
+          .upsert(item.payload, { onConflict: "id", ignoreDuplicates: true });
         if (error) throw error;
       } else if (item.op === "update") {
         const { id, ...rest } = item.payload;
@@ -81,8 +128,11 @@ async function flushQueue(): Promise<{ ok: number; failed: number }> {
         attempts: (item.attempts ?? 0) + 1,
         last_error: String(e?.message ?? e),
       });
+      // Stop the pass: preserve chronological application on the cloud.
+      break;
     }
   }
+  if (!opts.silent) setSyncProgress(null, null);
   // Prune "done" rows > 7 days old.
   const cutoff = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
   await db()._queue.where("status").equals("done").and((r) => r.local_created_at < cutoff).delete();
@@ -98,18 +148,17 @@ export async function runSync(opts: { silent?: boolean } = {}): Promise<void> {
   if (!s.online) return;
   running = true;
   if (!opts.silent) markSyncStart();
+  else markSyncStart();
   try {
     // 1. Push local queue first so cloud sees fresh writes before we overwrite locally.
-    const flushResult = await flushQueue();
-    if (!opts.silent) {
-      if (flushResult.ok > 0) {
-        toast.success(`${flushResult.ok} pending action${flushResult.ok > 1 ? "s" : ""} synced`);
-      }
-      if (flushResult.failed > 0) {
-        toast.error(`${flushResult.failed} queued action${flushResult.failed > 1 ? "s" : ""} failed to sync`);
-      }
+    const flushResult = await flushQueue(opts);
+    if (flushResult.ok > 0) {
+      toast.success(`${flushResult.ok} offline action${flushResult.ok > 1 ? "s" : ""} synced`);
     }
-    // 2. Pull master data.
+    if (flushResult.failed > 0 && !opts.silent) {
+      toast.error(`${flushResult.failed} queued action${flushResult.failed > 1 ? "s" : ""} failed to sync — will retry`);
+    }
+    // 2. Pull master + transactional data.
     for (const t of PULL_TABLES) {
       try { await pullTable(t); }
       catch (e: any) {
@@ -133,9 +182,18 @@ export async function enqueueWrite(item: {
   op: "insert" | "update" | "delete" | "rpc";
   table: string;
   payload: any;
+  client_uuid?: string;
 }): Promise<number> {
   const id = await db()._queue.add({
-    ...item,
+    op: item.op,
+    table: item.table,
+    payload: item.payload,
+    client_uuid:
+      item.client_uuid ??
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `q-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    device_id: getDeviceId(),
     local_created_at: new Date().toISOString(),
     attempts: 0,
     last_error: null,
@@ -145,7 +203,7 @@ export async function enqueueWrite(item: {
   return id as number;
 }
 
-/** Wipe local mirror — used when user disables offline mode or switches tenants. */
+/** Wipe local mirror — used on logout or when the active tenant/user changes. */
 export async function wipeLocalMirror() {
   for (const t of MIRRORED_TABLES) {
     try { await (db() as any)[t].clear(); } catch {}

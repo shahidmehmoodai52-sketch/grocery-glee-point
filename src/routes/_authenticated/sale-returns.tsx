@@ -16,6 +16,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { Receipt, printReceipt } from "@/components/receipt";
+import { offlineFirst } from "@/lib/offline/pos";
+import { db as offlineDb } from "@/lib/offline/db";
+import { completeSaleReturnOfflineAware } from "@/lib/offline/returns";
 
 export const Route = createFileRoute("/_authenticated/sale-returns")({ component: Page });
 
@@ -46,17 +49,47 @@ function Page() {
 
   const { data: returns = [] } = useQuery({
     queryKey: ["sale-returns"],
-    queryFn: async () =>
-      (await supabase.from("sale_returns").select("*, customers(name), sale_return_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+    queryFn: () =>
+      offlineFirst(
+        async () =>
+          (await supabase.from("sale_returns").select("*, customers(name), sale_return_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+        async () =>
+          (await offlineDb().sale_returns.orderBy("created_at").reverse().limit(200).toArray()) as any[],
+        async (rows) => { try { await offlineDb().sale_returns.bulkPut(rows as any[]); } catch {} },
+      ),
   });
   const { data: sales = [] } = useQuery({
     queryKey: ["sales-for-return"],
-    queryFn: async () =>
-      (await supabase.from("sales").select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+    queryFn: () =>
+      offlineFirst(
+        async () =>
+          (await supabase.from("sales").select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+        async () => {
+          const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(200).toArray();
+          return Promise.all(
+            rows.map(async (r: any) => ({
+              ...r,
+              sale_items: r.sale_items ?? (await offlineDb().sale_items.where("sale_id").equals(r.id).toArray()),
+            })),
+          ) as any;
+        },
+        async (rows) => {
+          try {
+            await offlineDb().sales.bulkPut(rows as any[]);
+            const items = (rows as any[]).flatMap((r) => r.sale_items ?? []);
+            if (items.length) await offlineDb().sale_items.bulkPut(items);
+          } catch {}
+        },
+      ),
   });
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
-    queryFn: async () => (await supabase.from("customers").select("id,name").order("name")).data ?? [],
+    queryFn: () =>
+      offlineFirst(
+        async () => (await supabase.from("customers").select("id,name").order("name")).data ?? [],
+        async () => (await offlineDb().customers.orderBy("name").toArray()) as any[],
+        async (rows) => { try { await offlineDb().customers.bulkPut(rows as any[]); } catch {} },
+      ),
   });
 
   // Load items from selected invoice — pre-checked, editable qty capped at sold qty
@@ -118,16 +151,26 @@ function Page() {
       }
     }
     if (refund > total + 0.001) return toast.error("Refund cannot exceed total");
-    const { error } = await supabase.rpc("complete_sale_return" as any, {
-      payload: {
+    let offline = false;
+    try {
+      const res = await completeSaleReturnOfflineAware({
         sale_id: saleId === "none" ? null : saleId,
         customer_id: customer === "none" ? null : customer,
-        tax, refund_amount: refund, refund_method: method, note,
+        tax,
+        refund_amount: refund,
+        refund_method: method,
+        note,
         items: picked.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
-      },
-    });
-    if (error) return toast.error(error.message);
-    toast.success("Sale return recorded, stock restored");
+      });
+      offline = res.offline;
+    } catch (e: any) {
+      return toast.error(e?.message ?? "Could not record return");
+    }
+    toast.success(
+      offline
+        ? "Return saved offline — will sync automatically"
+        : "Sale return recorded, stock restored",
+    );
     reset();
     qc.invalidateQueries({ queryKey: ["sale-returns"] });
     qc.invalidateQueries({ queryKey: ["products"] });
