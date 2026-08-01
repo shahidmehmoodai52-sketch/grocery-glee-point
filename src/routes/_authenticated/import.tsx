@@ -1231,7 +1231,7 @@ function SingleMergedFile() {
 
     await finalizeImportBatch(batchId, {
       products: prodOk, barcodes: bcOk, failed: prodFail,
-      notes: skippedExisting ? `${skippedExisting} already existed` : null,
+      notes: skippedExisting ? `${skippedExisting} already existed` : undefined,
     });
     notifyBatchChanged();
     invalidateAfterImport(qc);
