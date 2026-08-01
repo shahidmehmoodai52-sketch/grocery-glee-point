@@ -122,7 +122,9 @@ async function tryDirectPrint(): Promise<boolean> {
     return win.pos?.print ?? win.electron?.print;
   };
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const hasBridge = typeof getPrintApi() === "function";
+  const attempts = hasBridge ? 3 : 1;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     const printApi = getPrintApi();
     if (typeof printApi === "function") {
       try {
@@ -132,10 +134,11 @@ async function tryDirectPrint(): Promise<boolean> {
         // Keep retrying a few times for the desktop bridge to become ready.
       }
     }
-    if (attempt < 2) {
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
     }
   }
+
 
   // Browser fallback — no desktop bridge available, use the native print dialog.
   try {
