@@ -6,8 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
-import { Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Trash2, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 
 export type Party = "customer" | "supplier";
 export type LedgerEntity = "sale" | "purchase" | "sale_return" | "purchase_return" | "payment";
