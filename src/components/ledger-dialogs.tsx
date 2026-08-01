@@ -278,7 +278,7 @@ export function EditPaymentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Edit payment</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div><Label>Date & time</Label><Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
+          <DateTimeField value={when} onChange={setWhen} />
           <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div>
             <Label>Payment source</Label>
