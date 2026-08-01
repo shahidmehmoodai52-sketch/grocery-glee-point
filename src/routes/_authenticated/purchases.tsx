@@ -141,6 +141,9 @@ function Page() {
   const setDiscountMode = (v: "amt" | "pct") => setDraft((d) => ({ ...d, discountMode: v }));
   const setPaid = (v: number) => setDraft((d) => ({ ...d, paid: v }));
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
+  const paySource = draft.paySource ?? "";
+  const setPaySource = (v: string) => setDraft((d) => ({ ...d, paySource: v }));
+
 
 
   const [search, setSearch] = useState("");
