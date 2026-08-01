@@ -33,8 +33,22 @@ type Draft = {
   discountMode: "amt" | "pct";
   paid: number;
   note: string;
+  paySource?: string;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "" };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", paySource: "" };
+
+// Presets offered when the shop hasn't created these heads in Cash Flow yet.
+// Selecting one creates the matching cash account so purchase payments always
+// land on a real account (and show up in Cash Flow / reports).
+const PAY_SOURCE_PRESETS = ["Cash in hand", "Cheque", "Bank", "Online"];
+function guessAccountType(name: string) {
+  const s = (name || "").toLowerCase();
+  if (s.includes("bank") || s.includes("cheque") || s.includes("check") || s.includes("online")) return "bank";
+  if (s.includes("card")) return "card";
+  if (s.includes("easy") || s.includes("jazz") || s.includes("wallet")) return "mobile_wallet";
+  return "cash";
+}
+
 
 
 const normalizeItemCode = (value: string | null | undefined) => {
