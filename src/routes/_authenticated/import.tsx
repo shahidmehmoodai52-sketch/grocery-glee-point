@@ -660,19 +660,17 @@ function SmartMerge() {
     const batchId = await createImportBatch(batchName, "smart_merge");
     const tag = (p: any) => (batchId ? { ...p, import_batch_id: batchId } : p);
 
-    // 1) Upsert products by SKU (when present)
-    const chunkSize = 200;
-    const withSku = merged.filter((p) => p.sku).map(tag);
-    const noSku = merged.filter((p) => !p.sku).map(tag);
-    for (let i = 0; i < withSku.length; i += chunkSize) {
-      const chunk = withSku.slice(i, i + chunkSize);
-      const { error } = await supabase.from("products").insert(chunk as any);
-      if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
-    }
-    for (let i = 0; i < noSku.length; i += chunkSize) {
-      const chunk = noSku.slice(i, i + chunkSize);
-      const { error } = await supabase.from("products").insert(chunk as any);
-      if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
+    // 1) Insert products by SKU (when present) — skip codes already in the shop
+    const existingSkus = await existingValues("products", "sku", merged.map((p) => p.sku).filter(Boolean));
+    const fresh = merged.filter((p) => !(p.sku && existingSkus.has(p.sku)));
+    const skippedExisting = merged.length - fresh.length;
+    if (skippedExisting) errors.push(`${skippedExisting} items pehle se mojood thay (skip kiye gaye).`);
+    const withSku = fresh.filter((p) => p.sku).map(tag);
+    const noSku = fresh.filter((p) => !p.sku).map(tag);
+    for (const bucket of [withSku, noSku]) {
+      if (!bucket.length) continue;
+      const res = await insertResilient("products", bucket);
+      ok += res.ok; failed += res.failed; errors.push(...res.errors);
     }
 
     // 2) Handle extra barcodes — need product IDs via SKU lookup
@@ -680,20 +678,21 @@ function SmartMerge() {
     if (extraBarcodes.length > 0) {
       const uniqueSkus = [...new Set(extraBarcodes.map((x) => x.sku))];
       const skuToId: Record<string, string> = {};
-      for (let i = 0; i < uniqueSkus.length; i += 500) {
-        const slice = uniqueSkus.slice(i, i + 500);
+      for (let i = 0; i < uniqueSkus.length; i += 300) {
+        const slice = uniqueSkus.slice(i, i + 300);
         const { data } = await supabase.from("products").select("id, sku").in("sku", slice);
         (data ?? []).forEach((p: any) => { if (p.sku) skuToId[p.sku] = p.id; });
       }
+      const seen = new Set<string>();
       const rows = extraBarcodes
         .map((x) => tag({ product_id: skuToId[x.sku], barcode: x.barcode }))
-        .filter((x) => x.product_id);
-      for (let i = 0; i < rows.length; i += chunkSize) {
-        const chunk = rows.slice(i, i + chunkSize);
-        const { error } = await supabase.from("product_barcodes").insert(chunk as any);
-        if (error) errors.push(error.message); else bcOk += chunk.length;
-      }
+        .filter((x) => x.product_id && !(seen.has(x.barcode) ? true : (seen.add(x.barcode), false)));
+      const existingBC = await existingValues("product_barcodes", "barcode", rows.map((r: any) => r.barcode));
+      const newBC = rows.filter((r: any) => !existingBC.has(r.barcode));
+      const res = await insertResilient("product_barcodes", newBC);
+      bcOk = res.ok; errors.push(...res.errors);
     }
+
 
     await finalizeImportBatch(batchId, { products: ok, barcodes: bcOk, failed });
     notifyBatchChanged();
