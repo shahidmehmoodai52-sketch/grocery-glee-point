@@ -1,8 +1,8 @@
 {
   "name": "grocery-glee-point",
   "version": "0.1.0",
-  "description": "Grocery POS \u2014 offline-first SaaS point of sale for grocery stores",
-  "author": "Managed by tillix.co support \u00b7 info@tillix.co",
+  "description": "Grocery POS — offline-first SaaS point of sale for grocery stores",
+  "author": "Managed by tillix.co support · info@tillix.co",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -87,7 +87,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
-    "@lovable.dev/vite-tanstack-config": "2.8.4",
+    "@lovable.dev/vite-tanstack-config": "2.8.5",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
