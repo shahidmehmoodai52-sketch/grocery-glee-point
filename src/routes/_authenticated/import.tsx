@@ -891,20 +891,21 @@ function Importer({ entity }: { entity: EntityKey }) {
     if (mapped.length === 0) return toast.error("No rows to import");
     setBusy(true); setResult({ ok: 0, failed: 0, errors: [] });
     const errors: string[] = []; let ok = 0, failed = 0;
-    const chunkSize = 200;
     const batchId = await createImportBatch(filename || `${entity}-upload`, entity);
     const tag = (r: any) => (batchId ? { ...r, import_batch_id: batchId } : r);
-    for (let i = 0; i < mapped.length; i += chunkSize) {
-      const chunk = mapped.slice(i, i + chunkSize).map(tag);
-      if (entity === "products") {
-        const { error } = await supabase.from("products").insert(chunk as any);
-        if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
-      } else {
-        const { error } = await supabase.from(entity).insert(chunk as any);
-        if (error) { failed += chunk.length; errors.push(error.message); } else ok += chunk.length;
-      }
-      setResult({ ok, failed, errors: [...new Set(errors)].slice(0, 5) });
+    let rows = mapped.map(tag);
+    if (entity === "products") {
+      const existingSkus = await existingValues("products", "sku", rows.map((r: any) => r.sku).filter(Boolean));
+      const before = rows.length;
+      rows = rows.filter((r: any) => !(r.sku && existingSkus.has(r.sku)));
+      if (before - rows.length) errors.push(`${before - rows.length} items pehle se mojood thay (skip kiye gaye).`);
     }
+    const res = await insertResilient(entity, rows, {
+      onProgress: (o, f) => setResult({ ok: o, failed: f, errors: [...new Set(errors)].slice(0, 6) }),
+    });
+    ok = res.ok; failed = res.failed; errors.push(...res.errors);
+    setResult({ ok, failed, errors: [...new Set(errors)].slice(0, 6) });
+
     await finalizeImportBatch(batchId, {
       products: entity === "products" ? ok : 0,
       customers: entity === "customers" ? ok : 0,
