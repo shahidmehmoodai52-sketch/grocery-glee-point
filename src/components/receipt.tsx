@@ -156,6 +156,11 @@ export function printReceipt(sourceElement?: HTMLElement | null) {
   }
   const printRoot = document.createElement("div");
   printRoot.className = "receipt-print-root";
+  // Keep the clone invisible on screen — printing must never look like a preview.
+  printRoot.style.position = "fixed";
+  printRoot.style.left = "-10000px";
+  printRoot.style.top = "0";
+  printRoot.style.pointerEvents = "none";
   const clonedSource = source.cloneNode(true) as HTMLElement;
   printRoot.appendChild(clonedSource);
   document.body.appendChild(printRoot);
@@ -168,7 +173,10 @@ export function printReceipt(sourceElement?: HTMLElement | null) {
     styleEl.id = styleId;
     document.head.appendChild(styleEl);
   }
+  let done = false;
   const cleanup = () => {
+    if (done) return;
+    done = true;
     document.documentElement.classList.remove("receipt-printing");
     printRoot.remove();
     window.removeEventListener("afterprint", cleanup);
@@ -176,9 +184,15 @@ export function printReceipt(sourceElement?: HTMLElement | null) {
   window.addEventListener("afterprint", cleanup);
   setReceiptPrintPageSize(styleEl, "80mm", printRoot);
   requestAnimationFrame(() => {
-    void tryDirectPrint();
+    void tryDirectPrint().then(() => {
+      // Silent desktop printing never fires afterprint — clean up ourselves.
+      window.setTimeout(cleanup, 400);
+    });
+    // Safety net in case the print call never settles.
+    window.setTimeout(cleanup, 8000);
   });
 }
+
 
 /** Print an invoice directly without opening a preview dialog.
  *  Renders the receipt off-screen, prints it, then cleans up. */
