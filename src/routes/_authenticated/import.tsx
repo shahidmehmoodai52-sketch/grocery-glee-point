@@ -53,8 +53,68 @@ async function finalizeImportBatch(
   }).eq("id", id);
 }
 
+// ---------- Resilient bulk insert ----------
+// A single bad row used to fail an entire 200-row chunk ("kuch items fail ho jati
+// hain"). This retries failing chunks by splitting them in half down to single
+// rows, so only the genuinely bad rows are reported.
+function friendlyError(msg: string): string {
+  if (/product limit reached/i.test(msg)) return "Plan ka product limit poora ho gaya — plan upgrade karen.";
+  if (/duplicate key/i.test(msg) && /barcode/i.test(msg)) return "Ye barcode pehle se kisi product par mojood hai (skip kiya gaya).";
+  if (/duplicate key/i.test(msg) && /sku/i.test(msg)) return "Ye item code pehle se mojood hai (skip kiya gaya).";
+  if (/violates not-null/i.test(msg)) return "Zaroori column khali hai (item name required hai).";
+  if (/row-level security/i.test(msg)) return "Permission nahi — shop owner/admin se import karwaen.";
+  return msg;
+}
+
+async function insertResilient(
+  table: "products" | "product_barcodes" | "customers" | "suppliers",
+  rows: any[],
+  opts: { chunkSize?: number; onProgress?: (ok: number, failed: number) => void } = {},
+): Promise<{ ok: number; failed: number; errors: string[] }> {
+  const chunkSize = opts.chunkSize ?? 200;
+  let ok = 0, failed = 0;
+  const errors: string[] = [];
+
+  const push = async (batch: any[]): Promise<void> => {
+    if (!batch.length) return;
+    const { error } = await supabase.from(table).insert(batch as any);
+    if (!error) { ok += batch.length; opts.onProgress?.(ok, failed); return; }
+    if (batch.length === 1) {
+      failed += 1;
+      errors.push(friendlyError(error.message));
+      opts.onProgress?.(ok, failed);
+      return;
+    }
+    const mid = Math.ceil(batch.length / 2);
+    await push(batch.slice(0, mid));
+    await push(batch.slice(mid));
+  };
+
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    await push(rows.slice(i, i + chunkSize));
+  }
+  return { ok, failed, errors: [...new Set(errors)].slice(0, 6) };
+}
+
+// Values that already exist for this tenant, so imports can skip duplicates
+// instead of failing with unique-violation errors.
+async function existingValues(
+  table: "products" | "product_barcodes",
+  column: "sku" | "barcode",
+  values: string[],
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  const list = [...new Set(values.filter(Boolean))];
+  for (let i = 0; i < list.length; i += 300) {
+    const slice = list.slice(i, i + 300);
+    const { data } = await supabase.from(table).select(column).in(column, slice);
+    (data ?? []).forEach((r: any) => { if (r[column]) out.add(String(r[column])); });
+  }
+  return out;
+}
 
 type EntityKey = "products" | "customers" | "suppliers";
+
 
 const SCHEMAS: Record<EntityKey, { fields: { key: string; label: string; required?: boolean; type?: "number" | "bool" }[]; sample: any[][]; onConflict?: string }> = {
   products: {
