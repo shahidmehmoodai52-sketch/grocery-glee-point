@@ -30,6 +30,50 @@ function toLocalInputValue(iso?: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function DateTimeField({ label = "Date & time", value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
+  const datePart = value ? value.slice(0, 10) : "";
+  const timePart = value ? value.slice(11, 16) : "00:00";
+  const selected = datePart ? new Date(`${datePart}T00:00:00`) : undefined;
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="flex gap-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className={cn("flex-1 justify-start text-left font-normal", !datePart && "text-muted-foreground")}
+            >
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              {selected ? format(selected, "PPP") : <span>Pick a date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selected}
+              onSelect={(d) => {
+                if (!d) return;
+                const pad = (n: number) => String(n).padStart(2, "0");
+                onChange(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${timePart || "00:00"}`);
+              }}
+              initialFocus
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
+        <Input
+          type="time"
+          className="w-[110px]"
+          value={timePart}
+          onChange={(e) => onChange(`${datePart || toLocalInputValue(new Date().toISOString()).slice(0, 10)}T${e.target.value || "00:00"}`)}
+        />
+      </div>
+    </div>
+  );
+}
+
 const PAYMENT_SOURCE_PRESETS = ["Cash in hand", "Bank", "EasyPaisa", "JazzCash", "Card"];
 
 function guessAccountType(name: string) {
