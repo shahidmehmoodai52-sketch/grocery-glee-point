@@ -30,7 +30,8 @@ export default defineConfig({
         includeAssets: ["favicon.svg", "favicon.png", "manifest.webmanifest"],
         workbox: {
           cleanupOutdatedCaches: true,
-          navigateFallback: "/index.html",
+          navigateFallback: "/",
+          navigateFallbackAllowlist: [/^\/(?!~oauth|api\/|\.mcp|\.well-known)/],
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/\.mcp/, /^\/\.well-known/],
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
           runtimeCaching: [
@@ -40,6 +41,7 @@ export default defineConfig({
               options: {
                 cacheName: "html-nav",
                 networkTimeoutSeconds: 3,
+                matchOptions: { ignoreSearch: true },
                 expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
               },
             },
