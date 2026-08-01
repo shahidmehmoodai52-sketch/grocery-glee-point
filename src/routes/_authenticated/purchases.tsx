@@ -307,8 +307,23 @@ function Page() {
 
 
 
+  // Payment heads come from Cash Flow accounts so both screens stay in sync.
+  const { data: cashAccounts = [] } = useQuery({
+    queryKey: ["cash-accounts", "purchase-pay"],
+    staleTime: 30_000,
+    queryFn: async () =>
+      (await supabase.from("cash_accounts").select("id,name,type,is_active")
+        .eq("is_active", true).order("sort_order").order("name")).data ?? [],
+  });
+  const paySourceOptions = useMemo(() => [
+    ...(cashAccounts as any[]).map((a) => ({ id: a.id as string, name: a.name as string, preset: false })),
+    ...PAY_SOURCE_PRESETS
+      .filter((p) => !(cashAccounts as any[]).some((a) => String(a.name).toLowerCase() === p.toLowerCase()))
+      .map((p) => ({ id: `preset:${p}`, name: p, preset: true })),
+  ], [cashAccounts]);
 
   const { data: suppliers = [] } = useQuery({
+
     queryKey: ["suppliers"],
     staleTime: 60_000,
     queryFn: async () => offlineFirst<any[]>(
