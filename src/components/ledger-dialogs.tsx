@@ -109,6 +109,7 @@ export function AddPaymentDialog({
   const [method, setMethod] = useState("cash");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
+  const [when, setWhen] = useState("");
   const [saving, setSaving] = useState(false);
   const cashAccountsQ = useCashAccounts();
   const cashAccounts = cashAccountsQ.data ?? [];
