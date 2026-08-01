@@ -790,6 +790,20 @@ function Page() {
                     Due: <span className="font-medium text-foreground">{fmtMoney(Math.max(0, total - Number(paid || 0)), sym)}</span>
                   </div>
                 </div>
+
+                <div>
+                  <Label className="text-xs">Pay from</Label>
+                  <Select value={effectivePaySource} onValueChange={setPaySource}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Cash / Cheque / Bank…" /></SelectTrigger>
+                    <SelectContent>
+                      {paySourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Paid amount is deducted from this account in Cash Flow.
+                  </div>
+                </div>
+
                   <div>
                     <Label className="text-xs">Note</Label>
                     <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
