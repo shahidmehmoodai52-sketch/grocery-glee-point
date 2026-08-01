@@ -27,8 +27,10 @@ export default defineConfig({
         injectRegister: null, // registration happens from our guarded wrapper
         filename: "sw.js",
         devOptions: { enabled: false },
+        includeAssets: ["favicon.svg", "favicon.png", "manifest.webmanifest"],
         workbox: {
-          navigateFallback: "/",
+          cleanupOutdatedCaches: true,
+          navigateFallback: "/index.html",
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/\.mcp/, /^\/\.well-known/],
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
           runtimeCaching: [

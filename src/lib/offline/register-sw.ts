@@ -43,6 +43,12 @@ export async function registerAppShellSW(): Promise<void> {
   }
 
   try {
-    await navigator.serviceWorker.register(SW_PATH, { scope: "/" });
-  } catch { /* ignore */ }
+    const registration = await navigator.serviceWorker.register(SW_PATH, { scope: "/" });
+    if (registration.installing || registration.waiting || registration.active) {
+      // Keep the app shell durable on first install.
+      await registration.update();
+    }
+  } catch {
+    // Ignore registration failures; offline mode still works if the app is already cached.
+  }
 }

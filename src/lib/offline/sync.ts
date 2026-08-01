@@ -10,6 +10,7 @@ import { db, MIRRORED_TABLES, type MirroredTable } from "./db";
 import {
   getOfflineStatus, markSyncStart, markSyncDone, markSyncError, refreshPendingCount,
 } from "./status";
+import { toast } from "sonner";
 
 const PULL_TABLES: MirroredTable[] = [
   "products", "product_barcodes", "customers", "suppliers",
@@ -99,7 +100,15 @@ export async function runSync(opts: { silent?: boolean } = {}): Promise<void> {
   if (!opts.silent) markSyncStart();
   try {
     // 1. Push local queue first so cloud sees fresh writes before we overwrite locally.
-    await flushQueue();
+    const flushResult = await flushQueue();
+    if (!opts.silent) {
+      if (flushResult.ok > 0) {
+        toast.success(`${flushResult.ok} pending action${flushResult.ok > 1 ? "s" : ""} synced`);
+      }
+      if (flushResult.failed > 0) {
+        toast.error(`${flushResult.failed} queued action${flushResult.failed > 1 ? "s" : ""} failed to sync`);
+      }
+    }
     // 2. Pull master data.
     for (const t of PULL_TABLES) {
       try { await pullTable(t); }

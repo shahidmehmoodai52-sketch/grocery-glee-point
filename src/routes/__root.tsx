@@ -153,8 +153,29 @@ function RootComponent() {
         const { registerAppShellSW } = await import("@/lib/offline/register-sw");
         bootOfflineStatus();
         void registerAppShellSW();
-        const s = getOfflineStatus();
-        if (s.enabled && s.online) void runSync({ silent: true });
+
+        // Attempt an immediate boot-time sync with a few retries so queued writes
+        // are flushed as soon as connectivity is available after app startup.
+        const attemptBootSync = async () => {
+          const maxAttempts = 5;
+          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            const s = getOfflineStatus();
+            if (s.enabled && s.online) {
+              try {
+                await runSync({ silent: true });
+                break;
+              } catch {
+                // swallow and retry with backoff
+              }
+            }
+            // exponential-ish backoff (1s, 3s, 5s, ...)
+            const waitMs = 1000 * Math.min(1 + attempt * 2, 10);
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((r) => setTimeout(r, waitMs));
+          }
+        };
+        void attemptBootSync();
+
         const onOnline = () => { if (getOfflineStatus().enabled) void runSync({ silent: true }); };
         window.addEventListener("online", onOnline);
         const interval = window.setInterval(() => {
