@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { parseInput, addAdminStaffInput, setAdminStaffPermsInput, userIdInput } from "@/lib/server-validators";
 
 async function assertSuperAdmin(context: any) {
   const { data, error } = await context.supabase.rpc("is_super_admin", { _user_id: context.userId });
@@ -36,7 +37,7 @@ export const listAdminStaff = createServerFn({ method: "GET" })
 
 export const addAdminStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { email: string; perms: string[] }) => data)
+  .inputValidator((data: unknown) => parseInput(addAdminStaffInput, data))
   .handler(async ({ data, context }) => {
     await assertSuperAdmin(context);
     if (!data.email) throw new Error("Email required");
@@ -59,7 +60,7 @@ export const addAdminStaff = createServerFn({ method: "POST" })
 
 export const setAdminStaffPermissions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { user_id: string; perms: string[] }) => data)
+  .inputValidator((data: unknown) => parseInput(setAdminStaffPermsInput, data))
   .handler(async ({ data, context }) => {
     await assertSuperAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -74,7 +75,7 @@ export const setAdminStaffPermissions = createServerFn({ method: "POST" })
 
 export const removeAdminStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { user_id: string }) => data)
+  .inputValidator((data: unknown) => parseInput(userIdInput, data))
   .handler(async ({ data, context }) => {
     await assertSuperAdmin(context);
     if (data.user_id === context.userId) throw new Error("You cannot remove yourself");

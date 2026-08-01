@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Printer, Undo2, Ban, CalendarIcon, ArrowUpRight, ArrowDownRight, Receipt as ReceiptIcon, Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Eye, Printer, Undo2, Ban, CalendarIcon, ArrowUpRight, ArrowDownRight, Receipt as ReceiptIcon, Wallet, TrendingUp } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -44,16 +44,42 @@ function Page() {
     setToDate(to ? new Date(to) : undefined);
   };
 
+  // Previous comparable range (declared first so fetches can cover both windows)
+  const { prevFrom, prevTo } = useMemo(() => {
+    if (!fromDate || !toDate) return { prevFrom: undefined, prevTo: undefined };
+    const f = new Date(fromDate); f.setHours(0, 0, 0, 0);
+    const t = new Date(toDate); t.setHours(0, 0, 0, 0);
+    const spanDays = Math.max(1, Math.round((t.getTime() - f.getTime()) / 86400000) + 1);
+    const pTo = new Date(f.getTime() - 86400000);
+    const pFrom = new Date(pTo.getTime() - (spanDays - 1) * 86400000);
+    return { prevFrom: pFrom, prevTo: pTo };
+  }, [fromDate, toDate]);
+
+  // Server-side window: only the selected range + the comparison range are fetched.
+  const window = useMemo(() => {
+    const start = prevFrom ?? fromDate;
+    const startIso = start ? (() => { const d = new Date(start); d.setHours(0, 0, 0, 0); return d.toISOString(); })() : null;
+    const endIso = toDate ? (() => { const d = new Date(toDate); d.setHours(23, 59, 59, 999); return d.toISOString(); })() : null;
+    return { startIso, endIso };
+  }, [prevFrom, fromDate, toDate]);
+
+  const rangedQuery = (table: "sales" | "sale_returns", cols: string) => async () => {
+    let q = supabase.from(table).select(cols).order("created_at", { ascending: false }).limit(5000);
+    if (window.startIso) q = q.gte("created_at", window.startIso);
+    if (window.endIso) q = q.lte("created_at", window.endIso);
+    return ((await q).data as any[]) ?? [];
+  };
+
   const { data: allSales = [] } = useQuery({
-    queryKey: ["sales"],
-    queryFn: async () =>
-      (await supabase.from("sales").select("*, customers(name), sale_items(*)").order("created_at", { ascending: false }).limit(1000)).data ?? [],
+    queryKey: ["sales", window.startIso, window.endIso],
+    queryFn: rangedQuery("sales", "*, customers(name), sale_items(*)"),
+    staleTime: 30_000,
   });
 
   const { data: allReturns = [] } = useQuery({
-    queryKey: ["sale-returns-on-sales"],
-    queryFn: async () =>
-      (await supabase.from("sale_returns").select("*, customers(name), sale_return_items(*), sales(invoice_no)").order("created_at", { ascending: false }).limit(1000)).data ?? [],
+    queryKey: ["sale-returns-on-sales", window.startIso, window.endIso],
+    queryFn: rangedQuery("sale_returns", "*, customers(name), sale_return_items(*), sales(invoice_no)"),
+    staleTime: 30_000,
   });
 
   const inRange = (iso: string, f?: Date, t?: Date) => {
@@ -65,17 +91,6 @@ function Page() {
 
   const sales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at, fromDate, toDate)), [allSales, fromDate, toDate]);
   const returns = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at, fromDate, toDate)), [allReturns, fromDate, toDate]);
-
-  // Previous comparable range
-  const { prevFrom, prevTo } = useMemo(() => {
-    if (!fromDate || !toDate) return { prevFrom: undefined, prevTo: undefined };
-    const f = new Date(fromDate); f.setHours(0, 0, 0, 0);
-    const t = new Date(toDate); t.setHours(0, 0, 0, 0);
-    const spanDays = Math.max(1, Math.round((t.getTime() - f.getTime()) / 86400000) + 1);
-    const pTo = new Date(f.getTime() - 86400000);
-    const pFrom = new Date(pTo.getTime() - (spanDays - 1) * 86400000);
-    return { prevFrom: pFrom, prevTo: pTo };
-  }, [fromDate, toDate]);
 
   const prevSales = useMemo(() => allSales.filter((s: any) => inRange(s.created_at, prevFrom, prevTo)), [allSales, prevFrom, prevTo]);
   const prevReturnsArr = useMemo(() => allReturns.filter((r: any) => inRange(r.created_at, prevFrom, prevTo)), [allReturns, prevFrom, prevTo]);
