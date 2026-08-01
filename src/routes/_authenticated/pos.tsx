@@ -55,6 +55,8 @@ type Tab = {
   payment_method: string;
   discount: number;
   discount_pct: string;
+  charge: number;
+  charge_pct: string;
   paid: string;
   note: string;
   restored?: boolean;
@@ -87,6 +89,8 @@ const newTab = (n: number): Tab => ({
   payment_method: "cash",
   discount: 0,
   discount_pct: "",
+  charge: 0,
+  charge_pct: "",
   paid: "",
   note: "",
 });
@@ -569,7 +573,8 @@ function POSPage() {
     return s + (net * Number(i.tax_pct || 0)) / 100;
   }, 0).toFixed(2);
   const discount = Number(tab.discount || 0);
-  const total = +(subtotal + tax - discount).toFixed(2);
+  const charge = Number(tab.charge || 0);
+  const total = +(subtotal + tax - discount + charge).toFixed(2);
   const paidNum = Number(tab.paid || 0);
   const change = Math.max(paidNum - total, 0);
   const due = Math.max(total - paidNum, 0);
@@ -583,6 +588,17 @@ function POSPage() {
     }
     const newDisc = +Math.max(0, (subtotal * n) / 100).toFixed(2);
     setTab({ discount_pct: pct, discount: newDisc });
+  };
+
+  // Extra charge (delivery / service etc.) — % of subtotal or flat amount
+  const applyChargePct = (pct: string) => {
+    const n = Number(pct);
+    if (!isFinite(n) || pct === "") {
+      setTab({ charge_pct: pct });
+      return;
+    }
+    const newCharge = +Math.max(0, (subtotal * n) / 100).toFixed(2);
+    setTab({ charge_pct: pct, charge: newCharge });
   };
 
 
@@ -646,6 +662,8 @@ function POSPage() {
       payment_method: payload.payment_method ?? "cash",
       discount: Number(payload.discount ?? 0),
       discount_pct: "",
+      charge: Number(payload.charge ?? 0),
+      charge_pct: "",
       paid: String(payload.paid ?? ""),
       note: payload.note ?? "",
       restored: !isEdit,
@@ -682,6 +700,8 @@ function POSPage() {
       payment_method: sale.payment_method ?? "cash",
       discount: Number(sale.discount ?? 0),
       discount_pct: "",
+      charge: 0,
+      charge_pct: "",
       paid: String(sale.paid ?? ""),
       note: sale.note ?? "",
       editing_sale_id: sale.id,
@@ -721,6 +741,7 @@ function POSPage() {
         expense_person_id: tab.expense_person_id,
         payment_method: tab.payment_method,
         discount: Number(tab.discount || 0),
+        charge: Number(tab.charge || 0),
         paid: tab.paid,
         note: tab.note,
         label: tab.name,
@@ -851,8 +872,10 @@ function POSPage() {
         payment_method: tab.payment_method,
         tax,
         // Combine per-line discounts with cart-level discount so they reach the ledger.
-        discount: +(lineDiscountTotal + discount).toFixed(2),
-        paid: paidNum,
+        // Extra charge is applied as a negative discount so the server total matches.
+        discount: +(lineDiscountTotal + discount - charge).toFixed(2),
+        // Change (extra tendered cash) is never recorded — only the bill amount is.
+        paid: +Math.min(paidNum, total).toFixed(2),
         note: tab.note,
         items: tab.items.map((i) => ({
           product_id: i.product_id,
@@ -873,7 +896,17 @@ function POSPage() {
         price: i.price,
         line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
       }));
-      const patchedSale = sale ? { ...sale, sale_items: localItems } : sale;
+      // Receipt shows the real tendered amount + change; the ledger keeps only the bill amount.
+      const patchedSale = sale
+        ? {
+            ...sale,
+            sale_items: localItems,
+            discount: +(lineDiscountTotal + discount).toFixed(2),
+            charge: +charge.toFixed(2),
+            paid: +paidNum.toFixed(2),
+            change_due: +change.toFixed(2),
+          }
+        : sale;
       setLastInvoice(patchedSale);
       if (patchedSale?.id) {
         setUndoCandidate({
@@ -986,6 +1019,8 @@ function POSPage() {
         payment_method: payload.payment_method ?? "cash",
         discount: Number(payload.discount ?? 0),
         discount_pct: "",
+        charge: 0,
+        charge_pct: "",
         paid: String(payload.paid ?? ""),
         note: payload.note ?? "",
         restored: true,
@@ -1675,6 +1710,30 @@ function POSPage() {
                 step="0.01"
                 value={tab.discount}
                 onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
+                className="h-8 w-24 text-right text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-sm gap-2">
+            <span className="text-muted-foreground">Charges</span>
+            <div className="flex items-center gap-1.5">
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={tab.charge_pct}
+                  onChange={(e) => applyChargePct(e.target.value)}
+                  placeholder="0"
+                  className="h-8 w-14 text-right text-sm pr-5"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                value={tab.charge}
+                onChange={(e) => setTab({ charge: Number(e.target.value), charge_pct: "" })}
                 className="h-8 w-24 text-right text-sm"
               />
             </div>

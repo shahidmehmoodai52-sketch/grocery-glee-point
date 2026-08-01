@@ -41,6 +41,7 @@ export type ReceiptInvoice = {
   subtotal: number;
   tax: number;
   discount?: number;
+  charge?: number;
   total: number;
   paid?: number;
   refund_amount?: number;
@@ -136,7 +137,13 @@ async function tryDirectPrint(): Promise<boolean> {
     }
   }
 
-  return false;
+  // Browser fallback — no desktop bridge available, use the native print dialog.
+  try {
+    window.print();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function printReceipt(sourceElement?: HTMLElement | null) {
@@ -367,6 +374,9 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
           />
         )}
         {savings > 0 && <Row label="Discount" value={`-${fmtMoney(savings, sym)}`} />}
+        {Number(invoice.charge ?? 0) > 0 && (
+          <Row label="Charges" value={fmtMoney(invoice.charge ?? 0, sym)} />
+        )}
       </div>
 
       <div className="mt-1 flex justify-between items-center px-1 py-1 text-[15px] font-extrabold uppercase tracking-wide" style={{ borderTop: "2px solid #000", borderBottom: "2px solid #000" }}>
