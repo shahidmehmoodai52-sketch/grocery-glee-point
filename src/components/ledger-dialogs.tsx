@@ -347,7 +347,7 @@ export function EditEntryDialog({
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Edit {entity?.replace("_"," ")} · {entry?.ref}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div><Label>Date & time</Label><Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
+          <DateTimeField value={when} onChange={setWhen} />
           <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">
             Amount is derived from items and cannot be changed here. Delete or re-create the transaction to change amounts.
