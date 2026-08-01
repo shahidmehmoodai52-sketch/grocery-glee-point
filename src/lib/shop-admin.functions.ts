@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireCloudAuth } from "@/lib/cloud-auth-middleware";
 import {
-import { parseInput, createShopStaffInput, resetPasswordInput, setStaffAccessInput, userIdInput } from "@/lib/server-validators";
   assertStrongStaffPassword,
   callerTenant,
   cleanUsername,
@@ -9,6 +8,7 @@ import { parseInput, createShopStaffInput, resetPasswordInput, setStaffAccessInp
   getSignupClient,
   internalEmail,
 } from "@/lib/shop-admin.server";
+import { parseInput, createShopStaffInput, resetPasswordInput, setStaffAccessInput, userIdInput } from "@/lib/server-validators";
 
 export const getMyShopInfo = createServerFn({ method: "GET" })
   .middleware([requireCloudAuth])
