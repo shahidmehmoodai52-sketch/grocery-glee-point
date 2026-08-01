@@ -442,7 +442,7 @@ function POSPage() {
       if (s >= 0) scored.push({ p, s });
     }
     scored.sort((a, b) => a.s - b.s || a.p.name.localeCompare(b.p.name));
-    return scored.slice(0, 12).map((x) => x.p);
+    return scored.slice(0, 200).map((x) => x.p);
   }, [searchableProducts, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
