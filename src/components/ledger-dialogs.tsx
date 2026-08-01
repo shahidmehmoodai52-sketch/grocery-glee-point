@@ -185,6 +185,7 @@ export function AddPaymentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Add payment{party_name ? ` — ${party_name}` : ""}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
+          <DateTimeField value={when} onChange={setWhen} />
           <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div>
             <Label>{party === "supplier" ? "Pay from" : "Receive in"}</Label>
