@@ -1019,6 +1019,8 @@ function POSPage() {
         payment_method: payload.payment_method ?? "cash",
         discount: Number(payload.discount ?? 0),
         discount_pct: "",
+        charge: 0,
+        charge_pct: "",
         paid: String(payload.paid ?? ""),
         note: payload.note ?? "",
         restored: true,
@@ -1708,6 +1710,30 @@ function POSPage() {
                 step="0.01"
                 value={tab.discount}
                 onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
+                className="h-8 w-24 text-right text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-sm gap-2">
+            <span className="text-muted-foreground">Charges</span>
+            <div className="flex items-center gap-1.5">
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={tab.charge_pct}
+                  onChange={(e) => applyChargePct(e.target.value)}
+                  placeholder="0"
+                  className="h-8 w-14 text-right text-sm pr-5"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                value={tab.charge}
+                onChange={(e) => setTab({ charge: Number(e.target.value), charge_pct: "" })}
                 className="h-8 w-24 text-right text-sm"
               />
             </div>
