@@ -47,6 +47,8 @@ class PosOfflineDB extends Dexie {
       suppliers: "id, name, phone, updated_at",
       sales: "id, invoice_no, customer_id, created_at, updated_at",
       sale_items: "id, sale_id, product_id",
+      sale_returns: "id, return_no, customer_id, created_at, updated_at",
+      sale_return_items: "id, return_id, product_id",
       purchases: "id, supplier_id, created_at, updated_at",
       purchase_items: "id, purchase_id, product_id",
       expenses: "id, created_at, updated_at",
@@ -71,7 +73,7 @@ export function db(): PosOfflineDB {
 
 export const MIRRORED_TABLES = [
   "products", "product_barcodes", "customers", "suppliers",
-  "sales", "sale_items", "purchases", "purchase_items",
-  "expenses", "store_settings", "user_roles",
+  "sales", "sale_items", "sale_returns", "sale_return_items",
+  "purchases", "purchase_items", "expenses", "store_settings", "user_roles",
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];
