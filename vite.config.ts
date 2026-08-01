@@ -30,9 +30,9 @@ export default defineConfig({
         includeAssets: ["favicon.svg", "favicon.png", "manifest.webmanifest"],
         workbox: {
           cleanupOutdatedCaches: true,
-          navigateFallback: "/",
-          navigateFallbackAllowlist: [/^\/(?!~oauth|api\/|\.mcp|\.well-known)/],
-          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/\.mcp/, /^\/\.well-known/],
+          // No navigateFallback: this is an SSR app, so there is no precached
+          // index.html to fall back to. Offline navigations are served from the
+          // "html-nav" runtime cache, pre-warmed on first online visit.
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
           runtimeCaching: [
             {
