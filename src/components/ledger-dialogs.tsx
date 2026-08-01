@@ -158,6 +158,17 @@ export function AddPaymentDialog({
         p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id ?? undefined,
       });
       error = res.error;
+      if (!error && when && res.data) {
+        const chosen = new Date(when);
+        const nowIso = new Date();
+        if (Math.abs(chosen.getTime() - nowIso.getTime()) > 60_000) {
+          const upd = await supabase.rpc("update_party_payment", {
+            _id: res.data as string, _amount: amount, _method: account.name, _note: note || "",
+            _created_at: chosen.toISOString(), _account_id: account.id ?? undefined,
+          });
+          error = upd.error;
+        }
+      }
     } catch (e: any) {
       error = e;
     }
