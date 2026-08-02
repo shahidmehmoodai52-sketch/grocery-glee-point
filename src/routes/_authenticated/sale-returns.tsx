@@ -39,6 +39,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [saleId, setSaleId] = useState<string>("none");
   const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   const [customer, setCustomer] = useState<string>("none");
   const [items, setItems] = useState<ItemRow[]>([]);
   const [tax, setTax] = useState(0);
