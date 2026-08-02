@@ -151,10 +151,25 @@ export interface CompleteSalePayload {
   items: Array<{ product_id: string | null; name: string; qty: number; price: number; cost: number }>;
 }
 
+/** Presentation/audit-only breakdown captured by the POS UI. It is NEVER sent to
+ *  `complete_sale` (the server derives its own totals from the same figures);
+ *  it is only stored on the local record so an offline sale can be audited,
+ *  reprinted and reconciled without the cloud. */
+export interface OfflineSaleMeta {
+  charge?: number;
+  line_discount_total?: number;
+  bill_discount?: number;
+  tax_breakdown?: Array<{ rate: number; amount: number }>;
+  payments?: Array<{ method: string; amount: number }>;
+  tendered?: number;
+  change_due?: number;
+}
+
 /** Online-first sale. When offline, records the sale locally and queues the RPC.
  *  Returns a sale-shaped object matching the cloud response so the UI can print it. */
-export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
+export async function completeSaleOfflineAware(payload: CompleteSalePayload, meta: OfflineSaleMeta = {}) {
   const enabled = getOfflineStatus().enabled;
+
   const offline = isOffline() && enabled;
 
   if (!offline) {
@@ -232,6 +247,20 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
     note: payload.note,
     created_at: now,
     updated_at: now,
+    // Audit payload required for standalone offline reconciliation.
+    charge: +Number(meta.charge ?? 0).toFixed(2),
+    _discounts: {
+      line_total: +Number(meta.line_discount_total ?? 0).toFixed(2),
+      bill: +Number(meta.bill_discount ?? 0).toFixed(2),
+      effective: payload.discount,
+    },
+    _taxes: { total: payload.tax, breakdown: meta.tax_breakdown ?? [] },
+    _payments: meta.payments ?? [{ method: payload.payment_method, amount: paid }],
+    _tendered: +Number(meta.tendered ?? paid).toFixed(2),
+    change_due: +Number(meta.change_due ?? 0).toFixed(2),
+    _inventory_impact: payload.items
+      .filter((i) => !!i.product_id)
+      .map((i) => ({ product_id: i.product_id, qty_delta: -Math.abs(Number(i.qty) || 0) })),
     _offline_pending: true, // marker so the UI can badge it
     _sync: "pending",
     sync_status: "pending",
@@ -240,6 +269,7 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
     _deleted: 0,
     customers: customerName ? { name: customerName, phone: null } : null,
   };
+
 
   const sale_items = payload.items.map((i, idx) => ({
     id: `${localId}:${idx}`,

@@ -889,6 +889,14 @@ function POSPage() {
     try {
       // ---- Edit existing invoice path ----
       if (tab.editing_sale_id) {
+        // Editing an existing invoice re-runs server-side stock/ledger reversal,
+        // so it stays online-only. Fail with a clear message instead of a
+        // raw network error, and keep the tab intact so nothing is lost.
+        if (isOfflineNow()) {
+          toast.error("Editing an invoice needs internet. The bill is kept open — retry once you're back online.");
+          return;
+        }
+
         const items = tab.items.map((i) => ({
           product_id: i.product_id,
           name: i.name,
@@ -945,7 +953,25 @@ function POSPage() {
         })),
       };
 
-      const { sale, offline } = await completeSaleOfflineAware(payload as any);
+      // Audit-only breakdown: stored on the local record when offline, never
+      // sent to the server (the RPC derives its own totals from `payload`).
+      const taxBuckets = new Map<number, number>();
+      for (const i of tab.items) {
+        const rate = Number(i.tax_pct || 0);
+        if (!rate) continue;
+        const base = Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0);
+        taxBuckets.set(rate, +( (taxBuckets.get(rate) ?? 0) + base * rate / 100 ).toFixed(2));
+      }
+      const { sale, offline } = await completeSaleOfflineAware(payload as any, {
+        charge,
+        line_discount_total: lineDiscountTotal,
+        bill_discount: discount,
+        tax_breakdown: Array.from(taxBuckets, ([rate, amount]) => ({ rate, amount })),
+        payments: [{ method: tab.payment_method, amount: +Math.min(paidNum, total).toFixed(2) }],
+        tendered: paidNum,
+        change_due: change,
+      });
+
       // Override server sale_items with the cashier's edited prices so the
       // printed receipt reflects any rate changes made in the cart.
       const localItems = tab.items.map((i, idx) => ({
