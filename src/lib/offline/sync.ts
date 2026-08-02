@@ -93,28 +93,77 @@ async function pullTable(table: MirroredTable): Promise<number> {
 }
 
 
+/** Statuses that still need an upload attempt. "syncing"/"uploading" are
+ *  included on purpose: a browser crash or power failure leaves an item in that
+ *  state and it must resume, never be lost. */
+const ACTIVE_STATUSES = ["pending", "failed", "retrying", "syncing", "uploading"] as const;
+
+/** Exponential backoff with jitter: 5s, 10s, 20s … capped at 5 minutes. */
+function backoffMs(attempts: number): number {
+  const base = Math.min(5_000 * 2 ** Math.max(0, attempts), 5 * 60_000);
+  return base + Math.floor(Math.random() * 1000);
+}
+
+/** Recover items interrupted mid-upload (crash / power loss / tab kill). */
+export async function recoverInterruptedQueue(): Promise<number> {
+  try {
+    const stuck = await db()._queue.where("status").anyOf(["syncing", "uploading"]).toArray();
+    for (const it of stuck) {
+      await db()._queue.update(it.id!, { status: "pending", next_attempt_at: null });
+    }
+    if (stuck.length) logPerf("queue recovered", { items: stuck.length });
+    return stuck.length;
+  } catch {
+    return 0;
+  }
+}
+
 /**
- * Flush the queue in chronological order.
- * A failing item aborts the pass so later transactions never overtake earlier
- * ones (inventory maths depends on ordering). Items past MAX_ATTEMPTS are
- * skipped so a single poison record cannot block the whole queue forever.
+ * Flush the queue.
+ *
+ * Ordering: entity priority (customers → suppliers → products → sales →
+ * sale returns → inventory adjustments), then strict chronological order
+ * inside each entity, because inventory maths depends on it.
+ *
+ * A failure only stops the remaining items of that same entity — other
+ * entities keep uploading — and schedules an exponentially backed-off retry.
+ * Once the retry budget is spent the item becomes "cancelled" so a single
+ * poison record can never block the queue forever.
  */
-async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number; failed: number }> {
-  const pending = (await db()._queue.where("status").anyOf(["pending", "failed", "syncing"]).toArray())
-    .filter((r) => (r.attempts ?? 0) < MAX_ATTEMPTS)
-    .sort((a, b) =>
-      a.local_created_at === b.local_created_at
-        ? (a.id ?? 0) - (b.id ?? 0)
-        : a.local_created_at < b.local_created_at ? -1 : 1,
-    );
+async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number; failed: number; cancelled: number }> {
+  const nowIso = new Date().toISOString();
+  const all = await db()._queue.where("status").anyOf(ACTIVE_STATUSES as unknown as string[]).toArray();
+
+  let cancelled = 0;
+  const runnable: typeof all = [];
+  for (const r of all) {
+    if ((r.attempts ?? 0) >= MAX_ATTEMPTS) {
+      await db()._queue.update(r.id!, { status: "cancelled" });
+      cancelled++;
+      continue;
+    }
+    if (r.next_attempt_at && r.next_attempt_at > nowIso) continue; // backoff not elapsed
+    runnable.push(r);
+  }
+
+  runnable.sort((a, b) => {
+    const pa = a.priority ?? queuePriority(a.table);
+    const pb = b.priority ?? queuePriority(b.table);
+    if (pa !== pb) return pa - pb;
+    if (a.local_created_at !== b.local_created_at) return a.local_created_at < b.local_created_at ? -1 : 1;
+    return (a.id ?? 0) - (b.id ?? 0);
+  });
 
   let ok = 0, failed = 0;
-  const totalItems = pending.length;
+  const totalItems = runnable.length;
+  /** Entities whose chain broke this pass — later items must wait their turn. */
+  const blocked = new Set<string>();
 
-  for (const item of pending) {
+  for (const item of runnable) {
+    if (blocked.has(item.table)) continue;
     if (totalItems > 0 && !opts.silent) setSyncProgress(ok + failed, totalItems);
     try {
-      await db()._queue.update(item.id!, { status: "syncing" });
+      await db()._queue.update(item.id!, { status: "uploading" });
       if (item.op === "rpc") {
         const { error } = await supabase.rpc(item.table as any, item.payload);
         if (error) throw error;
@@ -132,26 +181,37 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
         const { error } = await supabase.from(item.table as any).delete().eq("id", item.payload.id);
         if (error) throw error;
       }
-      await db()._queue.update(item.id!, { status: "done", last_error: null });
+      await db()._queue.update(item.id!, {
+        status: "uploaded",
+        last_error: null,
+        next_attempt_at: null,
+      });
       ok++;
     } catch (e: any) {
       failed++;
+      const attempts = (item.attempts ?? 0) + 1;
+      const exhausted = attempts >= MAX_ATTEMPTS;
+      if (exhausted) cancelled++;
       await db()._queue.update(item.id!, {
-        status: "failed",
-        attempts: (item.attempts ?? 0) + 1,
+        status: exhausted ? "cancelled" : "retrying",
+        attempts,
         last_error: String(e?.message ?? e),
+        next_attempt_at: exhausted ? null : new Date(Date.now() + backoffMs(attempts)).toISOString(),
       });
-      // Stop the pass: preserve chronological application on the cloud.
-      break;
+      // Preserve chronological application for this entity only.
+      blocked.add(item.table);
     }
     // Never hold the main thread for a long queue.
     await yieldToUI();
   }
   if (!opts.silent) setSyncProgress(null, null);
-  // Prune "done" rows > 7 days old.
+  // Prune confirmed uploads > 7 days old.
   const cutoff = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
-  await db()._queue.where("status").equals("done").and((r) => r.local_created_at < cutoff).delete();
-  return { ok, failed };
+  await db()._queue
+    .where("status").anyOf(["uploaded", "done"])
+    .and((r) => r.local_created_at < cutoff)
+    .delete();
+  return { ok, failed, cancelled };
 }
 
 let running = false;
