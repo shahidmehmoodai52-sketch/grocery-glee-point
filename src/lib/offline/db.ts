@@ -143,6 +143,27 @@ class PosOfflineDB extends Dexie {
       barcode_settings: "id, tenant_id, updated_at",
       printer_settings: "id, tenant_id, updated_at",
     });
+    // v4 — background sync engine: queue gains retry scheduling + entity
+    // priority indexes, and a unique idempotency index on client_uuid so the
+    // same transaction can never be enqueued (or uploaded) twice.
+    this.version(4)
+      .stores({
+        _queue:
+          "++id, status, table, local_created_at, &client_uuid, next_attempt_at, priority, [status+priority], [status+next_attempt_at]",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("_queue")
+          .toCollection()
+          .modify((r: any) => {
+            if (r.next_attempt_at === undefined) r.next_attempt_at = null;
+            if (r.tenant_id === undefined) r.tenant_id = null;
+            if (r.version === undefined) r.version = 1;
+            if (r.priority === undefined) r.priority = queuePriority(r.table);
+            // A write interrupted by a crash/power failure is resumable.
+            if (r.status === "syncing") r.status = "pending";
+          });
+      });
   }
 }
 
