@@ -59,7 +59,9 @@ export async function guardTenantScope(tenantId: string | null, userId: string |
 
   if (changed) {
     const { wipeLocalMirror } = await import("./sync");
+    const { resetLocalFirstSession } = await import("./data-access");
     await wipeLocalMirror();
+    resetLocalFirstSession();
   }
   if (tenantId) await setMeta("tenant_id", tenantId);
   if (userId) await setMeta("user_id", userId);
@@ -70,7 +72,9 @@ export async function guardTenantScope(tenantId: string | null, userId: string |
 export async function clearOfflineDataOnLogout(): Promise<void> {
   try {
     const { wipeLocalMirror } = await import("./sync");
+    const { resetLocalFirstSession } = await import("./data-access");
     await wipeLocalMirror();
+    resetLocalFirstSession();
     await setMeta("tenant_id", null);
     await setMeta("user_id", null);
   } catch {
