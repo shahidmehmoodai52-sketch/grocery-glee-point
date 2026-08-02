@@ -179,7 +179,7 @@ function Page() {
 
   const reset = () => {
     setOpen(false); setItems([]); setSaleId("none"); setInvoiceSearch(""); setCustomer("none");
-    setTax(0); setRefund(0); setMethod("cash"); setNote("");
+    setTax(0); setRefund(0); setMethod("cash"); setNote(""); setProductSearch("");
   };
 
   const submit = async () => {
