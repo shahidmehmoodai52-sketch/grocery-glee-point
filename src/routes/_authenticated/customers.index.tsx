@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { offlineFirst, cacheCustomers, insertOfflineAware } from "@/lib/offline/pos";
+import { readLocalFirst } from "@/lib/offline/data-access";
 import { db } from "@/lib/offline/db";
 
 
@@ -87,7 +88,7 @@ function Page() {
       cloud: async () => (await supabase.from("customers").select("*").order("name")).data ?? [],
       local: async () => (await db().customers.orderBy("name").toArray()) as any[],
       cache: cacheCustomers,
-      onRevalidated: (fresh) => qc.setQueryData(["customers"], fresh),
+      onRevalidated: (fresh: any[]) => qc.setQueryData(["customers"], fresh),
     }),
   });
 

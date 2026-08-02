@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { offlineFirst, cacheSuppliers, insertOfflineAware } from "@/lib/offline/pos";
+import { readLocalFirst } from "@/lib/offline/data-access";
 import { db } from "@/lib/offline/db";
 
 
