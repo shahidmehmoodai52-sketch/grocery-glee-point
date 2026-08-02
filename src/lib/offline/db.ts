@@ -68,6 +68,41 @@ export interface LocalRecordMeta {
   _v: number;
 }
 
+/**
+ * Mandated entity upload order. Lower value uploads first; items within the
+ * same entity keep strict chronological order (inventory maths depends on it).
+ *   customers → suppliers → products → sales → sale returns → inventory adj.
+ */
+const QUEUE_PRIORITY: Record<string, number> = {
+  customers: 10,
+  suppliers: 20,
+  products: 30,
+  product_barcodes: 31,
+  sales: 40,
+  sale_items: 41,
+  complete_sale: 40,
+  edit_sale: 42,
+  hold_bill: 45,
+  resume_bill: 45,
+  discard_held_bill: 45,
+  sale_returns: 50,
+  sale_return_items: 51,
+  complete_sale_return: 50,
+  inventory_movements: 60,
+  adjust_product_stock: 60,
+  record_damage: 60,
+  record_waste: 60,
+  expenses: 70,
+  cash_transactions: 70,
+  record_payment: 70,
+  record_cash_event: 70,
+};
+
+/** Priority for a queued write, derived from its table / RPC name. */
+export function queuePriority(table: string): number {
+  return QUEUE_PRIORITY[table] ?? 80;
+}
+
 class PosOfflineDB extends Dexie {
   products!: Table<any, string>;
   product_barcodes!: Table<any, string>;
