@@ -11,6 +11,21 @@ export interface SyncState {
 }
 
 /** Local mirror of `sync_queue` — pending writes generated while offline. */
+export type QueueStatus =
+  /** waiting for its turn */
+  | "pending"
+  /** currently being uploaded (legacy alias: "syncing") */
+  | "uploading"
+  | "syncing"
+  /** upload confirmed by the cloud (legacy alias: "done") */
+  | "uploaded"
+  | "done"
+  /** last attempt failed, will be retried after `next_attempt_at` */
+  | "failed"
+  | "retrying"
+  /** retry budget exhausted — never uploaded again automatically */
+  | "cancelled";
+
 export interface QueuedWrite {
   id?: number;                // auto-inc PK
   op: "insert" | "update" | "delete" | "rpc";
@@ -19,10 +34,18 @@ export interface QueuedWrite {
   /** Client-generated idempotency key — prevents duplicate cloud writes on retry. */
   client_uuid: string;
   device_id: string;
+  /** Tenant that produced the write — part of the idempotency triple. */
+  tenant_id?: string | null;
+  /** Local monotonic version of the record this write carries. */
+  version?: number;
   local_created_at: string;   // ISO
   attempts: number;
   last_error: string | null;
-  status: "pending" | "syncing" | "failed" | "done";
+  status: QueueStatus;
+  /** ISO timestamp before which the item must not be retried (exponential backoff). */
+  next_attempt_at?: string | null;
+  /** Entity sync priority (lower runs first). Derived from `table`. */
+  priority?: number;
 }
 
 /** Arbitrary key/value meta (device id, active tenant, sale counters…). */
