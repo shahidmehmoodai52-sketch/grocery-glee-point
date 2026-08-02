@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { Receipt, printInvoiceDirect } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
@@ -159,9 +160,22 @@ function POSPage() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
 
-  const [tabs, setTabs] = useState<Tab[]>(() => [newTab(1)]);
-  const [active, setActive] = useState<string>(() => tabs[0].id);
+  // Billing in progress survives navigation to other sections (and refresh):
+  // cart lines, customer, payment, discounts and the active tab are persisted.
+  const [tabs, setTabs] = usePersistentState<Tab[]>("pos-tabs", [newTab(1)]);
+  const [active, setActive] = usePersistentState<string>("pos-active-tab", tabs[0]?.id ?? "");
   const tab = tabs.find((t) => t.id === active) ?? tabs[0];
+
+  // Guard against a corrupted/empty persisted draft.
+  useEffect(() => {
+    if (!tabs.length) {
+      const t = newTab(1);
+      setTabs([t]);
+      setActive(t.id);
+    } else if (!tabs.some((t) => t.id === active)) {
+      setActive(tabs[0].id);
+    }
+  }, [tabs, active, setTabs, setActive]);
 
   const [search, setSearch] = useState("");
   const searchTerm = useMemo(() => search.trim().replace(/\s+/g, " "), [search]);
