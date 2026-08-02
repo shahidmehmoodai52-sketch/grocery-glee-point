@@ -192,17 +192,22 @@ function Page() {
     }
     if (refund > total + 0.001) return toast.error("Refund cannot exceed total");
     let offline = false;
+    let localRet: any = null;
     try {
-      const res = await completeSaleReturnOfflineAware({
-        sale_id: saleId === "none" ? null : saleId,
-        customer_id: customer === "none" ? null : customer,
-        tax,
-        refund_amount: refund,
-        refund_method: method,
-        note,
-        items: picked.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
-      });
+      const res = await completeSaleReturnOfflineAware(
+        {
+          sale_id: saleId === "none" ? null : saleId,
+          customer_id: customer === "none" ? null : customer,
+          tax,
+          refund_amount: refund,
+          refund_method: method,
+          note,
+          items: picked.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
+        },
+        { original_invoice_no: selectedSale?.invoice_no ?? null },
+      );
       offline = res.offline;
+      localRet = res.ret;
     } catch (e: any) {
       return toast.error(e?.message ?? "Could not record return");
     }
@@ -212,6 +217,10 @@ function Page() {
         : "Sale return recorded, stock restored",
     );
     reset();
+    // Offline the cloud row doesn't exist yet — open the local record so the
+    // cashier can still print the return receipt.
+    if (offline && localRet) setViewing(localRet);
+
     qc.invalidateQueries({ queryKey: ["sale-returns"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["customers"] });
