@@ -144,6 +144,8 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
       // Stop the pass: preserve chronological application on the cloud.
       break;
     }
+    // Never hold the main thread for a long queue.
+    await yieldToUI();
   }
   if (!opts.silent) setSyncProgress(null, null);
   // Prune "done" rows > 7 days old.
@@ -153,42 +155,76 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
 }
 
 let running = false;
+let lastPullAt = 0;
+/** Minimum gap between full mirror pulls — reconnect bursts reuse the last pass. */
+const PULL_MIN_GAP_MS = 60_000;
+/** Tables pulled per idle batch, so a reconnect never stalls the UI thread. */
+const PULL_BATCH = 3;
 
-export async function runSync(opts: { silent?: boolean } = {}): Promise<void> {
+export async function runSync(opts: { silent?: boolean; reason?: string } = {}): Promise<void> {
   if (running) return;
   const s = getOfflineStatus();
   if (!s.enabled) return;
   if (!s.online) return;
   running = true;
-  if (!opts.silent) markSyncStart();
-  else markSyncStart();
+  const t0 = nowMs();
+  markSyncStart();
   try {
     // 1. Push local queue first so cloud sees fresh writes before we overwrite locally.
-    const flushResult = await flushQueue(opts);
+    const flushResult = await timed("sync:push", () => flushQueue(opts));
     if (flushResult.ok > 0) {
       toast.success(`${flushResult.ok} offline action${flushResult.ok > 1 ? "s" : ""} synced`);
     }
     if (flushResult.failed > 0 && !opts.silent) {
       toast.error(`${flushResult.failed} queued action${flushResult.failed > 1 ? "s" : ""} failed to sync — will retry`);
     }
-    // 2. Pull master + transactional data.
-    for (const t of PULL_TABLES) {
-      try { await pullTable(t); }
-      catch (e: any) {
-        await db()._sync_state.put({
-          table: t, last_pulled_at: (await getWatermark(t)),
-          last_error: String(e?.message ?? e),
-        });
+
+    // 2. Pull master + transactional data in small idle batches, and only when
+    //    the previous pull is old enough (reconnect flapping is a no-op).
+    const changed: string[] = [];
+    const skipPull = nowMs() - lastPullAt < PULL_MIN_GAP_MS && flushResult.ok === 0;
+    if (!skipPull) {
+      for (let i = 0; i < PULL_TABLES.length; i += PULL_BATCH) {
+        await whenIdle(400);
+        const batch = PULL_TABLES.slice(i, i + PULL_BATCH);
+        for (const t of batch) {
+          try {
+            const n = await timed(`sync:pull:${t}`, () => pullTable(t));
+            if (n > 0) changed.push(t);
+          } catch (e: any) {
+            await db()._sync_state.put({
+              table: t, last_pulled_at: (await getWatermark(t)),
+              last_error: String(e?.message ?? e),
+            });
+          }
+          await yieldToUI();
+        }
       }
+      lastPullAt = nowMs();
     }
+
     await refreshPendingCount();
     markSyncDone();
+    logPerf("sync complete", {
+      reason: opts.reason ?? "manual",
+      ms: Math.round(nowMs() - t0),
+      pushed: flushResult.ok,
+      pushFailed: flushResult.failed,
+      pulledTables: skipPull ? "skipped" : changed.length,
+    });
+    // 3. Tell the UI which tables actually changed — nothing else refetches.
+    if (changed.length) {
+      for (const l of changedListeners) {
+        try { l(changed); } catch {/* listener errors must not break sync */}
+      }
+    }
   } catch (e: any) {
     markSyncError(String(e?.message ?? e));
   } finally {
     running = false;
   }
 }
+
 
 /** Enqueue a write for later sync. Returns the local queue id. */
 export async function enqueueWrite(item: {
