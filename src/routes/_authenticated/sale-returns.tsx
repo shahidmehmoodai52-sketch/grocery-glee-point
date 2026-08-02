@@ -93,6 +93,35 @@ function Page() {
       ),
   });
 
+  // Item-wise product search (works offline via the local mirror)
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedProductSearch(productSearch.trim()), 200);
+    return () => clearTimeout(t);
+  }, [productSearch]);
+  const { data: productResults = [] } = useQuery({
+    queryKey: ["sale-return-product-search", debouncedProductSearch],
+    enabled: debouncedProductSearch.length > 0,
+    queryFn: async () => {
+      const q = debouncedProductSearch;
+      const like = `%${q}%`;
+      try {
+        const [nameRes, skuRes, barcodeRes] = await Promise.all([
+          supabase.from("products").select("id,name,sku,barcode,sell_price,stock,unit").eq("is_active", true).ilike("name", like).order("name").limit(30),
+          supabase.from("products").select("id,name,sku,barcode,sell_price,stock,unit").eq("is_active", true).ilike("sku", like).limit(15),
+          supabase.from("products").select("id,name,sku,barcode,sell_price,stock,unit").eq("is_active", true).ilike("barcode", like).limit(15),
+        ]);
+        const err = nameRes.error ?? skuRes.error ?? barcodeRes.error;
+        if (err) throw err;
+        const map = new Map<string, any>();
+        for (const r of [...(skuRes.data ?? []), ...(barcodeRes.data ?? []), ...(nameRes.data ?? [])]) map.set(r.id, r);
+        return [...map.values()].slice(0, 30);
+      } catch {
+        return (await searchProductsLocal(q, 30)) as any[];
+      }
+    },
+  });
+
   // Load items from selected invoice — pre-checked, editable qty capped at sold qty
   useEffect(() => {
     if (saleId === "none") {
