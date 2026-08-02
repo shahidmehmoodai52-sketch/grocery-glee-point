@@ -137,6 +137,16 @@ function Page() {
   const addAdhoc = () =>
     setItems((l) => [...l, { product_id: null, name: "", qty: 1, price: 0, selected: true }]);
 
+  const addProduct = (p: any) => {
+    setItems((ls) => {
+      const idx = ls.findIndex((l) => l.product_id === p.id && l.max == null);
+      if (idx >= 0) return ls.map((l, i) => (i === idx ? { ...l, qty: l.qty + 1, selected: true } : l));
+      return [...ls, { product_id: p.id, name: p.name, qty: 1, price: Number(p.sell_price ?? 0), selected: true }];
+    });
+    setProductSearch("");
+    toast.success(`${p.name} added`);
+  };
+
   const reset = () => {
     setOpen(false); setItems([]); setSaleId("none"); setInvoiceSearch(""); setCustomer("none");
     setTax(0); setRefund(0); setMethod("cash"); setNote("");
