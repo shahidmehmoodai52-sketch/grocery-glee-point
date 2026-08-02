@@ -6,14 +6,18 @@ export const getRouter = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        // Refetch fresh data whenever the user returns to a tab/window or reconnects,
-        // so stock/reports/intelligence never look stale after edits in another view.
-        refetchOnWindowFocus: true,
-        refetchOnReconnect: true,
+        // Reconnect/focus storms were the main cause of POS lag: every mounted
+        // query refetched at once the moment the network came back. Freshness is
+        // instead driven by realtime invalidation (batched) and the sync engine,
+        // which only touches tables that actually changed.
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        retry: 1,
         staleTime: 15_000,
       },
     },
   });
+
 
   const router = createRouter({
     routeTree,

@@ -145,46 +145,62 @@ function RootComponent() {
   useSessionHeartbeat();
 
   useEffect(() => {
-    // Boot offline layer (safe no-op if disabled / unsupported).
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+
     (async () => {
       try {
         const { bootOfflineStatus, getOfflineStatus } = await import("@/lib/offline/status");
         const { runSync } = await import("@/lib/offline/sync");
         const { registerAppShellSW } = await import("@/lib/offline/register-sw");
+        const { debounceAsync, logPerf, nowMs, whenIdle } = await import("@/lib/offline/perf");
+        if (disposed) return;
         bootOfflineStatus();
         void registerAppShellSW();
 
-        // Attempt an immediate boot-time sync with a few retries so queued writes
-        // are flushed as soon as connectivity is available after app startup.
-        const attemptBootSync = async () => {
-          const maxAttempts = 5;
-          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-            const s = getOfflineStatus();
-            if (s.enabled && s.online) {
-              try {
-                await runSync({ silent: true });
-                break;
-              } catch {
-                // swallow and retry with backoff
-              }
-            }
-            // exponential-ish backoff (1s, 3s, 5s, ...)
-            const waitMs = 1000 * Math.min(1 + attempt * 2, 10);
-            // eslint-disable-next-line no-await-in-loop
-            await new Promise((r) => setTimeout(r, waitMs));
-          }
+        const trigger = (reason: string) => {
+          const s = getOfflineStatus();
+          if (!s.enabled || !s.online) return;
+          void runSync({ silent: true, reason });
         };
-        void attemptBootSync();
 
-        const onOnline = () => { if (getOfflineStatus().enabled) void runSync({ silent: true }); };
+        // Boot sync waits for the first idle window so the POS shell paints and
+        // becomes interactive before any network/IndexedDB work starts.
+        void (async () => {
+          await whenIdle(1500);
+          if (!disposed) trigger("boot");
+        })();
+
+        // Reconnect can fire several `online` events (Wi-Fi flap, VPN, captive
+        // portal). Debounce so only one sync pass runs, and never sooner than
+        // 10s after the previous reconnect-triggered pass.
+        let offlineSince: number | null = null;
+        const debouncedReconnectSync = debounceAsync(() => trigger("reconnect"), 2500, 10_000);
+        const onOnline = () => {
+          if (offlineSince !== null) {
+            logPerf("reconnected", { offlineForMs: Math.round(nowMs() - offlineSince) });
+            offlineSince = null;
+          }
+          debouncedReconnectSync();
+        };
+        const onOffline = () => { offlineSince = nowMs(); };
         window.addEventListener("online", onOnline);
-        const interval = window.setInterval(() => {
-          if (getOfflineStatus().enabled && getOfflineStatus().online) void runSync({ silent: true });
-        }, 5 * 60_000);
-        return () => { window.removeEventListener("online", onOnline); window.clearInterval(interval); };
+        window.addEventListener("offline", onOffline);
+
+        const interval = window.setInterval(() => trigger("interval"), 5 * 60_000);
+
+        cleanup = () => {
+          window.removeEventListener("online", onOnline);
+          window.removeEventListener("offline", onOffline);
+          window.clearInterval(interval);
+        };
+        if (disposed) cleanup();
       } catch {/* SSR / unsupported */}
     })();
+
+    return () => { disposed = true; cleanup?.(); };
   }, []);
+
 
 
   return (
