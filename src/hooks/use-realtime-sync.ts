@@ -143,6 +143,16 @@ export function useRealtimeSync() {
       ch.subscribe();
       channel = ch;
     }
+    // Background sync reports the tables it actually refreshed — route them
+    // through the same coalesced flush instead of a blanket invalidateQueries().
+    let unsubSync: (() => void) | undefined;
+    void import("@/lib/offline/sync").then(({ subscribeSyncedTables }) => {
+      unsubSync = subscribeSyncedTables((tables) => {
+        for (const t of tables) dirty.add(t);
+        scheduleFlush();
+      });
+    });
+
     return () => {
       clients.delete(qc);
       subscribers -= 1;
