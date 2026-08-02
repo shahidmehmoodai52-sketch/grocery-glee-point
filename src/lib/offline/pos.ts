@@ -282,7 +282,18 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
   await enqueueWrite({
     op: "rpc",
     table: "complete_sale",
-    payload: { payload: { ...payload, _local_id: localId, _local_invoice_no: invoice_no } },
+    payload: {
+      payload: {
+        ...payload,
+        _local_id: localId,
+        _local_invoice_no: invoice_no,
+        _device_id: device_id,
+        _tenant_id: tenant_id,
+        _user_id: user_id,
+        _created_at: now,
+        _version: 1,
+      },
+    },
   });
 
   return { sale: { ...sale, sale_items }, offline: true };
