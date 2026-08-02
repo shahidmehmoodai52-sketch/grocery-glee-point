@@ -1,6 +1,8 @@
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logPerf, whenIdle } from "@/lib/offline/perf";
+
 
 // Tables → query keys to invalidate when any row changes anywhere in the system.
 const MAP: Record<string, string[][]> = {
