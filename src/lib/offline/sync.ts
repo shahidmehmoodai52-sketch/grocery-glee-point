@@ -12,7 +12,9 @@ import {
   setSyncProgress,
 } from "./status";
 import { getDeviceId } from "./device";
+import { logPerf, nowMs, timed, whenIdle, yieldToUI } from "./perf";
 import { toast } from "sonner";
+
 
 const PULL_TABLES: MirroredTable[] = [
   "products", "product_barcodes", "customers", "suppliers",
