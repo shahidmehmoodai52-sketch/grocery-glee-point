@@ -6,12 +6,12 @@
 //         idempotency keys, bounded retries and progress reporting.
 
 import { supabase } from "@/integrations/supabase/client";
-import { db, MIRRORED_TABLES, type MirroredTable } from "./db";
+import { db, MIRRORED_TABLES, queuePriority, type MirroredTable } from "./db";
 import {
   getOfflineStatus, markSyncStart, markSyncDone, markSyncError, refreshPendingCount,
   setSyncProgress,
 } from "./status";
-import { getDeviceId } from "./device";
+import { getDeviceId, getMeta } from "./device";
 import { logPerf, nowMs, timed, whenIdle, yieldToUI } from "./perf";
 import { toast } from "sonner";
 
@@ -238,6 +238,13 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
     if (flushResult.failed > 0 && !opts.silent) {
       toast.error(`${flushResult.failed} queued action${flushResult.failed > 1 ? "s" : ""} failed to sync — will retry`);
     }
+    if (flushResult.cancelled > 0 && !opts.silent) {
+      toast.error(
+        `${flushResult.cancelled} action${flushResult.cancelled > 1 ? "s" : ""} could not be synced after several retries — open Offline settings to review`,
+      );
+    }
+    // Anything still waiting on a backoff window gets its own timer.
+    void scheduleRetryPass();
 
     // 2. Pull master + transactional data in small idle batches, and only when
     //    the previous pull is old enough (reconnect flapping is a no-op).
@@ -299,30 +306,74 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
 }
 
 
-/** Enqueue a write for later sync. Returns the local queue id. */
+/** Enqueue a write for later sync. Returns the local queue id.
+ *  Idempotent: the same `client_uuid` is never queued twice (the `_queue`
+ *  index is unique on it), so a retried caller cannot create a duplicate
+ *  upload. Every item carries UUID + tenant + device + version + timestamps
+ *  + retry count + status. */
 export async function enqueueWrite(item: {
   op: "insert" | "update" | "delete" | "rpc";
   table: string;
   payload: any;
   client_uuid?: string;
+  tenant_id?: string | null;
+  version?: number;
 }): Promise<number> {
+  const client_uuid =
+    item.client_uuid ??
+    (typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `q-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+  // Duplicate guard — same transaction, same device: reuse the existing row.
+  try {
+    const existing = await db()._queue.where("client_uuid").equals(client_uuid).first();
+    if (existing?.id != null) return existing.id;
+  } catch {/* index unavailable on very old schema — add below */}
+
+  const tenant_id = item.tenant_id ?? (await getMeta<string>("tenant_id"));
   const id = await db()._queue.add({
     op: item.op,
     table: item.table,
     payload: item.payload,
-    client_uuid:
-      item.client_uuid ??
-      (typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `q-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    client_uuid,
     device_id: getDeviceId(),
+    tenant_id: tenant_id ?? null,
+    version: item.version ?? 1,
     local_created_at: new Date().toISOString(),
     attempts: 0,
     last_error: null,
     status: "pending",
+    next_attempt_at: null,
+    priority: queuePriority(item.table),
   });
   await refreshPendingCount();
+  // A write created while online should leave immediately.
+  if (getOfflineStatus().online) void scheduleRetryPass(0);
   return id as number;
+}
+
+/** Timer that resumes the queue when a backoff window elapses. */
+let retryTimer: number | null = null;
+export async function scheduleRetryPass(delayMs?: number): Promise<void> {
+  if (typeof window === "undefined") return;
+  let delay = delayMs;
+  if (delay == null) {
+    try {
+      const items = await db()._queue.where("status").anyOf(["retrying", "failed", "pending"]).toArray();
+      const next = items
+        .map((r) => r.next_attempt_at)
+        .filter((t): t is string => !!t)
+        .sort()[0];
+      if (!next) return;
+      delay = Math.max(1000, new Date(next).getTime() - Date.now());
+    } catch { return; }
+  }
+  if (retryTimer !== null) window.clearTimeout(retryTimer);
+  retryTimer = window.setTimeout(() => {
+    retryTimer = null;
+    void runSync({ silent: true, reason: "retry" });
+  }, Math.min(delay, 5 * 60_000));
 }
 
 /** Wipe local mirror — used on logout or when the active tenant/user changes. */
