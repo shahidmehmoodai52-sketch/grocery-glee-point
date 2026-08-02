@@ -203,6 +203,13 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
       lastPullAt = nowMs();
     }
 
+    // 2b. Master data (categories / units / taxes / shops / users / payment
+    //     methods / barcode + printer settings) into the local repositories.
+    try {
+      const { runMasterSync } = await import("./master-sync");
+      await runMasterSync({ force: !skipPull });
+    } catch {/* master data is best-effort; never fail a sync pass for it */}
+
     await refreshPendingCount();
     markSyncDone();
     logPerf("sync complete", {
