@@ -154,7 +154,9 @@ export function useRealtimeSync() {
     });
 
     return () => {
+      unsubSync?.();
       clients.delete(qc);
+
       subscribers -= 1;
       if (subscribers <= 0) {
         subscribers = 0;
