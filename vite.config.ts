@@ -27,12 +27,13 @@ export default defineConfig({
         injectRegister: null, // registration happens from our guarded wrapper
         filename: "sw.js",
         devOptions: { enabled: false },
-        includeAssets: ["favicon.svg", "favicon.png", "manifest.webmanifest"],
+        includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest"],
         workbox: {
           cleanupOutdatedCaches: true,
           // No navigateFallback: this is an SSR app, so there is no precached
           // index.html to fall back to. Offline navigations are served from the
-          // "html-nav" runtime cache, pre-warmed on first online visit.
+          // "html-nav" runtime cache, pre-warmed on first online visit, and
+          // fall back to the precached /offline.html page as a last resort.
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
           runtimeCaching: [
             {
@@ -43,6 +44,7 @@ export default defineConfig({
                 networkTimeoutSeconds: 3,
                 matchOptions: { ignoreSearch: true },
                 expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
+                precacheFallback: { fallbackURL: "/offline.html" },
               },
             },
             {
