@@ -151,10 +151,25 @@ export interface CompleteSalePayload {
   items: Array<{ product_id: string | null; name: string; qty: number; price: number; cost: number }>;
 }
 
+/** Presentation/audit-only breakdown captured by the POS UI. It is NEVER sent to
+ *  `complete_sale` (the server derives its own totals from the same figures);
+ *  it is only stored on the local record so an offline sale can be audited,
+ *  reprinted and reconciled without the cloud. */
+export interface OfflineSaleMeta {
+  charge?: number;
+  line_discount_total?: number;
+  bill_discount?: number;
+  tax_breakdown?: Array<{ rate: number; amount: number }>;
+  payments?: Array<{ method: string; amount: number }>;
+  tendered?: number;
+  change_due?: number;
+}
+
 /** Online-first sale. When offline, records the sale locally and queues the RPC.
  *  Returns a sale-shaped object matching the cloud response so the UI can print it. */
-export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
+export async function completeSaleOfflineAware(payload: CompleteSalePayload, meta: OfflineSaleMeta = {}) {
   const enabled = getOfflineStatus().enabled;
+
   const offline = isOffline() && enabled;
 
   if (!offline) {
