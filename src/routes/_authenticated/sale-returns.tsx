@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { Receipt, printReceipt } from "@/components/receipt";
-import { offlineFirst } from "@/lib/offline/pos";
+import { offlineFirst, searchProductsLocal } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
 import { completeSaleReturnOfflineAware } from "@/lib/offline/returns";
 
