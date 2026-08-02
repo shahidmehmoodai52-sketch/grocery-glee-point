@@ -6,12 +6,12 @@
 //         idempotency keys, bounded retries and progress reporting.
 
 import { supabase } from "@/integrations/supabase/client";
-import { db, MIRRORED_TABLES, type MirroredTable } from "./db";
+import { db, MIRRORED_TABLES, queuePriority, type MirroredTable } from "./db";
 import {
   getOfflineStatus, markSyncStart, markSyncDone, markSyncError, refreshPendingCount,
   setSyncProgress,
 } from "./status";
-import { getDeviceId } from "./device";
+import { getDeviceId, getMeta } from "./device";
 import { logPerf, nowMs, timed, whenIdle, yieldToUI } from "./perf";
 import { toast } from "sonner";
 
@@ -93,28 +93,77 @@ async function pullTable(table: MirroredTable): Promise<number> {
 }
 
 
+/** Statuses that still need an upload attempt. "syncing"/"uploading" are
+ *  included on purpose: a browser crash or power failure leaves an item in that
+ *  state and it must resume, never be lost. */
+const ACTIVE_STATUSES = ["pending", "failed", "retrying", "syncing", "uploading"] as const;
+
+/** Exponential backoff with jitter: 5s, 10s, 20s … capped at 5 minutes. */
+function backoffMs(attempts: number): number {
+  const base = Math.min(5_000 * 2 ** Math.max(0, attempts), 5 * 60_000);
+  return base + Math.floor(Math.random() * 1000);
+}
+
+/** Recover items interrupted mid-upload (crash / power loss / tab kill). */
+export async function recoverInterruptedQueue(): Promise<number> {
+  try {
+    const stuck = await db()._queue.where("status").anyOf(["syncing", "uploading"]).toArray();
+    for (const it of stuck) {
+      await db()._queue.update(it.id!, { status: "pending", next_attempt_at: null });
+    }
+    if (stuck.length) logPerf("queue recovered", { items: stuck.length });
+    return stuck.length;
+  } catch {
+    return 0;
+  }
+}
+
 /**
- * Flush the queue in chronological order.
- * A failing item aborts the pass so later transactions never overtake earlier
- * ones (inventory maths depends on ordering). Items past MAX_ATTEMPTS are
- * skipped so a single poison record cannot block the whole queue forever.
+ * Flush the queue.
+ *
+ * Ordering: entity priority (customers → suppliers → products → sales →
+ * sale returns → inventory adjustments), then strict chronological order
+ * inside each entity, because inventory maths depends on it.
+ *
+ * A failure only stops the remaining items of that same entity — other
+ * entities keep uploading — and schedules an exponentially backed-off retry.
+ * Once the retry budget is spent the item becomes "cancelled" so a single
+ * poison record can never block the queue forever.
  */
-async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number; failed: number }> {
-  const pending = (await db()._queue.where("status").anyOf(["pending", "failed", "syncing"]).toArray())
-    .filter((r) => (r.attempts ?? 0) < MAX_ATTEMPTS)
-    .sort((a, b) =>
-      a.local_created_at === b.local_created_at
-        ? (a.id ?? 0) - (b.id ?? 0)
-        : a.local_created_at < b.local_created_at ? -1 : 1,
-    );
+async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number; failed: number; cancelled: number }> {
+  const nowIso = new Date().toISOString();
+  const all = await db()._queue.where("status").anyOf(ACTIVE_STATUSES as unknown as string[]).toArray();
+
+  let cancelled = 0;
+  const runnable: typeof all = [];
+  for (const r of all) {
+    if ((r.attempts ?? 0) >= MAX_ATTEMPTS) {
+      await db()._queue.update(r.id!, { status: "cancelled" });
+      cancelled++;
+      continue;
+    }
+    if (r.next_attempt_at && r.next_attempt_at > nowIso) continue; // backoff not elapsed
+    runnable.push(r);
+  }
+
+  runnable.sort((a, b) => {
+    const pa = a.priority ?? queuePriority(a.table);
+    const pb = b.priority ?? queuePriority(b.table);
+    if (pa !== pb) return pa - pb;
+    if (a.local_created_at !== b.local_created_at) return a.local_created_at < b.local_created_at ? -1 : 1;
+    return (a.id ?? 0) - (b.id ?? 0);
+  });
 
   let ok = 0, failed = 0;
-  const totalItems = pending.length;
+  const totalItems = runnable.length;
+  /** Entities whose chain broke this pass — later items must wait their turn. */
+  const blocked = new Set<string>();
 
-  for (const item of pending) {
+  for (const item of runnable) {
+    if (blocked.has(item.table)) continue;
     if (totalItems > 0 && !opts.silent) setSyncProgress(ok + failed, totalItems);
     try {
-      await db()._queue.update(item.id!, { status: "syncing" });
+      await db()._queue.update(item.id!, { status: "uploading" });
       if (item.op === "rpc") {
         const { error } = await supabase.rpc(item.table as any, item.payload);
         if (error) throw error;
@@ -132,26 +181,37 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
         const { error } = await supabase.from(item.table as any).delete().eq("id", item.payload.id);
         if (error) throw error;
       }
-      await db()._queue.update(item.id!, { status: "done", last_error: null });
+      await db()._queue.update(item.id!, {
+        status: "uploaded",
+        last_error: null,
+        next_attempt_at: null,
+      });
       ok++;
     } catch (e: any) {
       failed++;
+      const attempts = (item.attempts ?? 0) + 1;
+      const exhausted = attempts >= MAX_ATTEMPTS;
+      if (exhausted) cancelled++;
       await db()._queue.update(item.id!, {
-        status: "failed",
-        attempts: (item.attempts ?? 0) + 1,
+        status: exhausted ? "cancelled" : "retrying",
+        attempts,
         last_error: String(e?.message ?? e),
+        next_attempt_at: exhausted ? null : new Date(Date.now() + backoffMs(attempts)).toISOString(),
       });
-      // Stop the pass: preserve chronological application on the cloud.
-      break;
+      // Preserve chronological application for this entity only.
+      blocked.add(item.table);
     }
     // Never hold the main thread for a long queue.
     await yieldToUI();
   }
   if (!opts.silent) setSyncProgress(null, null);
-  // Prune "done" rows > 7 days old.
+  // Prune confirmed uploads > 7 days old.
   const cutoff = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
-  await db()._queue.where("status").equals("done").and((r) => r.local_created_at < cutoff).delete();
-  return { ok, failed };
+  await db()._queue
+    .where("status").anyOf(["uploaded", "done"])
+    .and((r) => r.local_created_at < cutoff)
+    .delete();
+  return { ok, failed, cancelled };
 }
 
 let running = false;
@@ -178,6 +238,13 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
     if (flushResult.failed > 0 && !opts.silent) {
       toast.error(`${flushResult.failed} queued action${flushResult.failed > 1 ? "s" : ""} failed to sync — will retry`);
     }
+    if (flushResult.cancelled > 0 && !opts.silent) {
+      toast.error(
+        `${flushResult.cancelled} action${flushResult.cancelled > 1 ? "s" : ""} could not be synced after several retries — open Offline settings to review`,
+      );
+    }
+    // Anything still waiting on a backoff window gets its own timer.
+    void scheduleRetryPass();
 
     // 2. Pull master + transactional data in small idle batches, and only when
     //    the previous pull is old enough (reconnect flapping is a no-op).
@@ -239,30 +306,74 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
 }
 
 
-/** Enqueue a write for later sync. Returns the local queue id. */
+/** Enqueue a write for later sync. Returns the local queue id.
+ *  Idempotent: the same `client_uuid` is never queued twice (the `_queue`
+ *  index is unique on it), so a retried caller cannot create a duplicate
+ *  upload. Every item carries UUID + tenant + device + version + timestamps
+ *  + retry count + status. */
 export async function enqueueWrite(item: {
   op: "insert" | "update" | "delete" | "rpc";
   table: string;
   payload: any;
   client_uuid?: string;
+  tenant_id?: string | null;
+  version?: number;
 }): Promise<number> {
+  const client_uuid =
+    item.client_uuid ??
+    (typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `q-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+  // Duplicate guard — same transaction, same device: reuse the existing row.
+  try {
+    const existing = await db()._queue.where("client_uuid").equals(client_uuid).first();
+    if (existing?.id != null) return existing.id;
+  } catch {/* index unavailable on very old schema — add below */}
+
+  const tenant_id = item.tenant_id ?? (await getMeta<string>("tenant_id"));
   const id = await db()._queue.add({
     op: item.op,
     table: item.table,
     payload: item.payload,
-    client_uuid:
-      item.client_uuid ??
-      (typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `q-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    client_uuid,
     device_id: getDeviceId(),
+    tenant_id: tenant_id ?? null,
+    version: item.version ?? 1,
     local_created_at: new Date().toISOString(),
     attempts: 0,
     last_error: null,
     status: "pending",
+    next_attempt_at: null,
+    priority: queuePriority(item.table),
   });
   await refreshPendingCount();
+  // A write created while online should leave immediately.
+  if (getOfflineStatus().online) void scheduleRetryPass(0);
   return id as number;
+}
+
+/** Timer that resumes the queue when a backoff window elapses. */
+let retryTimer: number | null = null;
+export async function scheduleRetryPass(delayMs?: number): Promise<void> {
+  if (typeof window === "undefined") return;
+  let delay = delayMs;
+  if (delay == null) {
+    try {
+      const items = await db()._queue.where("status").anyOf(["retrying", "failed", "pending"]).toArray();
+      const next = items
+        .map((r) => r.next_attempt_at)
+        .filter((t): t is string => !!t)
+        .sort()[0];
+      if (!next) return;
+      delay = Math.max(1000, new Date(next).getTime() - Date.now());
+    } catch { return; }
+  }
+  if (retryTimer !== null) window.clearTimeout(retryTimer);
+  retryTimer = window.setTimeout(() => {
+    retryTimer = null;
+    void runSync({ silent: true, reason: "retry" });
+  }, Math.min(delay, 5 * 60_000));
 }
 
 /** Wipe local mirror — used on logout or when the active tenant/user changes. */

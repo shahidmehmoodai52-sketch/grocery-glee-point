@@ -153,12 +153,16 @@ function RootComponent() {
     (async () => {
       try {
         const { bootOfflineStatus, getOfflineStatus } = await import("@/lib/offline/status");
-        const { runSync } = await import("@/lib/offline/sync");
+        const { runSync, recoverInterruptedQueue, scheduleRetryPass } = await import("@/lib/offline/sync");
         const { registerAppShellSW } = await import("@/lib/offline/register-sw");
         const { debounceAsync, logPerf, nowMs, whenIdle } = await import("@/lib/offline/perf");
         if (disposed) return;
         bootOfflineStatus();
         void registerAppShellSW();
+        // Resume any upload interrupted by a crash / power failure, then arm
+        // the backoff timer for items still waiting on a retry window.
+        await recoverInterruptedQueue();
+        void scheduleRetryPass();
 
         const trigger = (reason: string) => {
           const s = getOfflineStatus();
@@ -191,9 +195,15 @@ function RootComponent() {
 
         const interval = window.setInterval(() => trigger("interval"), 5 * 60_000);
 
+        // Returning to the tab (or app resume on desktop) is also a good moment
+        // to drain the queue — some platforms never fire an `online` event.
+        const onVisible = () => { if (document.visibilityState === "visible") debouncedReconnectSync(); };
+        document.addEventListener("visibilitychange", onVisible);
+
         cleanup = () => {
           window.removeEventListener("online", onOnline);
           window.removeEventListener("offline", onOffline);
+          document.removeEventListener("visibilitychange", onVisible);
           window.clearInterval(interval);
         };
         if (disposed) cleanup();

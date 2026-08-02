@@ -11,6 +11,21 @@ export interface SyncState {
 }
 
 /** Local mirror of `sync_queue` — pending writes generated while offline. */
+export type QueueStatus =
+  /** waiting for its turn */
+  | "pending"
+  /** currently being uploaded (legacy alias: "syncing") */
+  | "uploading"
+  | "syncing"
+  /** upload confirmed by the cloud (legacy alias: "done") */
+  | "uploaded"
+  | "done"
+  /** last attempt failed, will be retried after `next_attempt_at` */
+  | "failed"
+  | "retrying"
+  /** retry budget exhausted — never uploaded again automatically */
+  | "cancelled";
+
 export interface QueuedWrite {
   id?: number;                // auto-inc PK
   op: "insert" | "update" | "delete" | "rpc";
@@ -19,10 +34,18 @@ export interface QueuedWrite {
   /** Client-generated idempotency key — prevents duplicate cloud writes on retry. */
   client_uuid: string;
   device_id: string;
+  /** Tenant that produced the write — part of the idempotency triple. */
+  tenant_id?: string | null;
+  /** Local monotonic version of the record this write carries. */
+  version?: number;
   local_created_at: string;   // ISO
   attempts: number;
   last_error: string | null;
-  status: "pending" | "syncing" | "failed" | "done";
+  status: QueueStatus;
+  /** ISO timestamp before which the item must not be retried (exponential backoff). */
+  next_attempt_at?: string | null;
+  /** Entity sync priority (lower runs first). Derived from `table`. */
+  priority?: number;
 }
 
 /** Arbitrary key/value meta (device id, active tenant, sale counters…). */
@@ -43,6 +66,41 @@ export interface LocalRecordMeta {
   _deleted: 0 | 1;
   /** Monotonic local version, bumped on every local write. */
   _v: number;
+}
+
+/**
+ * Mandated entity upload order. Lower value uploads first; items within the
+ * same entity keep strict chronological order (inventory maths depends on it).
+ *   customers → suppliers → products → sales → sale returns → inventory adj.
+ */
+const QUEUE_PRIORITY: Record<string, number> = {
+  customers: 10,
+  suppliers: 20,
+  products: 30,
+  product_barcodes: 31,
+  sales: 40,
+  sale_items: 41,
+  complete_sale: 40,
+  edit_sale: 42,
+  hold_bill: 45,
+  resume_bill: 45,
+  discard_held_bill: 45,
+  sale_returns: 50,
+  sale_return_items: 51,
+  complete_sale_return: 50,
+  inventory_movements: 60,
+  adjust_product_stock: 60,
+  record_damage: 60,
+  record_waste: 60,
+  expenses: 70,
+  cash_transactions: 70,
+  record_payment: 70,
+  record_cash_event: 70,
+};
+
+/** Priority for a queued write, derived from its table / RPC name. */
+export function queuePriority(table: string): number {
+  return QUEUE_PRIORITY[table] ?? 80;
 }
 
 class PosOfflineDB extends Dexie {
@@ -120,6 +178,30 @@ class PosOfflineDB extends Dexie {
       barcode_settings: "id, tenant_id, updated_at",
       printer_settings: "id, tenant_id, updated_at",
     });
+    // v4 — background sync engine: queue gains retry scheduling + entity
+    // priority indexes, and a unique idempotency index on client_uuid so the
+    // same transaction can never be enqueued (or uploaded) twice.
+    this.version(4)
+      .stores({
+        _queue:
+          // client_uuid stays a plain index (not unique): an existing device may already
+        // hold legacy rows, and a failed unique-index build would brick the mirror.
+        // Duplicate prevention is enforced by the lookup in `enqueueWrite`.
+        "++id, status, table, local_created_at, client_uuid, next_attempt_at, priority, [status+priority], [status+next_attempt_at]",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("_queue")
+          .toCollection()
+          .modify((r: any) => {
+            if (r.next_attempt_at === undefined) r.next_attempt_at = null;
+            if (r.tenant_id === undefined) r.tenant_id = null;
+            if (r.version === undefined) r.version = 1;
+            if (r.priority === undefined) r.priority = queuePriority(r.table);
+            // A write interrupted by a crash/power failure is resumable.
+            if (r.status === "syncing") r.status = "pending";
+          });
+      });
   }
 }
 

@@ -195,6 +195,8 @@ export async function completeSaleReturnOfflineAware(
     op: "rpc",
     table: "complete_sale_return",
     client_uuid: clientUuid,
+    tenant_id: tenant_id,
+    version: 1,
     payload: {
       payload: {
         ...payload,
