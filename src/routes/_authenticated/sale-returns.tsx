@@ -44,6 +44,7 @@ function Page() {
   const [note, setNote] = useState("");
   const [viewing, setViewing] = useState<any>(null);
 
+  const today = new Date().toISOString().slice(0, 10);
   const { data: returns = [] } = useQuery({
     queryKey: ["sale-returns"],
     queryFn: async () =>
@@ -54,6 +55,7 @@ function Page() {
     queryFn: async () =>
       (await supabase.from("sales").select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
   });
+  const [date, setDate] = useState(today);
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
     queryFn: async () => (await supabase.from("customers").select("id,name").order("name")).data ?? [],
@@ -106,7 +108,7 @@ function Page() {
 
   const reset = () => {
     setOpen(false); setItems([]); setSaleId("none"); setInvoiceSearch(""); setCustomer("none");
-    setTax(0); setRefund(0); setMethod("cash"); setNote("");
+    setTax(0); setRefund(0); setMethod("cash"); setNote(""); setDate(today);
   };
 
   const submit = async () => {
@@ -123,6 +125,7 @@ function Page() {
         sale_id: saleId === "none" ? null : saleId,
         customer_id: customer === "none" ? null : customer,
         tax, refund_amount: refund, refund_method: method, note,
+        created_at: date || undefined,
         items: picked.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
       },
     });
@@ -213,7 +216,17 @@ function Page() {
               </div>
 
               {/* Step 2: pick items */}
-              <div className="border rounded-md">
+              <div className="border rounded-md p-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Date</Label>
+                    <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9" />
+                  </div>
+                  <div>
+                    <Label>Note</Label>
+                    <Input value={note} onChange={(e) => setNote(e.target.value)} />
+                  </div>
+                </div>
                 <Table>
                   <TableHeader><TableRow>
                     <TableHead className="w-10"></TableHead>

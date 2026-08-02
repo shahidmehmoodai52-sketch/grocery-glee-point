@@ -300,8 +300,8 @@ BEGIN
   v_total := v_subtotal + v_tax;
   IF v_refund > v_total THEN RAISE EXCEPTION 'Refund exceeds return total'; END IF;
 
-  INSERT INTO public.sale_returns (tenant_id, sale_id, customer_id, user_id, subtotal, tax, total, refund_amount, refund_method, note)
-  VALUES (v_tenant, v_sale, v_customer, v_uid, v_subtotal, v_tax, v_total, v_refund, v_method, payload->>'note')
+  INSERT INTO public.sale_returns (tenant_id, sale_id, customer_id, user_id, subtotal, tax, total, refund_amount, refund_method, note, created_at)
+  VALUES (v_tenant, v_sale, v_customer, v_uid, v_subtotal, v_tax, v_total, v_refund, v_method, payload->>'note', COALESCE(NULLIF(payload->>'created_at','')::timestamptz, now()))
   RETURNING id INTO v_id;
 
   FOR v_item IN SELECT * FROM jsonb_array_elements(payload->'items') LOOP

@@ -33,9 +33,10 @@ type Draft = {
   discountMode: "amt" | "pct";
   paid: number;
   note: string;
+  date: string;
   paySource?: string;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", paySource: "" };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", date: new Date().toISOString().slice(0,10), paySource: "" };
 
 // Presets offered when the shop hasn't created these heads in Cash Flow yet.
 // Selecting one creates the matching cash account so purchase payments always
@@ -125,14 +126,16 @@ function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
+  const today = new Date().toISOString().slice(0,10);
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
-  const { open, supplier, lines, tax, paid, note } = draft;
+  const { open, supplier, lines, tax, paid, note, date } = draft;
   const taxMode: "amt" | "pct" = draft.taxMode ?? "amt";
   const billDiscount = Number(draft.discount ?? 0);
   const discountMode: "amt" | "pct" = draft.discountMode ?? "amt";
   const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
+  const setDate = (v: string) => setDraft((d) => ({ ...d, date: v }));
   const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
     setDraft((d) => ({ ...d, lines: typeof updater === "function" ? (updater as any)(d.lines) : updater }));
   const setTax = (v: number) => setDraft((d) => ({ ...d, tax: v }));
@@ -453,6 +456,7 @@ function Page() {
         tax: taxAmt, paid, note,
         payment_method: account.name,
         account_id: account.id ?? undefined,
+        created_at: date || undefined,
 
         items: items.map((l) => {
           const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
@@ -572,6 +576,15 @@ function Page() {
                     <option value="none">— None —</option>
                     {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
+                </div>
+                <div className="w-[180px] shrink-0">
+                  <Label className="text-xs">Purchase date</Label>
+                  <Input
+                    type="date"
+                    value={date || today}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="h-9"
+                  />
                 </div>
               </div>
             </div>

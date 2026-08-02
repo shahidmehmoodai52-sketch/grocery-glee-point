@@ -61,8 +61,8 @@ BEGIN
   END LOOP;
   v_total := v_subtotal + v_tax;
 
-  INSERT INTO public.purchases (tenant_id, supplier_id, user_id, subtotal, tax, total, paid, note, payment_method, account_id)
-  VALUES (v_tenant, v_supplier, v_uid, v_subtotal, v_tax, v_total, v_paid, payload->>'note', v_method, v_account)
+  INSERT INTO public.purchases (tenant_id, supplier_id, user_id, subtotal, tax, total, paid, note, payment_method, account_id, created_at)
+  VALUES (v_tenant, v_supplier, v_uid, v_subtotal, v_tax, v_total, v_paid, payload->>'note', v_method, v_account, COALESCE(NULLIF(payload->>'created_at','')::timestamptz, now()))
   RETURNING id INTO v_id;
 
   FOR v_item IN SELECT * FROM jsonb_array_elements(payload->'items') LOOP
