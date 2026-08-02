@@ -889,6 +889,14 @@ function POSPage() {
     try {
       // ---- Edit existing invoice path ----
       if (tab.editing_sale_id) {
+        // Editing an existing invoice re-runs server-side stock/ledger reversal,
+        // so it stays online-only. Fail with a clear message instead of a
+        // raw network error, and keep the tab intact so nothing is lost.
+        if (isOfflineNow()) {
+          toast.error("Editing an invoice needs internet. The bill is kept open — retry once you're back online.");
+          return;
+        }
+
         const items = tab.items.map((i) => ({
           product_id: i.product_id,
           name: i.name,
