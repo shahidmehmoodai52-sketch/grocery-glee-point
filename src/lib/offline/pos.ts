@@ -125,16 +125,19 @@ export async function cacheProductBarcodes(rows: any[]) {
   await db().product_barcodes.bulkPut(withKey);
 }
 
-/** Local-generated invoice numbers use OFF-<epoch>-<counter> prefix so they
- *  never collide with server numbers. Server assigns the final number on sync. */
+/** Local-generated invoice numbers use OFF-<device>-<epoch>-<counter> so they
+ *  never collide with server numbers, nor with another terminal's offline
+ *  numbers for the same tenant. Server assigns the final number on sync. */
 function nextLocalInvoiceNo(): string {
   const key = "pos_local_invoice_counter";
   let n = 0;
   try { n = Number(window.localStorage.getItem(key) ?? "0") || 0; } catch {}
   n += 1;
   try { window.localStorage.setItem(key, String(n)); } catch {}
-  return `OFF-${Date.now().toString(36).toUpperCase()}-${n}`;
+  const dev = getDeviceId().replace(/-/g, "").slice(0, 4).toUpperCase();
+  return `OFF-${dev}-${Date.now().toString(36).toUpperCase()}-${n}`;
 }
+
 
 export interface CompleteSalePayload {
   customer_id: string | null;
