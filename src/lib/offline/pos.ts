@@ -312,6 +312,11 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload, met
   await enqueueWrite({
     op: "rpc",
     table: "complete_sale",
+    // The local sale id is the idempotency key: replaying this sale can never
+    // enqueue (or upload) it twice.
+    client_uuid: localId,
+    tenant_id: tenant_id,
+    version: 1,
     payload: {
       payload: {
         ...payload,
