@@ -206,9 +206,19 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
     } catch {/* ignore */}
   }
 
+  // Transaction identity — every offline sale carries tenant/device/user +
+  // sync status + version so it can be reconciled safely later.
+  const device_id = getDeviceId();
+  const tenant_id = (await getMeta<string>("tenant_id")) ?? null;
+  const user_id = (await getMeta<string>("user_id")) ?? null;
+
   const sale: any = {
     id: localId,
     invoice_no,
+    tenant_id,
+    device_id,
+    user_id,
+    created_by: user_id,
     customer_id: payload.customer_id,
     expense_person_id: payload.expense_person_id,
     payment_method: payload.payment_method,
@@ -223,32 +233,50 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload) {
     created_at: now,
     updated_at: now,
     _offline_pending: true, // marker so the UI can badge it
+    _sync: "pending",
+    sync_status: "pending",
+    _v: 1,
+    version: 1,
+    _deleted: 0,
     customers: customerName ? { name: customerName, phone: null } : null,
   };
 
   const sale_items = payload.items.map((i, idx) => ({
     id: `${localId}:${idx}`,
     sale_id: localId,
+    tenant_id,
     product_id: i.product_id,
     name: i.name,
     qty: i.qty,
     price: i.price,
     cost: i.cost,
+    _sync: "pending",
+    _v: 1,
+    _deleted: 0,
   }));
 
   await db().sales.put(sale);
   await db().sale_items.bulkPut(sale_items);
 
-  // Optimistic local stock decrement.
-  for (const it of payload.items) {
-    if (!it.product_id) continue;
-    try {
-      const p = await db().products.get(it.product_id);
-      if (p && typeof p.stock_qty === "number") {
-        await db().products.put({ ...p, stock_qty: +(p.stock_qty - it.qty).toFixed(3) });
+  // Optimistic local stock decrement (kept in one transaction so a crash
+  // mid-loop can't leave stock half-deducted).
+  try {
+    await db().transaction("rw", db().products, async () => {
+      for (const it of payload.items) {
+        if (!it.product_id) continue;
+        const p = await db().products.get(it.product_id);
+        if (p && typeof p.stock_qty === "number") {
+          await db().products.put({
+            ...p,
+            stock_qty: +(p.stock_qty - it.qty).toFixed(3),
+            _sync: "pending",
+            _v: (Number(p._v ?? 0) || 0) + 1,
+          });
+        }
       }
-    } catch {/* ignore */}
-  }
+    });
+  } catch {/* ignore */}
+
 
   // Enqueue the RPC so the sync engine can replay it against the cloud.
   await enqueueWrite({
