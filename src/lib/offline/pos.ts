@@ -7,6 +7,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { db } from "./db";
+import { getDeviceId, getMeta } from "./device";
 import { getOfflineStatus } from "./status";
 import { enqueueWrite } from "./sync";
 
