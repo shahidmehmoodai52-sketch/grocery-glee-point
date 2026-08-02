@@ -31,6 +31,20 @@ export interface MetaRow {
   value: any;
 }
 
+/** Envelope fields every mirrored record carries (added on write by `record.ts`). */
+export interface LocalRecordMeta {
+  id: string;
+  tenant_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  /** "synced" = came from cloud, "pending" = local write awaiting push, "conflict" = push failed. */
+  _sync: "synced" | "pending" | "conflict";
+  /** Soft delete — repositories filter these out of reads. */
+  _deleted: 0 | 1;
+  /** Monotonic local version, bumped on every local write. */
+  _v: number;
+}
+
 class PosOfflineDB extends Dexie {
   products!: Table<any, string>;
   product_barcodes!: Table<any, string>;
@@ -47,6 +61,15 @@ class PosOfflineDB extends Dexie {
   cash_accounts!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
+  // v3 master-data tables
+  categories!: Table<any, string>;
+  units!: Table<any, string>;
+  taxes!: Table<any, string>;
+  shops!: Table<any, string>;
+  users!: Table<any, string>;
+  payment_methods!: Table<any, string>;
+  barcode_settings!: Table<any, string>;
+  printer_settings!: Table<any, string>;
   _sync_state!: Table<SyncState, string>;
   _queue!: Table<QueuedWrite, number>;
   _meta!: Table<MetaRow, string>;
@@ -79,6 +102,24 @@ class PosOfflineDB extends Dexie {
       _meta: "key",
       _queue: "++id, status, table, local_created_at, client_uuid",
     });
+    // v3 — master-data tables for the local data layer, plus envelope indexes
+    // (_sync / _deleted / tenant_id) so repositories can filter without scans.
+    // Existing indexes are preserved; only new ones are appended.
+    this.version(3).stores({
+      products:
+        "id, name, barcode, sku, item_code, category, updated_at, _sync, _deleted, tenant_id, [tenant_id+_deleted], [_deleted+name]",
+      product_barcodes: "id, product_id, barcode, updated_at, _deleted, [product_id+barcode]",
+      customers: "id, name, phone, updated_at, _sync, _deleted, tenant_id, [_deleted+name]",
+      suppliers: "id, name, phone, updated_at, _sync, _deleted, tenant_id, [_deleted+name]",
+      categories: "id, name, tenant_id, _sync, _deleted, updated_at",
+      units: "id, name, code, tenant_id, _sync, _deleted, updated_at",
+      taxes: "id, name, rate, tenant_id, _sync, _deleted, updated_at",
+      shops: "id, name, code, _sync, _deleted, updated_at",
+      users: "id, user_id, email, role, tenant_id, _sync, _deleted, updated_at",
+      payment_methods: "id, name, slug, tenant_id, _sync, _deleted, updated_at",
+      barcode_settings: "id, tenant_id, updated_at",
+      printer_settings: "id, tenant_id, updated_at",
+    });
   }
 }
 
@@ -93,10 +134,18 @@ export function db(): PosOfflineDB {
   return _db;
 }
 
+/** Master-data tables — small, fully replaced on each sync pass. */
+export const MASTER_TABLES = [
+  "categories", "units", "taxes", "shops", "users",
+  "payment_methods", "barcode_settings", "printer_settings",
+] as const;
+export type MasterTable = typeof MASTER_TABLES[number];
+
 export const MIRRORED_TABLES = [
   "products", "product_barcodes", "customers", "suppliers",
   "sales", "sale_items", "sale_returns", "sale_return_items",
   "purchases", "purchase_items", "expenses", "held_bills",
   "cash_accounts", "store_settings", "user_roles",
+  ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];
