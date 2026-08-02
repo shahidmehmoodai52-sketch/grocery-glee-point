@@ -69,7 +69,11 @@ export function markSyncError(msg: string) {
 }
 export async function refreshPendingCount() {
   try {
-    const n = await db()._queue.where("status").anyOf(["pending", "failed"]).count();
+    // Everything not yet confirmed by the cloud counts as pending work.
+    const n = await db()._queue
+      .where("status")
+      .anyOf(["pending", "failed", "retrying", "uploading", "syncing"])
+      .count();
     state = { ...state, pending: n };
     emit();
   } catch {/* SSR / unsupported */}
