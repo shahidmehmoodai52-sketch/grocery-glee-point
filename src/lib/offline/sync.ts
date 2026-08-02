@@ -46,6 +46,14 @@ const FULL_PULL = new Set<string>([
   "sale_items", "sale_return_items", "purchase_items",
 ]);
 
+/** Notified with the set of tables whose local mirror actually changed. */
+type ChangedListener = (tables: string[]) => void;
+const changedListeners = new Set<ChangedListener>();
+export function subscribeSyncedTables(l: ChangedListener) {
+  changedListeners.add(l);
+  return () => { changedListeners.delete(l); };
+}
+
 async function pullTable(table: MirroredTable): Promise<number> {
   const since = await getWatermark(table);
   const full = FULL_PULL.has(table);
@@ -76,11 +84,14 @@ async function pullTable(table: MirroredTable): Promise<number> {
       if (pageMax && (!maxTs || pageMax > maxTs)) maxTs = pageMax;
     }
     if (data.length < PAGE) break;
+    // Give the main thread back between pages so scanning/checkout stay instant.
+    await yieldToUI();
   }
 
   if (maxTs) await setWatermark(table, maxTs);
   return total;
 }
+
 
 /**
  * Flush the queue in chronological order.
