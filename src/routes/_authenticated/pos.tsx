@@ -921,7 +921,11 @@ function POSPage() {
         const { error } = await supabase.rpc("edit_sale", {
           _sale_id: tab.editing_sale_id,
           _items: items as any,
-        });
+          // Header figures the cashier just corrected (paid amount, discount, tax).
+          _paid: +Math.min(paidNum, total).toFixed(2),
+          _discount: +(lineDiscountTotal + discount - charge).toFixed(2),
+          _tax: +Number(tax || 0).toFixed(2),
+        } as any);
         if (error) throw error;
         // Also update lightweight header fields (customer / payment / note)
         // that the RPC does not touch, so the cashier's edits stick.
