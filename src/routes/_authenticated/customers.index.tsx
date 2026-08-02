@@ -81,11 +81,14 @@ function Page() {
 
   const { data: rows = [] } = useQuery({
     queryKey: ["customers"],
-    queryFn: async () => offlineFirst<any[]>(
-      async () => (await supabase.from("customers").select("*").order("name")).data ?? [],
-      async () => (await db().customers.orderBy("name").toArray()) as any[],
-      cacheCustomers,
-    ),
+    // Local-first on cold start (instant paint), cloud on every later refetch.
+    queryFn: async () => readLocalFirst<any[]>({
+      table: "customers",
+      cloud: async () => (await supabase.from("customers").select("*").order("name")).data ?? [],
+      local: async () => (await db().customers.orderBy("name").toArray()) as any[],
+      cache: cacheCustomers,
+      onRevalidated: (fresh) => qc.setQueryData(["customers"], fresh),
+    }),
   });
 
   const { data: cashAccounts = [] } = useQuery({
