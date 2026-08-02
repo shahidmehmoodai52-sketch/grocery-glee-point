@@ -184,7 +184,10 @@ class PosOfflineDB extends Dexie {
     this.version(4)
       .stores({
         _queue:
-          "++id, status, table, local_created_at, &client_uuid, next_attempt_at, priority, [status+priority], [status+next_attempt_at]",
+          // client_uuid stays a plain index (not unique): an existing device may already
+        // hold legacy rows, and a failed unique-index build would brick the mirror.
+        // Duplicate prevention is enforced by the lookup in `enqueueWrite`.
+        "++id, status, table, local_created_at, client_uuid, next_attempt_at, priority, [status+priority], [status+next_attempt_at]",
       })
       .upgrade(async (tx) => {
         await tx
