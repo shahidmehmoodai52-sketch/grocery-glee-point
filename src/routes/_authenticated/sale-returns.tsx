@@ -295,7 +295,46 @@ function Page() {
                 )}
               </div>
 
-              {/* Step 2: pick items */}
+              {/* Step 2: search a product and add it item-wise */}
+              <div>
+                <Label>Search item to return</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && productResults.length) {
+                        e.preventDefault();
+                        addProduct(productResults[0]);
+                      }
+                    }}
+                    placeholder="Item name, code or barcode…"
+                    className="pl-8"
+                  />
+                </div>
+                {productSearch.trim() !== "" && (
+                  <div className="mt-2 max-h-44 overflow-y-auto border rounded-md">
+                    {productResults.map((p: any) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => addProduct(p)}
+                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex justify-between gap-2"
+                      >
+                        <span className="truncate">{p.name}</span>
+                        <span className="text-xs text-muted-foreground font-mono shrink-0">{p.sku ?? p.barcode ?? ""}</span>
+                        <span className="shrink-0">{fmtMoney(p.sell_price ?? 0, sym)}</span>
+                      </button>
+                    ))}
+                    {productResults.length === 0 && (
+                      <div className="text-center text-xs text-muted-foreground py-3">No items found</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 3: pick items */}
               <div className="border rounded-md">
                 <Table>
                   <TableHeader><TableRow>
