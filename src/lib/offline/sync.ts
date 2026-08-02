@@ -191,6 +191,12 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
           try {
             const n = await timed(`sync:pull:${t}`, () => pullTable(t));
             if (n > 0) changed.push(t);
+            // Mark the local snapshot fresh so the smart data-access layer can
+            // serve it on the next cold start without an extra cloud round trip.
+            try {
+              const { stampFresh } = await import("./data-access");
+              await stampFresh(t);
+            } catch {/* freshness stamping is best effort */}
           } catch (e: any) {
             await db()._sync_state.put({
               table: t, last_pulled_at: (await getWatermark(t)),
