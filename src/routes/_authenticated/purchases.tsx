@@ -150,8 +150,14 @@ function Page() {
 
 
   const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState<"today" | "yesterday" | "week" | "month" | "custom">("today");
+  const [filterFrom, setFilterFrom] = useState(today);
+  const [filterTo, setFilterTo] = useState(today);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [entrySearch, setEntrySearch] = useState("");
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
@@ -218,6 +224,17 @@ function Page() {
     const rows = (data ?? []).map((r: any) => ({ ...r, qty: Number(r.qty), cost: Number(r.cost) }));
     setEditItems(rows);
     setEditItemsOriginal(rows.map((r) => ({ ...r })));
+  };
+
+  const handleDeletePurchase = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { error } = await supabase.from("purchases").delete().eq("id", deleteTarget.id);
+    setDeleting(false);
+    if (error) return toast.error(error.message);
+    toast.success("Purchase deleted");
+    setDeleteTarget(null);
+    qc.invalidateQueries({ queryKey: ["purchases"] });
   };
   const searchRef = useRef<HTMLInputElement>(null);
   const focusCell = (kind: "cost" | "qty", i: number) => {
@@ -402,6 +419,70 @@ function Page() {
     ),
   });
 
+  const formatLocalDate = (value: Date) => {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
+  const getPresetRange = (preset: typeof dateFilter) => {
+    const now = new Date();
+    const todayKey = formatLocalDate(now);
+    if (preset === "yesterday") {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 1);
+      const key = formatLocalDate(d);
+      return { from: key, to: key };
+    }
+    if (preset === "week") {
+      const d = new Date(now);
+      const day = d.getDay();
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - ((day + 6) % 7));
+      return { from: formatLocalDate(monday), to: todayKey };
+    }
+    if (preset === "month") {
+      const d = new Date(now);
+      const first = new Date(d.getFullYear(), d.getMonth(), 1);
+      return { from: formatLocalDate(first), to: todayKey };
+    }
+    return { from: todayKey, to: todayKey };
+  };
+
+  useEffect(() => {
+    if (dateFilter !== "custom") {
+      const range = getPresetRange(dateFilter);
+      setFilterFrom(range.from);
+      setFilterTo(range.to);
+    }
+  }, [dateFilter]);
+
+  const filteredPurchases = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (purchases as any[])
+      .filter((p) => {
+        const createdAt = formatLocalDate(new Date(p.created_at));
+        if (createdAt < filterFrom || createdAt > filterTo) return false;
+        if (!query) return true;
+        return (
+          (p.invoice_no ?? "").toLowerCase().includes(query) ||
+          (p.suppliers?.name ?? "").toLowerCase().includes(query) ||
+          (p.note ?? "").toLowerCase().includes(query)
+        );
+      });
+  }, [purchases, search, filterFrom, filterTo]);
+
+  const filteredTotals = useMemo(() => {
+    const todayKey = formatLocalDate(new Date());
+    return {
+      totalAmount: filteredPurchases.reduce((sum, p) => sum + Number(p.total || 0), 0),
+      todayAmount: filteredPurchases.reduce(
+        (sum, p) => sum + (formatLocalDate(new Date(p.created_at)) === todayKey ? Number(p.total || 0) : 0),
+        0,
+      ),
+    };
+  }, [filteredPurchases]);
 
   const discountTotal = lines.reduce((s, l) => s + Number(l.discount || 0), 0);
   const subtotal = lines.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
@@ -438,18 +519,24 @@ function Page() {
   };
 
   const submit = async () => {
+    if (savingRef.current) return;
     if (!supplier || supplier === "none") return toast.error("Supplier is required");
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
     const sub = items.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
+    savingRef.current = true;
     setSaving(true);
     let account: { id: string | null; name: string };
     try {
       account = await resolvePayAccount();
     } catch (e: any) {
       setSaving(false);
+      savingRef.current = false;
       return toast.error(e?.message ?? "Could not resolve payment account");
     }
+    const clientUuid = typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier && supplier !== "none" ? supplier : null,
@@ -457,7 +544,7 @@ function Page() {
         payment_method: account.name,
         account_id: account.id ?? undefined,
         created_at: date || undefined,
-
+        client_uuid: clientUuid,
         items: items.map((l) => {
           const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
           const taxShare = sub > 0 ? taxAmt * (lineNet / sub) : 0;
@@ -465,10 +552,10 @@ function Page() {
           const effCost = l.qty > 0 ? Math.max(0, lineNet + taxShare - discShare) / l.qty : l.cost;
           return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
         }),
-
       },
     });
     setSaving(false);
+    savingRef.current = false;
     if (error) return toast.error(error.message);
     toast.success("Purchase recorded, stock updated");
     setConfirmOpen(false);
@@ -892,6 +979,20 @@ function Page() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={!!deleteTarget} onOpenChange={(v) => { if (!deleting && !v) setDeleteTarget(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Delete purchase</DialogTitle></DialogHeader>
+            <div className="space-y-2 text-sm">
+              <p>Delete purchase <b>{deleteTarget?.invoice_no ?? ""}</b>?</p>
+              <p className="text-muted-foreground">This will delete the purchase and its related items permanently.</p>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="destructive" onClick={handleDeletePurchase} disabled={deleting}>{deleting ? "Deleting…" : "Delete purchase"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={newProdOpen} onOpenChange={(v) => { if (!newProdSaving) setNewProdOpen(v); }}>
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>Add new product</DialogTitle></DialogHeader>
@@ -1128,6 +1229,48 @@ function Page() {
 
       </div>
 
+      <div className="grid gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Card className="p-4">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Total purchases</div>
+            <div className="mt-2 text-2xl font-semibold">{filteredPurchases.length}</div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Filtered amount</div>
+            <div className="mt-2 text-2xl font-semibold">{fmtMoney(filteredTotals.totalAmount, sym)}</div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Today's purchase amount</div>
+            <div className="mt-2 text-2xl font-semibold">{fmtMoney(filteredTotals.todayAmount, sym)}</div>
+          </Card>
+        </div>
+        <Card className="p-4">
+          <div className="grid gap-3 md:grid-cols-[220px_1fr_1fr] items-end">
+            <div>
+              <Label className="text-xs">Date filter</Label>
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="yesterday">Yesterday</SelectItem>
+                  <SelectItem value="week">This week</SelectItem>
+                  <SelectItem value="month">This month</SelectItem>
+                  <SelectItem value="custom">Custom range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">From</Label>
+              <Input type="date" value={filterFrom} onChange={(e) => { setDateFilter("custom"); setFilterFrom(e.target.value); }} className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">To</Label>
+              <Input type="date" value={filterTo} onChange={(e) => { setDateFilter("custom"); setFilterTo(e.target.value); }} className="h-9" />
+            </div>
+          </div>
+        </Card>
+      </div>
+
       <Card className="p-3 space-y-3">
         <div className="relative max-w-sm">
           <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -1138,23 +1281,14 @@ function Page() {
             className="pl-8 h-9"
           />
         </div>
-        {(() => {
-          const q = search.trim().toLowerCase();
-          const filtered = q
-            ? (purchases as any[]).filter((p) =>
-                (p.invoice_no ?? "").toLowerCase().includes(q) ||
-                (p.suppliers?.name ?? "").toLowerCase().includes(q) ||
-                (p.note ?? "").toLowerCase().includes(q))
-            : (purchases as any[]);
-          return (
         <Table>
           <TableHeader><TableRow>
             <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
-            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead><TableHead className="w-16 text-right">Edit</TableHead>
+            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead><TableHead className="w-24 text-right">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{q ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
-            {filtered.map((p: any) => (
+            {filteredPurchases.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{search.trim() ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
+            {filteredPurchases.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
                 <TableCell className="text-sm">{new Date(p.created_at).toLocaleString()}</TableCell>
@@ -1162,16 +1296,19 @@ function Page() {
                 <TableCell className="text-right font-medium">{fmtMoney(p.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-1">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
                     <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(p)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </TableCell>
               </TableRow>
             ))}
-            {filtered.length > 0 && (() => {
-              const allTotal = filtered.reduce((s: number, p: any) => s + Number(p.total), 0);
-              const allPaid = filtered.reduce((s: number, p: any) => s + Number(p.paid), 0);
+            {filteredPurchases.length > 0 && (() => {
+              const allTotal = filteredPurchases.reduce((s: number, p: any) => s + Number(p.total), 0);
+              const allPaid = filteredPurchases.reduce((s: number, p: any) => s + Number(p.paid), 0);
               const due = allTotal - allPaid;
               return (
                 <>
@@ -1191,19 +1328,10 @@ function Page() {
             })()}
           </TableBody>
         </Table>
-          );
-        })()}
-        {(() => {
-          const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
-          const todayTotal = (purchases as any[]).filter((p) => new Date(p.created_at) >= startOfToday).reduce((s, p) => s + Number(p.total), 0);
-          const todayPaid = (purchases as any[]).filter((p) => new Date(p.created_at) >= startOfToday).reduce((s, p) => s + Number(p.paid), 0);
-          return (
-            <div className="flex flex-wrap gap-6 justify-end border-t mt-2 pt-3 px-2 text-sm">
-              <div><span className="text-muted-foreground">Today's purchases: </span><span className="font-semibold text-primary">{fmtMoney(todayTotal, sym)}</span></div>
-              <div><span className="text-muted-foreground">Today's paid: </span><span className="font-semibold">{fmtMoney(todayPaid, sym)}</span></div>
-            </div>
-          );
-        })()}
+        <div className="flex flex-wrap gap-6 justify-end border-t mt-2 pt-3 px-2 text-sm">
+          <div><span className="text-muted-foreground">Filtered total: </span><span className="font-semibold text-primary">{fmtMoney(filteredTotals.totalAmount, sym)}</span></div>
+          <div><span className="text-muted-foreground">Today's filtered total: </span><span className="font-semibold">{fmtMoney(filteredTotals.todayAmount, sym)}</span></div>
+        </div>
       </Card>
     </div>
   );
