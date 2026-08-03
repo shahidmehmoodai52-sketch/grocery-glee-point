@@ -53,15 +53,31 @@ const emitValue = (
   } as unknown as React.ChangeEvent<HTMLInputElement>);
 };
 
+/** Group the integer part with commas while preserving what the user is typing
+ *  (e.g. "1234." -> "1,234.", "1234.50" -> "1,234.50"). */
+export const groupDigits = (raw: string): string => {
+  if (raw === "" || raw === "-") return raw;
+  const negative = raw.startsWith("-");
+  const body = negative ? raw.slice(1) : raw;
+  const [intPart = "", ...rest] = body.split(".");
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const hasDot = body.includes(".");
+  const frac = rest.join("");
+  return `${negative ? "-" : ""}${grouped}${hasDot ? `.${frac}` : ""}`;
+};
+
+const stripGrouping = (raw: string) => raw.replace(/,/g, "");
+const isPartialNumber = (raw: string) => /^-?\d*\.?\d*$/.test(raw);
+
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, onBlur, onKeyDown, onChange, inputMode, value, ...props }, ref) => {
     const isNumeric = type === "number";
-    // While the user types a formula (e.g. "10+10"), keep the raw text locally so the
-    // controlled numeric value doesn't wipe it out.
+    // While the user types a formula (e.g. "10+10") or a partial decimal ("12."),
+    // keep the raw text locally so the controlled numeric value doesn't wipe it out.
     const [draft, setDraft] = React.useState<string | null>(null);
 
     const commit = (el: HTMLInputElement) => {
-      const raw = draft ?? el.value;
+      const raw = stripGrouping(draft ?? el.value);
       const evaluated = evaluateCalculatorExpression(raw);
       if (evaluated !== null) emitValue(el, evaluated, onChange);
       setDraft(null);
@@ -69,14 +85,21 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       if (isNumeric) {
-        const raw = event.target.value;
+        const raw = stripGrouping(event.target.value);
         if (isCalculatorExpression(raw)) {
           setDraft(raw);
           const evaluated = evaluateCalculatorExpression(raw);
           if (evaluated !== null) emitValue(event.target, evaluated, onChange);
           return;
         }
+        if (isPartialNumber(raw)) {
+          setDraft(groupDigits(raw));
+          emitValue(event.target, raw, onChange);
+          return;
+        }
         setDraft(null);
+        emitValue(event.target, raw, onChange);
+        return;
       }
       onChange?.(event);
     };
@@ -91,7 +114,14 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
       onKeyDown?.(event);
     };
 
-    const renderedValue = isNumeric && draft !== null ? draft : value;
+    const renderedValue = isNumeric
+      ? draft !== null
+        ? draft
+        : value === "" || value === null || value === undefined
+        ? (value as any)
+        : groupDigits(String(value))
+      : value;
+
 
     return (
       <input
