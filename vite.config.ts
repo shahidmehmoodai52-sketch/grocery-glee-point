@@ -27,11 +27,13 @@ export default defineConfig({
         injectRegister: null, // registration happens from our guarded wrapper
         filename: "sw.js",
         devOptions: { enabled: false },
-        includeAssets: ["favicon.svg", "favicon.png", "manifest.webmanifest"],
+        includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest"],
         workbox: {
           cleanupOutdatedCaches: true,
-          navigateFallback: "/index.html",
-          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/\.mcp/, /^\/\.well-known/],
+          // No navigateFallback: this is an SSR app, so there is no precached
+          // index.html to fall back to. Offline navigations are served from the
+          // "html-nav" runtime cache, pre-warmed on first online visit, and
+          // fall back to the precached /offline.html page as a last resort.
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
           runtimeCaching: [
             {
@@ -40,7 +42,9 @@ export default defineConfig({
               options: {
                 cacheName: "html-nav",
                 networkTimeoutSeconds: 3,
+                matchOptions: { ignoreSearch: true },
                 expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
+                precacheFallback: { fallbackURL: "/offline.html" },
               },
             },
             {
@@ -55,14 +59,17 @@ export default defineConfig({
           ],
         },
         manifest: {
-          name: "POS",
-          short_name: "POS",
+          name: "Tillix POS",
+          short_name: "Tillix",
           start_url: "/",
           scope: "/",
           display: "standalone",
           background_color: "#ffffff",
           theme_color: "#ffffff",
-          icons: [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml" }],
+          icons: [
+            { src: "/favicon.png", sizes: "512x512", type: "image/png", purpose: "any" },
+            { src: "/favicon.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          ],
         },
       }),
     ],

@@ -3879,7 +3879,18 @@ export type Database = {
         Args: { _id: string; _reason: string }
         Returns: undefined
       }
-      edit_sale: { Args: { _items: Json; _sale_id: string }; Returns: string }
+      edit_sale:
+        | { Args: { _items: Json; _sale_id: string }; Returns: string }
+        | {
+            Args: {
+              _discount?: number
+              _items: Json
+              _paid?: number
+              _sale_id: string
+              _tax?: number
+            }
+            Returns: string
+          }
       emergency_close_shift: {
         Args: { _reason: string; _shift_id: string }
         Returns: string
@@ -4046,6 +4057,7 @@ export type Database = {
       }
       owner_alerts: { Args: never; Returns: Json }
       owner_recommendations: { Args: never; Returns: Json }
+      prune_audit_logs: { Args: { _days?: number }; Returns: number }
       record_cash_event: {
         Args: {
           _amount: number

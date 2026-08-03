@@ -1,6 +1,8 @@
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logPerf, whenIdle } from "@/lib/offline/perf";
+
 
 // Tables → query keys to invalidate when any row changes anywhere in the system.
 const MAP: Record<string, string[][]> = {
@@ -83,25 +85,92 @@ const MAP: Record<string, string[][]> = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Single shared realtime channel (module scope) — StrictMode double-mounts and
+// remounts of the authenticated layout previously created duplicate
+// subscriptions, so every DB change fanned out N times.
+// ---------------------------------------------------------------------------
+let channel: ReturnType<typeof supabase.channel> | null = null;
+let subscribers = 0;
+const clients = new Set<QueryClient>();
+
+// Changed tables are coalesced and flushed once per window, during idle time,
+// so a burst of realtime events (or a reconnect replay) cannot trigger dozens
+// of simultaneous refetches while the cashier is typing.
+const dirty = new Set<string>();
+let flushTimer: number | null = null;
+const FLUSH_MS = 600;
+
+function scheduleFlush() {
+  if (typeof window === "undefined") return;
+  if (flushTimer !== null) return;
+  flushTimer = window.setTimeout(async () => {
+    flushTimer = null;
+    if (!dirty.size) return;
+    const tables = Array.from(dirty);
+    dirty.clear();
+    await whenIdle(300);
+    const keys = new Set<string>();
+    for (const t of tables) for (const key of MAP[t] ?? []) keys.add(JSON.stringify(key));
+    for (const qc of clients) {
+      for (const k of keys) {
+        // Only refetch queries currently rendered; everything else is marked
+        // stale and refetches lazily on next mount.
+        qc.invalidateQueries({ queryKey: JSON.parse(k), refetchType: "active" });
+      }
+    }
+    logPerf("realtime invalidate", { tables: tables.length, keys: keys.size });
+  }, FLUSH_MS);
+}
 
 export function useRealtimeSync() {
   const qc = useQueryClient();
   useEffect(() => {
-    const channel = supabase.channel("pos-live-sync");
-    Object.keys(MAP).forEach((table) => {
-      channel.on(
-        "postgres_changes" as any,
-        { event: "*", schema: "public", table },
-        () => {
-          for (const key of MAP[table]) {
-            qc.invalidateQueries({ queryKey: key });
-          }
-        },
-      );
+    clients.add(qc);
+    subscribers += 1;
+    if (!channel) {
+      const ch = supabase.channel("pos-live-sync");
+      Object.keys(MAP).forEach((table) => {
+        ch.on(
+          "postgres_changes" as any,
+          { event: "*", schema: "public", table },
+          () => {
+            dirty.add(table);
+            scheduleFlush();
+          },
+        );
+      });
+      ch.subscribe();
+      channel = ch;
+    }
+    // Background sync reports the tables it actually refreshed — route them
+    // through the same coalesced flush instead of a blanket invalidateQueries().
+    let unsubSync: (() => void) | undefined;
+    void import("@/lib/offline/sync").then(({ subscribeSyncedTables }) => {
+      unsubSync = subscribeSyncedTables((tables) => {
+        for (const t of tables) dirty.add(t);
+        scheduleFlush();
+      });
     });
-    channel.subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      unsubSync?.();
+      clients.delete(qc);
+
+      subscribers -= 1;
+      if (subscribers <= 0) {
+        subscribers = 0;
+        if (flushTimer !== null) {
+          window.clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        dirty.clear();
+        if (channel) {
+          supabase.removeChannel(channel);
+          channel = null;
+        }
+      }
     };
   }, [qc]);
 }
+

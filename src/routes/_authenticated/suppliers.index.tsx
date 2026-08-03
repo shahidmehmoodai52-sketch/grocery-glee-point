@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { offlineFirst, cacheSuppliers, insertOfflineAware } from "@/lib/offline/pos";
+import { readLocalFirst } from "@/lib/offline/data-access";
 import { db } from "@/lib/offline/db";
 
 
@@ -74,11 +75,14 @@ function Page() {
 
   const { data: rows = [] } = useQuery({
     queryKey: ["suppliers"],
-    queryFn: async () => offlineFirst<any[]>(
-      async () => (await supabase.from("suppliers").select("*").order("name")).data ?? [],
-      async () => (await db().suppliers.orderBy("name").toArray()) as any[],
-      cacheSuppliers,
-    ),
+    // Local-first on cold start (instant paint), cloud on every later refetch.
+    queryFn: async () => readLocalFirst<any[]>({
+      table: "suppliers",
+      cloud: async () => (await supabase.from("suppliers").select("*").order("name")).data ?? [],
+      local: async () => (await db().suppliers.orderBy("name").toArray()) as any[],
+      cache: cacheSuppliers,
+      onRevalidated: (fresh: any[]) => qc.setQueryData(["suppliers"], fresh),
+    }),
   });
 
   const { data: cashAccounts = [] } = useQuery({

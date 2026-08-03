@@ -11,6 +11,9 @@ export interface OfflineStatus {
   pending: number;
   lastSyncedAt: string | null;
   error: string | null;
+  /** Sync progress while flushing the offline queue (null when idle). */
+  progressDone: number | null;
+  progressTotal: number | null;
 }
 
 const LS_LAST = "pos_offline_last_synced";
@@ -25,6 +28,8 @@ let state: OfflineStatus = {
   pending: 0,
   lastSyncedAt: null,
   error: null,
+  progressDone: null,
+  progressTotal: null,
 };
 
 
@@ -43,6 +48,11 @@ export function setOfflineEnabled(_v: boolean) {
 }
 
 
+export function setSyncProgress(done: number | null, total: number | null) {
+  state = { ...state, progressDone: done, progressTotal: total };
+  emit();
+}
+
 export function markSyncStart() {
   state = { ...state, phase: "syncing", error: null };
   emit();
@@ -50,16 +60,20 @@ export function markSyncStart() {
 export function markSyncDone() {
   const now = new Date().toISOString();
   try { window.localStorage.setItem(LS_LAST, now); } catch {}
-  state = { ...state, phase: "idle", lastSyncedAt: now, error: null };
+  state = { ...state, phase: "idle", lastSyncedAt: now, error: null, progressDone: null, progressTotal: null };
   emit();
 }
 export function markSyncError(msg: string) {
-  state = { ...state, phase: "error", error: msg };
+  state = { ...state, phase: "error", error: msg, progressDone: null, progressTotal: null };
   emit();
 }
 export async function refreshPendingCount() {
   try {
-    const n = await db()._queue.where("status").anyOf(["pending", "failed"]).count();
+    // Everything not yet confirmed by the cloud counts as pending work.
+    const n = await db()._queue
+      .where("status")
+      .anyOf(["pending", "failed", "retrying", "uploading", "syncing"])
+      .count();
     state = { ...state, pending: n };
     emit();
   } catch {/* SSR / unsupported */}

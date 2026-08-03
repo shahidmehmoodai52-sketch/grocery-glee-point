@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { parseInput, resetTenantOwnerPasswordInput } from "@/lib/server-validators";
 
 async function assertSuperAdmin(context: any) {
   const { data, error } = await context.supabase.rpc("is_super_admin", { _user_id: context.userId });
@@ -16,7 +17,7 @@ async function assertAdminPerm(context: any, perm: string) {
  */
 export const resetTenantOwnerPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { tenant_id: string; new_password: string }) => data)
+  .inputValidator((data: unknown) => parseInput(resetTenantOwnerPasswordInput, data))
   .handler(async ({ data, context }) => {
     await assertAdminPerm(context, "shops.reset_password");
     if (!data.new_password || data.new_password.length < 6) {

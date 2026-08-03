@@ -15,6 +15,8 @@ import { setDefaultCurrencySymbol } from "@/lib/format";
 import { PendingBanner } from "@/components/pending-banner";
 import { ExpiryCountdown } from "@/components/expiry-countdown";
 import { getUserAllowOffline } from "@/lib/offline/session";
+import { OfflineStatusBadge } from "@/components/offline-status";
+import { clearOfflineDataOnLogout, guardTenantScope } from "@/lib/offline/device";
 
 
 export const Route = createFileRoute("/_authenticated")({
@@ -34,6 +36,8 @@ export const Route = createFileRoute("/_authenticated")({
 function Layout() {
   const navigate = useNavigate();
   const handleSignOut = async () => {
+    // Multi-tenant safety: remove every cached row before releasing the device.
+    await clearOfflineDataOnLogout();
     await supabase.auth.signOut();
     navigate({ to: "/auth", search: { next: "/dashboard" }, replace: true });
   };
@@ -47,6 +51,20 @@ function Layout() {
     // Poll every minute so the scheduled time triggers when the app is left open.
     const t = setInterval(() => { maybeRunDaily(); }, 60_000);
     return () => clearInterval(t);
+  }, []);
+
+  // Isolate the local mirror per tenant/user — wipes cached data if either changed.
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    (async () => {
+      try {
+        const [{ data: tenantId }, { data: auth }] = await Promise.all([
+          supabase.rpc("current_tenant_id") as any,
+          supabase.auth.getUser(),
+        ]);
+        await guardTenantScope((tenantId as string) ?? null, auth?.user?.id ?? null);
+      } catch {/* offline or RPC unavailable — mirror stays as-is */}
+    })();
   }, []);
 
   useRealtimeSync();
@@ -63,6 +81,7 @@ function Layout() {
             <div className="flex-1 min-w-0">
               <LowStockAlerts />
             </div>
+            <OfflineStatusBadge className="mr-1" />
             <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2">
               <LogOut className="h-4 w-4" />
               <span className="hidden sm:inline">Sign out</span>

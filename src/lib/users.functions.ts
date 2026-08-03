@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { parseInput, createStaffInput, resetPasswordInput, setStaffAccessInput, userIdInput } from "@/lib/server-validators";
 
 type TenantMemberRole = "admin" | "cashier" | "manager" | "owner" | "staff" | "viewer";
 
@@ -117,7 +118,7 @@ export const listStaff = createServerFn({ method: "GET" })
 
 export const createStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { email: string; password: string; role: "admin" | "cashier"; perms: string[] }) => data)
+  .inputValidator((data: unknown) => parseInput(createStaffInput, data))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, tenantId } = await resolveStaffAdmin(context);
     if (!data.email || !data.password || data.password.length < 6) throw new Error("Email and 6+ char password required");
@@ -141,7 +142,7 @@ export const createStaff = createServerFn({ method: "POST" })
 
 export const resetStaffPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { user_id: string; password: string }) => data)
+  .inputValidator((data: unknown) => parseInput(resetPasswordInput, data))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, tenantId } = await resolveStaffAdmin(context);
     await assertSameTenant(supabaseAdmin, tenantId, data.user_id);
@@ -153,7 +154,7 @@ export const resetStaffPassword = createServerFn({ method: "POST" })
 
 export const setStaffPermissions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { user_id: string; role: "admin" | "cashier"; perms: string[] }) => data)
+  .inputValidator((data: unknown) => parseInput(setStaffAccessInput, data))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, tenantId } = await resolveStaffAdmin(context);
     await assertSameTenant(supabaseAdmin, tenantId, data.user_id);
@@ -172,7 +173,7 @@ export const setStaffPermissions = createServerFn({ method: "POST" })
 
 export const deleteStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { user_id: string }) => data)
+  .inputValidator((data: unknown) => parseInput(userIdInput, data))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, tenantId } = await resolveStaffAdmin(context);
     if (data.user_id === context.userId) throw new Error("You cannot delete your own account");

@@ -6,8 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
-import { Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Trash2, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 
 export type Party = "customer" | "supplier";
 export type LedgerEntity = "sale" | "purchase" | "sale_return" | "purchase_return" | "payment";
@@ -24,6 +28,50 @@ function toLocalInputValue(iso?: string) {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function DateTimeField({ label = "Date & time", value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
+  const datePart = value ? value.slice(0, 10) : "";
+  const timePart = value ? value.slice(11, 16) : "00:00";
+  const selected = datePart ? new Date(`${datePart}T00:00:00`) : undefined;
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="flex gap-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className={cn("flex-1 justify-start text-left font-normal", !datePart && "text-muted-foreground")}
+            >
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              {selected ? format(selected, "PPP") : <span>Pick a date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selected}
+              onSelect={(d) => {
+                if (!d) return;
+                const pad = (n: number) => String(n).padStart(2, "0");
+                onChange(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${timePart || "00:00"}`);
+              }}
+              initialFocus
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
+        <Input
+          type="time"
+          className="w-[110px]"
+          value={timePart}
+          onChange={(e) => onChange(`${datePart || toLocalInputValue(new Date().toISOString()).slice(0, 10)}T${e.target.value || "00:00"}`)}
+        />
+      </div>
+    </div>
+  );
 }
 
 const PAYMENT_SOURCE_PRESETS = ["Cash in hand", "Bank", "EasyPaisa", "JazzCash", "Card"];
@@ -61,6 +109,7 @@ export function AddPaymentDialog({
   const [method, setMethod] = useState("cash");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
+  const [when, setWhen] = useState("");
   const [saving, setSaving] = useState(false);
   const cashAccountsQ = useCashAccounts();
   const cashAccounts = cashAccountsQ.data ?? [];
@@ -80,6 +129,7 @@ export function AddPaymentDialog({
       setMethod(defaultSource?.name ?? "Cash in hand");
       setAccountId(defaultSource?.id ?? "");
       setNote("");
+      setWhen(toLocalInputValue(new Date().toISOString()));
     }
   }, [open, defaultAmount, cashAccounts.length]);
 
@@ -108,6 +158,17 @@ export function AddPaymentDialog({
         p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id ?? undefined,
       });
       error = res.error;
+      if (!error && when && res.data) {
+        const chosen = new Date(when);
+        const nowIso = new Date();
+        if (Math.abs(chosen.getTime() - nowIso.getTime()) > 60_000) {
+          const upd = await supabase.rpc("update_party_payment", {
+            _id: res.data as string, _amount: amount, _method: account.name, _note: note || "",
+            _created_at: chosen.toISOString(), _account_id: account.id ?? undefined,
+          });
+          error = upd.error;
+        }
+      }
     } catch (e: any) {
       error = e;
     }
@@ -124,6 +185,7 @@ export function AddPaymentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Add payment{party_name ? ` — ${party_name}` : ""}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
+          <DateTimeField value={when} onChange={setWhen} />
           <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div>
             <Label>{party === "supplier" ? "Pay from" : "Receive in"}</Label>
@@ -217,7 +279,7 @@ export function EditPaymentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Edit payment</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div><Label>Date & time</Label><Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
+          <DateTimeField value={when} onChange={setWhen} />
           <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div>
             <Label>Payment source</Label>
@@ -286,7 +348,7 @@ export function EditEntryDialog({
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Edit {entity?.replace("_"," ")} · {entry?.ref}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div><Label>Date & time</Label><Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
+          <DateTimeField value={when} onChange={setWhen} />
           <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">
             Amount is derived from items and cannot be changed here. Delete or re-create the transaction to change amounts.

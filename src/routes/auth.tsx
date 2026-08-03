@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isBlocked, logSecurityEvent } from "@/lib/security-log";
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { next?: string } => ({
     next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//") ? s.next : undefined,
   }),
   component: AuthPage,

@@ -2,24 +2,23 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog, PauseCircle, Play, ChevronDown, Pencil } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty } from "@/lib/format";
-import { Receipt, printReceipt, printInvoiceDirect } from "@/components/receipt";
+import { Receipt, printInvoiceDirect } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
 import {
@@ -27,6 +26,9 @@ import {
   completeSaleOfflineAware,
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
+import { enqueueWrite } from "@/lib/offline/sync";
+import { isOfflineNow } from "@/lib/offline/session";
+import { searchProductsLocal } from "@/lib/offline/pos";
 
 
 
@@ -57,6 +59,8 @@ type Tab = {
   payment_method: string;
   discount: number;
   discount_pct: string;
+  charge: number;
+  charge_pct: string;
   paid: string;
   note: string;
   restored?: boolean;
@@ -89,6 +93,8 @@ const newTab = (n: number): Tab => ({
   payment_method: "cash",
   discount: 0,
   discount_pct: "",
+  charge: 0,
+  charge_pct: "",
   paid: "",
   note: "",
 });
@@ -96,6 +102,18 @@ const newTab = (n: number): Tab => ({
 async function searchProducts(term: string) {
   const q = term.trim().replace(/\s+/g, " ");
   if (!q) return [];
+  // Offline (or flaky network): search the local mirror instead.
+  if (isOfflineNow()) return searchProductsLocal(q);
+  try {
+    return await searchProductsOnline(q);
+  } catch (e: any) {
+    const local = await searchProductsLocal(q);
+    if (local.length) return local;
+    throw e;
+  }
+}
+
+async function searchProductsOnline(q: string) {
 
   const like = `%${q}%`;
   const [nameRes, skuRes, barcodeRes, extraBarcodeRes] = await Promise.all([
@@ -141,19 +159,30 @@ function POSPage() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
-  const taxRate = Number(settings?.tax_rate ?? 0);
 
-  const [tabs, setTabs] = useState<Tab[]>(() => [newTab(1)]);
-  const [active, setActive] = useState<string>(() => tabs[0].id);
+  // Billing in progress survives navigation to other sections (and refresh):
+  // cart lines, customer, payment, discounts and the active tab are persisted.
+  const [tabs, setTabs] = usePersistentState<Tab[]>("pos-tabs", [newTab(1)]);
+  const [active, setActive] = usePersistentState<string>("pos-active-tab", tabs[0]?.id ?? "");
   const tab = tabs.find((t) => t.id === active) ?? tabs[0];
+
+  // Guard against a corrupted/empty persisted draft.
+  useEffect(() => {
+    if (!tabs.length) {
+      const t = newTab(1);
+      setTabs([t]);
+      setActive(t.id);
+    } else if (!tabs.some((t) => t.id === active)) {
+      setActive(tabs[0].id);
+    }
+  }, [tabs, active, setTabs, setActive]);
 
   const [search, setSearch] = useState("");
   const searchTerm = useMemo(() => search.trim().replace(/\s+/g, " "), [search]);
-  const [lastInvoice, setLastInvoice] = useState<any>(null);
+  const [, setLastInvoice] = useState<any>(null);
   const [reprintOpen, setReprintOpen] = useState(false);
   const [reprintView, setReprintView] = useState<any>(null);
   const [printAsk, setPrintAsk] = useState<any>(null);
-  const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const [heldOpen, setHeldOpen] = useState(false);
   const [holding, setHolding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -391,6 +420,13 @@ function POSPage() {
     return m;
   }, [searchableProducts, barcodesByProduct]);
 
+  // O(1) id -> product lookup so cart rows never linear-scan the catalogue.
+  const productById = useMemo(() => {
+    const m: Record<string, any> = {};
+    searchableProducts.forEach((p) => { m[p.id] = p; });
+    return m;
+  }, [searchableProducts]);
+
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
     queryFn: () =>
@@ -566,7 +602,8 @@ function POSPage() {
     return s + (net * Number(i.tax_pct || 0)) / 100;
   }, 0).toFixed(2);
   const discount = Number(tab.discount || 0);
-  const total = +(subtotal + tax - discount).toFixed(2);
+  const charge = Number(tab.charge || 0);
+  const total = +(subtotal + tax - discount + charge).toFixed(2);
   const paidNum = Number(tab.paid || 0);
   const change = Math.max(paidNum - total, 0);
   const due = Math.max(total - paidNum, 0);
@@ -580,6 +617,17 @@ function POSPage() {
     }
     const newDisc = +Math.max(0, (subtotal * n) / 100).toFixed(2);
     setTab({ discount_pct: pct, discount: newDisc });
+  };
+
+  // Extra charge (delivery / service etc.) — % of subtotal or flat amount
+  const applyChargePct = (pct: string) => {
+    const n = Number(pct);
+    if (!isFinite(n) || pct === "") {
+      setTab({ charge_pct: pct });
+      return;
+    }
+    const newCharge = +Math.max(0, (subtotal * n) / 100).toFixed(2);
+    setTab({ charge_pct: pct, charge: newCharge });
   };
 
 
@@ -602,15 +650,25 @@ function POSPage() {
   const { data: heldBills = [], refetch: refetchHeld } = useQuery({
     queryKey: ["held_bills", "pos"],
     enabled: holdBillsEnabled,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("held_bills")
-        .select("id,label,total,item_count,created_at,customer_id,payload,customers(name)")
-        .eq("status", "held")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data as any[]) ?? [];
-    },
+    queryFn: () =>
+      offlineFirst(
+        async () => {
+          const { data, error } = await supabase
+            .from("held_bills")
+            .select("id,label,total,item_count,created_at,customer_id,payload,customers(name)")
+            .eq("status", "held")
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          return (data as any[]) ?? [];
+        },
+        async () =>
+          (await offlineDb().held_bills.where("status").equals("held").reverse().sortBy("created_at")) as any[],
+        async (rows) => {
+          try {
+            await offlineDb().held_bills.bulkPut((rows as any[]).map((r) => ({ ...r, status: "held" })));
+          } catch {}
+        },
+      ),
     staleTime: 30_000,
   });
 
@@ -643,6 +701,8 @@ function POSPage() {
       payment_method: payload.payment_method ?? "cash",
       discount: Number(payload.discount ?? 0),
       discount_pct: "",
+      charge: Number(payload.charge ?? 0),
+      charge_pct: "",
       paid: String(payload.paid ?? ""),
       note: payload.note ?? "",
       restored: !isEdit,
@@ -679,6 +739,8 @@ function POSPage() {
       payment_method: sale.payment_method ?? "cash",
       discount: Number(sale.discount ?? 0),
       discount_pct: "",
+      charge: 0,
+      charge_pct: "",
       paid: String(sale.paid ?? ""),
       note: sale.note ?? "",
       editing_sale_id: sale.id,
@@ -691,9 +753,19 @@ function POSPage() {
 
 
   const resumeHeld = async (id: string) => {
-    const { data, error } = await supabase.rpc("resume_bill", { _id: id });
-    if (error) return toast.error(error.message);
-    restorePayloadIntoNewTab(data as any, "↺");
+    let payload: any = null;
+    if (isOfflineNow()) {
+      const local = await offlineDb().held_bills.get(id);
+      if (!local) return toast.error("Held bill not available offline");
+      payload = local.payload;
+      await offlineDb().held_bills.put({ ...local, status: "resumed" });
+      await enqueueWrite({ op: "rpc", table: "resume_bill", payload: { _id: id } });
+    } else {
+      const { data, error } = await supabase.rpc("resume_bill", { _id: id });
+      if (error) return toast.error(error.message);
+      payload = data;
+    }
+    restorePayloadIntoNewTab(payload as any, "↺");
     setHeldOpen(false);
     refetchHeld();
     toast.success("Bill resumed");
@@ -701,8 +773,13 @@ function POSPage() {
 
   const discardHeld = async (id: string) => {
     if (!confirm("Discard this held bill?")) return;
-    const { error } = await (supabase.rpc as any)("discard_held_bill", { _id: id, _reason: null });
-    if (error) return toast.error(error.message);
+    if (isOfflineNow()) {
+      await offlineDb().held_bills.delete(id);
+      await enqueueWrite({ op: "rpc", table: "discard_held_bill", payload: { _id: id, _reason: null } });
+    } else {
+      const { error } = await (supabase.rpc as any)("discard_held_bill", { _id: id, _reason: null });
+      if (error) return toast.error(error.message);
+    }
     refetchHeld();
     toast.success("Discarded");
   };
@@ -718,23 +795,43 @@ function POSPage() {
         expense_person_id: tab.expense_person_id,
         payment_method: tab.payment_method,
         discount: Number(tab.discount || 0),
+        charge: Number(tab.charge || 0),
         paid: tab.paid,
         note: tab.note,
         label: tab.name,
         editing_sale_id: tab.editing_sale_id ?? null,
         editing_invoice_no: tab.editing_invoice_no ?? null,
       };
-      const { error } = await supabase.rpc("hold_bill", {
+      const label = tab.editing_sale_id
+        ? `✎ Edit ${tab.editing_invoice_no ?? tab.name}`
+        : tab.name;
+      const args = {
         _customer: tab.customer_id as any,
         _item_count: tab.items.length,
-        _label: tab.editing_sale_id
-          ? `✎ Edit ${tab.editing_invoice_no ?? tab.name}`
-          : tab.name,
+        _label: label,
         _payload: payload as any,
         _total: total,
-      });
-      if (error) throw error;
-      toast.success("Bill held");
+      };
+      if (isOfflineNow()) {
+        const localId = crypto.randomUUID();
+        await offlineDb().held_bills.put({
+          id: localId,
+          label,
+          total,
+          item_count: tab.items.length,
+          customer_id: tab.customer_id,
+          payload,
+          status: "held",
+          created_at: new Date().toISOString(),
+          _offline_pending: true,
+        });
+        await enqueueWrite({ op: "rpc", table: "hold_bill", payload: args });
+        toast.success("Bill held offline");
+      } else {
+        const { error } = await supabase.rpc("hold_bill", args);
+        if (error) throw error;
+        toast.success("Bill held");
+      }
       closeTab(active);
       refetchHeld();
     } catch (err: any) {
@@ -806,6 +903,14 @@ function POSPage() {
     try {
       // ---- Edit existing invoice path ----
       if (tab.editing_sale_id) {
+        // Editing an existing invoice re-runs server-side stock/ledger reversal,
+        // so it stays online-only. Fail with a clear message instead of a
+        // raw network error, and keep the tab intact so nothing is lost.
+        if (isOfflineNow()) {
+          toast.error("Editing an invoice needs internet. The bill is kept open — retry once you're back online.");
+          return;
+        }
+
         const items = tab.items.map((i) => ({
           product_id: i.product_id,
           name: i.name,
@@ -816,7 +921,11 @@ function POSPage() {
         const { error } = await supabase.rpc("edit_sale", {
           _sale_id: tab.editing_sale_id,
           _items: items as any,
-        });
+          // Header figures the cashier just corrected (paid amount, discount, tax).
+          _paid: +Math.min(paidNum, total).toFixed(2),
+          _discount: +(lineDiscountTotal + discount - charge).toFixed(2),
+          _tax: +Number(tax || 0).toFixed(2),
+        } as any);
         if (error) throw error;
         // Also update lightweight header fields (customer / payment / note)
         // that the RPC does not touch, so the cashier's edits stick.
@@ -848,8 +957,10 @@ function POSPage() {
         payment_method: tab.payment_method,
         tax,
         // Combine per-line discounts with cart-level discount so they reach the ledger.
-        discount: +(lineDiscountTotal + discount).toFixed(2),
-        paid: paidNum,
+        // Extra charge is applied as a negative discount so the server total matches.
+        discount: +(lineDiscountTotal + discount - charge).toFixed(2),
+        // Change (extra tendered cash) is never recorded — only the bill amount is.
+        paid: +Math.min(paidNum, total).toFixed(2),
         note: tab.note,
         items: tab.items.map((i) => ({
           product_id: i.product_id,
@@ -860,7 +971,25 @@ function POSPage() {
         })),
       };
 
-      const { sale, offline } = await completeSaleOfflineAware(payload as any);
+      // Audit-only breakdown: stored on the local record when offline, never
+      // sent to the server (the RPC derives its own totals from `payload`).
+      const taxBuckets = new Map<number, number>();
+      for (const i of tab.items) {
+        const rate = Number(i.tax_pct || 0);
+        if (!rate) continue;
+        const base = Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0);
+        taxBuckets.set(rate, +( (taxBuckets.get(rate) ?? 0) + base * rate / 100 ).toFixed(2));
+      }
+      const { sale, offline } = await completeSaleOfflineAware(payload as any, {
+        charge,
+        line_discount_total: lineDiscountTotal,
+        bill_discount: discount,
+        tax_breakdown: Array.from(taxBuckets, ([rate, amount]) => ({ rate, amount })),
+        payments: [{ method: tab.payment_method, amount: +Math.min(paidNum, total).toFixed(2) }],
+        tendered: paidNum,
+        change_due: change,
+      });
+
       // Override server sale_items with the cashier's edited prices so the
       // printed receipt reflects any rate changes made in the cart.
       const localItems = tab.items.map((i, idx) => ({
@@ -870,7 +999,17 @@ function POSPage() {
         price: i.price,
         line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
       }));
-      const patchedSale = sale ? { ...sale, sale_items: localItems } : sale;
+      // Receipt shows the real tendered amount + change; the ledger keeps only the bill amount.
+      const patchedSale = sale
+        ? {
+            ...sale,
+            sale_items: localItems,
+            discount: +(lineDiscountTotal + discount).toFixed(2),
+            charge: +charge.toFixed(2),
+            paid: +paidNum.toFixed(2),
+            change_due: +change.toFixed(2),
+          }
+        : sale;
       setLastInvoice(patchedSale);
       if (patchedSale?.id) {
         setUndoCandidate({
@@ -983,6 +1122,8 @@ function POSPage() {
         payment_method: payload.payment_method ?? "cash",
         discount: Number(payload.discount ?? 0),
         discount_pct: "",
+        charge: 0,
+        charge_pct: "",
         paid: String(payload.paid ?? ""),
         note: payload.note ?? "",
         restored: true,
@@ -1355,7 +1496,7 @@ function POSPage() {
                 const net = Math.max(gross - lineDisc, 0);
                 const amount = net;
                 const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
-                const p = it.product_id ? searchableProducts.find((x) => x.id === it.product_id) : null;
+                const p = it.product_id ? (productById[it.product_id] ?? null) : null;
                 const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
                 const displayCode = it.code || (p ? itemCodeForProduct(p) : "");
                 const subline = p
@@ -1672,6 +1813,30 @@ function POSPage() {
                 step="0.01"
                 value={tab.discount}
                 onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
+                className="h-8 w-24 text-right text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-sm gap-2">
+            <span className="text-muted-foreground">Charges</span>
+            <div className="flex items-center gap-1.5">
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={tab.charge_pct}
+                  onChange={(e) => applyChargePct(e.target.value)}
+                  placeholder="0"
+                  className="h-8 w-14 text-right text-sm pr-5"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                value={tab.charge}
+                onChange={(e) => setTab({ charge: Number(e.target.value), charge_pct: "" })}
                 className="h-8 w-24 text-right text-sm"
               />
             </div>
@@ -2054,8 +2219,6 @@ function POSPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Suppress unused-var warning while keeping lastInvoice for potential future quick-print */}
-      {false && lastInvoice}
     </div>
   );
 }
@@ -2245,157 +2408,6 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
   );
 }
 
-function EditInvoiceDialog({ invoice, sym, onClose }: { invoice: any; sym: string; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [items, setItems] = useState<Array<{ product_id: string | null; name: string; qty: number; price: number; cost: number }>>([]);
-  const [saving, setSaving] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickQ, setPickQ] = useState("");
-
-  useEffect(() => {
-    if (invoice?.sale_items) {
-      setItems(invoice.sale_items.map((it: any) => ({
-        product_id: it.product_id,
-        name: it.name,
-        qty: Number(it.qty),
-        price: Number(it.price),
-        cost: Number(it.cost),
-      })));
-    }
-  }, [invoice]);
-
-  const { data: products = [] } = useQuery({
-    queryKey: ["products", "edit-invoice-picker"],
-    enabled: pickerOpen,
-    queryFn: async () => (await supabase.from("products").select("id,name,sell_price,cost_price,stock,is_active").eq("is_active", true).order("name").limit(500)).data ?? [],
-  });
-
-  const filteredProducts = useMemo(() => {
-    const t = pickQ.trim().toLowerCase();
-    if (!t) return (products as any[]).slice(0, 50);
-    return (products as any[]).filter((p) => (p.name ?? "").toLowerCase().includes(t)).slice(0, 100);
-  }, [pickQ, products]);
-
-  const subtotal = items.reduce((s, it) => s + it.qty * it.price, 0);
-  const tax = Number(invoice?.tax ?? 0);
-  const discount = Number(invoice?.discount ?? 0);
-  const total = subtotal + tax - discount;
-
-  const updateItem = (idx: number, patch: Partial<typeof items[number]>) => {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
-  };
-  const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
-  const addProduct = (p: any) => {
-    setItems((prev) => [...prev, {
-      product_id: p.id, name: p.name, qty: 1,
-      price: Number(p.sell_price ?? 0), cost: Number(p.cost_price ?? 0),
-    }]);
-    setPickerOpen(false); setPickQ("");
-  };
-
-  const save = async () => {
-    if (!invoice) return;
-    if (items.length === 0) return toast.error("At least one item is required");
-    for (const it of items) {
-      if (!it.qty || it.qty <= 0) return toast.error(`Qty must be > 0 for ${it.name}`);
-      if (it.price < 0) return toast.error(`Price must be ≥ 0 for ${it.name}`);
-    }
-    if (discount > subtotal) return toast.error("Discount exceeds new subtotal");
-    setSaving(true);
-    const { error } = await supabase.rpc("edit_sale", {
-      _sale_id: invoice.id,
-      _items: items as any,
-    });
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Invoice updated");
-    qc.invalidateQueries({ queryKey: ["sales"] });
-    qc.invalidateQueries({ queryKey: ["products"] });
-    onClose();
-  };
-
-  if (!invoice) return null;
-  return (
-    <Dialog open={!!invoice} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Edit invoice {invoice.invoice_no}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="rounded-md border max-h-[50vh] overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-xs uppercase tracking-wide sticky top-0">
-                <tr>
-                  <th className="text-left px-2 py-2">Item</th>
-                  <th className="text-right px-2 py-2 w-24">Qty</th>
-                  <th className="text-right px-2 py-2 w-28">Rate</th>
-                  <th className="text-right px-2 py-2 w-28">Total</th>
-                  <th className="w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No items — add one below.</td></tr>
-                )}
-                {items.map((it, idx) => (
-                  <tr key={idx} className="border-t">
-                    <td className="px-2 py-1">
-                      <Input value={it.name} onChange={(e) => updateItem(idx, { name: e.target.value })} className="h-8" />
-                    </td>
-                    <td className="px-2 py-1">
-                      <Input type="number" step="0.001" value={it.qty || ""} onChange={(e) => updateItem(idx, { qty: Number(e.target.value) })} className="h-8 text-right" />
-                    </td>
-                    <td className="px-2 py-1">
-                      <Input type="number" step="0.01" value={it.price || ""} onChange={(e) => updateItem(idx, { price: Number(e.target.value) })} className="h-8 text-right" />
-                    </td>
-                    <td className="px-2 py-1 text-right font-medium tabular-nums">{fmtMoney(it.qty * it.price, sym)}</td>
-                    <td className="px-2 py-1 text-right">
-                      <Button variant="ghost" size="icon" onClick={() => removeItem(idx)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Add item
-            </Button>
-            <div className="text-sm space-y-0.5 text-right">
-              <div>Subtotal: <span className="font-medium tabular-nums">{fmtMoney(subtotal, sym)}</span></div>
-              {discount > 0 && <div>Discount: <span className="tabular-nums">−{fmtMoney(discount, sym)}</span></div>}
-              {tax > 0 && <div>Tax: <span className="tabular-nums">{fmtMoney(tax, sym)}</span></div>}
-              <div className="text-base font-semibold">Total: <span className="tabular-nums">{fmtMoney(total, sym)}</span></div>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
-        </DialogFooter>
-
-        <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Add item</DialogTitle></DialogHeader>
-            <Input autoFocus placeholder="Search product…" value={pickQ} onChange={(e) => setPickQ(e.target.value)} />
-            <div className="max-h-[50vh] overflow-auto border rounded mt-2">
-              {filteredProducts.length === 0 && <div className="p-4 text-sm text-muted-foreground text-center">No products.</div>}
-              {filteredProducts.map((p: any) => (
-                <button key={p.id} onClick={() => addProduct(p)} className="w-full text-left px-3 py-2 hover:bg-accent border-b text-sm flex justify-between">
-                  <span>{p.name}</span>
-                  <span className="tabular-nums text-muted-foreground">{fmtMoney(Number(p.sell_price ?? 0), sym)}</span>
-                </button>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 
 
@@ -2419,15 +2431,34 @@ function ReprintDialog({
   const { data: sales = [], isFetching } = useQuery({
     queryKey: ["sales", "reprint"],
     enabled: open,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales")
-        .select("*, customers(name), sale_items(*)")
-        .order("created_at", { ascending: false })
-        .limit(300);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () =>
+      offlineFirst(
+        async () => {
+          const { data, error } = await supabase
+            .from("sales")
+            .select("*, customers(name), sale_items(*)")
+            .order("created_at", { ascending: false })
+            .limit(300);
+          if (error) throw error;
+          return data ?? [];
+        },
+        async () => {
+          const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(300).toArray();
+          return Promise.all(
+            rows.map(async (r: any) => ({
+              ...r,
+              sale_items: r.sale_items ?? (await offlineDb().sale_items.where("sale_id").equals(r.id).toArray()),
+            })),
+          ) as any;
+        },
+        async (rows) => {
+          try {
+            await offlineDb().sales.bulkPut(rows as any[]);
+            const items = (rows as any[]).flatMap((r: any) => r.sale_items ?? []);
+            if (items.length) await offlineDb().sale_items.bulkPut(items);
+          } catch {}
+        },
+      ),
   });
 
   const filtered = useMemo(() => {

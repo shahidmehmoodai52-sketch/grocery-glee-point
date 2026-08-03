@@ -8,6 +8,7 @@ import {
   getSignupClient,
   internalEmail,
 } from "@/lib/shop-admin.server";
+import { parseInput, createShopStaffInput, resetPasswordInput, setStaffAccessInput, userIdInput } from "@/lib/server-validators";
 
 export const getMyShopInfo = createServerFn({ method: "GET" })
   .middleware([requireCloudAuth])
@@ -78,7 +79,7 @@ export const listShopStaff = createServerFn({ method: "GET" })
 
 export const createShopStaff = createServerFn({ method: "POST" })
   .middleware([requireCloudAuth])
-  .inputValidator((data: { username: string; password: string; role: "admin" | "cashier"; perms: string[] }) => data)
+  .inputValidator((data: unknown) => parseInput(createShopStaffInput, data))
   .handler(async ({ data, context }) => {
     const { slug } = await callerTenant(context);
     const username = cleanUsername(data.username);
@@ -119,7 +120,7 @@ export const createShopStaff = createServerFn({ method: "POST" })
 
 export const resetShopStaffPassword = createServerFn({ method: "POST" })
   .middleware([requireCloudAuth])
-  .inputValidator((data: { user_id: string; password: string }) => data)
+  .inputValidator((data: unknown) => parseInput(resetPasswordInput, data))
   .handler(async ({ data, context }) => {
     const { tenant_id } = await callerTenant(context);
     assertStrongStaffPassword(data.password);
@@ -134,7 +135,7 @@ export const resetShopStaffPassword = createServerFn({ method: "POST" })
 
 export const setShopStaffPerms = createServerFn({ method: "POST" })
   .middleware([requireCloudAuth])
-  .inputValidator((data: { user_id: string; role: "admin" | "cashier"; perms: string[] }) => data)
+  .inputValidator((data: unknown) => parseInput(setStaffAccessInput, data))
   .handler(async ({ data, context }) => {
     await callerTenant(context);
     if (data.user_id === context.userId) throw new Error("You cannot change your own role");
@@ -149,7 +150,7 @@ export const setShopStaffPerms = createServerFn({ method: "POST" })
 
 export const deleteShopStaff = createServerFn({ method: "POST" })
   .middleware([requireCloudAuth])
-  .inputValidator((data: { user_id: string }) => data)
+  .inputValidator((data: unknown) => parseInput(userIdInput, data))
   .handler(async ({ data, context }) => {
     await callerTenant(context);
     if (data.user_id === context.userId) throw new Error("You cannot remove yourself");
