@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty } from "@/lib/format";
+import { normalizePaymentAllocations, sumPaymentAllocations, type PaymentAllocation } from "@/lib/pos-payments";
 import { Receipt, printInvoiceDirect } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
@@ -57,6 +58,7 @@ type Tab = {
   customer_id: string | null;
   expense_person_id: string | null;
   payment_method: string;
+  payments: PaymentAllocation[];
   discount: number;
   discount_pct: string;
   charge: number;
@@ -91,6 +93,7 @@ const newTab = (n: number): Tab => ({
   customer_id: null,
   expense_person_id: null,
   payment_method: "cash",
+  payments: [{ method: "cash", amount: 0 }],
   discount: 0,
   discount_pct: "",
   charge: 0,
@@ -604,9 +607,45 @@ function POSPage() {
   const discount = Number(tab.discount || 0);
   const charge = Number(tab.charge || 0);
   const total = +(subtotal + tax - discount + charge).toFixed(2);
-  const paidNum = Number(tab.paid || 0);
+  const paymentRows = Array.isArray((tab as any).payments) && (tab as any).payments.length
+    ? (tab as any).payments as PaymentAllocation[]
+    : [{ method: tab.payment_method || "cash", amount: Number(tab.paid || 0) }];
+  const normalizedPayments = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
+  const paidNum = sumPaymentAllocations(normalizedPayments);
   const change = Math.max(paidNum - total, 0);
   const due = Math.max(total - paidNum, 0);
+
+  const setPaymentRows = (rows: PaymentAllocation[]) => {
+    const nextRows = rows.length ? rows : [{ method: tab.payment_method || "cash", amount: 0 }];
+    setTab({
+      payments: nextRows,
+      payment_method: nextRows[0]?.method || tab.payment_method || "cash",
+      paid: String(sumPaymentAllocations(nextRows)),
+    });
+  };
+
+  const updatePaymentRow = (idx: number, patch: Partial<PaymentAllocation>) => {
+    const nextRows = [...paymentRows];
+    const current = nextRows[idx] ?? { method: tab.payment_method || "cash", amount: 0 };
+    nextRows[idx] = { ...current, ...patch };
+    setPaymentRows(nextRows);
+  };
+
+  const addPaymentRow = () => {
+    const nextRows = [...paymentRows, { method: paymentRows[paymentRows.length - 1]?.method || tab.payment_method || "cash", amount: 0 }];
+    setPaymentRows(nextRows);
+  };
+
+  const removePaymentRow = (idx: number) => {
+    const nextRows = paymentRows.filter((_, i) => i !== idx);
+    setPaymentRows(nextRows);
+  };
+
+  const setPrimaryPaymentMethod = (method: string) => {
+    const nextRows = [...paymentRows];
+    if (nextRows[0]) { nextRows[0] = { ...nextRows[0], method }; } else { nextRows.push({ method, amount: 0 }); }
+    setPaymentRows(nextRows);
+  };
 
   // Keep cart discount in sync when percentage is typed
   const applyDiscountPct = (pct: string) => {
@@ -699,6 +738,9 @@ function POSPage() {
       customer_id: payload.customer_id ?? null,
       expense_person_id: payload.expense_person_id ?? null,
       payment_method: payload.payment_method ?? "cash",
+      payments: Array.isArray(payload.payments) && payload.payments.length
+        ? payload.payments.map((entry: any) => ({ method: entry.method ?? "cash", amount: Number(entry.amount ?? 0) }))
+        : [{ method: payload.payment_method ?? "cash", amount: Number(payload.paid ?? 0) }],
       discount: Number(payload.discount ?? 0),
       discount_pct: "",
       charge: Number(payload.charge ?? 0),
@@ -737,6 +779,7 @@ function POSPage() {
       customer_id: sale.customer_id ?? null,
       expense_person_id: sale.expense_person_id ?? null,
       payment_method: sale.payment_method ?? "cash",
+      payments: [{ method: sale.payment_method ?? "cash", amount: Number(sale.paid ?? 0) }],
       discount: Number(sale.discount ?? 0),
       discount_pct: "",
       charge: 0,
@@ -794,6 +837,7 @@ function POSPage() {
         customer_id: tab.customer_id,
         expense_person_id: tab.expense_person_id,
         payment_method: tab.payment_method,
+        payments: tab.payments,
         discount: Number(tab.discount || 0),
         charge: Number(tab.charge || 0),
         paid: tab.paid,
@@ -901,6 +945,12 @@ function POSPage() {
   const doSale = async () => {
     setSubmitting(true);
     try {
+      const paymentAllocations = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
+      const paymentMethodLabel = paymentAllocations.length > 1
+        ? paymentAllocations.map((entry) => entry.method).join(" + ")
+        : (paymentAllocations[0]?.method || tab.payment_method || "cash");
+      const tenderedAmount = +Math.min(sumPaymentAllocations(paymentAllocations), total).toFixed(2);
+
       // ---- Edit existing invoice path ----
       if (tab.editing_sale_id) {
         // Editing an existing invoice re-runs server-side stock/ledger reversal,
@@ -934,7 +984,7 @@ function POSPage() {
             .from("sales")
             .update({
               customer_id: tab.customer_id,
-              payment_method: tab.payment_method,
+              payment_method: paymentMethodLabel,
               note: tab.note,
             })
             .eq("id", tab.editing_sale_id);
@@ -954,13 +1004,13 @@ function POSPage() {
       const payload = {
         customer_id: tab.customer_id,
         expense_person_id: tab.expense_person_id,
-        payment_method: tab.payment_method,
+        payment_method: paymentMethodLabel,
         tax,
         // Combine per-line discounts with cart-level discount so they reach the ledger.
         // Extra charge is applied as a negative discount so the server total matches.
         discount: +(lineDiscountTotal + discount - charge).toFixed(2),
         // Change (extra tendered cash) is never recorded — only the bill amount is.
-        paid: +Math.min(paidNum, total).toFixed(2),
+        paid: tenderedAmount,
         note: tab.note,
         items: tab.items.map((i) => ({
           product_id: i.product_id,
@@ -985,8 +1035,8 @@ function POSPage() {
         line_discount_total: lineDiscountTotal,
         bill_discount: discount,
         tax_breakdown: Array.from(taxBuckets, ([rate, amount]) => ({ rate, amount })),
-        payments: [{ method: tab.payment_method, amount: +Math.min(paidNum, total).toFixed(2) }],
-        tendered: paidNum,
+        payments: paymentAllocations.map((entry) => ({ method: entry.method, amount: +Number(entry.amount ?? 0).toFixed(2) })),
+        tendered: tenderedAmount,
         change_due: change,
       });
 
@@ -1780,8 +1830,38 @@ function POSPage() {
             </div>
             <PaymentMethodGrid
               value={tab.payment_method}
-              onChange={(v) => { setTab({ payment_method: v }); setTimeout(() => searchRef.current?.focus(), 0); }}
+              onChange={(v) => { setPrimaryPaymentMethod(v); setTimeout(() => searchRef.current?.focus(), 0); }}
             />
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Tender</span>
+              <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={addPaymentRow}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Split
+              </Button>
+            </div>
+            <div className="mt-1 space-y-1.5">
+              {paymentRows.map((payment, idx) => (
+                <div key={`${payment.method}-${idx}`} className="flex items-center gap-1.5">
+                  <PaymentMethodSelect
+                    value={payment.method}
+                    onChange={(v) => updatePaymentRow(idx, { method: v })}
+                    className="h-8 flex-1"
+                  />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={payment.amount}
+                    onChange={(e) => updatePaymentRow(idx, { amount: Number(e.target.value || 0) })}
+                    className="h-8 w-24 text-right text-sm"
+                  />
+                  {paymentRows.length > 1 && (
+                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removePaymentRow(idx)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -1855,7 +1935,14 @@ function POSPage() {
                 type="number"
                 step="0.01"
                 value={tab.paid}
-                onChange={(e) => setTab({ paid: e.target.value })}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  const nextRows = [...paymentRows];
+                  if (nextRows[0]) {
+                    nextRows[0] = { ...nextRows[0], amount: Number(nextValue || 0) };
+                  }
+                  setTab({ paid: nextValue, payments: nextRows, payment_method: nextRows[0]?.method || tab.payment_method || "cash" });
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") { e.preventDefault(); handleSale(); }
                 }}
@@ -2283,6 +2370,39 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
       </DropdownMenu>
       <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>Credit</button>
     </div>
+  );
+}
+
+function PaymentMethodSelect({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
+  const accQ = useQuery({
+    queryKey: ["cash-accounts", "pos-payment-selector"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cash_accounts")
+        .select("id,name,type,is_active")
+        .eq("is_active", true)
+        .order("sort_order")
+        .order("name");
+      return data ?? [];
+    },
+  });
+  const accounts = accQ.data ?? [];
+  const options = [
+    { value: "cash", label: "Cash" },
+    { value: "card", label: "Card" },
+    { value: "credit", label: "Credit" },
+    ...accounts.filter((a: any) => a.type !== "cash").map((a: any) => ({ value: a.name, label: a.name })),
+  ];
+
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={className ?? "h-8 flex-1"}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
