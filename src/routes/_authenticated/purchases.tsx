@@ -1248,7 +1248,7 @@ function Page() {
           <div className="grid gap-3 md:grid-cols-[220px_1fr_1fr] items-end">
             <div>
               <Label className="text-xs">Date filter</Label>
-              <Select value={dateFilter} onValueChange={setDateFilter}>
+              <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as typeof dateFilter)}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="today">Today</SelectItem>
