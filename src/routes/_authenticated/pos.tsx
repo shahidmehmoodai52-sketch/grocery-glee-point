@@ -1175,6 +1175,7 @@ function POSPage() {
         charge: 0,
         charge_pct: "",
         paid: String(payload.paid ?? ""),
+        payments: [{ method: payload.payment_method ?? "cash", amount: Number(payload.paid ?? 0) }],
         note: payload.note ?? "",
         restored: true,
       };
