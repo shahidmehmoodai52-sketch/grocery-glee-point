@@ -8,28 +8,94 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { Receipt, printReceipt } from "@/components/receipt";
-import { offlineFirst, searchProductsLocal } from "@/lib/offline/pos";
+import { searchProductsLocal } from "@/lib/offline/pos";
+import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
 import { completeSaleReturnOfflineAware } from "@/lib/offline/returns";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const Route = createFileRoute("/_authenticated/sale-returns")({ component: Page });
 
 type ItemRow = {
   product_id: string | null;
   name: string;
-  qty: number;      // return qty
+  qty: number; // return qty
   price: number;
-  max?: number;     // original sold qty (when from an invoice)
+  max?: number; // original sold qty (when from an invoice)
   selected: boolean;
 };
+
+async function enrichReturnRow(row: any) {
+  if (!row.sale_return_items) {
+    try {
+      row.sale_return_items = await offlineDb()
+        .sale_return_items.where("return_id")
+        .equals(row.id)
+        .toArray();
+    } catch (error) {
+      void error;
+      row.sale_return_items = [];
+    }
+  }
+  if (!row.customers && row.customer_id) {
+    try {
+      const c = await offlineDb().customers.get(row.customer_id);
+      if (c) row.customers = { name: c.name };
+    } catch {
+      // ignore
+    }
+  }
+  return row;
+}
+
+async function enrichSaleRow(row: any) {
+  if (!row.sale_items) {
+    try {
+      row.sale_items = await offlineDb().sale_items.where("sale_id").equals(row.id).toArray();
+    } catch (error) {
+      void error;
+      row.sale_items = [];
+    }
+  }
+  if (!row.customers && row.customer_id) {
+    try {
+      const c = await offlineDb().customers.get(row.customer_id);
+      if (c) row.customers = { name: c.name };
+    } catch {
+      // ignore
+    }
+  }
+  return row;
+}
 
 function Page() {
   const qc = useQueryClient();
@@ -52,47 +118,78 @@ function Page() {
   const { data: returns = [] } = useQuery({
     queryKey: ["sale-returns"],
     queryFn: () =>
-      offlineFirst(
-        async () =>
-          (await supabase.from("sale_returns").select("*, customers(name), sale_return_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
-        async () =>
-          (await offlineDb().sale_returns.orderBy("created_at").reverse().limit(200).toArray()) as any[],
-        async (rows) => { try { await offlineDb().sale_returns.bulkPut(rows as any[]); } catch {} },
-      ),
+      readLocalFirst<any[]>({
+        table: "sale_returns",
+        cloud: async () =>
+          (
+            await supabase
+              .from("sale_returns")
+              .select("*, customers(name), sale_return_items(*)")
+              .order("created_at", { ascending: false })
+              .limit(200)
+          ).data ?? [],
+        local: async () => {
+          const rows = await offlineDb()
+            .sale_returns.orderBy("created_at")
+            .reverse()
+            .limit(200)
+            .toArray();
+          return await Promise.all(rows.map(enrichReturnRow));
+        },
+        cache: async (rows) => {
+          try {
+            await offlineDb().sale_returns.bulkPut(rows as any[]);
+            const items = (rows as any[]).flatMap((r) => r.sale_return_items ?? []);
+            if (items.length) await offlineDb().sale_return_items.bulkPut(items);
+          } catch (error) {
+            void error;
+          }
+        },
+      }),
   });
   const { data: sales = [] } = useQuery({
     queryKey: ["sales-for-return"],
     queryFn: () =>
-      offlineFirst(
-        async () =>
-          (await supabase.from("sales").select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
-        async () => {
+      readLocalFirst<any[]>({
+        table: "sales",
+        cloud: async () =>
+          (
+            await supabase
+              .from("sales")
+              .select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)")
+              .order("created_at", { ascending: false })
+              .limit(200)
+          ).data ?? [],
+        local: async () => {
           const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(200).toArray();
-          return Promise.all(
-            rows.map(async (r: any) => ({
-              ...r,
-              sale_items: r.sale_items ?? (await offlineDb().sale_items.where("sale_id").equals(r.id).toArray()),
-            })),
-          ) as any;
+          return await Promise.all(rows.map(enrichSaleRow));
         },
-        async (rows) => {
+        cache: async (rows) => {
           try {
             await offlineDb().sales.bulkPut(rows as any[]);
             const items = (rows as any[]).flatMap((r) => r.sale_items ?? []);
             if (items.length) await offlineDb().sale_items.bulkPut(items);
-          } catch {}
+          } catch (error) {
+            void error;
+          }
         },
-      ),
+      }),
   });
   const [date, setDate] = useState(today);
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
     queryFn: () =>
-      offlineFirst(
-        async () => (await supabase.from("customers").select("id,name").order("name")).data ?? [],
-        async () => (await offlineDb().customers.orderBy("name").toArray()) as any[],
-        async (rows) => { try { await offlineDb().customers.bulkPut(rows as any[]); } catch {} },
-      ),
+      readLocalFirst<any[]>({
+        table: "customers",
+        cloud: async () =>
+          (await supabase.from("customers").select("id,name").order("name")).data ?? [],
+        local: async () => (await offlineDb().customers.orderBy("name").toArray()) as any[],
+        cache: async (rows) => {
+          try {
+            await offlineDb().customers.bulkPut(rows as any[]);
+          } catch {}
+        },
+      }),
   });
 
   // Item-wise product search (works offline via the local mirror)
@@ -109,14 +206,35 @@ function Page() {
       const like = `%${q}%`;
       try {
         const [nameRes, skuRes, barcodeRes] = await Promise.all([
-          supabase.from("products").select("id,name,sku,barcode,sell_price,stock,unit").eq("is_active", true).ilike("name", like).order("name").limit(30),
-          supabase.from("products").select("id,name,sku,barcode,sell_price,stock,unit").eq("is_active", true).ilike("sku", like).limit(15),
-          supabase.from("products").select("id,name,sku,barcode,sell_price,stock,unit").eq("is_active", true).ilike("barcode", like).limit(15),
+          supabase
+            .from("products")
+            .select("id,name,sku,barcode,sell_price,stock,unit")
+            .eq("is_active", true)
+            .ilike("name", like)
+            .order("name")
+            .limit(30),
+          supabase
+            .from("products")
+            .select("id,name,sku,barcode,sell_price,stock,unit")
+            .eq("is_active", true)
+            .ilike("sku", like)
+            .limit(15),
+          supabase
+            .from("products")
+            .select("id,name,sku,barcode,sell_price,stock,unit")
+            .eq("is_active", true)
+            .ilike("barcode", like)
+            .limit(15),
         ]);
         const err = nameRes.error ?? skuRes.error ?? barcodeRes.error;
         if (err) throw err;
         const map = new Map<string, any>();
-        for (const r of [...(skuRes.data ?? []), ...(barcodeRes.data ?? []), ...(nameRes.data ?? [])]) map.set(r.id, r);
+        for (const r of [
+          ...(skuRes.data ?? []),
+          ...(barcodeRes.data ?? []),
+          ...(nameRes.data ?? []),
+        ])
+          map.set(r.id, r);
         return [...map.values()].slice(0, 30);
       } catch {
         return (await searchProductsLocal(q, 30)) as any[];
@@ -151,15 +269,22 @@ function Page() {
     [items],
   );
   const total = subtotal + Number(tax || 0);
-  useEffect(() => { setRefund(+total.toFixed(2)); }, [total]);
+  useEffect(() => {
+    setRefund(+total.toFixed(2));
+  }, [total]);
 
   const filteredSales = useMemo(() => {
     const q = invoiceSearch.trim().toLowerCase();
     if (!q) return sales as any[];
-    return (sales as any[]).filter((s) =>
-      String(s.invoice_no ?? "").toLowerCase().includes(q) ||
-      String(s.customers?.name ?? "").toLowerCase().includes(q) ||
-      String(Number(s.total).toFixed(2)).includes(q),
+    return (sales as any[]).filter(
+      (s) =>
+        String(s.invoice_no ?? "")
+          .toLowerCase()
+          .includes(q) ||
+        String(s.customers?.name ?? "")
+          .toLowerCase()
+          .includes(q) ||
+        String(Number(s.total).toFixed(2)).includes(q),
     );
   }, [sales, invoiceSearch]);
 
@@ -172,16 +297,35 @@ function Page() {
   const addProduct = (p: any) => {
     setItems((ls) => {
       const idx = ls.findIndex((l) => l.product_id === p.id && l.max == null);
-      if (idx >= 0) return ls.map((l, i) => (i === idx ? { ...l, qty: l.qty + 1, selected: true } : l));
-      return [...ls, { product_id: p.id, name: p.name, qty: 1, price: Number(p.sell_price ?? 0), selected: true }];
+      if (idx >= 0)
+        return ls.map((l, i) => (i === idx ? { ...l, qty: l.qty + 1, selected: true } : l));
+      return [
+        ...ls,
+        {
+          product_id: p.id,
+          name: p.name,
+          qty: 1,
+          price: Number(p.sell_price ?? 0),
+          selected: true,
+        },
+      ];
     });
     setProductSearch("");
     toast.success(`${p.name} added`);
   };
 
   const reset = () => {
-    setOpen(false); setItems([]); setSaleId("none"); setInvoiceSearch(""); setCustomer("none");
-    setTax(0); setRefund(0); setMethod("cash"); setNote(""); setDate(today); setProductSearch("");
+    setOpen(false);
+    setItems([]);
+    setSaleId("none");
+    setInvoiceSearch("");
+    setCustomer("none");
+    setTax(0);
+    setRefund(0);
+    setMethod("cash");
+    setNote("");
+    setDate(today);
+    setProductSearch("");
   };
 
   const submit = async () => {
@@ -204,7 +348,12 @@ function Page() {
           refund_amount: refund,
           refund_method: method,
           note,
-          items: picked.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
+          items: picked.map((l) => ({
+            product_id: l.product_id,
+            name: l.name,
+            qty: l.qty,
+            price: l.price,
+          })),
         },
         { original_invoice_no: selectedSale?.invoice_no ?? null },
       );
@@ -241,9 +390,16 @@ function Page() {
           <p className="text-sm text-muted-foreground">Refund customers and restore stock</p>
         </div>
         <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New return</Button></DialogTrigger>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New return
+            </Button>
+          </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>New sale return</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>New sale return</DialogTitle>
+            </DialogHeader>
             <div className="space-y-3">
               {/* Step 1: pick invoice */}
               <div className="grid grid-cols-1 gap-3">
@@ -274,12 +430,16 @@ function Page() {
                         className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex justify-between ${saleId === s.id ? "bg-accent font-medium" : ""}`}
                       >
                         <span className="font-mono">{s.invoice_no}</span>
-                        <span className="text-muted-foreground truncate mx-2">{s.customers?.name ?? "Walk-in"}</span>
+                        <span className="text-muted-foreground truncate mx-2">
+                          {s.customers?.name ?? "Walk-in"}
+                        </span>
                         <span>{fmtMoney(s.total, sym)}</span>
                       </button>
                     ))}
                     {filteredSales.length === 0 && (
-                      <div className="text-center text-xs text-muted-foreground py-3">No invoices found</div>
+                      <div className="text-center text-xs text-muted-foreground py-3">
+                        No invoices found
+                      </div>
                     )}
                   </div>
                 </div>
@@ -287,7 +447,8 @@ function Page() {
                 {selectedSale && (
                   <div className="text-xs bg-muted/40 rounded p-2">
                     Invoice <span className="font-mono">{selectedSale.invoice_no}</span> ·{" "}
-                    {new Date(selectedSale.created_at).toLocaleString()} · Total {fmtMoney(selectedSale.total, sym)} ·{" "}
+                    {new Date(selectedSale.created_at).toLocaleString()} · Total{" "}
+                    {fmtMoney(selectedSale.total, sym)} ·{" "}
                     {selectedSale.customers?.name ?? "Walk-in"}
                   </div>
                 )}
@@ -296,10 +457,16 @@ function Page() {
                   <div>
                     <Label>Customer</Label>
                     <Select value={customer} onValueChange={setCustomer}>
-                      <SelectTrigger><SelectValue placeholder="Walk-in" /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Walk-in" />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">— Walk-in —</SelectItem>
-                        {customers.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {customers.map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -334,12 +501,16 @@ function Page() {
                         className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex justify-between gap-2"
                       >
                         <span className="truncate">{p.name}</span>
-                        <span className="text-xs text-muted-foreground font-mono shrink-0">{p.sku ?? p.barcode ?? ""}</span>
+                        <span className="text-xs text-muted-foreground font-mono shrink-0">
+                          {p.sku ?? p.barcode ?? ""}
+                        </span>
                         <span className="shrink-0">{fmtMoney(p.sell_price ?? 0, sym)}</span>
                       </button>
                     ))}
                     {productResults.length === 0 && (
-                      <div className="text-center text-xs text-muted-foreground py-3">No items found</div>
+                      <div className="text-center text-xs text-muted-foreground py-3">
+                        No items found
+                      </div>
                     )}
                   </div>
                 )}
@@ -348,19 +519,26 @@ function Page() {
               {/* Step 3: pick items */}
               <div className="border rounded-md">
                 <Table>
-                  <TableHeader><TableRow>
-                    <TableHead className="w-10"></TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead className="w-28">Return qty</TableHead>
-                    <TableHead className="w-28">Price</TableHead>
-                    <TableHead className="text-right w-28">Line total</TableHead>
-                    <TableHead className="w-10"></TableHead>
-                  </TableRow></TableHeader>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10"></TableHead>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="w-28">Return qty</TableHead>
+                      <TableHead className="w-28">Price</TableHead>
+                      <TableHead className="text-right w-28">Line total</TableHead>
+                      <TableHead className="w-10"></TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {items.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-4 text-sm">
-                          {saleId === "none" ? "Add items below" : "Pick an invoice to load its items"}
+                        <TableCell
+                          colSpan={6}
+                          className="text-center text-muted-foreground py-4 text-sm"
+                        >
+                          {saleId === "none"
+                            ? "Add items below"
+                            : "Pick an invoice to load its items"}
                         </TableCell>
                       </TableRow>
                     )}
@@ -379,24 +557,44 @@ function Page() {
                               <div className="text-xs text-muted-foreground">sold: {l.max}</div>
                             </div>
                           ) : (
-                            <Input value={l.name} onChange={(e) => setItem(i, { name: e.target.value })} className="h-8" placeholder="Item name" />
+                            <Input
+                              value={l.name}
+                              onChange={(e) => setItem(i, { name: e.target.value })}
+                              className="h-8"
+                              placeholder="Item name"
+                            />
                           )}
                         </TableCell>
                         <TableCell>
                           <Input
-                            type="number" step="0.001" min={0} max={l.max}
+                            type="number"
+                            step="0.001"
+                            min={0}
+                            max={l.max}
                             value={l.qty}
                             onChange={(e) => setItem(i, { qty: Number(e.target.value) })}
                             className="h-8"
                           />
                         </TableCell>
                         <TableCell>
-                          <Input type="number" step="0.01" value={l.price} onChange={(e) => setItem(i, { price: Number(e.target.value) })} className="h-8" />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={l.price}
+                            onChange={(e) => setItem(i, { price: Number(e.target.value) })}
+                            className="h-8"
+                          />
                         </TableCell>
-                        <TableCell className="text-right font-medium">{fmtMoney(l.qty * l.price, sym)}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {fmtMoney(l.qty * l.price, sym)}
+                        </TableCell>
                         <TableCell>
                           {l.max == null && (
-                            <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, x) => x !== i))}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setItems(items.filter((_, x) => x !== i))}
+                            >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
@@ -407,18 +605,37 @@ function Page() {
                 </Table>
                 <div className="p-2">
                   <Button variant="outline" size="sm" onClick={addAdhoc}>
-                    <Plus className="h-3.5 w-3.5 mr-1" />Add ad-hoc item
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add ad-hoc item
                   </Button>
                 </div>
               </div>
 
               <div className="grid grid-cols-4 gap-3">
-                <div><Label>Tax</Label><Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} /></div>
-                <div><Label>Refund</Label><Input type="number" step="0.01" value={refund || ""} onChange={(e) => setRefund(Number(e.target.value))} /></div>
+                <div>
+                  <Label>Tax</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={tax || ""}
+                    onChange={(e) => setTax(Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <Label>Refund</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={refund || ""}
+                    onChange={(e) => setRefund(Number(e.target.value))}
+                  />
+                </div>
                 <div>
                   <Label>Method</Label>
                   <Select value={method} onValueChange={setMethod}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="card">Card</SelectItem>
@@ -432,11 +649,19 @@ function Page() {
                   <div className="text-2xl font-semibold text-primary">{fmtMoney(total, sym)}</div>
                 </div>
               </div>
-              <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
+              <div>
+                <Label>Note</Label>
+                <Input value={note} onChange={(e) => setNote(e.target.value)} />
+              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={reset}>Cancel</Button>
-              <Button onClick={submit}><Undo2 className="h-4 w-4 mr-2" />Process return</Button>
+              <Button variant="outline" onClick={reset}>
+                Cancel
+              </Button>
+              <Button onClick={submit}>
+                <Undo2 className="h-4 w-4 mr-2" />
+                Process return
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -444,13 +669,25 @@ function Page() {
 
       <Card className="p-3">
         <Table>
-          <TableHeader><TableRow>
-            <TableHead>Return #</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
-            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Refund</TableHead>
-            <TableHead>Method</TableHead><TableHead></TableHead>
-          </TableRow></TableHeader>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Return #</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Refund</TableHead>
+              <TableHead>Method</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
           <TableBody>
-            {returns.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No returns yet</TableCell></TableRow>}
+            {returns.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                  No returns yet
+                </TableCell>
+              </TableRow>
+            )}
             {returns.map((r: any) => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono text-xs">{r.return_no}</TableCell>
@@ -458,9 +695,15 @@ function Page() {
                 <TableCell>{r.customers?.name ?? "Walk-in"}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(r.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(r.refund_amount, sym)}</TableCell>
-                <TableCell><Badge variant="outline" className="capitalize">{r.refund_method}</Badge></TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="capitalize">
+                    {r.refund_method}
+                  </Badge>
+                </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => setViewing(r)}><Eye className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => setViewing(r)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -470,7 +713,9 @@ function Page() {
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Return {viewing?.return_no}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Return {viewing?.return_no}</DialogTitle>
+          </DialogHeader>
           {viewing && (
             <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
               <div className="print-area">
@@ -483,7 +728,10 @@ function Page() {
             </div>
           )}
           <DialogFooter className="no-print">
-            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+            <Button onClick={() => printReceipt()}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
