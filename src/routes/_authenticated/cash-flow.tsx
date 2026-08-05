@@ -20,6 +20,53 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney } from "@/lib/format";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { cn } from "@/lib/utils";
+
+function DateRangeBar({
+  preset, from, to, onPreset, onFrom, onTo,
+}: {
+  preset: DatePreset; from: string; to: string;
+  onPreset: (p: DatePreset) => void; onFrom: (v: string) => void; onTo: (v: string) => void;
+}) {
+  const pick = (val: string, set: (v: string) => void, label: string) => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 justify-start font-normal">
+          <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+          {val || label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={val ? new Date(`${val}T00:00:00`) : undefined}
+          onSelect={(d) => { onPreset("all"); set(d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : ""); }}
+          className={cn("p-3 pointer-events-auto")}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Select value={preset} onValueChange={(v) => { const p = v as DatePreset; onPreset(p); const r = rangeFor(p); onFrom(r.from); onTo(r.to); }}>
+        <SelectTrigger className="h-8 w-[150px]"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {PRESETS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      {pick(from, onFrom, "From")}
+      {pick(to, onTo, "To")}
+      {(from || to) && (
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => { onPreset("all"); onFrom(""); onTo(""); }}>Clear</Button>
+      )}
+    </div>
+  );
+}
+
 
 export const Route = createFileRoute("/_authenticated/cash-flow")({
   component: Page,
@@ -101,11 +148,19 @@ function Page() {
   const [dateTo, setDateTo] = useState("");
   const [filterAcc, setFilterAcc] = useState<string>("all");
 
-  const [details, setDetails] = useState<
+  const [details, setDetailsRaw] = useState<
     | { kind: "opening" | "in" | "out" | "balance" }
     | { kind: "account"; accountId: string }
     | null
   >(null);
+  const [dPreset, setDPreset] = useState<DatePreset>("all");
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
+  const setDetails = (d: typeof details) => {
+    if (d) { setDPreset("all"); setDFrom(""); setDTo(""); }
+    setDetailsRaw(d);
+  };
+
 
   const accountsQ = useQuery({
     queryKey: ["cash-accounts"],
@@ -1101,9 +1156,20 @@ function Page() {
             if (!details) return null;
             if (details.kind === "opening" || details.kind === "balance") {
               const title = details.kind === "opening" ? "Opening balance — per account" : "Cash on hand — per account";
+              const perAcc = new Map<string, { prior: number; inSum: number; outSum: number }>();
+              for (const a of allAccounts) perAcc.set(a.id, { prior: 0, inSum: 0, outSum: 0 });
+              for (const t of txs) {
+                const r = perAcc.get(t.account_id);
+                if (!r) continue;
+                const amt = Number(t.amount);
+                if (dFrom && t.occurred_on < dFrom) { r.prior += t.direction === "in" ? amt : -amt; continue; }
+                if (dTo && t.occurred_on > dTo) continue;
+                if (t.direction === "in") r.inSum += amt; else r.outSum += amt;
+              }
               return (
                 <>
                   <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+                  <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
                   <div className="max-h-[60vh] overflow-auto">
                     <Table>
                       <TableHeader>
@@ -1118,15 +1184,16 @@ function Page() {
                       </TableHeader>
                       <TableBody>
                         {allAccounts.map((a) => {
-                          const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
-                          const bal = Number(a.opening_balance) + b.inSum - b.outSum;
+                          const r = perAcc.get(a.id) ?? { prior: 0, inSum: 0, outSum: 0 };
+                          const opening = Number(a.opening_balance) + r.prior;
+                          const bal = opening + r.inSum - r.outSum;
                           return (
                             <TableRow key={a.id}>
                               <TableCell className="font-medium">{a.name}</TableCell>
                               <TableCell className="text-muted-foreground">{labelFor(a.type)}</TableCell>
-                              <TableCell className="text-right">{fmt(Number(a.opening_balance))}</TableCell>
-                              <TableCell className="text-right text-emerald-600">{fmt(b.inSum)}</TableCell>
-                              <TableCell className="text-right text-rose-600">{fmt(b.outSum)}</TableCell>
+                              <TableCell className="text-right">{fmt(opening)}</TableCell>
+                              <TableCell className="text-right text-emerald-600">{fmt(r.inSum)}</TableCell>
+                              <TableCell className="text-right text-rose-600">{fmt(r.outSum)}</TableCell>
                               <TableCell className="text-right font-bold">{fmt(bal)}</TableCell>
                             </TableRow>
                           );
@@ -1137,20 +1204,37 @@ function Page() {
                 </>
               );
             }
+
             const dir = details.kind === "in" ? "in" : details.kind === "out" ? "out" : null;
             const accId = details.kind === "account" ? details.accountId : null;
-            const list = txs.filter((t) => {
+            const scope = txs.filter((t) => {
               if (dir && t.direction !== dir) return false;
               if (accId && t.account_id !== accId) return false;
               return true;
             });
+            const list = scope
+              .filter((t) => (!dFrom || t.occurred_on >= dFrom) && (!dTo || t.occurred_on <= dTo))
+              .sort((a, b) =>
+                String(b.occurred_on).localeCompare(String(a.occurred_on)) ||
+                String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")) ||
+                String(b.id).localeCompare(String(a.id)),
+              );
             const inTot = list.filter((t) => t.direction === "in").reduce((s, t) => s + Number(t.amount), 0);
             const outTot = list.filter((t) => t.direction === "out").reduce((s, t) => s + Number(t.amount), 0);
-            const openingBal = accId
+            const baseOpening = accId
               ? Number(accById(accId)?.opening_balance ?? 0)
               : allAccounts.reduce((s, a) => s + Number(a.opening_balance ?? 0), 0);
+            // Everything before the selected window rolls into the opening balance
+            let prior = 0;
+            if (dFrom) {
+              for (const t of scope) {
+                if (t.occurred_on >= dFrom) continue;
+                prior += t.direction === "in" ? Number(t.amount) : -Number(t.amount);
+              }
+            }
+            const openingBal = baseOpening + prior;
             // Running balance (oldest → newest), then map back to display order
-            const asc = [...list].sort((a, b) => String(a.occurred_on).localeCompare(String(b.occurred_on)) || String(a.id).localeCompare(String(b.id)));
+            const asc = [...list].reverse();
             const runMap = new Map<string, number>();
             let run = openingBal;
             for (const t of asc) {
@@ -1158,6 +1242,7 @@ function Page() {
               runMap.set(t.id, run);
             }
             const closingBal = openingBal + inTot - outTot;
+
             const title =
               details.kind === "in" ? "Every payment received"
               : details.kind === "out" ? "Every payment sent"
@@ -1167,6 +1252,8 @@ function Page() {
                 <DialogHeader>
                   <DialogTitle>{title}</DialogTitle>
                 </DialogHeader>
+                <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
+
                 <div className="flex flex-wrap gap-3 text-sm">
                   <span>Entries: <b>{list.length}</b></span>
                   <span>Opening: <b>{fmt(openingBal)}</b></span>
