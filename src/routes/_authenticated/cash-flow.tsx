@@ -1194,18 +1194,34 @@ function Page() {
             }
             const dir = details.kind === "in" ? "in" : details.kind === "out" ? "out" : null;
             const accId = details.kind === "account" ? details.accountId : null;
-            const list = txs.filter((t) => {
+            const scope = txs.filter((t) => {
               if (dir && t.direction !== dir) return false;
               if (accId && t.account_id !== accId) return false;
               return true;
             });
+            const list = scope
+              .filter((t) => (!dFrom || t.occurred_on >= dFrom) && (!dTo || t.occurred_on <= dTo))
+              .sort((a, b) =>
+                String(b.occurred_on).localeCompare(String(a.occurred_on)) ||
+                String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")) ||
+                String(b.id).localeCompare(String(a.id)),
+              );
             const inTot = list.filter((t) => t.direction === "in").reduce((s, t) => s + Number(t.amount), 0);
             const outTot = list.filter((t) => t.direction === "out").reduce((s, t) => s + Number(t.amount), 0);
-            const openingBal = accId
+            const baseOpening = accId
               ? Number(accById(accId)?.opening_balance ?? 0)
               : allAccounts.reduce((s, a) => s + Number(a.opening_balance ?? 0), 0);
+            // Everything before the selected window rolls into the opening balance
+            let prior = 0;
+            if (dFrom) {
+              for (const t of scope) {
+                if (t.occurred_on >= dFrom) continue;
+                prior += t.direction === "in" ? Number(t.amount) : -Number(t.amount);
+              }
+            }
+            const openingBal = baseOpening + prior;
             // Running balance (oldest → newest), then map back to display order
-            const asc = [...list].sort((a, b) => String(a.occurred_on).localeCompare(String(b.occurred_on)) || String(a.id).localeCompare(String(b.id)));
+            const asc = [...list].reverse();
             const runMap = new Map<string, number>();
             let run = openingBal;
             for (const t of asc) {
@@ -1213,6 +1229,7 @@ function Page() {
               runMap.set(t.id, run);
             }
             const closingBal = openingBal + inTot - outTot;
+
             const title =
               details.kind === "in" ? "Every payment received"
               : details.kind === "out" ? "Every payment sent"
