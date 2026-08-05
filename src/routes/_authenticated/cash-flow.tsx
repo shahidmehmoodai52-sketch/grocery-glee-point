@@ -20,6 +20,53 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney } from "@/lib/format";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { cn } from "@/lib/utils";
+
+function DateRangeBar({
+  preset, from, to, onPreset, onFrom, onTo,
+}: {
+  preset: DatePreset; from: string; to: string;
+  onPreset: (p: DatePreset) => void; onFrom: (v: string) => void; onTo: (v: string) => void;
+}) {
+  const pick = (val: string, set: (v: string) => void, label: string) => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 justify-start font-normal">
+          <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+          {val || label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={val ? new Date(`${val}T00:00:00`) : undefined}
+          onSelect={(d) => { onPreset("all"); set(d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : ""); }}
+          className={cn("p-3 pointer-events-auto")}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Select value={preset} onValueChange={(v) => { const p = v as DatePreset; onPreset(p); const r = rangeFor(p); onFrom(r.from); onTo(r.to); }}>
+        <SelectTrigger className="h-8 w-[150px]"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {PRESETS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      {pick(from, onFrom, "From")}
+      {pick(to, onTo, "To")}
+      {(from || to) && (
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => { onPreset("all"); onFrom(""); onTo(""); }}>Clear</Button>
+      )}
+    </div>
+  );
+}
+
 
 export const Route = createFileRoute("/_authenticated/cash-flow")({
   component: Page,
