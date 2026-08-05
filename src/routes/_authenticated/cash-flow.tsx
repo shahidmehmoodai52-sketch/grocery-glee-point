@@ -1239,6 +1239,8 @@ function Page() {
                 <DialogHeader>
                   <DialogTitle>{title}</DialogTitle>
                 </DialogHeader>
+                <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
+
                 <div className="flex flex-wrap gap-3 text-sm">
                   <span>Entries: <b>{list.length}</b></span>
                   <span>Opening: <b>{fmt(openingBal)}</b></span>
