@@ -1156,9 +1156,20 @@ function Page() {
             if (!details) return null;
             if (details.kind === "opening" || details.kind === "balance") {
               const title = details.kind === "opening" ? "Opening balance — per account" : "Cash on hand — per account";
+              const perAcc = new Map<string, { prior: number; inSum: number; outSum: number }>();
+              for (const a of allAccounts) perAcc.set(a.id, { prior: 0, inSum: 0, outSum: 0 });
+              for (const t of txs) {
+                const r = perAcc.get(t.account_id);
+                if (!r) continue;
+                const amt = Number(t.amount);
+                if (dFrom && t.occurred_on < dFrom) { r.prior += t.direction === "in" ? amt : -amt; continue; }
+                if (dTo && t.occurred_on > dTo) continue;
+                if (t.direction === "in") r.inSum += amt; else r.outSum += amt;
+              }
               return (
                 <>
                   <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+                  <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
                   <div className="max-h-[60vh] overflow-auto">
                     <Table>
                       <TableHeader>
@@ -1173,15 +1184,16 @@ function Page() {
                       </TableHeader>
                       <TableBody>
                         {allAccounts.map((a) => {
-                          const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
-                          const bal = Number(a.opening_balance) + b.inSum - b.outSum;
+                          const r = perAcc.get(a.id) ?? { prior: 0, inSum: 0, outSum: 0 };
+                          const opening = Number(a.opening_balance) + r.prior;
+                          const bal = opening + r.inSum - r.outSum;
                           return (
                             <TableRow key={a.id}>
                               <TableCell className="font-medium">{a.name}</TableCell>
                               <TableCell className="text-muted-foreground">{labelFor(a.type)}</TableCell>
-                              <TableCell className="text-right">{fmt(Number(a.opening_balance))}</TableCell>
-                              <TableCell className="text-right text-emerald-600">{fmt(b.inSum)}</TableCell>
-                              <TableCell className="text-right text-rose-600">{fmt(b.outSum)}</TableCell>
+                              <TableCell className="text-right">{fmt(opening)}</TableCell>
+                              <TableCell className="text-right text-emerald-600">{fmt(r.inSum)}</TableCell>
+                              <TableCell className="text-right text-rose-600">{fmt(r.outSum)}</TableCell>
                               <TableCell className="text-right font-bold">{fmt(bal)}</TableCell>
                             </TableRow>
                           );
@@ -1192,6 +1204,7 @@ function Page() {
                 </>
               );
             }
+
             const dir = details.kind === "in" ? "in" : details.kind === "out" ? "out" : null;
             const accId = details.kind === "account" ? details.accountId : null;
             const scope = txs.filter((t) => {
