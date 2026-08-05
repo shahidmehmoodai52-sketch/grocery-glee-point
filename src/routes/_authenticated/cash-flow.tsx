@@ -1146,6 +1146,18 @@ function Page() {
             });
             const inTot = list.filter((t) => t.direction === "in").reduce((s, t) => s + Number(t.amount), 0);
             const outTot = list.filter((t) => t.direction === "out").reduce((s, t) => s + Number(t.amount), 0);
+            const openingBal = accId
+              ? Number(accById(accId)?.opening_balance ?? 0)
+              : allAccounts.reduce((s, a) => s + Number(a.opening_balance ?? 0), 0);
+            // Running balance (oldest → newest), then map back to display order
+            const asc = [...list].sort((a, b) => String(a.occurred_on).localeCompare(String(b.occurred_on)) || String(a.id).localeCompare(String(b.id)));
+            const runMap = new Map<string, number>();
+            let run = openingBal;
+            for (const t of asc) {
+              run += t.direction === "in" ? Number(t.amount) : -Number(t.amount);
+              runMap.set(t.id, run);
+            }
+            const closingBal = openingBal + inTot - outTot;
             const title =
               details.kind === "in" ? "Every payment received"
               : details.kind === "out" ? "Every payment sent"
@@ -1157,9 +1169,11 @@ function Page() {
                 </DialogHeader>
                 <div className="flex flex-wrap gap-3 text-sm">
                   <span>Entries: <b>{list.length}</b></span>
+                  <span>Opening: <b>{fmt(openingBal)}</b></span>
                   <span className="text-emerald-600">In: <b>{fmt(inTot)}</b></span>
                   <span className="text-rose-600">Out: <b>{fmt(outTot)}</b></span>
                   <span>Net: <b>{fmt(inTot - outTot)}</b></span>
+                  <span>Balance: <b>{fmt(closingBal)}</b></span>
                 </div>
                 <div className="max-h-[60vh] overflow-auto">
                   <Table>
@@ -1171,11 +1185,12 @@ function Page() {
                         <TableHead>Reference / Notes</TableHead>
                         <TableHead className="text-right">In</TableHead>
                         <TableHead className="text-right">Out</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {list.length === 0 && (
-                        <TableRow><TableCell colSpan={accId ? 5 : 6} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={accId ? 6 : 7} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
                       )}
                       {list.map((t) => {
                         const acc = accById(t.account_id);
@@ -1191,6 +1206,7 @@ function Page() {
                             </TableCell>
                             <TableCell className="text-right text-emerald-600">{t.direction === "in" ? fmt(Number(t.amount)) : ""}</TableCell>
                             <TableCell className="text-right text-rose-600">{t.direction === "out" ? fmt(Number(t.amount)) : ""}</TableCell>
+                            <TableCell className="text-right font-semibold">{fmt(runMap.get(t.id) ?? 0)}</TableCell>
                           </TableRow>
                         );
                       })}
