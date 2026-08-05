@@ -101,11 +101,19 @@ function Page() {
   const [dateTo, setDateTo] = useState("");
   const [filterAcc, setFilterAcc] = useState<string>("all");
 
-  const [details, setDetails] = useState<
+  const [details, setDetailsRaw] = useState<
     | { kind: "opening" | "in" | "out" | "balance" }
     | { kind: "account"; accountId: string }
     | null
   >(null);
+  const [dPreset, setDPreset] = useState<DatePreset>("all");
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
+  const setDetails = (d: typeof details) => {
+    if (d) { setDPreset("all"); setDFrom(""); setDTo(""); }
+    setDetailsRaw(d);
+  };
+
 
   const accountsQ = useQuery({
     queryKey: ["cash-accounts"],
