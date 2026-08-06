@@ -2694,7 +2694,17 @@ function ReprintDialog({
 
                   </tr>
                 ))}
+                {sales.length >= pageSize && (
+                  <tr className="border-t">
+                    <td colSpan={5} className="text-center py-2">
+                      <Button size="sm" variant="outline" onClick={() => setPageSize((n) => n + 300)}>
+                        Load older invoices
+                      </Button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
+
             </table>
           </div>
         </div>
