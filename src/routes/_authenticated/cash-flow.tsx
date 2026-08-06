@@ -591,6 +591,7 @@ function Page() {
     setTxForm({
       account_id: t.account_id, direction: t.direction, amount: Number(t.amount),
       occurred_on: t.occurred_on, category: t.category, reference: t.reference ?? "", notes: t.notes ?? "",
+      payment_method: methodOf(t),
     });
     setTxOpen(true);
   };
@@ -605,7 +606,9 @@ function Page() {
       category: txForm.category || "other",
       reference: txForm.reference || null,
       notes: txForm.notes || null,
+      payment_method: txForm.payment_method || "cash",
     };
+
     const q = editingTxId
       ? supabase.from("cash_transactions").update(payload).eq("id", editingTxId)
       : supabase.from("cash_transactions").insert(payload);
