@@ -883,6 +883,16 @@ function Page() {
               </Select>
             </div>
             <div>
+              <Label className="text-xs">Payment method</Label>
+              <Select value={filterMethod} onValueChange={setFilterMethod}>
+                <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All methods</SelectItem>
+                  {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label className="text-xs">From</Label>
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
             </div>
@@ -890,6 +900,7 @@ function Page() {
               <Label className="text-xs">To</Label>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </div>
+            <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
           </div>
           <Card className="overflow-x-auto">
             <Table>
@@ -897,12 +908,14 @@ function Page() {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Account</TableHead>
+                  <TableHead>Method</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Reference / Notes</TableHead>
                   <TableHead className="text-right">In</TableHead>
                   <TableHead className="text-right">Out</TableHead>
                   {isAdmin && <TableHead className="w-[100px]"></TableHead>}
                 </TableRow>
+
               </TableHeader>
               <TableBody>
                 {filteredTx.length === 0 && (
