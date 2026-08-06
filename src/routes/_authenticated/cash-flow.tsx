@@ -1397,6 +1397,7 @@ function Page() {
                       <TableRow>
                         <TableHead>Date</TableHead>
                         {!accId && <TableHead>Account</TableHead>}
+                        <TableHead>Method</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Reference / Notes</TableHead>
                         <TableHead className="text-right">In</TableHead>
@@ -1406,7 +1407,7 @@ function Page() {
                     </TableHeader>
                     <TableBody>
                       {list.length === 0 && (
-                        <TableRow><TableCell colSpan={accId ? 6 : 7} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={accId ? 7 : 8} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
                       )}
                       {list.map((t) => {
                         const acc = accById(t.account_id);
@@ -1414,7 +1415,9 @@ function Page() {
                           <TableRow key={t.id}>
                             <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
                             {!accId && <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>}
+                            <TableCell className="whitespace-nowrap">{payLabel(methodOf(t))}</TableCell>
                             <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
+
                             <TableCell className="max-w-[280px] truncate">
                               {t.reference && <span className="font-medium">{t.reference}</span>}
                               {t.reference && t.notes && <span> — </span>}
