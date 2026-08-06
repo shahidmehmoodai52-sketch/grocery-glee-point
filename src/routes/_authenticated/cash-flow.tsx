@@ -217,63 +217,66 @@ function Page() {
 
   const txQ = useQuery({
     queryKey: ["cash-transactions"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("cash_transactions")
-        .select("*")
-        .order("occurred_on", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(1000);
-      if (error) throw error;
-      return (data ?? []) as Tx[];
-    },
+    queryFn: async () =>
+      await fetchAll<Tx>(
+        () => supabase.from("cash_transactions").select("*"),
+        [{ col: "occurred_on" }, { col: "created_at" }],
+      ),
     staleTime: 30_000,
   });
 
   // --- Auto-derived cash movements from POS / purchases / expenses / party payments ---
+  // All of these are paged in full: financial history must never be truncated.
   const salesQ = useQuery({
     queryKey: ["cf-sales"],
-    queryFn: async () => (await supabase.from("sales")
-      .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("sales").select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
   const saleReturnsQ = useQuery({
     queryKey: ["cf-sale-returns"],
-    queryFn: async () => (await supabase.from("sale_returns")
-      .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("sale_returns").select("id,return_no,refund_amount,refund_method,created_at,customers(name)"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
   const purchasesQ = useQuery({
     queryKey: ["cf-purchases"],
-    queryFn: async () => (await supabase.from("purchases")
-      .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("purchases").select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
 
   const purchaseReturnsQ = useQuery({
     queryKey: ["cf-purchase-returns"],
-    queryFn: async () => (await supabase.from("purchase_returns")
-      .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("purchase_returns").select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
   const expensesQ = useQuery({
     queryKey: ["cf-expenses"],
-    queryFn: async () => (await supabase.from("expenses")
-      .select("id,amount,method,category,description,expense_date,created_at")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("expenses").select("id,amount,method,category,description,expense_date,created_at"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
   const partyPaymentsQ = useQuery({
     queryKey: ["cf-party-payments"],
-    queryFn: async () => (await supabase.from("party_payments")
-      .select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("party_payments").select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
+
   const suppliersQ = useQuery({
     queryKey: ["cf-suppliers"],
     queryFn: async () => (await supabase.from("suppliers").select("id,name,balance").order("name")).data ?? [],
