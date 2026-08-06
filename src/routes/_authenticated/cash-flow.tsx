@@ -495,19 +495,56 @@ function Page() {
     return sum;
   }, [purchasesQ.data]);
 
+  /** Payment method of an entry. Stored value wins; legacy/auto rows are
+   *  inferred from their account type and default to Cash. */
+  const methodOf = (t: Tx): string => {
+    if (t.payment_method) return t.payment_method;
+    const acc = allAccounts.find((a) => a.id === t.account_id);
+    const type = acc?.type ?? "cash";
+    const name = (acc?.name ?? "").toLowerCase();
+    if (type === "card") return "card";
+    if (type === "bank") return "bank";
+    if (type === "mobile_wallet") return name.includes("jazz") ? "jazzcash" : "easypaisa";
+    return "cash";
+  };
+
   const filteredTx = useMemo(() => {
     const term = search.trim().toLowerCase();
     return txs.filter((t) => {
       if (filterAcc !== "all" && t.account_id !== filterAcc) return false;
+      if (filterMethod !== "all" && methodOf(t) !== filterMethod) return false;
       if (dateFrom && t.occurred_on < dateFrom) return false;
       if (dateTo && t.occurred_on > dateTo) return false;
       if (term) {
-        const hay = `${t.category} ${t.reference ?? ""} ${t.notes ?? ""}`.toLowerCase();
+        const hay = `${t.category} ${t.reference ?? ""} ${t.notes ?? ""} ${payLabel(methodOf(t))}`.toLowerCase();
         if (!hay.includes(term)) return false;
       }
       return true;
     }).sort((a, b) => (b.occurred_on > a.occurred_on ? 1 : b.occurred_on < a.occurred_on ? -1 : (b.created_at > a.created_at ? 1 : -1)));
-  }, [txs, search, dateFrom, dateTo, filterAcc]);
+  }, [txs, search, dateFrom, dateTo, filterAcc, filterMethod, allAccounts]);
+
+  /** CSV export of exactly what is on screen (method + account included). */
+  const exportCsv = () => {
+    const rows = [
+      ["Date", "Account", "Payment method", "Category", "Reference", "Notes", "In", "Out"],
+      ...filteredTx.map((t) => [
+        t.occurred_on,
+        allAccounts.find((a) => a.id === t.account_id)?.name ?? "",
+        payLabel(methodOf(t)),
+        t.category,
+        t.reference ?? "",
+        t.notes ?? "",
+        t.direction === "in" ? String(t.amount) : "",
+        t.direction === "out" ? String(t.amount) : "",
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `cash-flow-${today()}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
 
 
   const openAccCreate = () => { setEditingAccId(null); setAccForm({ ...emptyAcc }); setAccOpen(true); };
