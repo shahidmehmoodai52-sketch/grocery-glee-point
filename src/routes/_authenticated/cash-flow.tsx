@@ -186,6 +186,7 @@ function Page() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [filterAcc, setFilterAcc] = useState<string>("all");
+  const [filterMethod, setFilterMethod] = useState<string>("all");
 
   const [details, setDetailsRaw] = useState<
     | { kind: "opening" | "in" | "out" | "balance" }
