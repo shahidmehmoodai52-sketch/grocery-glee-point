@@ -99,6 +99,7 @@ type Tx = {
   notes: string | null;
   transfer_group_id: string | null;
   created_at: string;
+  payment_method?: string | null;
 };
 
 const ACC_TYPES = [
@@ -108,6 +109,17 @@ const ACC_TYPES = [
   { v: "mobile_wallet", label: "Mobile wallet (EasyPaisa/JazzCash)", Icon: Smartphone },
   { v: "other", label: "Other", Icon: Wallet },
 ] as const;
+
+/** Payment methods offered on every cash-flow entry. */
+const PAY_METHODS = [
+  { v: "cash", label: "Cash" },
+  { v: "card", label: "Card" },
+  { v: "easypaisa", label: "EasyPaisa" },
+  { v: "jazzcash", label: "JazzCash" },
+  { v: "bank", label: "Bank Account" },
+] as const;
+const payLabel = (v?: string | null) =>
+  PAY_METHODS.find((m) => m.v === (v || "cash"))?.label ?? (v || "Cash");
 
 const CATEGORIES = [
   "sale", "expense", "deposit", "withdrawal", "supplier_payment",
@@ -119,9 +131,36 @@ const labelFor = (t: string) => ACC_TYPES.find((x) => x.v === t)?.label ?? t;
 
 const emptyAcc = { name: "", type: "cash", opening_balance: 0, notes: "", is_active: true };
 const today = () => new Date().toISOString().slice(0, 10);
-const emptyTx = { account_id: "", direction: "in" as "in" | "out", amount: 0, occurred_on: today(), category: "other", reference: "", notes: "" };
+const emptyTx = { account_id: "", direction: "in" as "in" | "out", amount: 0, occurred_on: today(), category: "other", reference: "", notes: "", payment_method: "cash" };
 const emptyTransfer = { from_id: "", to_id: "", amount: 0, occurred_on: today(), notes: "" };
 const emptySupplierPay = { supplier_id: "", from_id: "", amount: 0, occurred_on: today(), note: "" };
+
+/**
+ * Fetch an ENTIRE table page-by-page.
+ *
+ * Cash flow is a financial ledger: a fixed `.limit()` silently drops the OLDEST
+ * rows once a shop crosses the cap, which reads to the user as history being
+ * deleted. Never cap these reads — page until the server stops returning rows.
+ */
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 200; // 200k rows safety ceiling
+async function fetchAll<T = any>(
+  build: () => any,
+  order: { col: string; asc?: boolean }[],
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let q = build();
+    for (const o of order) q = q.order(o.col, { ascending: o.asc ?? false });
+    const { data, error } = await q.range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
 
 function Page() {
   const qc = useQueryClient();
