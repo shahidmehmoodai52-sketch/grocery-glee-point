@@ -1077,14 +1077,45 @@ function Page() {
               </div>
             </div>
             <div>
-              <Label>Account</Label>
-              <Select value={txForm.account_id} onValueChange={(v) => setTxForm((f: any) => ({ ...f, account_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Choose account" /></SelectTrigger>
+              <Label>Payment method</Label>
+              <Select
+                value={txForm.payment_method || "cash"}
+                onValueChange={(v) => setTxForm((f: any) => {
+                  // Picking a non-bank method keeps the matching account in sync when one exists.
+                  const wantType = v === "bank" ? "bank" : v === "card" ? "card" : v === "cash" ? "cash" : "mobile_wallet";
+                  const match = accounts.find((a) => a.type === wantType);
+                  return { ...f, payment_method: v, account_id: match?.id ?? f.account_id };
+                })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{m.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            {(txForm.payment_method || "cash") === "bank" ? (
+              <div>
+                <Label>Select account</Label>
+                <Select value={txForm.account_id} onValueChange={(v) => setTxForm((f: any) => ({ ...f, account_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Choose bank account" /></SelectTrigger>
+                  <SelectContent>
+                    {(accounts.filter((a) => a.type === "bank").length ? accounts.filter((a) => a.type === "bank") : accounts)
+                      .map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div>
+                <Label>Account</Label>
+                <Select value={txForm.account_id} onValueChange={(v) => setTxForm((f: any) => ({ ...f, account_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Choose account" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Amount</Label>
