@@ -491,6 +491,7 @@ export type Database = {
           id: string
           notes: string | null
           occurred_on: string
+          payment_method: string
           reference: string | null
           tenant_id: string
           transfer_group_id: string | null
@@ -506,6 +507,7 @@ export type Database = {
           id?: string
           notes?: string | null
           occurred_on?: string
+          payment_method?: string
           reference?: string | null
           tenant_id?: string
           transfer_group_id?: string | null
@@ -521,6 +523,7 @@ export type Database = {
           id?: string
           notes?: string | null
           occurred_on?: string
+          payment_method?: string
           reference?: string | null
           tenant_id?: string
           transfer_group_id?: string | null
