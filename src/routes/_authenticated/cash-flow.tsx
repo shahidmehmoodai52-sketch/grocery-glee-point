@@ -99,6 +99,7 @@ type Tx = {
   notes: string | null;
   transfer_group_id: string | null;
   created_at: string;
+  payment_method?: string | null;
 };
 
 const ACC_TYPES = [
@@ -108,6 +109,17 @@ const ACC_TYPES = [
   { v: "mobile_wallet", label: "Mobile wallet (EasyPaisa/JazzCash)", Icon: Smartphone },
   { v: "other", label: "Other", Icon: Wallet },
 ] as const;
+
+/** Payment methods offered on every cash-flow entry. */
+const PAY_METHODS = [
+  { v: "cash", label: "Cash" },
+  { v: "card", label: "Card" },
+  { v: "easypaisa", label: "EasyPaisa" },
+  { v: "jazzcash", label: "JazzCash" },
+  { v: "bank", label: "Bank Account" },
+] as const;
+const payLabel = (v?: string | null) =>
+  PAY_METHODS.find((m) => m.v === (v || "cash"))?.label ?? (v || "Cash");
 
 const CATEGORIES = [
   "sale", "expense", "deposit", "withdrawal", "supplier_payment",
@@ -119,9 +131,36 @@ const labelFor = (t: string) => ACC_TYPES.find((x) => x.v === t)?.label ?? t;
 
 const emptyAcc = { name: "", type: "cash", opening_balance: 0, notes: "", is_active: true };
 const today = () => new Date().toISOString().slice(0, 10);
-const emptyTx = { account_id: "", direction: "in" as "in" | "out", amount: 0, occurred_on: today(), category: "other", reference: "", notes: "" };
+const emptyTx = { account_id: "", direction: "in" as "in" | "out", amount: 0, occurred_on: today(), category: "other", reference: "", notes: "", payment_method: "cash" };
 const emptyTransfer = { from_id: "", to_id: "", amount: 0, occurred_on: today(), notes: "" };
 const emptySupplierPay = { supplier_id: "", from_id: "", amount: 0, occurred_on: today(), note: "" };
+
+/**
+ * Fetch an ENTIRE table page-by-page.
+ *
+ * Cash flow is a financial ledger: a fixed `.limit()` silently drops the OLDEST
+ * rows once a shop crosses the cap, which reads to the user as history being
+ * deleted. Never cap these reads — page until the server stops returning rows.
+ */
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 200; // 200k rows safety ceiling
+async function fetchAll<T = any>(
+  build: () => any,
+  order: { col: string; asc?: boolean }[],
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let q = build();
+    for (const o of order) q = q.order(o.col, { ascending: o.asc ?? false });
+    const { data, error } = await q.range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
 
 function Page() {
   const qc = useQueryClient();
@@ -147,6 +186,7 @@ function Page() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [filterAcc, setFilterAcc] = useState<string>("all");
+  const [filterMethod, setFilterMethod] = useState<string>("all");
 
   const [details, setDetailsRaw] = useState<
     | { kind: "opening" | "in" | "out" | "balance" }
@@ -178,63 +218,66 @@ function Page() {
 
   const txQ = useQuery({
     queryKey: ["cash-transactions"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("cash_transactions")
-        .select("*")
-        .order("occurred_on", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(1000);
-      if (error) throw error;
-      return (data ?? []) as Tx[];
-    },
+    queryFn: async () =>
+      await fetchAll<Tx>(
+        () => supabase.from("cash_transactions").select("*"),
+        [{ col: "occurred_on" }, { col: "created_at" }],
+      ),
     staleTime: 30_000,
   });
 
   // --- Auto-derived cash movements from POS / purchases / expenses / party payments ---
+  // All of these are paged in full: financial history must never be truncated.
   const salesQ = useQuery({
     queryKey: ["cf-sales"],
-    queryFn: async () => (await supabase.from("sales")
-      .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("sales").select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
   const saleReturnsQ = useQuery({
     queryKey: ["cf-sale-returns"],
-    queryFn: async () => (await supabase.from("sale_returns")
-      .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("sale_returns").select("id,return_no,refund_amount,refund_method,created_at,customers(name)"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
   const purchasesQ = useQuery({
     queryKey: ["cf-purchases"],
-    queryFn: async () => (await supabase.from("purchases")
-      .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("purchases").select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
 
   const purchaseReturnsQ = useQuery({
     queryKey: ["cf-purchase-returns"],
-    queryFn: async () => (await supabase.from("purchase_returns")
-      .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("purchase_returns").select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
   const expensesQ = useQuery({
     queryKey: ["cf-expenses"],
-    queryFn: async () => (await supabase.from("expenses")
-      .select("id,amount,method,category,description,expense_date,created_at")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("expenses").select("id,amount,method,category,description,expense_date,created_at"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
   const partyPaymentsQ = useQuery({
     queryKey: ["cf-party-payments"],
-    queryFn: async () => (await supabase.from("party_payments")
-      .select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id")
-      .order("created_at", { ascending: false }).limit(2000)).data ?? [],
+    queryFn: async () => await fetchAll(
+      () => supabase.from("party_payments").select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id"),
+      [{ col: "created_at" }],
+    ),
     staleTime: 30_000,
   });
+
   const suppliersQ = useQuery({
     queryKey: ["cf-suppliers"],
     queryFn: async () => (await supabase.from("suppliers").select("id,name,balance").order("name")).data ?? [],
@@ -453,19 +496,56 @@ function Page() {
     return sum;
   }, [purchasesQ.data]);
 
+  /** Payment method of an entry. Stored value wins; legacy/auto rows are
+   *  inferred from their account type and default to Cash. */
+  const methodOf = (t: Tx): string => {
+    if (t.payment_method) return t.payment_method;
+    const acc = allAccounts.find((a) => a.id === t.account_id);
+    const type = acc?.type ?? "cash";
+    const name = (acc?.name ?? "").toLowerCase();
+    if (type === "card") return "card";
+    if (type === "bank") return "bank";
+    if (type === "mobile_wallet") return name.includes("jazz") ? "jazzcash" : "easypaisa";
+    return "cash";
+  };
+
   const filteredTx = useMemo(() => {
     const term = search.trim().toLowerCase();
     return txs.filter((t) => {
       if (filterAcc !== "all" && t.account_id !== filterAcc) return false;
+      if (filterMethod !== "all" && methodOf(t) !== filterMethod) return false;
       if (dateFrom && t.occurred_on < dateFrom) return false;
       if (dateTo && t.occurred_on > dateTo) return false;
       if (term) {
-        const hay = `${t.category} ${t.reference ?? ""} ${t.notes ?? ""}`.toLowerCase();
+        const hay = `${t.category} ${t.reference ?? ""} ${t.notes ?? ""} ${payLabel(methodOf(t))}`.toLowerCase();
         if (!hay.includes(term)) return false;
       }
       return true;
     }).sort((a, b) => (b.occurred_on > a.occurred_on ? 1 : b.occurred_on < a.occurred_on ? -1 : (b.created_at > a.created_at ? 1 : -1)));
-  }, [txs, search, dateFrom, dateTo, filterAcc]);
+  }, [txs, search, dateFrom, dateTo, filterAcc, filterMethod, allAccounts]);
+
+  /** CSV export of exactly what is on screen (method + account included). */
+  const exportCsv = () => {
+    const rows = [
+      ["Date", "Account", "Payment method", "Category", "Reference", "Notes", "In", "Out"],
+      ...filteredTx.map((t) => [
+        t.occurred_on,
+        allAccounts.find((a) => a.id === t.account_id)?.name ?? "",
+        payLabel(methodOf(t)),
+        t.category,
+        t.reference ?? "",
+        t.notes ?? "",
+        t.direction === "in" ? String(t.amount) : "",
+        t.direction === "out" ? String(t.amount) : "",
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `cash-flow-${today()}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
 
 
   const openAccCreate = () => { setEditingAccId(null); setAccForm({ ...emptyAcc }); setAccOpen(true); };
@@ -511,6 +591,7 @@ function Page() {
     setTxForm({
       account_id: t.account_id, direction: t.direction, amount: Number(t.amount),
       occurred_on: t.occurred_on, category: t.category, reference: t.reference ?? "", notes: t.notes ?? "",
+      payment_method: methodOf(t),
     });
     setTxOpen(true);
   };
@@ -525,7 +606,9 @@ function Page() {
       category: txForm.category || "other",
       reference: txForm.reference || null,
       notes: txForm.notes || null,
+      payment_method: txForm.payment_method || "cash",
     };
+
     const q = editingTxId
       ? supabase.from("cash_transactions").update(payload).eq("id", editingTxId)
       : supabase.from("cash_transactions").insert(payload);
@@ -800,6 +883,16 @@ function Page() {
               </Select>
             </div>
             <div>
+              <Label className="text-xs">Payment method</Label>
+              <Select value={filterMethod} onValueChange={setFilterMethod}>
+                <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All methods</SelectItem>
+                  {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label className="text-xs">From</Label>
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
             </div>
@@ -807,6 +900,7 @@ function Page() {
               <Label className="text-xs">To</Label>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </div>
+            <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
           </div>
           <Card className="overflow-x-auto">
             <Table>
@@ -814,16 +908,18 @@ function Page() {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Account</TableHead>
+                  <TableHead>Method</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Reference / Notes</TableHead>
                   <TableHead className="text-right">In</TableHead>
                   <TableHead className="text-right">Out</TableHead>
                   {isAdmin && <TableHead className="w-[100px]"></TableHead>}
                 </TableRow>
+
               </TableHeader>
               <TableBody>
                 {filteredTx.length === 0 && (
-                  <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
                 )}
                 {filteredTx.map((t) => {
                   const acc = accById(t.account_id);
@@ -832,7 +928,9 @@ function Page() {
                     <TableRow key={t.id}>
                       <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
                       <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{payLabel(methodOf(t))}</TableCell>
                       <TableCell className="capitalize">
+
                         {t.category.replace(/_/g, " ")}
                         {auto && <Badge variant="outline" className="ml-2 text-[10px]">Auto</Badge>}
                       </TableCell>
@@ -979,14 +1077,45 @@ function Page() {
               </div>
             </div>
             <div>
-              <Label>Account</Label>
-              <Select value={txForm.account_id} onValueChange={(v) => setTxForm((f: any) => ({ ...f, account_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Choose account" /></SelectTrigger>
+              <Label>Payment method</Label>
+              <Select
+                value={txForm.payment_method || "cash"}
+                onValueChange={(v) => setTxForm((f: any) => {
+                  // Picking a non-bank method keeps the matching account in sync when one exists.
+                  const wantType = v === "bank" ? "bank" : v === "card" ? "card" : v === "cash" ? "cash" : "mobile_wallet";
+                  const match = accounts.find((a) => a.type === wantType);
+                  return { ...f, payment_method: v, account_id: match?.id ?? f.account_id };
+                })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{m.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            {(txForm.payment_method || "cash") === "bank" ? (
+              <div>
+                <Label>Select account</Label>
+                <Select value={txForm.account_id} onValueChange={(v) => setTxForm((f: any) => ({ ...f, account_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Choose bank account" /></SelectTrigger>
+                  <SelectContent>
+                    {(accounts.filter((a) => a.type === "bank").length ? accounts.filter((a) => a.type === "bank") : accounts)
+                      .map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div>
+                <Label>Account</Label>
+                <Select value={txForm.account_id} onValueChange={(v) => setTxForm((f: any) => ({ ...f, account_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Choose account" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Amount</Label>
@@ -1268,6 +1397,7 @@ function Page() {
                       <TableRow>
                         <TableHead>Date</TableHead>
                         {!accId && <TableHead>Account</TableHead>}
+                        <TableHead>Method</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Reference / Notes</TableHead>
                         <TableHead className="text-right">In</TableHead>
@@ -1277,7 +1407,7 @@ function Page() {
                     </TableHeader>
                     <TableBody>
                       {list.length === 0 && (
-                        <TableRow><TableCell colSpan={accId ? 6 : 7} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={accId ? 7 : 8} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
                       )}
                       {list.map((t) => {
                         const acc = accById(t.account_id);
@@ -1285,7 +1415,9 @@ function Page() {
                           <TableRow key={t.id}>
                             <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
                             {!accId && <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>}
+                            <TableCell className="whitespace-nowrap">{payLabel(methodOf(t))}</TableCell>
                             <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
+
                             <TableCell className="max-w-[280px] truncate">
                               {t.reference && <span className="font-medium">{t.reference}</span>}
                               {t.reference && t.notes && <span> — </span>}
