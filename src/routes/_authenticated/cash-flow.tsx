@@ -919,7 +919,7 @@ function Page() {
               </TableHeader>
               <TableBody>
                 {filteredTx.length === 0 && (
-                  <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
                 )}
                 {filteredTx.map((t) => {
                   const acc = accById(t.account_id);
@@ -928,7 +928,9 @@ function Page() {
                     <TableRow key={t.id}>
                       <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
                       <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{payLabel(methodOf(t))}</TableCell>
                       <TableCell className="capitalize">
+
                         {t.category.replace(/_/g, " ")}
                         {auto && <Badge variant="outline" className="ml-2 text-[10px]">Auto</Badge>}
                       </TableCell>
