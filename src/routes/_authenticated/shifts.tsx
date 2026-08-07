@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/shifts")({ component: Page });
 
@@ -90,11 +91,11 @@ function Page() {
   const listQ = useQuery({
     queryKey: ["shifts_list", isAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase
         .from("shift_sessions")
         .select("*")
         .order("opened_at", { ascending: false })
-        .limit(100);
+        .range(_f, _t) as any), error: null as any };
       if (error) throw error;
       return (data ?? []) as ShiftRow[];
     },

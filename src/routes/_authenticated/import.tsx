@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
+import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/import")({ component: Page });
 
@@ -262,13 +263,15 @@ function ImportHistory({ compact = false }: { compact?: boolean }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("import_batches")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) toast.error(error.message);
-    setRows((data as BatchRow[]) ?? []);
+    let data: BatchRow[] = [];
+    try {
+      data = await fetchAll<BatchRow>((_f, _t) =>
+        supabase.from("import_batches").select("*").order("created_at", { ascending: false }).range(_f, _t) as any,
+      );
+    } catch (e: any) {
+      toast.error(e?.message ?? "Import history load nahi hui");
+    }
+    setRows(data);
     setLoading(false);
   }, []);
 

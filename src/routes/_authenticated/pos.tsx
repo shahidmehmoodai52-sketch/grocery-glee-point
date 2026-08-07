@@ -2899,9 +2899,34 @@ function ReprintDialog({
   onEdit: (s: any) => void;
 }) {
   const [q, setQ] = useState("");
+  /** How many invoices are loaded. Grows on "Load more" so NO invoice is
+   *  permanently hidden behind a fixed cap. */
+  const [pageSize, setPageSize] = useState(300);
+  const term = q.trim();
+
+  // When the user searches, ask the server across the WHOLE history instead of
+  // filtering only the loaded page — otherwise old invoices look missing.
+  const { data: serverHits = [] } = useQuery({
+    queryKey: ["sales", "reprint-search", term],
+    enabled: open && term.length > 0,
+    queryFn: async () => {
+      const like = `%${term.replace(/[%_]/g, "")}%`;
+      const asNum = Number(term);
+      const filters = [`invoice_no.ilike.${like}`, `payment_method.ilike.${like}`];
+      if (isFinite(asNum) && term !== "") filters.push(`total.eq.${asNum}`, `paid.eq.${asNum}`);
+      return await fetchAll<any>((_f, _t) =>
+        supabase
+          .from("sales")
+          .select("*, customers(name), sale_items(*)")
+          .or(filters.join(","))
+          .order("created_at", { ascending: false })
+          .range(_f, _t) as any,
+      );
+    },
+  });
 
   const { data: sales = [], isFetching } = useQuery({
-    queryKey: ["sales", "reprint"],
+    queryKey: ["sales", "reprint", pageSize],
     enabled: open,
     queryFn: () =>
       offlineFirst(
@@ -2910,12 +2935,13 @@ function ReprintDialog({
             .from("sales")
             .select("*, customers(name), sale_items(*)")
             .order("created_at", { ascending: false })
-            .limit(300);
+            .order("id", { ascending: false })
+            .limit(pageSize);
           if (error) throw error;
           return data ?? [];
         },
         async () => {
-          const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(300).toArray();
+          const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(pageSize).toArray();
           return Promise.all(
             rows.map(async (r: any) => ({
               ...r,
@@ -2931,25 +2957,33 @@ function ReprintDialog({
           } catch {}
         },
       ),
+    placeholderData: (prev) => prev,
   });
 
   const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (!term) return sales.slice(0, 50);
-    const asNum = Number(term);
-    const isNum = isFinite(asNum) && term !== "";
-    return sales.filter((s: any) => {
-      if (String(s.invoice_no ?? "").toLowerCase().includes(term)) return true;
-      if ((s.customers?.name ?? "").toLowerCase().includes(term)) return true;
-      if ((s.payment_method ?? "").toLowerCase().includes(term)) return true;
-      if (isNum) {
-        // amount match — tolerate within 1 unit so user can type 250 to find 250.00
-        if (Math.abs(Number(s.total) - asNum) < 1) return true;
-        if (Math.abs(Number(s.paid) - asNum) < 1) return true;
-      }
-      return false;
-    });
-  }, [q, sales]);
+    const lower = term.toLowerCase();
+    const local = !lower
+      ? sales
+      : sales.filter((s: any) => {
+          const asNum = Number(lower);
+          const isNum = isFinite(asNum) && lower !== "";
+          if (String(s.invoice_no ?? "").toLowerCase().includes(lower)) return true;
+          if ((s.customers?.name ?? "").toLowerCase().includes(lower)) return true;
+          if ((s.payment_method ?? "").toLowerCase().includes(lower)) return true;
+          if (isNum) {
+            if (Math.abs(Number(s.total) - asNum) < 1) return true;
+            if (Math.abs(Number(s.paid) - asNum) < 1) return true;
+          }
+          return false;
+        });
+    // Merge local + server hits, de-duplicated by id, newest first.
+    const byId = new Map<string, any>();
+    for (const s of [...local, ...(serverHits as any[])]) byId.set(s.id, s);
+    return Array.from(byId.values()).sort((a, b) =>
+      String(b.created_at).localeCompare(String(a.created_at)),
+    );
+  }, [term, sales, serverHits]);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -3011,7 +3045,17 @@ function ReprintDialog({
 
                   </tr>
                 ))}
+                {sales.length >= pageSize && (
+                  <tr className="border-t">
+                    <td colSpan={5} className="text-center py-2">
+                      <Button size="sm" variant="outline" onClick={() => setPageSize((n) => n + 300)}>
+                        Load older invoices
+                      </Button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
+
             </table>
           </div>
         </div>
