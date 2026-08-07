@@ -2563,14 +2563,14 @@ function ReprintDialog({
       const asNum = Number(term);
       const filters = [`invoice_no.ilike.${like}`, `payment_method.ilike.${like}`];
       if (isFinite(asNum) && term !== "") filters.push(`total.eq.${asNum}`, `paid.eq.${asNum}`);
-      const { data, error } = await supabase
-        .from("sales")
-        .select("*, customers(name), sale_items(*)")
-        .or(filters.join(","))
-        .order("created_at", { ascending: false })
-        .limit(300);
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAll<any>((_f, _t) =>
+        supabase
+          .from("sales")
+          .select("*, customers(name), sale_items(*)")
+          .or(filters.join(","))
+          .order("created_at", { ascending: false })
+          .range(_f, _t) as any,
+      );
     },
   });
 
