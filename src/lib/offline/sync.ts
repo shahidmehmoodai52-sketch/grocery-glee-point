@@ -27,6 +27,8 @@ const PAGE = 1000;
 /** Safety ceiling per table per sync pass (products can be huge on first sync). */
 const MAX_PAGES = 150; // 150k rows
 const MAX_ATTEMPTS = 8;
+/** Full-pull tables can be large (item history). Don't re-download too often. */
+const FULL_PULL_MIN_GAP_MS = 20 * 60_000;
 
 async function getWatermark(table: string): Promise<string | null> {
   const row = await db()._sync_state.get(table);
@@ -57,6 +59,12 @@ export function subscribeSyncedTables(l: ChangedListener) {
 async function pullTable(table: MirroredTable): Promise<number> {
   const since = await getWatermark(table);
   const full = FULL_PULL.has(table);
+  if (full && since) {
+    const age = Date.now() - new Date(since).getTime();
+    if (Number.isFinite(age) && age >= 0 && age < FULL_PULL_MIN_GAP_MS) {
+      return 0;
+    }
+  }
   const watermarkCol = HAS_UPDATED_AT.has(table) ? "updated_at" : "created_at";
   const orderCol = full ? "id" : watermarkCol;
 
@@ -89,6 +97,7 @@ async function pullTable(table: MirroredTable): Promise<number> {
   }
 
   if (maxTs) await setWatermark(table, maxTs);
+  if (full) await setWatermark(table, new Date().toISOString());
   return total;
 }
 
@@ -102,6 +111,13 @@ const ACTIVE_STATUSES = ["pending", "failed", "retrying", "syncing", "uploading"
 function backoffMs(attempts: number): number {
   const base = Math.min(5_000 * 2 ** Math.max(0, attempts), 5 * 60_000);
   return base + Math.floor(Math.random() * 1000);
+}
+
+function isPermanentSyncError(e: any): boolean {
+  const code = String((e as any)?.code ?? "").toUpperCase();
+  const msg = String((e as any)?.message ?? e ?? "").toLowerCase();
+  if (["22P02", "23502", "23503", "42P01", "42703", "42883", "PGRST202"].includes(code)) return true;
+  return /invalid input syntax|null value|foreign key|does not exist|function .* does not exist|unknown|not authenticated|forbidden|permission denied|does not belong to current tenant|no active tenant|party does not belong/.test(msg);
 }
 
 /** Recover items interrupted mid-upload (crash / power loss / tab kill). */
@@ -190,12 +206,13 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
     } catch (e: any) {
       failed++;
       const attempts = (item.attempts ?? 0) + 1;
-      const exhausted = attempts >= MAX_ATTEMPTS;
+      const permanent = isPermanentSyncError(e);
+      const exhausted = permanent || attempts >= MAX_ATTEMPTS;
       if (exhausted) cancelled++;
       await db()._queue.update(item.id!, {
         status: exhausted ? "cancelled" : "retrying",
         attempts,
-        last_error: String(e?.message ?? e),
+        last_error: `${permanent ? "PERMANENT: " : ""}${String(e?.message ?? e)}`,
         next_attempt_at: exhausted ? null : new Date(Date.now() + backoffMs(attempts)).toISOString(),
       });
       // Preserve chronological application for this entity only.
