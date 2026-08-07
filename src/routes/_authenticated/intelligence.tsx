@@ -39,6 +39,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
+import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/intelligence")({
   component: IntelligencePage,
@@ -111,11 +112,11 @@ function IntelligencePage() {
   const intelQ = useQuery({
     queryKey: ["product-intel"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase
         .from("product_intelligence" as any)
         .select("*")
         .order("revenue_90d", { ascending: false })
-        .limit(2000);
+        .range(_f, _t) as any), error: null as any };
       if (error) throw error;
       return (data ?? []) as unknown as Intel[];
     },
@@ -367,7 +368,7 @@ function ReorderEditDialog({ product, onClose }: { product: Intel; onClose: () =
   const suppliersQ = useQuery({
     queryKey: ["suppliers-picker"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("suppliers").select("id,name").order("name").limit(500);
+      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase.from("suppliers").select("id,name").order("name").range(_f, _t) as any), error: null as any };
       if (error) throw error;
       return data ?? [];
     },
@@ -570,11 +571,11 @@ function SuggestionsTab({ sym }: { sym: string }) {
   const q = useQuery({
     queryKey: ["purchase-suggestions"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase
         .from("smart_purchase_suggestions" as any)
         .select("*")
         .order("suggested_cost", { ascending: false })
-        .limit(2000);
+        .range(_f, _t) as any), error: null as any };
       if (error) throw error;
       return (data ?? []) as unknown as Suggestion[];
     },
