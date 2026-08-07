@@ -52,6 +52,7 @@ import {
 } from "@/lib/admin-staff.functions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserCog, BookOpen } from "lucide-react";
+import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPanelPage,
@@ -1110,15 +1111,15 @@ function LibraryTab() {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-library", status],
     queryFn: async () => {
-      let q = supabase
-        .from("global_products")
-        .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at")
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (status !== "all") q = q.eq("status", status);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data as LibraryRow[]) ?? [];
+      const data = await fetchAll<LibraryRow>((_f, _t) => {
+        let q = supabase
+          .from("global_products")
+          .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at")
+          .order("created_at", { ascending: false });
+        if (status !== "all") q = q.eq("status", status);
+        return q.range(_f, _t) as any;
+      });
+      return data ?? [];
     },
   });
 
