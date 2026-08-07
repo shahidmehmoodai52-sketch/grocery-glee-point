@@ -24,7 +24,7 @@ import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
 import {
   offlineFirst, cacheProducts, cacheCustomers, cacheProductBarcodes,
-  completeSaleOfflineAware,
+  completeSaleOfflineAware, cacheSuppliers, insertOfflineAware,
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
 import { enqueueWrite } from "@/lib/offline/sync";
@@ -80,6 +80,130 @@ const UNDO_REASONS = [
 ];
 
 const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category";
+const STAFF_CACHE_KEY = "pos:expense-persons:cache";
+
+async function readCachedExpensePersons(): Promise<any[]> {
+  try {
+    const raw = window.localStorage.getItem(STAFF_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function cacheExpensePersons(rows: any[]) {
+  try {
+    window.localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(rows ?? []));
+  } catch {
+    // best effort
+  }
+}
+
+async function insertProductOfflineAware(payload: {
+  name: string;
+  barcode: string | null;
+  unit: string;
+  category: string | null;
+  cost_price: number;
+  sell_price: number;
+  stock: number;
+  tax_rate: number;
+  is_active: boolean;
+  preferred_supplier_id: string | null;
+}) {
+  const now = new Date().toISOString();
+  const localId = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const product = {
+    id: localId,
+    ...payload,
+    created_at: now,
+    updated_at: now,
+    _offline_pending: true,
+    _sync: "pending",
+    _deleted: 0,
+    _v: 1,
+  } as any;
+
+  const saveOffline = async () => {
+    await offlineDb().products.put(product);
+    await enqueueWrite({ op: "insert", table: "products", payload: { ...product, _offline_pending: undefined } });
+    if (payload.barcode) {
+      const barcodeRow = {
+        id: `${localId}:${payload.barcode}`,
+        product_id: localId,
+        barcode: payload.barcode,
+        created_at: now,
+        updated_at: now,
+        _offline_pending: true,
+        _sync: "pending",
+        _deleted: 0,
+        _v: 1,
+      } as any;
+      await offlineDb().product_barcodes.put(barcodeRow);
+      await enqueueWrite({ op: "insert", table: "product_barcodes", payload: { ...barcodeRow, _offline_pending: undefined } });
+    }
+    return product;
+  };
+
+  if (!isOfflineNow()) {
+    try {
+      const { data, error } = await supabase.from("products").insert(payload).select(PRODUCT_COLUMNS).single();
+      if (error) throw error;
+      if (payload.barcode) {
+        await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: payload.barcode });
+      }
+      try {
+        await offlineDb().products.put({ ...data, updated_at: now });
+        if (payload.barcode) {
+          await offlineDb().product_barcodes.put({ id: `${data.id}:${payload.barcode}`, product_id: data.id, barcode: payload.barcode });
+        }
+      } catch {
+        // best effort
+      }
+      return data;
+    } catch (e: any) {
+      const msg = String(e?.message ?? e ?? "").toLowerCase();
+      const networkish = /failed to fetch|network(error)?|fetch failed|timeout|timed out|offline|dns|err_(internet|network|name_not_resolved|connection)|socket|aborted|econn|enotfound/.test(msg);
+      if (!networkish) throw e;
+      return saveOffline();
+    }
+  }
+
+  return saveOffline();
+}
+
+async function fetchActiveCashAccounts() {
+  return offlineFirst<any[]>(
+    async () => {
+      const { data, error } = await supabase
+        .from("cash_accounts")
+        .select("id,name,type,is_active,sort_order,created_at")
+        .eq("is_active", true)
+        .order("sort_order")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    async () =>
+      (await offlineDb().cash_accounts.toArray())
+        .filter((a: any) => a.is_active)
+        .sort((a: any, b: any) => {
+          const bySort = Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0);
+          if (bySort !== 0) return bySort;
+          return String(a.name ?? "").localeCompare(String(b.name ?? ""));
+        }),
+    async (rows) => {
+      try {
+        await offlineDb().cash_accounts.bulkPut(rows as any[]);
+      } catch {
+        // best effort
+      }
+    },
+  );
+}
 
 const cleanItemCode = (value: unknown) => {
   const code = String(value ?? "").trim();
@@ -219,12 +343,17 @@ function POSPage() {
   const saveQuickCustomer = async () => {
     const name = newCustomer.name.trim();
     if (!name) return toast.error("Customer name required");
-    const { data, error } = await supabase.from("customers")
-      .insert({ name, phone: newCustomer.phone.trim() || null })
-      .select("id,name,balance").single();
-    if (error) return toast.error(error.message);
-    setTab({ customer_id: data.id, payment_method: "credit" });
-    toast.success(`Added ${data.name}`);
+    try {
+      const data = await insertOfflineAware("customers", { name, phone: newCustomer.phone.trim() || null, balance: 0 } as any);
+      setTab({ customer_id: data.id, payment_method: "credit" });
+      toast.success(
+        data._offline_pending
+          ? `Added ${data.name} offline — will sync automatically`
+          : `Added ${data.name}`,
+      );
+    } catch (e: any) {
+      return toast.error(e?.message ?? "Could not add customer");
+    }
     setQuickAddCustomerOpen(false);
     setNewCustomer({ name: "", phone: "" });
     qc.invalidateQueries({ queryKey: ["customers"] });
@@ -253,17 +382,37 @@ function POSPage() {
 
   const { data: quickAddSuppliers = [] } = useQuery({
     queryKey: ["suppliers", "quickadd"],
-    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await supabase.from("suppliers").select("id,name,phone,balance").order("name");
+          if (error) throw error;
+          return data ?? [];
+        },
+        async () => (await offlineDb().suppliers.toArray()).sort((a: any, b: any) => String(a.name ?? "").localeCompare(String(b.name ?? ""))),
+        (rows) => cacheSuppliers(rows),
+      ),
   });
 
   const { data: quickAddCategories = [] } = useQuery({
     queryKey: ["products", "categories"],
-    queryFn: async () => {
-      const { data } = await supabase.from("products").select("category").not("category", "is", null).limit(1000);
-      const set = new Set<string>();
-      (data ?? []).forEach((r: any) => { if (r.category) set.add(String(r.category)); });
-      return Array.from(set).sort();
-    },
+    queryFn: () =>
+      offlineFirst<string[]>(
+        async () => {
+          const { data, error } = await supabase.from("products").select("category").not("category", "is", null).limit(1000);
+          if (error) throw error;
+          const set = new Set<string>();
+          (data ?? []).forEach((r: any) => { if (r.category) set.add(String(r.category)); });
+          return Array.from(set).sort();
+        },
+        async () => {
+          const set = new Set<string>();
+          (await offlineDb().products.toArray()).forEach((r: any) => {
+            if (r.category) set.add(String(r.category));
+          });
+          return Array.from(set).sort();
+        },
+      ),
   });
 
   const saveQuickAdd = async () => {
@@ -274,16 +423,22 @@ function POSPage() {
     const stock = Number(quickAdd.stock || 0);
     const bc = quickAdd.barcode.trim() || null;
     const category = quickAdd.category.trim() || null;
-    const { data, error } = await supabase.from("products").insert({
+    const payload = {
       name, barcode: bc, unit: quickAdd.unit || "pcs", category,
       cost_price: cost, sell_price: sell, stock, tax_rate: 0, is_active: true,
       preferred_supplier_id: quickAdd.supplier_id || null,
-    }).select(PRODUCT_COLUMNS).single();
-    if (error) return toast.error(error.message);
-    if (bc) {
-      await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: bc });
+    };
+    let data: any;
+    try {
+      data = await insertProductOfflineAware(payload);
+    } catch (e: any) {
+      return toast.error(e?.message ?? "Could not add product");
     }
-    toast.success(`Added "${name}" to catalog`);
+    toast.success(
+      data?._offline_pending
+        ? `Added "${name}" offline — will sync automatically`
+        : `Added "${name}" to catalog`,
+    );
     addProduct(data);
     setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
     setSearch("");
@@ -373,19 +528,23 @@ function POSPage() {
     enabled: itemCodeLookupBarcodes.length > 0,
     queryFn: async () => {
       const map: Record<string, string> = {};
-      for (let i = 0; i < itemCodeLookupBarcodes.length; i += 500) {
-        const slice = itemCodeLookupBarcodes.slice(i, i + 500);
-        const { data, error } = await supabase
-          .from("global_products")
-          .select("barcode,item_code")
-          .in("barcode", slice)
-          .not("item_code", "is", null);
-        if (error) throw error;
-        (data ?? []).forEach((row: any) => {
-          const barcode = String(row.barcode ?? "").trim();
-          const itemCode = cleanItemCode(row.item_code);
-          if (barcode && itemCode && itemCode !== barcode) map[barcode] = itemCode;
-        });
+      try {
+        for (let i = 0; i < itemCodeLookupBarcodes.length; i += 500) {
+          const slice = itemCodeLookupBarcodes.slice(i, i + 500);
+          const { data, error } = await supabase
+            .from("global_products")
+            .select("barcode,item_code")
+            .in("barcode", slice)
+            .not("item_code", "is", null);
+          if (error) throw error;
+          (data ?? []).forEach((row: any) => {
+            const barcode = String(row.barcode ?? "").trim();
+            const itemCode = cleanItemCode(row.item_code);
+            if (barcode && itemCode && itemCode !== barcode) map[barcode] = itemCode;
+          });
+        }
+      } catch {
+        return {};
       }
       return map;
     },
@@ -447,12 +606,18 @@ function POSPage() {
 
   const { data: persons = [] } = useQuery({
     queryKey: ["expense_persons", "active"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("expense_persons")
-        .select("id,name,role").eq("is_active", true).order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await supabase.from("expense_persons")
+            .select("id,name,role,is_active").eq("is_active", true).order("name");
+          if (error) throw error;
+          const rows = data ?? [];
+          await cacheExpensePersons(rows);
+          return rows;
+        },
+        readCachedExpensePersons,
+      ),
   });
 
   const filtered = useMemo(() => {
@@ -794,6 +959,44 @@ function POSPage() {
     toast.success(`Editing invoice ${sale.invoice_no}`);
   };
 
+  const openRestoredTab = (payload: any, fallbackInvoiceNo: string) => {
+    const items: any[] = Array.isArray(payload?.items) ? payload.items : [];
+    const restoredItems: CartItem[] = items.map((i: any) => {
+      const qty = Number(i.qty ?? 0);
+      const price = Number(i.price ?? 0);
+      return {
+        product_id: i.product_id ?? null,
+        code: "",
+        name: String(i.name ?? "Item"),
+        qty,
+        price,
+        mrp: price,
+        cost: Number(i.cost ?? 0),
+        disc_pct: 0,
+        tax_pct: 0,
+        disc: 0,
+      };
+    });
+    const restored: Tab = {
+      id: crypto.randomUUID(),
+      name: `↩ ${payload?.invoice_no ?? fallbackInvoiceNo}`,
+      items: restoredItems,
+      customer_id: payload?.customer_id ?? null,
+      expense_person_id: payload?.expense_person_id ?? null,
+      payment_method: payload?.payment_method ?? "cash",
+      discount: Number(payload?.discount ?? 0),
+      discount_pct: "",
+      charge: 0,
+      charge_pct: "",
+      paid: String(payload?.paid ?? ""),
+      payments: [{ method: payload?.payment_method ?? "cash", amount: Number(payload?.paid ?? 0) }],
+      note: payload?.note ?? "",
+      restored: true,
+    };
+    setTabs((ts) => [...ts, restored]);
+    setActive(restored.id);
+  };
+
 
   const resumeHeld = async (id: string) => {
     let payload: any = null;
@@ -950,24 +1153,152 @@ function POSPage() {
         ? paymentAllocations.map((entry) => entry.method).join(" + ")
         : (paymentAllocations[0]?.method || tab.payment_method || "cash");
       const tenderedAmount = +Math.min(sumPaymentAllocations(paymentAllocations), total).toFixed(2);
+      const items = tab.items.map((i) => ({
+        product_id: i.product_id,
+        name: i.name,
+        qty: i.qty,
+        price: i.price,
+        cost: i.cost,
+      }));
 
       // ---- Edit existing invoice path ----
       if (tab.editing_sale_id) {
-        // Editing an existing invoice re-runs server-side stock/ledger reversal,
-        // so it stays online-only. Fail with a clear message instead of a
-        // raw network error, and keep the tab intact so nothing is lost.
         if (isOfflineNow()) {
-          toast.error("Editing an invoice needs internet. The bill is kept open — retry once you're back online.");
+          try {
+            const saleId = tab.editing_sale_id;
+            const nowIso = new Date().toISOString();
+            const subtotalEdited = +tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0).toFixed(2);
+            const discountEdited = +(lineDiscountTotal + discount - charge).toFixed(2);
+            const taxEdited = +Number(tax || 0).toFixed(2);
+            const totalEdited = +(subtotalEdited - discountEdited + taxEdited).toFixed(2);
+            const paidEdited = +Math.min(paidNum, totalEdited).toFixed(2);
+
+            const existingQueuedCreate = await offlineDb()._queue.where("client_uuid").equals(saleId).first();
+
+            await offlineDb().transaction("rw", offlineDb().sales, offlineDb().sale_items, offlineDb().products, async () => {
+              const prev = await offlineDb().sales.get(saleId);
+              if (!prev) throw new Error("Invoice not available offline");
+              const oldItems = await offlineDb().sale_items.where("sale_id").equals(saleId).toArray();
+
+              const oldQtyByProduct = new Map<string, number>();
+              const newQtyByProduct = new Map<string, number>();
+              for (const it of oldItems) {
+                if (!it.product_id) continue;
+                oldQtyByProduct.set(it.product_id, (oldQtyByProduct.get(it.product_id) ?? 0) + Number(it.qty || 0));
+              }
+              for (const it of items) {
+                if (!it.product_id) continue;
+                newQtyByProduct.set(it.product_id, (newQtyByProduct.get(it.product_id) ?? 0) + Number(it.qty || 0));
+              }
+
+              const productIds = new Set<string>([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
+              for (const pid of productIds) {
+                const p = await offlineDb().products.get(pid);
+                if (!p) continue;
+                const baseStock =
+                  typeof p.stock === "number"
+                    ? Number(p.stock)
+                    : typeof p.stock_qty === "number"
+                      ? Number(p.stock_qty)
+                      : null;
+                if (baseStock == null) continue;
+                const oldQty = oldQtyByProduct.get(pid) ?? 0;
+                const newQty = newQtyByProduct.get(pid) ?? 0;
+                const nextStock = +(baseStock + oldQty - newQty).toFixed(3);
+                await offlineDb().products.put({
+                  ...p,
+                  stock: nextStock,
+                  ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
+                  _sync: "pending",
+                  _v: (Number(p._v ?? 0) || 0) + 1,
+                  updated_at: nowIso,
+                });
+              }
+
+              await offlineDb().sale_items.where("sale_id").equals(saleId).delete();
+              const nextItems = items.map((i, idx) => ({
+                id: `${saleId}:${idx}`,
+                sale_id: saleId,
+                tenant_id: prev.tenant_id ?? null,
+                product_id: i.product_id,
+                name: i.name,
+                qty: i.qty,
+                price: i.price,
+                cost: i.cost,
+                _sync: "pending",
+                _v: 1,
+                _deleted: 0,
+              }));
+              await offlineDb().sale_items.bulkPut(nextItems);
+
+              await offlineDb().sales.put({
+                ...prev,
+                customer_id: tab.customer_id,
+                expense_person_id: tab.expense_person_id,
+                payment_method: paymentMethodLabel,
+                subtotal: subtotalEdited,
+                discount: discountEdited,
+                tax: taxEdited,
+                total: totalEdited,
+                paid: paidEdited,
+                status: paidEdited >= totalEdited ? "completed" : "credit",
+                note: tab.note,
+                updated_at: nowIso,
+                _sync: "pending",
+                _offline_pending: true,
+                _v: (Number(prev._v ?? 0) || 0) + 1,
+                sale_items: nextItems,
+              });
+            });
+
+            if (existingQueuedCreate?.table === "complete_sale") {
+              const queuedPayload = (existingQueuedCreate as any).payload?.payload ?? {};
+              await offlineDb()._queue.update(existingQueuedCreate.id!, {
+                payload: {
+                  payload: {
+                    ...queuedPayload,
+                    customer_id: tab.customer_id,
+                    expense_person_id: tab.expense_person_id,
+                    payment_method: paymentMethodLabel,
+                    tax: taxEdited,
+                    discount: discountEdited,
+                    paid: paidEdited,
+                    note: tab.note,
+                    items,
+                  },
+                },
+                status: "pending",
+                next_attempt_at: null,
+              });
+            } else {
+              await enqueueWrite({
+                op: "rpc",
+                table: "edit_sale",
+                client_uuid: `edit-${saleId}-${Date.now()}`,
+                payload: {
+                  _sale_id: saleId,
+                  _items: items as any,
+                  _paid: paidEdited,
+                  _discount: discountEdited,
+                  _tax: taxEdited,
+                },
+              });
+            }
+
+            toast.success(`Invoice ${tab.editing_invoice_no ?? ""} updated offline — will sync automatically`);
+            closeTab(active);
+            qc.invalidateQueries({ queryKey: ["products"] });
+            qc.invalidateQueries({ queryKey: ["sales"] });
+            qc.invalidateQueries({ queryKey: ["customers"] });
+            qc.invalidateQueries({ queryKey: ["expenses"] });
+            qc.invalidateQueries({ queryKey: ["expense_persons"] });
+            refetchHeld?.();
+          } catch (e: any) {
+            toast.error(e?.message ?? "Could not update invoice offline");
+          }
           return;
         }
 
-        const items = tab.items.map((i) => ({
-          product_id: i.product_id,
-          name: i.name,
-          qty: i.qty,
-          price: i.price,
-          cost: i.cost,
-        }));
         const { error } = await supabase.rpc("edit_sale", {
           _sale_id: tab.editing_sale_id,
           _items: items as any,
@@ -1139,58 +1470,94 @@ function POSPage() {
     if (!undoCandidate) return;
     setUndoing(true);
     try {
-      const { data, error } = await (supabase.rpc as any)("undo_last_sale", {
-        _sale_id: undoCandidate.sale_id,
-      });
-      if (error) throw error;
-      const payload: any = data ?? {};
-      const items: any[] = Array.isArray(payload.items) ? payload.items : [];
+      let payload: any;
+      if (isOfflineNow()) {
+        const sale = await offlineDb().sales.get(undoCandidate.sale_id);
+        if (!sale) throw new Error("Sale not available offline");
+        const saleItems = await offlineDb().sale_items.where("sale_id").equals(undoCandidate.sale_id).toArray();
 
-      // Restore the cart into a fresh tab so the cashier can edit & re-checkout.
-      const restoredItems: CartItem[] = items.map((i: any) => {
-        const qty = Number(i.qty ?? 0);
-        const price = Number(i.price ?? 0);
-        return {
-          product_id: i.product_id ?? null,
-          code: "",
-          name: String(i.name ?? "Item"),
-          qty,
-          price,
-          mrp: price,
-          cost: Number(i.cost ?? 0),
-          disc_pct: 0,
-          tax_pct: 0,
-          disc: 0,
+        await offlineDb().transaction("rw", offlineDb().sales, offlineDb().sale_items, offlineDb().products, async () => {
+          for (const it of saleItems) {
+            if (!it.product_id) continue;
+            const p = await offlineDb().products.get(it.product_id);
+            if (!p) continue;
+            const baseStock =
+              typeof p.stock === "number"
+                ? Number(p.stock)
+                : typeof p.stock_qty === "number"
+                  ? Number(p.stock_qty)
+                  : null;
+            if (baseStock == null) continue;
+            const nextStock = +(baseStock + Number(it.qty || 0)).toFixed(3);
+            await offlineDb().products.put({
+              ...p,
+              stock: nextStock,
+              ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
+              _sync: "pending",
+              _v: (Number(p._v ?? 0) || 0) + 1,
+              updated_at: new Date().toISOString(),
+            });
+          }
+          await offlineDb().sale_items.where("sale_id").equals(undoCandidate.sale_id).delete();
+          await offlineDb().sales.delete(undoCandidate.sale_id);
+        });
+
+        // If this sale was never synced, remove its queued create/edit actions.
+        const queueRows = await offlineDb()._queue.toArray();
+        const createRow = queueRows.find((r: any) => r.client_uuid === undoCandidate.sale_id && r.table === "complete_sale");
+        const relatedEditRows = queueRows.filter((r: any) => r.table === "edit_sale" && r.payload?._sale_id === undoCandidate.sale_id);
+        if (createRow?.id != null) await offlineDb()._queue.delete(createRow.id);
+        for (const row of relatedEditRows) {
+          if (row.id != null) await offlineDb()._queue.delete(row.id);
+        }
+
+        // If the sale exists in cloud, queue server-side undo too.
+        if (!createRow) {
+          await enqueueWrite({
+            op: "rpc",
+            table: "undo_last_sale",
+            client_uuid: `undo-${undoCandidate.sale_id}-${Date.now()}`,
+            payload: { _sale_id: undoCandidate.sale_id },
+          });
+        }
+
+        payload = {
+          invoice_no: sale.invoice_no,
+          customer_id: sale.customer_id,
+          expense_person_id: sale.expense_person_id,
+          payment_method: sale.payment_method,
+          discount: sale.discount,
+          paid: sale.paid,
+          note: sale.note,
+          items: saleItems.map((i: any) => ({
+            product_id: i.product_id ?? null,
+            name: i.name,
+            qty: Number(i.qty ?? 0),
+            price: Number(i.price ?? 0),
+            cost: Number(i.cost ?? 0),
+          })),
         };
-      });
-      const restored: Tab = {
-        id: crypto.randomUUID(),
-        name: `↩ ${payload.invoice_no ?? undoCandidate.invoice_no}`,
-        items: restoredItems,
-        customer_id: payload.customer_id ?? null,
-        expense_person_id: payload.expense_person_id ?? null,
-        payment_method: payload.payment_method ?? "cash",
-        discount: Number(payload.discount ?? 0),
-        discount_pct: "",
-        charge: 0,
-        charge_pct: "",
-        paid: String(payload.paid ?? ""),
-        payments: [{ method: payload.payment_method ?? "cash", amount: Number(payload.paid ?? 0) }],
-        note: payload.note ?? "",
-        restored: true,
-      };
-      setTabs((ts) => [...ts, restored]);
-      setActive(restored.id);
+      } else {
+        const { data, error } = await (supabase.rpc as any)("undo_last_sale", {
+          _sale_id: undoCandidate.sale_id,
+        });
+        if (error) throw error;
+        payload = data ?? {};
+      }
+
+      openRestoredTab(payload, undoCandidate.invoice_no);
 
       // Log undo reason to audit_logs (best-effort; ignore error)
       const reasonText = undoReason === "Other" ? undoReasonNote.trim() || "Other" : undoReason;
       try {
-        await supabase.from("audit_logs").insert({
-          action: "undo_last_sale.reason",
-          entity: "sales",
-          entity_id: undoCandidate.sale_id,
-          details: { invoice_no: payload.invoice_no ?? undoCandidate.invoice_no, reason: reasonText },
-        } as any);
+        if (!isOfflineNow()) {
+          await supabase.from("audit_logs").insert({
+            action: "undo_last_sale.reason",
+            entity: "sales",
+            entity_id: undoCandidate.sale_id,
+            details: { invoice_no: payload.invoice_no ?? undoCandidate.invoice_no, reason: reasonText },
+          } as any);
+        }
       } catch { /* noop */ }
 
       toast.success(`✓ Sale ${payload.invoice_no ?? undoCandidate.invoice_no} restored successfully`);
@@ -2316,15 +2683,7 @@ function POSPage() {
 function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const accQ = useQuery({
     queryKey: ["cash-accounts", "pos-payment-methods"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("cash_accounts")
-        .select("id,name,type,is_active")
-        .eq("is_active", true)
-        .order("sort_order")
-        .order("name");
-      return data ?? [];
-    },
+    queryFn: fetchActiveCashAccounts,
   });
   const accounts = accQ.data ?? [];
 
@@ -2377,15 +2736,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
 function PaymentMethodSelect({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
   const accQ = useQuery({
     queryKey: ["cash-accounts", "pos-payment-selector"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("cash_accounts")
-        .select("id,name,type,is_active")
-        .eq("is_active", true)
-        .order("sort_order")
-        .order("name");
-      return data ?? [];
-    },
+    queryFn: fetchActiveCashAccounts,
   });
   const accounts = accQ.data ?? [];
   const options = [

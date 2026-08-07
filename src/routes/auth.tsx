@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isBlocked, logSecurityEvent } from "@/lib/security-log";
+import { getUserAllowOffline } from "@/lib/offline/session";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>): { next?: string } => ({
@@ -70,9 +71,12 @@ function AuthPage() {
   }, [navigate, target]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) void goToApp();
-    });
+    (async () => {
+      const user = await getUserAllowOffline();
+      if (user) {
+        void goToApp();
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goToApp]);
 

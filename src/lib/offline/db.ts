@@ -82,6 +82,7 @@ const QUEUE_PRIORITY: Record<string, number> = {
   sale_items: 41,
   complete_sale: 40,
   edit_sale: 42,
+  undo_last_sale: 43,
   hold_bill: 45,
   resume_bill: 45,
   discard_held_bill: 45,

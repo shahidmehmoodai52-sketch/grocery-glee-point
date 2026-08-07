@@ -167,10 +167,19 @@ export async function completeSaleReturnOfflineAware(
       for (const it of payload.items) {
         if (!it.product_id) continue;
         const p = await db().products.get(it.product_id);
-        if (p && typeof p.stock_qty === "number") {
+        if (p) {
+          const baseStock =
+            typeof p.stock === "number"
+              ? Number(p.stock)
+              : typeof p.stock_qty === "number"
+                ? Number(p.stock_qty)
+                : null;
+          if (baseStock == null) continue;
+          const nextStock = +(baseStock + it.qty).toFixed(3);
           await db().products.put({
             ...p,
-            stock_qty: +(p.stock_qty + it.qty).toFixed(3),
+            stock: nextStock,
+            ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
             _sync: "pending",
             updated_at: now,
           });
