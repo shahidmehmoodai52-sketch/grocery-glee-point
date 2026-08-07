@@ -28,6 +28,29 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
 
+const SPLIT_PAYMENT_PREFIX = "split:";
+
+function parsePaymentSplit(methodValue: string | null | undefined, paidValue: number) {
+  const raw = String(methodValue ?? "").trim();
+  const paid = +Math.max(0, Number(paidValue || 0)).toFixed(2);
+  if (!raw.startsWith(SPLIT_PAYMENT_PREFIX)) return [{ method: raw || "cash", amount: paid }];
+  const rows = raw
+    .slice(SPLIT_PAYMENT_PREFIX.length)
+    .split("|")
+    .filter(Boolean)
+    .map((part) => {
+      const [methodEncoded, amountRaw] = part.split("=");
+      let decoded = methodEncoded || "";
+      try { decoded = decodeURIComponent(methodEncoded || ""); } catch {}
+      return { method: decoded.trim() || "cash", amount: +Math.max(0, Number(amountRaw || 0)).toFixed(2) };
+    })
+    .filter((entry) => entry.amount > 0);
+  return rows.length ? rows : [{ method: "cash", amount: paid }];
+}
+
+const displayPaymentMethod = (methodValue: string | null | undefined) =>
+  parsePaymentSplit(methodValue, 0).map((r) => r.method).join(" + ");
+
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDay(d: Date) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
 function diffDays(a: Date, b: Date) {
@@ -210,7 +233,15 @@ function Page() {
 
   const methodMix = useMemo(() => {
     const m = new Map<string, number>();
-    sales.forEach((s: any) => m.set(s.payment_method, (m.get(s.payment_method) ?? 0) + Number(s.total)));
+    sales.forEach((s: any) => {
+      const splits = parsePaymentSplit(s.payment_method, Number(s.paid));
+      const sumPaid = splits.reduce((sum, split) => sum + Number(split.amount || 0), 0);
+      for (const split of splits) {
+        const share = sumPaid > 0 ? Number(split.amount || 0) / sumPaid : 1 / splits.length;
+        const key = split.method || "cash";
+        m.set(key, (m.get(key) ?? 0) + Number(s.total) * share);
+      }
+    });
     return Array.from(m, ([name, value]) => ({ name, value }));
   }, [sales]);
   const pieColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)", "var(--chart-5)", "var(--chart-3)"];
@@ -243,7 +274,7 @@ function Page() {
     switch (detailKey) {
       case "revenue":
         return { title: `Revenue · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total"],
-          rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
+          rows: sales.map((s:any)=>[fmtDate(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
           total: fmtMoney(revenue, sym) };
       case "profit":
         return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
@@ -263,7 +294,7 @@ function Page() {
           total: fmtMoney(returnsTotal, sym) };
       case "invoices":
         return { title: `Invoices · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total", "Paid"],
-          rows: sales.map((s:any)=>[fmtDate(s.created_at), s.payment_method||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
+          rows: sales.map((s:any)=>[fmtDate(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
           total: `${sales.length} invoices` };
       case "net":
         return { title: `Net revenue · ${rangeLabel}`, cols: ["Metric", "Amount"],

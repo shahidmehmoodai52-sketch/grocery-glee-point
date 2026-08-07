@@ -20,6 +20,34 @@ import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: Page });
 
+const SPLIT_PAYMENT_PREFIX = "split:";
+
+function parsePaymentSplit(methodValue: string | null | undefined, paidValue: number) {
+  const raw = String(methodValue ?? "").trim();
+  const paid = +Math.max(0, Number(paidValue || 0)).toFixed(2);
+  if (!raw.startsWith(SPLIT_PAYMENT_PREFIX)) return [{ method: raw || "cash", amount: paid }];
+  const rows = raw
+    .slice(SPLIT_PAYMENT_PREFIX.length)
+    .split("|")
+    .filter(Boolean)
+    .map((part) => {
+      const [methodEncoded, amountRaw] = part.split("=");
+      let decoded = methodEncoded || "";
+      try { decoded = decodeURIComponent(methodEncoded || ""); } catch {}
+      return {
+        method: decoded.trim() || "cash",
+        amount: +Math.max(0, Number(amountRaw || 0)).toFixed(2),
+      };
+    })
+    .filter((entry) => entry.amount > 0);
+  return rows.length ? rows : [{ method: "cash", amount: paid }];
+}
+
+const displayPaymentMethod = (methodValue: string | null | undefined) => {
+  const rows = parsePaymentSplit(methodValue, 0);
+  return rows.map((r) => r.method).join(" + ");
+};
+
 function today() { return new Date().toISOString().slice(0, 10); }
 const toISO = (d: Date) => {
   const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -154,12 +182,17 @@ function Page() {
   const paymentBreakdown = useMemo(() => {
     const map = new Map<string, { method: string; invoices: number; total: number; paid: number }>();
     for (const s of sales as any[]) {
-      const method = s.payment_method || "unknown";
-      const cur = map.get(method) ?? { method, invoices: 0, total: 0, paid: 0 };
-      cur.invoices += 1;
-      cur.total += Number(s.total);
-      cur.paid += Number(s.paid);
-      map.set(method, cur);
+      const splits = parsePaymentSplit(s.payment_method, Number(s.paid));
+      const splitPaidTotal = splits.reduce((sum, split) => sum + Number(split.amount || 0), 0);
+      for (const split of splits) {
+        const method = split.method || "unknown";
+        const cur = map.get(method) ?? { method, invoices: 0, total: 0, paid: 0 };
+        const share = splitPaidTotal > 0 ? Number(split.amount || 0) / splitPaidTotal : 1 / splits.length;
+        cur.invoices += 1;
+        cur.total += Number(s.total) * share;
+        cur.paid += Number(split.amount || 0);
+        map.set(method, cur);
+      }
     }
     return Array.from(map.values()).sort((a, b) => b.paid - a.paid);
   }, [sales]);
@@ -172,8 +205,11 @@ function Page() {
       map.set(m, cur); return cur;
     };
     for (const s of sales as any[]) {
-      const cur = get((s.payment_method || "unknown").toLowerCase());
-      cur.in_sales += Number(s.paid);
+      const splits = parsePaymentSplit(s.payment_method, Number(s.paid));
+      for (const split of splits) {
+        const cur = get((split.method || "unknown").toLowerCase());
+        cur.in_sales += Number(split.amount || 0);
+      }
     }
     for (const p of partyPayments as any[]) {
       const cur = get((p.method || "unknown").toLowerCase());
@@ -190,7 +226,7 @@ function Page() {
     return (sales as any[]).filter((s) =>
       String(s.invoice_no ?? "").toLowerCase().includes(q) ||
       String(s.customers?.name ?? "walk-in").toLowerCase().includes(q) ||
-      String(s.payment_method ?? "").toLowerCase().includes(q) ||
+      displayPaymentMethod(s.payment_method).toLowerCase().includes(q) ||
       String(Number(s.total).toFixed(2)).includes(q) ||
       (s.sale_items ?? []).some((i: any) => String(i.name).toLowerCase().includes(q))
     );
@@ -393,7 +429,7 @@ function Page() {
                       <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
                       <TableCell className="text-sm">{new Date(s.created_at).toLocaleString()}</TableCell>
                       <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
-                      <TableCell className="capitalize">{s.payment_method}</TableCell>
+                      <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
                       <TableCell className="text-right">{qty}</TableCell>
                       <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
                       <TableCell className="text-right text-success">{fmtMoney(profit, sym)}</TableCell>

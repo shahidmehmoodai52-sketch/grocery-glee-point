@@ -134,6 +134,34 @@ const today = () => new Date().toISOString().slice(0, 10);
 const emptyTx = { account_id: "", direction: "in" as "in" | "out", amount: 0, occurred_on: today(), category: "other", reference: "", notes: "", payment_method: "cash" };
 const emptyTransfer = { from_id: "", to_id: "", amount: 0, occurred_on: today(), notes: "" };
 const emptySupplierPay = { supplier_id: "", from_id: "", amount: 0, occurred_on: today(), note: "" };
+const SPLIT_PAYMENT_PREFIX = "split:";
+
+function parseSalePaymentSplits(methodValue: string | null | undefined, paidValue: number) {
+  const raw = String(methodValue ?? "").trim();
+  const paid = +Math.max(0, Number(paidValue || 0)).toFixed(2);
+  if (!raw.startsWith(SPLIT_PAYMENT_PREFIX)) {
+    return [{ method: raw || "cash", amount: paid }];
+  }
+  const body = raw.slice(SPLIT_PAYMENT_PREFIX.length);
+  const rows = body
+    .split("|")
+    .filter(Boolean)
+    .map((part) => {
+      const [methodEncoded, amountRaw] = part.split("=");
+      let decoded = methodEncoded || "";
+      try {
+        decoded = decodeURIComponent(methodEncoded || "");
+      } catch {
+        decoded = methodEncoded || "";
+      }
+      const method = decoded.trim() || "cash";
+      const amount = +Math.max(0, Number(amountRaw || 0)).toFixed(2);
+      return { method, amount };
+    })
+    .filter((entry) => entry.amount > 0);
+  if (!rows.length) return [{ method: "cash", amount: paid }];
+  return rows;
+}
 
 /**
  * Fetch an ENTIRE table page-by-page.
@@ -330,19 +358,23 @@ function Page() {
       if (s.status === "voided") continue;
       const paid = Number(s.paid) || 0;
       if (paid <= 0) continue;
-      const method = s.payment_method === "credit" ? "cash" : (s.payment_method || "cash");
-      const acc = methodBuckets.resolve(method);
-      out.push({
-        id: `auto:sale:${s.id}`,
-        account_id: acc.id,
-        direction: "in",
-        amount: paid,
-        occurred_on: dateOf(s.created_at),
-        category: "sale",
-        reference: s.invoice_no ? `Invoice ${s.invoice_no}` : null,
-        notes: `${s.customers?.name ?? "Walk-in"} · ${s.payment_method}`,
-        transfer_group_id: null,
-        created_at: s.created_at,
+      const splits = parseSalePaymentSplits(s.payment_method, paid);
+      splits.forEach((split, index) => {
+        const method = split.method === "credit" ? "cash" : (split.method || "cash");
+        const acc = methodBuckets.resolve(method);
+        out.push({
+          id: `auto:sale:${s.id}:${index}`,
+          account_id: acc.id,
+          direction: "in",
+          amount: split.amount,
+          occurred_on: dateOf(s.created_at),
+          category: "sale",
+          reference: s.invoice_no ? `Invoice ${s.invoice_no}` : null,
+          notes: `${s.customers?.name ?? "Walk-in"} · ${split.method}`,
+          transfer_group_id: null,
+          created_at: s.created_at,
+          payment_method: split.method,
+        });
       });
     }
     // Sale returns — cash out

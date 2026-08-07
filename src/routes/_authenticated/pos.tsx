@@ -81,6 +81,7 @@ const UNDO_REASONS = [
 
 const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category";
 const STAFF_CACHE_KEY = "pos:expense-persons:cache";
+const POS_CASH_ACCOUNTS_QUERY_KEY = ["cash-accounts", "pos-payment"] as const;
 
 async function readCachedExpensePersons(): Promise<any[]> {
   try {
@@ -225,6 +226,61 @@ const newTab = (n: number): Tab => ({
   paid: "",
   note: "",
 });
+
+const SPLIT_PAYMENT_PREFIX = "split:";
+
+function toStoredSplitPayments(allocations: PaymentAllocation[], targetPaid: number) {
+  const positive = (allocations ?? []).filter((entry) => Number(entry.amount ?? 0) > 0);
+  const totalInput = positive.reduce((sum, entry) => sum + Number(entry.amount ?? 0), 0);
+  const target = +Math.max(0, Number(targetPaid || 0)).toFixed(2);
+  if (positive.length === 0 || totalInput <= 0 || target <= 0) return [] as { method: string; amount: number }[];
+
+  const scaled = positive.map((entry) => ({
+    method: (entry.method || "cash").trim() || "cash",
+    amount: +((Number(entry.amount ?? 0) * target) / totalInput).toFixed(2),
+  }));
+  const current = scaled.reduce((sum, entry) => sum + entry.amount, 0);
+  const delta = +(target - current).toFixed(2);
+  if (scaled.length > 0 && Math.abs(delta) >= 0.01) {
+    scaled[scaled.length - 1] = { ...scaled[scaled.length - 1], amount: +(scaled[scaled.length - 1].amount + delta).toFixed(2) };
+  }
+  return scaled.filter((entry) => entry.amount > 0);
+}
+
+function serializePaymentMethod(allocations: PaymentAllocation[], fallback: string, paid: number) {
+  const rows = toStoredSplitPayments(allocations, paid);
+  if (rows.length <= 1) return rows[0]?.method || fallback || "cash";
+  const encoded = rows
+    .map((entry) => `${encodeURIComponent(entry.method)}=${entry.amount.toFixed(2)}`)
+    .join("|");
+  return `${SPLIT_PAYMENT_PREFIX}${encoded}`;
+}
+
+function parsePaymentMethod(methodValue: string | null | undefined, paidValue: number): PaymentAllocation[] {
+  const raw = String(methodValue ?? "").trim();
+  const paid = +Math.max(0, Number(paidValue || 0)).toFixed(2);
+  if (!raw.startsWith(SPLIT_PAYMENT_PREFIX)) {
+    return [{ method: raw || "cash", amount: paid }];
+  }
+  const body = raw.slice(SPLIT_PAYMENT_PREFIX.length);
+  const parts = body.split("|").filter(Boolean);
+  const rows = parts
+    .map((part) => {
+      const [methodEncoded, amountRaw] = part.split("=");
+      let decoded = methodEncoded || "";
+      try {
+        decoded = decodeURIComponent(methodEncoded || "");
+      } catch {
+        decoded = methodEncoded || "";
+      }
+      const method = decoded.trim() || "cash";
+      const amount = +Math.max(0, Number(amountRaw || 0)).toFixed(2);
+      return { method, amount };
+    })
+    .filter((entry) => entry.amount > 0);
+  if (!rows.length) return [{ method: "cash", amount: paid }];
+  return rows;
+}
 
 async function searchProducts(term: string) {
   const q = term.trim().replace(/\s+/g, " ");
@@ -878,6 +934,9 @@ function POSPage() {
 
   const restorePayloadIntoNewTab = (payload: any, labelPrefix = "↺") => {
     if (!payload || !Array.isArray(payload.items)) return;
+    const parsedPayments = Array.isArray(payload.payments) && payload.payments.length
+      ? payload.payments.map((entry: any) => ({ method: entry.method ?? "cash", amount: Number(entry.amount ?? 0) }))
+      : parsePaymentMethod(payload.payment_method, Number(payload.paid ?? 0));
     const restoredItems: CartItem[] = payload.items.map((i: any) => {
       const qty = Number(i.qty ?? 1);
       const price = Number(i.price ?? 0);
@@ -902,10 +961,8 @@ function POSPage() {
       items: restoredItems,
       customer_id: payload.customer_id ?? null,
       expense_person_id: payload.expense_person_id ?? null,
-      payment_method: payload.payment_method ?? "cash",
-      payments: Array.isArray(payload.payments) && payload.payments.length
-        ? payload.payments.map((entry: any) => ({ method: entry.method ?? "cash", amount: Number(entry.amount ?? 0) }))
-        : [{ method: payload.payment_method ?? "cash", amount: Number(payload.paid ?? 0) }],
+      payment_method: parsedPayments[0]?.method ?? "cash",
+      payments: parsedPayments,
       discount: Number(payload.discount ?? 0),
       discount_pct: "",
       charge: Number(payload.charge ?? 0),
@@ -922,6 +979,7 @@ function POSPage() {
 
   const loadInvoiceForEdit = (sale: any) => {
     if (!sale) return;
+    const parsedPayments = parsePaymentMethod(sale.payment_method, Number(sale.paid ?? 0));
     const items: CartItem[] = (sale.sale_items ?? []).map((it: any) => {
       const qty = Number(it.qty ?? 1);
       const price = Number(it.price ?? 0);
@@ -943,8 +1001,8 @@ function POSPage() {
       items,
       customer_id: sale.customer_id ?? null,
       expense_person_id: sale.expense_person_id ?? null,
-      payment_method: sale.payment_method ?? "cash",
-      payments: [{ method: sale.payment_method ?? "cash", amount: Number(sale.paid ?? 0) }],
+      payment_method: parsedPayments[0]?.method ?? "cash",
+      payments: parsedPayments,
       discount: Number(sale.discount ?? 0),
       discount_pct: "",
       charge: 0,
@@ -960,6 +1018,7 @@ function POSPage() {
   };
 
   const openRestoredTab = (payload: any, fallbackInvoiceNo: string) => {
+    const parsedPayments = parsePaymentMethod(payload?.payment_method, Number(payload?.paid ?? 0));
     const items: any[] = Array.isArray(payload?.items) ? payload.items : [];
     const restoredItems: CartItem[] = items.map((i: any) => {
       const qty = Number(i.qty ?? 0);
@@ -983,13 +1042,13 @@ function POSPage() {
       items: restoredItems,
       customer_id: payload?.customer_id ?? null,
       expense_person_id: payload?.expense_person_id ?? null,
-      payment_method: payload?.payment_method ?? "cash",
+      payment_method: parsedPayments[0]?.method ?? "cash",
       discount: Number(payload?.discount ?? 0),
       discount_pct: "",
       charge: 0,
       charge_pct: "",
       paid: String(payload?.paid ?? ""),
-      payments: [{ method: payload?.payment_method ?? "cash", amount: Number(payload?.paid ?? 0) }],
+      payments: parsedPayments,
       note: payload?.note ?? "",
       restored: true,
     };
@@ -1149,10 +1208,8 @@ function POSPage() {
     setSubmitting(true);
     try {
       const paymentAllocations = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
-      const paymentMethodLabel = paymentAllocations.length > 1
-        ? paymentAllocations.map((entry) => entry.method).join(" + ")
-        : (paymentAllocations[0]?.method || tab.payment_method || "cash");
       const tenderedAmount = +Math.min(sumPaymentAllocations(paymentAllocations), total).toFixed(2);
+      const paymentMethodLabel = serializePaymentMethod(paymentAllocations, tab.payment_method || "cash", tenderedAmount);
       const items = tab.items.map((i) => ({
         product_id: i.product_id,
         name: i.name,
@@ -1819,8 +1876,7 @@ function POSPage() {
                 if (exact) { addProduct(exact); setSearch(""); triggerScanFlash(); return; }
                 if (filtered.length >= 1) {
                   const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
-                  const idx = addProduct(pick); setSearch("");
-                  setTimeout(() => setEditing({ idx, field: "qty" }), 0);
+                  addProduct(pick); setSearch("");
                   return;
                 }
                 openQuickAdd(raw);
@@ -2035,7 +2091,7 @@ function POSPage() {
                           key={`search-${p.id}`}
                           ref={(el) => { searchRowRefs.current[i] = el; }}
                           onMouseEnter={() => setHighlight(i)}
-                          onClick={() => { const idx = addProduct(p); setSearch(""); setTimeout(() => setEditing({ idx, field: "qty" }), 0); }}
+                          onClick={() => { addProduct(p); setSearch(""); }}
                           className={`cursor-pointer border-b border-border ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
                         >
                           <td className="px-2 py-1.5 font-mono text-xs">{code}</td>
@@ -2682,7 +2738,7 @@ function POSPage() {
 
 function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const accQ = useQuery({
-    queryKey: ["cash-accounts", "pos-payment-methods"],
+    queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
     queryFn: fetchActiveCashAccounts,
   });
   const accounts = accQ.data ?? [];
@@ -2735,7 +2791,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
 
 function PaymentMethodSelect({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
   const accQ = useQuery({
-    queryKey: ["cash-accounts", "pos-payment-selector"],
+    queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
     queryFn: fetchActiveCashAccounts,
   });
   const accounts = accQ.data ?? [];

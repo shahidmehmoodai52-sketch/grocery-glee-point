@@ -24,6 +24,24 @@ import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: Page });
 
+const SPLIT_PAYMENT_PREFIX = "split:";
+const displayPaymentMethod = (value: string | null | undefined) => {
+  const raw = String(value ?? "").trim();
+  if (!raw.startsWith(SPLIT_PAYMENT_PREFIX)) return raw || "cash";
+  const body = raw.slice(SPLIT_PAYMENT_PREFIX.length);
+  const methods = body
+    .split("|")
+    .filter(Boolean)
+    .map((part) => {
+      const [methodEncoded] = part.split("=");
+      let decoded = methodEncoded || "";
+      try { decoded = decodeURIComponent(methodEncoded || ""); } catch {}
+      return decoded.trim();
+    })
+    .filter(Boolean);
+  return methods.length ? methods.join(" + ") : "cash";
+};
+
 function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs.";
@@ -222,7 +240,7 @@ function Page() {
                 <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
                 <TableCell className="text-sm">{new Date(s.created_at).toLocaleString()}</TableCell>
                 <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
-                <TableCell className="capitalize">{s.payment_method}</TableCell>
+                <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(s.paid, sym)}</TableCell>
                 <TableCell>
