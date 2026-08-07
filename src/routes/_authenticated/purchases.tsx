@@ -18,6 +18,7 @@ import { usePersistentState } from "@/hooks/use-persistent-state";
 import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
 
 import { db } from "@/lib/offline/db";
+import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
@@ -409,9 +410,9 @@ function Page() {
     queryKey: ["purchases"],
     staleTime: 30_000,
     queryFn: async () => offlineFirst<any[]>(
-      async () => (await supabase.from("purchases").select("*, suppliers(name)").order("created_at", { ascending: false }).limit(100)).data ?? [],
+      async () => await fetchAll<any>((from, to) => supabase.from("purchases").select("*, suppliers(name)").order("created_at", { ascending: false }).range(from, to)),
       async () => {
-        const rows = await db().purchases.orderBy("created_at").reverse().limit(100).toArray();
+        const rows = await db().purchases.orderBy("created_at").reverse().toArray();
         const supMap = new Map((await db().suppliers.toArray()).map((s: any) => [s.id, s.name]));
         return rows.map((r: any) => ({ ...r, suppliers: r.supplier_id ? { name: supMap.get(r.supplier_id) ?? null } : null }));
       },

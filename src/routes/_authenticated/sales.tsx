@@ -19,6 +19,7 @@ import { fmtMoney } from "@/lib/format";
 import { Receipt, printReceipt } from "@/components/receipt";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { fetchAll } from "@/lib/supabase-page";
 
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: Page });
@@ -64,10 +65,12 @@ function Page() {
   }, [prevFrom, fromDate, toDate]);
 
   const rangedQuery = (table: "sales" | "sale_returns", cols: string) => async () => {
-    let q = supabase.from(table).select(cols).order("created_at", { ascending: false }).limit(5000);
-    if (window.startIso) q = q.gte("created_at", window.startIso);
-    if (window.endIso) q = q.lte("created_at", window.endIso);
-    return ((await q).data as any[]) ?? [];
+    return await fetchAll<any>((from, to) => {
+      let q = supabase.from(table).select(cols).order("created_at", { ascending: false });
+      if (window.startIso) q = q.gte("created_at", window.startIso);
+      if (window.endIso) q = q.lte("created_at", window.endIso);
+      return q.range(from, to) as any;
+    });
   };
 
   const { data: allSales = [] } = useQuery({

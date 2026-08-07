@@ -39,12 +39,12 @@ function Page() {
   const { data: returns = [] } = useQuery({
     queryKey: ["purchase-returns"],
     queryFn: async () =>
-      (await supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+      await fetchAll<any>((from, to) => supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)),
   });
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases-for-return"],
     queryFn: async () =>
-      (await supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).limit(100)).data ?? [],
+      await fetchAll<any>((from, to) => supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
   });
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],

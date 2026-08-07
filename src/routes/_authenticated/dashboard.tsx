@@ -115,8 +115,10 @@ function Page() {
   const { data: topItemsRaw = [] } = useQuery({
     queryKey: ["dash-top-items", fromISO, toISO],
     queryFn: async () =>
-      (await supabase.from("sale_items").select("name,qty,line_total,sales!inner(created_at)")
-        .gte("sales.created_at", fromISO).lte("sales.created_at", toISO).limit(2000)).data ?? [],
+      await fetchAll<any>((f, t) =>
+        supabase.from("sale_items").select("name,qty,line_total,sales!inner(created_at)")
+          .gte("sales.created_at", fromISO).lte("sales.created_at", toISO).range(f, t),
+      ),
   });
 
   const sum = (arr: any[], k: string) => arr.reduce((a, x) => a + Number(x[k] ?? 0), 0);

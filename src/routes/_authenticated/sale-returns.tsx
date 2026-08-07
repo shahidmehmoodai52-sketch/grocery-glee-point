@@ -40,6 +40,7 @@ import { searchProductsLocal } from "@/lib/offline/pos";
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
 import { completeSaleReturnOfflineAware } from "@/lib/offline/returns";
+import { fetchAll as fetchAllRows } from "@/lib/supabase-page";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -121,19 +122,15 @@ function Page() {
       readLocalFirst<any[]>({
         table: "sale_returns",
         cloud: async () =>
-          (
-            await supabase
+          await fetchAllRows<any>((from, to) =>
+            supabase
               .from("sale_returns")
               .select("*, customers(name), sale_return_items(*)")
               .order("created_at", { ascending: false })
-              .limit(200)
-          ).data ?? [],
+              .range(from, to),
+          ),
         local: async () => {
-          const rows = await offlineDb()
-            .sale_returns.orderBy("created_at")
-            .reverse()
-            .limit(200)
-            .toArray();
+          const rows = await offlineDb().sale_returns.orderBy("created_at").reverse().toArray();
           return await Promise.all(rows.map(enrichReturnRow));
         },
         cache: async (rows) => {
@@ -153,15 +150,15 @@ function Page() {
       readLocalFirst<any[]>({
         table: "sales",
         cloud: async () =>
-          (
-            await supabase
+          await fetchAllRows<any>((from, to) =>
+            supabase
               .from("sales")
               .select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)")
               .order("created_at", { ascending: false })
-              .limit(200)
-          ).data ?? [],
+              .range(from, to),
+          ),
         local: async () => {
-          const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(200).toArray();
+          const rows = await offlineDb().sales.orderBy("created_at").reverse().toArray();
           return await Promise.all(rows.map(enrichSaleRow));
         },
         cache: async (rows) => {
