@@ -710,7 +710,7 @@ function POSPage() {
   }, [searchableProducts, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
-  useEffect(() => { setHighlight(0); }, [search]);
+  useEffect(() => { setHighlight(0); kbNavRef.current = false; }, [search]);
 
   // Scroll highlighted search result into view (accounting for sticky header)
   useEffect(() => {
