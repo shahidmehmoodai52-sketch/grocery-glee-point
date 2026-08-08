@@ -751,9 +751,65 @@ function Page() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{drill?.title}</DialogTitle>
+            {drill?.note && <DialogDescription>{drill.note}</DialogDescription>}
+          </DialogHeader>
+          {drill?.invoices && (
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
+                <TableHead>Method</TableHead><TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {drill.invoices.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {drill.invoices.map((s: any) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">{new Date(s.created_at).toLocaleString()}</TableCell>
+                    <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
+                    <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
+                    <TableCell className="text-right font-medium">{fmtMoney(Number(s.total), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(Number(s.paid), sym)}</TableCell>
+                    <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
+                  </TableRow>
+                ))}
+                {drill.invoices.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell colSpan={4}>Total ({drill.invoices.length})</TableCell>
+                    <TableCell className="text-right">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.total), 0), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.paid), 0), sym)}</TableCell>
+                    <TableCell />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+          {drill?.cols && drill?.rows && (
+            <Table>
+              <TableHeader><TableRow>
+                {drill.cols.map((c, i) => <TableHead key={c} className={i === 0 ? "" : "text-right"}>{c}</TableHead>)}
+              </TableRow></TableHeader>
+              <TableBody>
+                {drill.rows.length === 0 && <TableRow><TableCell colSpan={drill.cols.length} className="text-center text-muted-foreground py-6">No records</TableCell></TableRow>}
+                {drill.rows.map((r, ri) => (
+                  <TableRow key={ri}>
+                    {r.map((c, ci) => <TableCell key={ci} className={ci === 0 ? "" : "text-right"}>{c}</TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function Stat({ icon: Icon, label, value, tone }: any) {
   const colors: Record<string, string> = { primary: "text-primary", success: "text-success", destructive: "text-destructive", warning: "text-warning" };
