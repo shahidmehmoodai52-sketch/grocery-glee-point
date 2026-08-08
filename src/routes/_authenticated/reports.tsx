@@ -821,9 +821,9 @@ function Stat({ icon: Icon, label, value, tone }: any) {
   );
 }
 
-function Row({ label, value, bold, muted, accent }: any) {
+function Row({ label, value, bold, muted, accent, onClick }: any) {
   return (
-    <TableRow>
+    <TableRow className={onClick ? "cursor-pointer hover:bg-muted/50" : ""} onClick={onClick}>
       <TableCell className={muted ? "text-muted-foreground" : ""}>{label}</TableCell>
       <TableCell className={`text-right ${bold ? "font-semibold" : ""} ${accent ? "text-primary text-lg" : ""}`}>{value}</TableCell>
     </TableRow>
