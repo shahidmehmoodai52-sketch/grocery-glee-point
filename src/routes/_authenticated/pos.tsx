@@ -1824,11 +1824,14 @@ function POSPage() {
                 const raw = search.trim();
                 // When search has text, arrows navigate the search results popup
                 if (raw && e.key === "ArrowDown" && filtered.length) {
-                  e.preventDefault(); setHighlight((h) => (h + 1) % filtered.length); return;
+                  e.preventDefault(); kbNavRef.current = true;
+                  setHighlight((h) => Math.min(h + 1, filtered.length - 1)); return;
                 }
                 if (raw && e.key === "ArrowUp" && filtered.length) {
-                  e.preventDefault(); setHighlight((h) => (h - 1 + filtered.length) % filtered.length); return;
+                  e.preventDefault(); kbNavRef.current = true;
+                  setHighlight((h) => Math.max(h - 1, 0)); return;
                 }
+
                 // When search is empty, arrows move the cart line cursor (clamped, no wrap)
                 if (!raw && (e.key === "ArrowDown" || e.key === "ArrowUp") && tab.items.length) {
                   e.preventDefault();
