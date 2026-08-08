@@ -540,7 +540,31 @@ function Page() {
                 {filteredProducts.map((p, i) => {
                   const margin = p.revenue ? (p.profit / p.revenue) * 100 : 0;
                   return (
-                    <TableRow key={i}>
+                    <TableRow
+                      key={i}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        const rows: (string | number)[][] = [];
+                        for (const s of sales as any[]) {
+                          for (const it of s.sale_items ?? []) {
+                            if (it.name !== p.name) continue;
+                            rows.push([
+                              s.invoice_no,
+                              new Date(s.created_at).toLocaleString(),
+                              s.customers?.name ?? "Walk-in",
+                              Number(it.qty),
+                              fmtMoney(Number(it.line_total), sym),
+                            ]);
+                          }
+                        }
+                        setDrill({
+                          title: p.name,
+                          note: `${rows.length} invoice line${rows.length === 1 ? "" : "s"} · Qty ${p.qty} · Revenue ${fmtMoney(p.revenue, sym)}`,
+                          cols: ["Invoice", "Date", "Customer", "Qty", "Amount"],
+                          rows,
+                        });
+                      }}
+                    >
                       <TableCell>{p.name}</TableCell>
                       <TableCell className="text-right">{p.qty}</TableCell>
                       <TableCell className="text-right">{fmtMoney(p.revenue, sym)}</TableCell>
