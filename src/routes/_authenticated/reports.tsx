@@ -717,7 +717,21 @@ function Page() {
               <TableBody>
                 {(partyPayments as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No party payments</TableCell></TableRow>}
                 {(partyPayments as any[]).map((p) => (
-                  <TableRow key={p.id}>
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setDrill({
+                      title: `${p.party_type === "customer" ? "Customer payment" : "Supplier payment"} · ${p.customers?.name ?? p.suppliers?.name ?? "—"}`,
+                      note: new Date(p.created_at).toLocaleString(),
+                      cols: ["Field", "Value"],
+                      rows: [
+                        ["Direction", p.party_type === "customer" ? "In · from customer" : "Out · to supplier"],
+                        ["Channel", p.method || "—"],
+                        ["Note", p.note || "—"],
+                        ["Amount", fmtMoney(Number(p.amount), sym)],
+                      ],
+                    })}
+                  >
                     <TableCell className="whitespace-nowrap text-xs">{new Date(p.created_at).toLocaleString()}</TableCell>
                     <TableCell>
                       {p.party_type === "customer"
