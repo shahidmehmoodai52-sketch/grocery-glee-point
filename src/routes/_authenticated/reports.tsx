@@ -66,6 +66,13 @@ function Page() {
   const to = toDate ? toISO(toDate) : today();
   const [tab, setTab] = useState("pnl");
   const [search, setSearch] = useState("");
+  const [drill, setDrill] = useState<null | {
+    title: string;
+    note?: string;
+    invoices?: any[];
+    cols?: string[];
+    rows?: (string | number)[][];
+  }>(null);
 
   const applyPreset = (p: DatePreset) => {
     setPreset(p);
