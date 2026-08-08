@@ -440,7 +440,11 @@ function Page() {
                   const cost = d.revenue - d.profit;
                   const margin = d.revenue ? (d.profit / d.revenue) * 100 : 0;
                   return (
-                    <TableRow key={d.date}>
+                    <TableRow
+                      key={d.date}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => openInvoices(`Sales & profit on ${d.date}`, (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                    >
                       <TableCell>{d.date}</TableCell>
                       <TableCell className="text-right">{d.invoices}</TableCell>
                       <TableCell className="text-right">{fmtMoney(d.revenue, sym)}</TableCell>
