@@ -484,7 +484,21 @@ function Page() {
                   const profit = (Number(s.subtotal) - Number(s.discount)) - Number(s.cost_total);
                   const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
                   return (
-                    <TableRow key={s.id}>
+                    <TableRow
+                      key={s.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setDrill({
+                        title: `Invoice ${s.invoice_no}`,
+                        note: `${new Date(s.created_at).toLocaleString()} · ${s.customers?.name ?? "Walk-in"} · ${displayPaymentMethod(s.payment_method)} · Total ${fmtMoney(Number(s.total), sym)} · Paid ${fmtMoney(Number(s.paid), sym)}`,
+                        cols: ["Item", "Qty", "Price", "Line total"],
+                        rows: (s.sale_items ?? []).map((i: any) => [
+                          i.name,
+                          Number(i.qty),
+                          fmtMoney(Number(i.price), sym),
+                          fmtMoney(Number(i.line_total), sym),
+                        ]),
+                      })}
+                    >
                       <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
                       <TableCell className="text-sm">{new Date(s.created_at).toLocaleString()}</TableCell>
                       <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
