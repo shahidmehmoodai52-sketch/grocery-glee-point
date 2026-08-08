@@ -11,6 +11,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
@@ -65,6 +66,13 @@ function Page() {
   const to = toDate ? toISO(toDate) : today();
   const [tab, setTab] = useState("pnl");
   const [search, setSearch] = useState("");
+  const [drill, setDrill] = useState<null | {
+    title: string;
+    note?: string;
+    invoices?: any[];
+    cols?: string[];
+    rows?: (string | number)[][];
+  }>(null);
 
   const applyPreset = (p: DatePreset) => {
     setPreset(p);
@@ -134,6 +142,48 @@ function Page() {
   const creditOut = sales.filter((x: any) => x.status === "credit").reduce((s, x: any) => s + (Number(x.total) - Number(x.paid)), 0);
   const expensesPeriod = expenses.reduce((s, x: any) => s + Number(x.amount), 0);
   const netProfit = grossProfit - expensesPeriod;
+
+  // ---- drill-down helpers (every report row is clickable)
+  const openInvoices = (title: string, list: any[], note?: string) =>
+    setDrill({ title, note: note ?? `${list.length} invoice${list.length === 1 ? "" : "s"}`, invoices: list });
+
+  const openReturns = (title: string) =>
+    setDrill({
+      title,
+      note: `${saleReturns.length} return${saleReturns.length === 1 ? "" : "s"}`,
+      cols: ["Return #", "Date", "Customer", "Subtotal", "Refund", "Total"],
+      rows: (saleReturns as any[]).map((r) => [
+        r.return_no ?? "—",
+        new Date(r.created_at).toLocaleString(),
+        r.customers?.name ?? "Walk-in",
+        fmtMoney(Number(r.subtotal ?? 0), sym),
+        fmtMoney(Number(r.refund_amount ?? 0), sym),
+        fmtMoney(Number(r.total ?? 0), sym),
+      ]),
+    });
+
+  const openExpenses = () =>
+    setDrill({
+      title: "Operating expenses",
+      note: `${expenses.length} entr${expenses.length === 1 ? "y" : "ies"} · ${fmtMoney(expensesPeriod, sym)}`,
+      cols: ["Date", "Category", "Amount"],
+      rows: (expenses as any[]).map((e) => [e.expense_date, e.category ?? "—", fmtMoney(Number(e.amount), sym)]),
+    });
+
+  const openPurchases = () =>
+    setDrill({
+      title: "Purchases (period)",
+      note: `${purchases.length} purchase${purchases.length === 1 ? "" : "s"} · ${fmtMoney(totalPurchases, sym)}`,
+      cols: ["Date", "Subtotal", "Tax", "Total", "Paid"],
+      rows: (purchases as any[]).map((p) => [
+        new Date(p.created_at).toLocaleString(),
+        fmtMoney(Number(p.subtotal ?? 0), sym),
+        fmtMoney(Number(p.tax ?? 0), sym),
+        fmtMoney(Number(p.total ?? 0), sym),
+        fmtMoney(Number(p.paid ?? 0), sym),
+      ]),
+    });
+
 
   // Daily sale report
   const dailySales = useMemo(() => {
@@ -320,16 +370,17 @@ function Page() {
             <h2 className="font-semibold mb-3">Profit &amp; Loss Statement</h2>
             <Table>
               <TableBody>
-                <Row label="Gross sales (before returns)" value={fmtMoney(grossRevenue, sym)} muted />
-                <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted />
-                <Row label="Sales (net of returns & discount)" value={fmtMoney(revenue, sym)} />
-                <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} />
-                <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold />
-                <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} />
-                <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted />
-                <Row label="Credit outstanding" value={fmtMoney(creditOut, sym)} muted />
-                <Row label="Total purchases (period)" value={fmtMoney(totalPurchases, sym)} muted />
-                <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent />
+                <Row label="Gross sales (before returns)" value={fmtMoney(grossRevenue, sym)} muted onClick={() => openInvoices("Gross sales (before returns)", sales as any[])} />
+                <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted onClick={() => openReturns("Sale returns")} />
+                <Row label="Sales (net of returns & discount)" value={fmtMoney(revenue, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", sales as any[])} />
+                <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices("Cost of goods sold", sales as any[])} />
+                <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", sales as any[])} />
+                <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
+                <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted onClick={() => openInvoices("Tax collected", (sales as any[]).filter((s) => Number(s.tax) > 0))} />
+                <Row label="Credit outstanding" value={fmtMoney(creditOut, sym)} muted onClick={() => openInvoices("Credit outstanding", (sales as any[]).filter((s) => s.status === "credit" && Number(s.total) - Number(s.paid) > 0))} />
+                <Row label="Total purchases (period)" value={fmtMoney(totalPurchases, sym)} muted onClick={openPurchases} />
+                <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices("Net profit basis · all invoices", sales as any[])} />
+
               </TableBody>
             </Table>
             <div className="text-xs text-muted-foreground mt-3">{from} → {to} · {sales.length} sales, {purchases.length} purchases, {expenses.length} expenses</div>
@@ -347,7 +398,11 @@ function Page() {
               <TableBody>
                 {dailySales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No sales</TableCell></TableRow>}
                 {dailySales.map((d) => (
-                  <TableRow key={d.date}>
+                  <TableRow
+                    key={d.date}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openInvoices(`Sales on ${d.date}`, (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                  >
                     <TableCell>{d.date}</TableCell>
                     <TableCell className="text-right">{d.invoices}</TableCell>
                     <TableCell className="text-right">{d.qty}</TableCell>
@@ -385,7 +440,11 @@ function Page() {
                   const cost = d.revenue - d.profit;
                   const margin = d.revenue ? (d.profit / d.revenue) * 100 : 0;
                   return (
-                    <TableRow key={d.date}>
+                    <TableRow
+                      key={d.date}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => openInvoices(`Sales & profit on ${d.date}`, (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                    >
                       <TableCell>{d.date}</TableCell>
                       <TableCell className="text-right">{d.invoices}</TableCell>
                       <TableCell className="text-right">{fmtMoney(d.revenue, sym)}</TableCell>
@@ -425,7 +484,21 @@ function Page() {
                   const profit = (Number(s.subtotal) - Number(s.discount)) - Number(s.cost_total);
                   const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
                   return (
-                    <TableRow key={s.id}>
+                    <TableRow
+                      key={s.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setDrill({
+                        title: `Invoice ${s.invoice_no}`,
+                        note: `${new Date(s.created_at).toLocaleString()} · ${s.customers?.name ?? "Walk-in"} · ${displayPaymentMethod(s.payment_method)} · Total ${fmtMoney(Number(s.total), sym)} · Paid ${fmtMoney(Number(s.paid), sym)}`,
+                        cols: ["Item", "Qty", "Price", "Line total"],
+                        rows: (s.sale_items ?? []).map((i: any) => [
+                          i.name,
+                          Number(i.qty),
+                          fmtMoney(Number(i.price), sym),
+                          fmtMoney(Number(i.line_total), sym),
+                        ]),
+                      })}
+                    >
                       <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
                       <TableCell className="text-sm">{new Date(s.created_at).toLocaleString()}</TableCell>
                       <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
@@ -434,7 +507,7 @@ function Page() {
                       <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
                       <TableCell className="text-right text-success">{fmtMoney(profit, sym)}</TableCell>
                       <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
-                      <TableCell className="text-right"><Button asChild variant="ghost" size="icon"><Link to="/sales"><Eye className="h-4 w-4" /></Link></Button></TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}><Button asChild variant="ghost" size="icon"><Link to="/sales"><Eye className="h-4 w-4" /></Link></Button></TableCell>
                     </TableRow>
                   );
                 })}
@@ -467,7 +540,31 @@ function Page() {
                 {filteredProducts.map((p, i) => {
                   const margin = p.revenue ? (p.profit / p.revenue) * 100 : 0;
                   return (
-                    <TableRow key={i}>
+                    <TableRow
+                      key={i}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        const rows: (string | number)[][] = [];
+                        for (const s of sales as any[]) {
+                          for (const it of s.sale_items ?? []) {
+                            if (it.name !== p.name) continue;
+                            rows.push([
+                              s.invoice_no,
+                              new Date(s.created_at).toLocaleString(),
+                              s.customers?.name ?? "Walk-in",
+                              Number(it.qty),
+                              fmtMoney(Number(it.line_total), sym),
+                            ]);
+                          }
+                        }
+                        setDrill({
+                          title: p.name,
+                          note: `${rows.length} invoice line${rows.length === 1 ? "" : "s"} · Qty ${p.qty} · Revenue ${fmtMoney(p.revenue, sym)}`,
+                          cols: ["Invoice", "Date", "Customer", "Qty", "Amount"],
+                          rows,
+                        });
+                      }}
+                    >
                       <TableCell>{p.name}</TableCell>
                       <TableCell className="text-right">{p.qty}</TableCell>
                       <TableCell className="text-right">{fmtMoney(p.revenue, sym)}</TableCell>
@@ -509,7 +606,15 @@ function Page() {
                   const totalPaid = paymentBreakdown.reduce((a, b) => a + b.paid, 0);
                   const share = totalPaid ? (p.paid / totalPaid) * 100 : 0;
                   return (
-                    <TableRow key={p.method}>
+                    <TableRow
+                      key={p.method}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => openInvoices(
+                        `Payments · ${p.method}`,
+                        (sales as any[]).filter((s) => parsePaymentSplit(s.payment_method, Number(s.paid)).some((x) => (x.method || "unknown") === p.method)),
+                        `${p.invoices} invoice${p.invoices === 1 ? "" : "s"} · Received ${fmtMoney(p.paid, sym)}`,
+                      )}
+                    >
                       <TableCell className="capitalize font-medium">{p.method}</TableCell>
                       <TableCell className="text-right">{p.invoices}</TableCell>
                       <TableCell className="text-right">{fmtMoney(p.total, sym)}</TableCell>
@@ -549,7 +654,35 @@ function Page() {
               <TableBody>
                 {methodFlow.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No activity</TableCell></TableRow>}
                 {methodFlow.map((m) => (
-                  <TableRow key={m.method}>
+                  <TableRow
+                    key={m.method}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => {
+                      const rows: (string | number)[][] = [];
+                      for (const s of sales as any[]) {
+                        for (const split of parsePaymentSplit(s.payment_method, Number(s.paid))) {
+                          if ((split.method || "unknown").toLowerCase() !== m.method) continue;
+                          rows.push([new Date(s.created_at).toLocaleString(), "In · Sale", s.invoice_no, s.customers?.name ?? "Walk-in", fmtMoney(Number(split.amount), sym)]);
+                        }
+                      }
+                      for (const p of partyPayments as any[]) {
+                        if ((p.method || "unknown").toLowerCase() !== m.method) continue;
+                        rows.push([
+                          new Date(p.created_at).toLocaleString(),
+                          p.party_type === "customer" ? "In · Customer payment" : "Out · Supplier payment",
+                          p.note || "—",
+                          p.customers?.name ?? p.suppliers?.name ?? "—",
+                          `${p.party_type === "customer" ? "+" : "−"}${fmtMoney(Number(p.amount), sym)}`,
+                        ]);
+                      }
+                      setDrill({
+                        title: `Channel · ${m.method}`,
+                        note: `${rows.length} entr${rows.length === 1 ? "y" : "ies"} · Net ${fmtMoney(m.net, sym)}`,
+                        cols: ["Date", "Type", "Reference", "Party", "Amount"],
+                        rows,
+                      });
+                    }}
+                  >
                     <TableCell className="capitalize font-medium">{m.method}</TableCell>
                     <TableCell className="text-right text-success">{m.in_sales ? fmtMoney(m.in_sales, sym) : "—"}</TableCell>
                     <TableCell className="text-right text-success">{m.in_customer ? fmtMoney(m.in_customer, sym) : "—"}</TableCell>
@@ -584,7 +717,21 @@ function Page() {
               <TableBody>
                 {(partyPayments as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No party payments</TableCell></TableRow>}
                 {(partyPayments as any[]).map((p) => (
-                  <TableRow key={p.id}>
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setDrill({
+                      title: `${p.party_type === "customer" ? "Customer payment" : "Supplier payment"} · ${p.customers?.name ?? p.suppliers?.name ?? "—"}`,
+                      note: new Date(p.created_at).toLocaleString(),
+                      cols: ["Field", "Value"],
+                      rows: [
+                        ["Direction", p.party_type === "customer" ? "In · from customer" : "Out · to supplier"],
+                        ["Channel", p.method || "—"],
+                        ["Note", p.note || "—"],
+                        ["Amount", fmtMoney(Number(p.amount), sym)],
+                      ],
+                    })}
+                  >
                     <TableCell className="whitespace-nowrap text-xs">{new Date(p.created_at).toLocaleString()}</TableCell>
                     <TableCell>
                       {p.party_type === "customer"
@@ -604,9 +751,65 @@ function Page() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{drill?.title}</DialogTitle>
+            {drill?.note && <DialogDescription>{drill.note}</DialogDescription>}
+          </DialogHeader>
+          {drill?.invoices && (
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
+                <TableHead>Method</TableHead><TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {drill.invoices.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {drill.invoices.map((s: any) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">{new Date(s.created_at).toLocaleString()}</TableCell>
+                    <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
+                    <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
+                    <TableCell className="text-right font-medium">{fmtMoney(Number(s.total), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(Number(s.paid), sym)}</TableCell>
+                    <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
+                  </TableRow>
+                ))}
+                {drill.invoices.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell colSpan={4}>Total ({drill.invoices.length})</TableCell>
+                    <TableCell className="text-right">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.total), 0), sym)}</TableCell>
+                    <TableCell className="text-right">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.paid), 0), sym)}</TableCell>
+                    <TableCell />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+          {drill?.cols && drill?.rows && (
+            <Table>
+              <TableHeader><TableRow>
+                {drill.cols.map((c, i) => <TableHead key={c} className={i === 0 ? "" : "text-right"}>{c}</TableHead>)}
+              </TableRow></TableHeader>
+              <TableBody>
+                {drill.rows.length === 0 && <TableRow><TableCell colSpan={drill.cols.length} className="text-center text-muted-foreground py-6">No records</TableCell></TableRow>}
+                {drill.rows.map((r, ri) => (
+                  <TableRow key={ri}>
+                    {r.map((c, ci) => <TableCell key={ci} className={ci === 0 ? "" : "text-right"}>{c}</TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function Stat({ icon: Icon, label, value, tone }: any) {
   const colors: Record<string, string> = { primary: "text-primary", success: "text-success", destructive: "text-destructive", warning: "text-warning" };
@@ -618,9 +821,9 @@ function Stat({ icon: Icon, label, value, tone }: any) {
   );
 }
 
-function Row({ label, value, bold, muted, accent }: any) {
+function Row({ label, value, bold, muted, accent, onClick }: any) {
   return (
-    <TableRow>
+    <TableRow className={onClick ? "cursor-pointer hover:bg-muted/50" : ""} onClick={onClick}>
       <TableCell className={muted ? "text-muted-foreground" : ""}>{label}</TableCell>
       <TableCell className={`text-right ${bold ? "font-semibold" : ""} ${accent ? "text-primary text-lg" : ""}`}>{value}</TableCell>
     </TableRow>
