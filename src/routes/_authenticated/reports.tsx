@@ -654,7 +654,35 @@ function Page() {
               <TableBody>
                 {methodFlow.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No activity</TableCell></TableRow>}
                 {methodFlow.map((m) => (
-                  <TableRow key={m.method}>
+                  <TableRow
+                    key={m.method}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => {
+                      const rows: (string | number)[][] = [];
+                      for (const s of sales as any[]) {
+                        for (const split of parsePaymentSplit(s.payment_method, Number(s.paid))) {
+                          if ((split.method || "unknown").toLowerCase() !== m.method) continue;
+                          rows.push([new Date(s.created_at).toLocaleString(), "In · Sale", s.invoice_no, s.customers?.name ?? "Walk-in", fmtMoney(Number(split.amount), sym)]);
+                        }
+                      }
+                      for (const p of partyPayments as any[]) {
+                        if ((p.method || "unknown").toLowerCase() !== m.method) continue;
+                        rows.push([
+                          new Date(p.created_at).toLocaleString(),
+                          p.party_type === "customer" ? "In · Customer payment" : "Out · Supplier payment",
+                          p.note || "—",
+                          p.customers?.name ?? p.suppliers?.name ?? "—",
+                          `${p.party_type === "customer" ? "+" : "−"}${fmtMoney(Number(p.amount), sym)}`,
+                        ]);
+                      }
+                      setDrill({
+                        title: `Channel · ${m.method}`,
+                        note: `${rows.length} entr${rows.length === 1 ? "y" : "ies"} · Net ${fmtMoney(m.net, sym)}`,
+                        cols: ["Date", "Type", "Reference", "Party", "Amount"],
+                        rows,
+                      });
+                    }}
+                  >
                     <TableCell className="capitalize font-medium">{m.method}</TableCell>
                     <TableCell className="text-right text-success">{m.in_sales ? fmtMoney(m.in_sales, sym) : "—"}</TableCell>
                     <TableCell className="text-right text-success">{m.in_customer ? fmtMoney(m.in_customer, sym) : "—"}</TableCell>
