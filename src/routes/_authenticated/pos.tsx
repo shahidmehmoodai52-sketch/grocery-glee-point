@@ -2097,7 +2097,7 @@ function POSPage() {
                         <tr
                           key={`search-${p.id}`}
                           ref={(el) => { searchRowRefs.current[i] = el; }}
-                          onMouseMove={() => { if (!kbNavRef.current) setHighlight(i); }}
+                          onMouseMove={() => { kbNavRef.current = false; setHighlight(i); }}
                           onClick={() => { addProduct(p); setSearch(""); }}
                           className={`cursor-pointer border-b border-border ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
                         >
