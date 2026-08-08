@@ -387,6 +387,10 @@ function POSPage() {
   const [cartCursor, setCartCursor] = useState<number>(-1);
   const cartRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   const searchRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
+  // True while the user is navigating results with the keyboard — blocks hover
+  // (including hover caused by auto-scrolling) from stealing the highlight.
+  const kbNavRef = useRef(false);
+
   const [scanFlash, setScanFlash] = useState(false);
   const [undoReason, setUndoReason] = useState<string>(UNDO_REASONS[0]);
   const [undoReasonNote, setUndoReasonNote] = useState<string>("");
