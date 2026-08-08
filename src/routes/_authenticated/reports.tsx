@@ -606,7 +606,15 @@ function Page() {
                   const totalPaid = paymentBreakdown.reduce((a, b) => a + b.paid, 0);
                   const share = totalPaid ? (p.paid / totalPaid) * 100 : 0;
                   return (
-                    <TableRow key={p.method}>
+                    <TableRow
+                      key={p.method}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => openInvoices(
+                        `Payments · ${p.method}`,
+                        (sales as any[]).filter((s) => parsePaymentSplit(s.payment_method, Number(s.paid)).some((x) => (x.method || "unknown") === p.method)),
+                        `${p.invoices} invoice${p.invoices === 1 ? "" : "s"} · Received ${fmtMoney(p.paid, sym)}`,
+                      )}
+                    >
                       <TableCell className="capitalize font-medium">{p.method}</TableCell>
                       <TableCell className="text-right">{p.invoices}</TableCell>
                       <TableCell className="text-right">{fmtMoney(p.total, sym)}</TableCell>
