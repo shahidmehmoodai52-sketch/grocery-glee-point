@@ -387,6 +387,10 @@ function POSPage() {
   const [cartCursor, setCartCursor] = useState<number>(-1);
   const cartRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   const searchRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
+  // True while the user is navigating results with the keyboard — blocks hover
+  // (including hover caused by auto-scrolling) from stealing the highlight.
+  const kbNavRef = useRef(false);
+
   const [scanFlash, setScanFlash] = useState(false);
   const [undoReason, setUndoReason] = useState<string>(UNDO_REASONS[0]);
   const [undoReasonNote, setUndoReasonNote] = useState<string>("");
@@ -706,7 +710,7 @@ function POSPage() {
   }, [searchableProducts, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
-  useEffect(() => { setHighlight(0); }, [search]);
+  useEffect(() => { setHighlight(0); kbNavRef.current = false; }, [search]);
 
   // Scroll highlighted search result into view (accounting for sticky header)
   useEffect(() => {
@@ -1824,11 +1828,14 @@ function POSPage() {
                 const raw = search.trim();
                 // When search has text, arrows navigate the search results popup
                 if (raw && e.key === "ArrowDown" && filtered.length) {
-                  e.preventDefault(); setHighlight((h) => (h + 1) % filtered.length); return;
+                  e.preventDefault(); kbNavRef.current = true;
+                  setHighlight((h) => Math.min(h + 1, filtered.length - 1)); return;
                 }
                 if (raw && e.key === "ArrowUp" && filtered.length) {
-                  e.preventDefault(); setHighlight((h) => (h - 1 + filtered.length) % filtered.length); return;
+                  e.preventDefault(); kbNavRef.current = true;
+                  setHighlight((h) => Math.max(h - 1, 0)); return;
                 }
+
                 // When search is empty, arrows move the cart line cursor (clamped, no wrap)
                 if (!raw && (e.key === "ArrowDown" || e.key === "ArrowUp") && tab.items.length) {
                   e.preventDefault();
@@ -2090,7 +2097,7 @@ function POSPage() {
                         <tr
                           key={`search-${p.id}`}
                           ref={(el) => { searchRowRefs.current[i] = el; }}
-                          onMouseEnter={() => setHighlight(i)}
+                          onMouseMove={() => { kbNavRef.current = false; setHighlight(i); }}
                           onClick={() => { addProduct(p); setSearch(""); }}
                           className={`cursor-pointer border-b border-border ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
                         >
