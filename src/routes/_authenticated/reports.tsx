@@ -143,6 +143,48 @@ function Page() {
   const expensesPeriod = expenses.reduce((s, x: any) => s + Number(x.amount), 0);
   const netProfit = grossProfit - expensesPeriod;
 
+  // ---- drill-down helpers (every report row is clickable)
+  const openInvoices = (title: string, list: any[], note?: string) =>
+    setDrill({ title, note: note ?? `${list.length} invoice${list.length === 1 ? "" : "s"}`, invoices: list });
+
+  const openReturns = (title: string) =>
+    setDrill({
+      title,
+      note: `${saleReturns.length} return${saleReturns.length === 1 ? "" : "s"}`,
+      cols: ["Return #", "Date", "Customer", "Subtotal", "Refund", "Total"],
+      rows: (saleReturns as any[]).map((r) => [
+        r.return_no ?? "—",
+        new Date(r.created_at).toLocaleString(),
+        r.customers?.name ?? "Walk-in",
+        fmtMoney(Number(r.subtotal ?? 0), sym),
+        fmtMoney(Number(r.refund_amount ?? 0), sym),
+        fmtMoney(Number(r.total ?? 0), sym),
+      ]),
+    });
+
+  const openExpenses = () =>
+    setDrill({
+      title: "Operating expenses",
+      note: `${expenses.length} entr${expenses.length === 1 ? "y" : "ies"} · ${fmtMoney(expensesPeriod, sym)}`,
+      cols: ["Date", "Category", "Amount"],
+      rows: (expenses as any[]).map((e) => [e.expense_date, e.category ?? "—", fmtMoney(Number(e.amount), sym)]),
+    });
+
+  const openPurchases = () =>
+    setDrill({
+      title: "Purchases (period)",
+      note: `${purchases.length} purchase${purchases.length === 1 ? "" : "s"} · ${fmtMoney(totalPurchases, sym)}`,
+      cols: ["Date", "Subtotal", "Tax", "Total", "Paid"],
+      rows: (purchases as any[]).map((p) => [
+        new Date(p.created_at).toLocaleString(),
+        fmtMoney(Number(p.subtotal ?? 0), sym),
+        fmtMoney(Number(p.tax ?? 0), sym),
+        fmtMoney(Number(p.total ?? 0), sym),
+        fmtMoney(Number(p.paid ?? 0), sym),
+      ]),
+    });
+
+
   // Daily sale report
   const dailySales = useMemo(() => {
     const map = new Map<string, { date: string; invoices: number; qty: number; revenue: number; tax: number; total: number; profit: number }>();
