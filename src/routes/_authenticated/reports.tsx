@@ -398,7 +398,11 @@ function Page() {
               <TableBody>
                 {dailySales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No sales</TableCell></TableRow>}
                 {dailySales.map((d) => (
-                  <TableRow key={d.date}>
+                  <TableRow
+                    key={d.date}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openInvoices(`Sales on ${d.date}`, (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                  >
                     <TableCell>{d.date}</TableCell>
                     <TableCell className="text-right">{d.invoices}</TableCell>
                     <TableCell className="text-right">{d.qty}</TableCell>
