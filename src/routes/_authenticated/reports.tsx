@@ -507,7 +507,7 @@ function Page() {
                       <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
                       <TableCell className="text-right text-success">{fmtMoney(profit, sym)}</TableCell>
                       <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
-                      <TableCell className="text-right"><Button asChild variant="ghost" size="icon"><Link to="/sales"><Eye className="h-4 w-4" /></Link></Button></TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}><Button asChild variant="ghost" size="icon"><Link to="/sales"><Eye className="h-4 w-4" /></Link></Button></TableCell>
                     </TableRow>
                   );
                 })}
