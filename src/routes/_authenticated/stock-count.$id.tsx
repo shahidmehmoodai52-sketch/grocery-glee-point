@@ -482,16 +482,23 @@ function StockCountDetailPage() {
                   <button
                     key={product.id}
                     type="button"
-                    className="flex w-full items-start justify-between rounded-lg border border-transparent bg-card px-3 py-3 text-left shadow-sm transition hover:border-primary hover:bg-accent/70"
+                    className="flex w-full items-start justify-between rounded-lg border border-border bg-card px-3 py-3 text-left shadow-sm transition cursor-pointer hover:border-primary hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     onClick={() => selectProductFromSearch(product)}
                   >
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="font-medium">{product.name}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {product.sku ?? "—"} · {product.barcode ?? "—"}
                       </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {product.unit ? `${product.unit}` : "unit"} · {fmtMoney(product.cost_price ?? 0, sym)}
+                      </div>
                     </div>
-                    <Badge variant="outline" className="shrink-0">{fmtQty(product.stock ?? 0)}</Badge>
+                    <div className="ml-3 shrink-0 text-right">
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Stock</div>
+                      <div className="font-semibold">{fmtQty(product.stock ?? 0)}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">Tap to count</div>
+                    </div>
                   </button>
                 ))}
               </div>
