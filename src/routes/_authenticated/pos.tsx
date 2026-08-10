@@ -396,6 +396,7 @@ function POSPage() {
   const [undoReasonNote, setUndoReasonNote] = useState<string>("");
   const [quickAddCustomerOpen, setQuickAddCustomerOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: "", phone: "" });
+  const [quickAddLookup, setQuickAddLookup] = useState("");
   const triggerScanFlash = () => {
     setScanFlash(true);
     window.setTimeout(() => setScanFlash(false), 300);
@@ -438,6 +439,23 @@ function POSPage() {
       unit: "pcs", cost_price: "", sell_price: "", stock: "1",
       category: "", supplier_id: "",
     });
+    setQuickAddLookup(raw);
+  };
+
+  const { data: quickAddMatches = [], isFetching: quickAddMatchesLoading } = useQuery({
+    queryKey: ["pos-quickadd-search", quickAddLookup],
+    enabled: quickAddLookup.trim().length >= 2,
+    queryFn: () => searchProducts(quickAddLookup),
+    staleTime: 10_000,
+  });
+
+  const selectQuickAddMatch = async (product: any) => {
+    addProduct(product);
+    toast.success(`Added ${product.name}`);
+    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
+    setQuickAddLookup("");
+    setSearch("");
+    setTimeout(() => searchRef.current?.focus(), 0);
   };
 
   const { data: quickAddSuppliers = [] } = useQuery({
@@ -2568,7 +2586,44 @@ function POSPage() {
           <DialogHeader>
             <DialogTitle>Add new item to catalog</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
+            <div>
+              <Label>Search existing item</Label>
+              <Input
+                placeholder="Barcode, item code or name"
+                value={quickAddLookup}
+                onChange={(e) => setQuickAddLookup(e.target.value)}
+              />
+              {quickAddLookup.trim().length >= 2 && (
+                <div className="mt-2 max-h-48 overflow-auto rounded-md border bg-muted/20 p-2 space-y-2">
+                  {quickAddMatchesLoading && <div className="text-xs text-muted-foreground">Searching…</div>}
+                  {!quickAddMatchesLoading && quickAddMatches.length === 0 && (
+                    <div className="text-xs text-muted-foreground">No existing item found</div>
+                  )}
+                  {(quickAddMatches ?? []).map((product: any) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      className="flex w-full items-start justify-between rounded-md border border-border bg-background px-3 py-2 text-left shadow-sm transition hover:border-primary hover:bg-accent/70"
+                      onClick={() => selectQuickAddMatch(product)}
+                    >
+                      <div>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {product.sku ?? "—"} · {product.barcode ?? "—"}
+                        </div>
+                      </div>
+                      <div className="ml-3 shrink-0 text-right">
+                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Stock</div>
+                        <div className="font-semibold">{fmtQty(product.stock ?? 0)}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <Label>Item name</Label>
               <Input
@@ -2637,6 +2692,7 @@ function POSPage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => {
               setQuickAdd((q) => ({ ...q, open: false }));
+              setQuickAddLookup("");
               setSearch("");
               setTimeout(() => searchRef.current?.focus(), 0);
             }}>Cancel</Button>
