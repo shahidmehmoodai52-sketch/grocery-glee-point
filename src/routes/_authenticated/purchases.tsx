@@ -564,7 +564,16 @@ function Page() {
     setSaving(false);
     savingRef.current = false;
     if (error) return toast.error(error.message);
-    toast.success("Purchase recorded, stock updated");
+
+    // Push changed sale rates onto the products so retail prices stay current.
+    const priceUpdates = items.filter(
+      (l) => l.product_id && Number(l.sale_price || 0) > 0 && Number(l.sale_price) !== Number(l.old_sale ?? -1),
+    );
+    for (const l of priceUpdates) {
+      await supabase.from("products").update({ sell_price: Number(l.sale_price) }).eq("id", l.product_id as string);
+    }
+
+    toast.success(priceUpdates.length ? "Purchase recorded — stock & sale rates updated" : "Purchase recorded, stock updated");
     setConfirmOpen(false);
     clearDraft();
     qc.invalidateQueries({ queryKey: ["purchases"] });
