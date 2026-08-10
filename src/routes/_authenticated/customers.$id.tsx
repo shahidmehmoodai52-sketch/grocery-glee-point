@@ -277,7 +277,16 @@ function Page() {
             {rows.map((x, i) => {
               const due = x.entity === "sale" ? Math.max(Number(x.total || 0) - Number(x.paid || 0), 0) : 0;
               return (
-              <TableRow key={i} className={x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}>
+              <TableRow
+                key={i}
+                className={`cursor-pointer ${x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : "hover:bg-muted/50"}`}
+                onClick={(e) => {
+                  // Inline action buttons keep their own behaviour.
+                  if ((e.target as HTMLElement).closest("button")) return;
+                  if (x.entity === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
+                  if (x.entity && x.entity !== "payment" && x.id) return setEditEntry({ entity: x.entity as Exclude<LedgerEntity, "payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
+                }}
+              >
 
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
                 <TableCell>

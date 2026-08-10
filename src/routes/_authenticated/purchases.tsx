@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
@@ -22,7 +22,7 @@ import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
 
 type Draft = {
   open: boolean;
@@ -130,6 +130,9 @@ function Page() {
   const today = new Date().toISOString().slice(0,10);
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
+  // Parked draft. "Hide (keep draft)" moves the current entry here so that
+  // "New purchase" always starts blank; the Draft button brings it back.
+  const [savedDraft, setSavedDraft, clearSavedDraft] = usePersistentState<Draft | null>("purchase-entry-saved", null);
   const { open, supplier, lines, tax, paid, note, date } = draft;
   const taxMode: "amt" | "pct" = draft.taxMode ?? "amt";
   const billDiscount = Number(draft.discount ?? 0);
@@ -163,19 +166,22 @@ function Page() {
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
   const [newProdOpen, setNewProdOpen] = useState(false);
-  const [newProd, setNewProd] = useState({ name: "", sku: "", barcode: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, supplier_id: "" });
+  const emptyNewProd = {
+    name: "", sku: "", barcode: "", category: "", unit: "pcs",
+    cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0,
+    low_stock_threshold: 5, supplier_id: "",
+    batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true,
+  };
+  const [newProd, setNewProd] = useState(emptyNewProd);
   const [newProdSaving, setNewProdSaving] = useState(false);
   const openNewProduct = (term: string) => {
     const t = term.trim();
     const isCode = /^\d+$/.test(t);
     setNewProd({
+      ...emptyNewProd,
       name: isCode ? "" : t,
       sku: isCode && t.length <= 6 ? t : "",
-      barcode: isCode && t.length > 4 ? t : (isCode ? "" : ""),
-      unit: "pcs",
-      cost_price: 0,
-      sell_price: 0,
-      stock: 0,
+      barcode: isCode && t.length > 4 ? t : "",
       supplier_id: supplier && supplier !== "none" ? supplier : "",
     });
     setNewProdOpen(true);
@@ -188,13 +194,21 @@ function Page() {
       name: newProd.name.trim(),
       sku: newProd.sku.trim() || null,
       barcode: primary,
+      category: newProd.category.trim() || null,
       unit: newProd.unit || "pcs",
       cost_price: Number(newProd.cost_price) || 0,
       sell_price: Number(newProd.sell_price) || 0,
       stock: Number(newProd.stock) || 0,
+      tax_rate: Number(newProd.tax_rate) || 0,
+      low_stock_threshold: Number(newProd.low_stock_threshold) || 0,
       preferred_supplier_id: newProd.supplier_id || null,
+      batch_no: newProd.batch_no.trim() || null,
+      expiry_date: newProd.expiry_date || null,
+      rack_location: newProd.rack_location.trim() || null,
+      allow_negative_stock: newProd.allow_negative_stock,
+      is_active: true,
     };
-    const { data, error } = await supabase.from("products").insert(payload).select("id,name,sku,barcode,cost_price,stock").single();
+    const { data, error } = await supabase.from("products").insert(payload).select("id,name,sku,barcode,cost_price,sell_price,stock").single();
     if (!error && data) {
       await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: primary });
     }
@@ -211,8 +225,17 @@ function Page() {
   const [editItemsOriginal, setEditItemsOriginal] = useState<any[]>([]);
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  // Selected payment source (cash account / preset) while editing a purchase.
+  const [editPay, setEditPay] = useState("");
   const openEdit = async (p: any) => {
     setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" });
+    setEditPay(
+      p.account_id
+        ? String(p.account_id)
+        : p.payment_method
+          ? `preset:${String(p.payment_method)}`
+          : "",
+    );
     setEditItems([]);
     setEditItemsOriginal([]);
     setEditLoading(true);
@@ -238,7 +261,7 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["purchases"] });
   };
   const searchRef = useRef<HTMLInputElement>(null);
-  const focusCell = (kind: "cost" | "qty", i: number) => {
+  const focusCell = (kind: "cost" | "sale" | "qty", i: number) => {
     setTimeout(() => {
       const el = document.getElementById(`purchase-${kind}-${i}`) as HTMLInputElement | null;
       el?.focus();
@@ -256,13 +279,15 @@ function Page() {
           name: product.name ?? "",
           qty: 1,
           cost: Number(product.cost_price ?? 0),
+          sale_price: Number(product.sell_price ?? 0),
+          old_sale: Number(product.sell_price ?? 0),
           old_stock: Number(product.stock ?? 0),
           old_cost: Number(product.cost_price ?? 0),
           barcode: product.barcode ?? null,
           item_code: product.sku ?? null,
         }];
       }
-      return [...ls, { product_id: null, name: fallbackName ?? "", qty: 1, cost: 0 }];
+      return [...ls, { product_id: null, name: fallbackName ?? "", qty: 1, cost: 0, sale_price: 0 }];
     });
     setEntrySearch("");
     setEntryActive(false);
@@ -505,8 +530,9 @@ function Page() {
   const effectivePaySource = paySource || defaultPaySource?.id || "";
 
   /** Turn the selected option into a real cash_accounts row (creating presets on demand). */
-  const resolvePayAccount = async (): Promise<{ id: string | null; name: string }> => {
-    const selected = paySourceOptions.find((a) => a.id === effectivePaySource) ?? defaultPaySource;
+  const resolvePayAccount = async (optionId?: string): Promise<{ id: string | null; name: string }> => {
+    const wanted = optionId || effectivePaySource;
+    const selected = paySourceOptions.find((a) => a.id === wanted) ?? defaultPaySource;
     if (!selected) return { id: null, name: "cash" };
     if (!selected.preset) return { id: selected.id, name: selected.name };
     const { data, error } = await supabase
@@ -559,7 +585,16 @@ function Page() {
     setSaving(false);
     savingRef.current = false;
     if (error) return toast.error(error.message);
-    toast.success("Purchase recorded, stock updated");
+
+    // Push changed sale rates onto the products so retail prices stay current.
+    const priceUpdates = items.filter(
+      (l) => l.product_id && Number(l.sale_price || 0) > 0 && Number(l.sale_price) !== Number(l.old_sale ?? -1),
+    );
+    for (const l of priceUpdates) {
+      await supabase.from("products").update({ sell_price: Number(l.sale_price) }).eq("id", l.product_id as string);
+    }
+
+    toast.success(priceUpdates.length ? "Purchase recorded — stock & sale rates updated" : "Purchase recorded, stock updated");
     setConfirmOpen(false);
     clearDraft();
     qc.invalidateQueries({ queryKey: ["purchases"] });
@@ -572,7 +607,25 @@ function Page() {
   };
 
 
-  const hasDraft = lines.length > 0 || !!note || tax > 0 || billDiscount > 0 || paid > 0 || supplier !== "none";
+  const draftHasContent = (d: Draft | null | undefined) =>
+    !!d && (d.lines.length > 0 || !!d.note || Number(d.tax || 0) > 0 || Number(d.discount || 0) > 0 || Number(d.paid || 0) > 0);
+  const hasParkedDraft = draftHasContent(savedDraft);
+
+  /** Hide the entry form: park it as a draft so "New purchase" opens blank. */
+  const hideKeepDraft = () => {
+    if (draftHasContent(draft)) setSavedDraft({ ...draft, open: false });
+    clearDraft();
+  };
+  const startNewPurchase = () => {
+    // Never resume the parked draft automatically — that only happens on Draft click.
+    if (draftHasContent(draft)) setSavedDraft({ ...draft, open: false });
+    setDraft({ ...emptyDraft, open: true, date: today });
+  };
+  const resumeDraft = () => {
+    if (!savedDraft) return;
+    setDraft({ ...savedDraft, open: true });
+    clearSavedDraft();
+  };
 
   return (
     <div className="p-6 space-y-4">
@@ -582,18 +635,19 @@ function Page() {
           <p className="text-sm text-muted-foreground">Record stock received from suppliers</p>
         </div>
         <div className="flex items-center gap-2">
-          {hasDraft && !open && (
-            <Button variant="outline" onClick={() => setOpen(true)} className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
+          {hasParkedDraft && !open && (
+            <Button variant="outline" onClick={resumeDraft} className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
               <Pencil className="h-4 w-4 mr-2" />
-              Draft ({lines.length} item{lines.length === 1 ? "" : "s"})
+              Draft ({savedDraft?.lines.length ?? 0} item{(savedDraft?.lines.length ?? 0) === 1 ? "" : "s"})
             </Button>
           )}
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New purchase</Button></DialogTrigger>
+        <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />New purchase</Button>
+        <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">
-              <DialogTitle>New purchase{hasDraft ? " · Draft in progress" : ""}</DialogTitle>
+              <DialogTitle>New purchase</DialogTitle>
             </DialogHeader>
+
 
 
             {/* Top bar: compact scan/search + manual add */}
@@ -705,7 +759,8 @@ function Page() {
                       <TableHeader className="sticky top-0 bg-background z-10">
                         <TableRow>
                           <TableHead>Name</TableHead>
-                          <TableHead className="w-[120px]">Cost</TableHead>
+                          <TableHead className="w-[120px]">Purchase rate</TableHead>
+                          <TableHead className="w-[120px]">Sale rate</TableHead>
                           <TableHead className="w-[100px]">Qty</TableHead>
                           <TableHead className="w-16 text-right">Old Avg</TableHead>
                           <TableHead className="w-16 text-right">New Avg</TableHead>
@@ -753,7 +808,7 @@ function Page() {
                                   value={l.cost ? l.cost : ""}
                                   placeholder="0"
                                   onChange={(e) => setLine(i, { cost: Number(e.target.value), _total: null })}
-                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("sale", i); } }}
                                   className="h-8 text-right text-sm"
                                 />
                                 {taxShare > 0 && qty > 0 && (
@@ -761,6 +816,31 @@ function Page() {
                                     +tax = {fmtMoney(effCost, sym)}
                                   </div>
                                 )}
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  id={`purchase-sale-${i}`}
+                                  type="number"
+                                  step="0.01"
+                                  value={l.sale_price ? l.sale_price : ""}
+                                  placeholder="0"
+                                  onChange={(e) => setLine(i, { sale_price: Number(e.target.value) })}
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
+                                  className="h-8 text-right text-sm"
+                                  title="Sale price — saved to the product when this purchase is recorded"
+                                />
+                                {(() => {
+                                  const sale = Number(l.sale_price || 0);
+                                  const oldSale = Number(l.old_sale ?? 0);
+                                  if (!sale) return null;
+                                  const margin = cost > 0 ? ((sale - cost) / cost) * 100 : 0;
+                                  return (
+                                    <div className={`mt-0.5 text-right text-[10px] ${sale < cost ? "text-destructive" : "text-muted-foreground"}`}>
+                                      {cost > 0 ? `${margin >= 0 ? "+" : ""}${margin.toFixed(1)}% margin` : ""}
+                                      {oldSale > 0 && sale !== oldSale ? ` · was ${fmtMoney(oldSale, sym)}` : ""}
+                                    </div>
+                                  );
+                                })()}
                               </TableCell>
                               <TableCell>
                                 <Input
@@ -954,7 +1034,7 @@ function Page() {
                 {lines.length} item{lines.length === 1 ? "" : "s"} • Total <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span>
               </div>
               <div className="flex flex-wrap gap-2 justify-end">
-                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+                <Button variant="ghost" size="sm" onClick={hideKeepDraft}>Hide (keep draft)</Button>
                 <Button variant="outline" size="sm" onClick={clearDraft}>Discard</Button>
                 <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>Record purchase</Button>
               </div>
@@ -996,9 +1076,20 @@ function Page() {
         </Dialog>
 
         <Dialog open={newProdOpen} onOpenChange={(v) => { if (!newProdSaving) setNewProdOpen(v); }}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Add new product</DialogTitle></DialogHeader>
             <div className="space-y-3">
+              <div>
+                <Label>Supplier</Label>
+                <select
+                  value={newProd.supplier_id || "none"}
+                  onChange={(e) => setNewProd((prev) => ({ ...prev, supplier_id: e.target.value === "none" ? "" : e.target.value }))}
+                  className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="none">— None —</option>
+                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
               <div>
                 <Label>Name</Label>
                 <Input autoFocus value={newProd.name} onChange={(e) => setNewProd({ ...newProd, name: e.target.value })} />
@@ -1013,11 +1104,17 @@ function Page() {
                   <Input value={newProd.barcode} onChange={(e) => setNewProd({ ...newProd, barcode: e.target.value })} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Category</Label>
+                  <Input value={newProd.category} onChange={(e) => setNewProd({ ...newProd, category: e.target.value })} />
+                </div>
                 <div>
                   <Label>Unit</Label>
                   <Input value={newProd.unit} onChange={(e) => setNewProd({ ...newProd, unit: e.target.value })} />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <Label>Cost</Label>
                   <Input type="number" step="0.01" value={newProd.cost_price || ""} onChange={(e) => setNewProd({ ...newProd, cost_price: Number(e.target.value) })} />
@@ -1026,18 +1123,38 @@ function Page() {
                   <Label>Sell</Label>
                   <Input type="number" step="0.01" value={newProd.sell_price || ""} onChange={(e) => setNewProd({ ...newProd, sell_price: Number(e.target.value) })} />
                 </div>
+                <div>
+                  <Label>Tax %</Label>
+                  <Input type="number" step="0.01" value={newProd.tax_rate || ""} onChange={(e) => setNewProd({ ...newProd, tax_rate: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <Label>Low stock alert</Label>
+                  <Input type="number" step="1" value={newProd.low_stock_threshold || ""} onChange={(e) => setNewProd({ ...newProd, low_stock_threshold: Number(e.target.value) })} />
+                </div>
               </div>
-              <div>
-                <Label>Supplier</Label>
-                <select
-                  value={newProd.supplier_id || "none"}
-                  onChange={(e) => setNewProd((prev) => ({ ...prev, supplier_id: e.target.value === "none" ? "" : e.target.value }))}
-                  className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="none">— None —</option>
-                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label>Batch no</Label>
+                  <Input value={newProd.batch_no} onChange={(e) => setNewProd({ ...newProd, batch_no: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Expiry date</Label>
+                  <Input type="date" value={newProd.expiry_date} onChange={(e) => setNewProd({ ...newProd, expiry_date: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Rack / location</Label>
+                  <Input value={newProd.rack_location} onChange={(e) => setNewProd({ ...newProd, rack_location: e.target.value })} />
+                </div>
               </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={newProd.allow_negative_stock}
+                  onChange={(e) => setNewProd({ ...newProd, allow_negative_stock: e.target.checked })}
+                />
+                Allow selling below zero stock
+              </label>
               <p className="text-xs text-muted-foreground">Opening stock stays 0 — this purchase will add the actual quantity.</p>
             </div>
             <DialogFooter className="gap-2">
@@ -1101,9 +1218,23 @@ function Page() {
                   </Table>
                 </div>
 
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <div><Label>Tax</Label><Input type="number" step="0.01" value={editRow.tax ?? 0} onChange={(e) => setEditRow({ ...editRow, tax: Number(e.target.value) })} /></div>
                   <div><Label>Paid</Label><Input type="number" step="0.01" value={editRow.paid ?? 0} onChange={(e) => setEditRow({ ...editRow, paid: Number(e.target.value) })} /></div>
+                  <div>
+                    <Label>Pay from</Label>
+                    <Select
+                      value={editPay && paySourceOptions.some((o) => o.id === editPay)
+                        ? editPay
+                        : (paySourceOptions.find((o) => o.name.toLowerCase() === String(editRow.payment_method ?? "").toLowerCase())?.id ?? "")}
+                      onValueChange={setEditPay}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Cash / Cheque / Bank…" /></SelectTrigger>
+                      <SelectContent>
+                        {paySourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div>
                     <Label>Status</Label>
                     <Select value={editRow.status ?? "completed"} onValueChange={(v) => setEditRow({ ...editRow, status: v })}>
@@ -1194,6 +1325,14 @@ function Page() {
                     const subtotal = editItems.reduce((s, it) => s + Number(it.qty || 0) * Number(it.cost || 0), 0);
                     const newTax = Number(editRow.tax ?? 0);
                     const newTotal = subtotal + newTax;
+                    // Payment source may have been changed in the dialog.
+                    const chosenPay = editPay && paySourceOptions.some((o) => o.id === editPay) ? editPay : "";
+                    const payPatch: Record<string, any> = {};
+                    if (chosenPay) {
+                      const acc = await resolvePayAccount(chosenPay);
+                      payPatch.account_id = acc.id;
+                      payPatch.payment_method = acc.name;
+                    }
                     const { error: hErr } = await supabase
                       .from("purchases")
                       .update({
@@ -1205,6 +1344,7 @@ function Page() {
                         paid: Number(editRow.paid ?? 0),
                         note: editRow.note ?? null,
                         status: editRow.status ?? "completed",
+                        ...payPatch,
                       })
                       .eq("id", editRow.id);
                     if (hErr) throw hErr;
