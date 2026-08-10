@@ -214,8 +214,17 @@ function Page() {
   const [editItemsOriginal, setEditItemsOriginal] = useState<any[]>([]);
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  // Selected payment source (cash account / preset) while editing a purchase.
+  const [editPay, setEditPay] = useState("");
   const openEdit = async (p: any) => {
     setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" });
+    setEditPay(
+      p.account_id
+        ? String(p.account_id)
+        : p.payment_method
+          ? `preset:${String(p.payment_method)}`
+          : "",
+    );
     setEditItems([]);
     setEditItemsOriginal([]);
     setEditLoading(true);
