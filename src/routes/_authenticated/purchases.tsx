@@ -166,19 +166,22 @@ function Page() {
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
   const [newProdOpen, setNewProdOpen] = useState(false);
-  const [newProd, setNewProd] = useState({ name: "", sku: "", barcode: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, supplier_id: "" });
+  const emptyNewProd = {
+    name: "", sku: "", barcode: "", category: "", unit: "pcs",
+    cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0,
+    low_stock_threshold: 5, supplier_id: "",
+    batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true,
+  };
+  const [newProd, setNewProd] = useState(emptyNewProd);
   const [newProdSaving, setNewProdSaving] = useState(false);
   const openNewProduct = (term: string) => {
     const t = term.trim();
     const isCode = /^\d+$/.test(t);
     setNewProd({
+      ...emptyNewProd,
       name: isCode ? "" : t,
       sku: isCode && t.length <= 6 ? t : "",
-      barcode: isCode && t.length > 4 ? t : (isCode ? "" : ""),
-      unit: "pcs",
-      cost_price: 0,
-      sell_price: 0,
-      stock: 0,
+      barcode: isCode && t.length > 4 ? t : "",
       supplier_id: supplier && supplier !== "none" ? supplier : "",
     });
     setNewProdOpen(true);
@@ -191,13 +194,21 @@ function Page() {
       name: newProd.name.trim(),
       sku: newProd.sku.trim() || null,
       barcode: primary,
+      category: newProd.category.trim() || null,
       unit: newProd.unit || "pcs",
       cost_price: Number(newProd.cost_price) || 0,
       sell_price: Number(newProd.sell_price) || 0,
       stock: Number(newProd.stock) || 0,
+      tax_rate: Number(newProd.tax_rate) || 0,
+      low_stock_threshold: Number(newProd.low_stock_threshold) || 0,
       preferred_supplier_id: newProd.supplier_id || null,
+      batch_no: newProd.batch_no.trim() || null,
+      expiry_date: newProd.expiry_date || null,
+      rack_location: newProd.rack_location.trim() || null,
+      allow_negative_stock: newProd.allow_negative_stock,
+      is_active: true,
     };
-    const { data, error } = await supabase.from("products").insert(payload).select("id,name,sku,barcode,cost_price,stock").single();
+    const { data, error } = await supabase.from("products").insert(payload).select("id,name,sku,barcode,cost_price,sell_price,stock").single();
     if (!error && data) {
       await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: primary });
     }
