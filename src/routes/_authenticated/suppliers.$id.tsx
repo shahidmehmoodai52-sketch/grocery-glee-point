@@ -17,6 +17,7 @@ import { printReceipt } from "@/components/receipt";
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
+import { summarizeCustomerLedger } from "@/lib/customer-ledger";
 
 
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
@@ -110,7 +111,7 @@ function Page() {
     return e;
   }, [purchases, payments, returns]);
 
-  const filtered = entries.filter((x) => {
+  const filteredEntries = entries.filter((x) => {
     if (from && x.date < from) return false;
     if (to && x.date > to + "T23:59:59") return false;
     return true;
@@ -137,16 +138,17 @@ function Page() {
 
 
   let running = opening;
-  const rows = filtered.map((x) => {
+  const rows = filteredEntries.map((x) => {
     running += x.debit - x.credit;
     return { ...x, balance: running };
   });
 
-  const totalIn = filtered.reduce((s, x) => s + x.debit, 0);
-  const totalOut = filtered.reduce((s, x) => s + x.credit, 0);
-  const closing = opening + totalIn - totalOut;
-  const closingLabel = closing > 0 ? "Outstanding (we owe)" : closing < 0 ? "Advance (we paid extra)" : "Settled";
-  const closingTone = closing > 0 ? "destructive" : closing < 0 ? "success" : "primary";
+  const summary = useMemo(() => summarizeCustomerLedger({ openingBalance: opening, entries: filteredEntries }), [opening, filteredEntries]);
+  const totalIn = summary.totalIn;
+  const totalOut = summary.totalOut;
+  const closing = summary.closing;
+  const closingLabel = summary.closingLabel;
+  const closingTone = summary.closingTone;
 
   return (
     <div className="p-6 space-y-4">
@@ -178,7 +180,7 @@ function Page() {
             const a = document.createElement("a"); a.href = url; a.download = `Ledger-${supplier?.name?.replace(/\s+/g,"_")}.pdf`; a.click();
             setTimeout(() => URL.revokeObjectURL(url), 5000);
           }}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
-          <Button onClick={() => { setPayDefault(Math.max(Number(supplier?.balance ?? 0), 0)); setAddPayOpen(true); }}>
+          <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />Add payment
           </Button>
         </div>

@@ -17,6 +17,7 @@ import { fmtMoney } from "@/lib/format";
 import { offlineFirst, cacheSuppliers, insertOfflineAware } from "@/lib/offline/pos";
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db } from "@/lib/offline/db";
+import { summarizeCustomerLedger } from "@/lib/customer-ledger";
 
 
 export const Route = createFileRoute("/_authenticated/suppliers/")({ component: Page });
@@ -89,6 +90,41 @@ function Page() {
     queryKey: ["cash-accounts", "supplier-pay"],
     queryFn: async () => (await supabase.from("cash_accounts").select("id,name,type,is_active").eq("is_active", true).order("sort_order").order("name")).data ?? [],
   });
+  const { data: purchases = [] } = useQuery({
+    queryKey: ["supplier-list-purchases"],
+    queryFn: async () => (await supabase.from("purchases").select("id,supplier_id,total,paid,created_at").order("created_at", { ascending: true })).data ?? [],
+  });
+  const { data: payments = [] } = useQuery({
+    queryKey: ["supplier-list-payments"],
+    queryFn: async () => (await supabase.from("party_payments").select("id,party_type,party_id,amount,created_at").eq("party_type", "supplier").order("created_at", { ascending: true })).data ?? [],
+  });
+  const { data: returns = [] } = useQuery({
+    queryKey: ["supplier-list-returns"],
+    queryFn: async () => (await supabase.from("purchase_returns").select("id,supplier_id,total,refund_amount,created_at").order("created_at", { ascending: true })).data ?? [],
+  });
+
+  const supplierBalances = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of rows as any[]) {
+      const entries: Array<{ debit: number; credit: number }> = [];
+      for (const p of purchases as any[]) {
+        if (p.supplier_id !== s.id) continue;
+        entries.push({ debit: Number(p.total || 0), credit: 0 });
+        if (Number(p.paid || 0) > 0) entries.push({ debit: 0, credit: Number(p.paid || 0) });
+      }
+      for (const r of returns as any[]) {
+        if (r.supplier_id !== s.id) continue;
+        entries.push({ debit: 0, credit: Number(r.total || 0) });
+      }
+      for (const pay of payments as any[]) {
+        if (pay.party_id !== s.id) continue;
+        entries.push({ debit: 0, credit: Number(pay.amount || 0) });
+      }
+      const summary = summarizeCustomerLedger({ openingBalance: Number(s.opening_balance ?? 0), entries });
+      map.set(s.id, summary.closing);
+    }
+    return map;
+  }, [rows, purchases, payments, returns]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -104,12 +140,12 @@ function Page() {
   const totals = useMemo(() => {
     let payable = 0, advance = 0;
     for (const s of rows as any[]) {
-      const b = Number(s.balance ?? 0);
+      const b = supplierBalances.get(s.id) ?? Number(s.balance ?? 0);
       if (b > 0) payable += b;
       else if (b < 0) advance += -b;
     }
     return { payable, advance, net: payable - advance };
-  }, [rows]);
+  }, [rows, supplierBalances]);
 
   const save = async () => {
     if (!form.name) return toast.error("Name required");
@@ -213,7 +249,7 @@ function Page() {
                 </TableRow>
               )}
               {filtered.map((c: any) => {
-                const bal = Number(c.balance ?? 0);
+                const bal = supplierBalances.get(c.id) ?? Number(c.balance ?? 0);
                 return (
                   <TableRow key={c.id} className="group">
                     <TableCell className="font-medium">
