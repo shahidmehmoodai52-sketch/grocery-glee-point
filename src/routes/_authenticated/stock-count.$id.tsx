@@ -61,8 +61,10 @@ function StockCountDetailPage() {
   const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   const [scanValue, setScanValue] = useState("");
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
+  const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [pendingQty, setPendingQty] = useState<number>(1);
   const [filter, setFilter] = useState<"all" | "variance" | "missing" | "extra" | "match">("all");
   const scanRef = useRef<HTMLInputElement>(null);
@@ -108,6 +110,22 @@ function StockCountDetailPage() {
       for (const p of (data ?? []) as any[]) map[p.id] = p;
       return map;
     },
+  });
+
+  const productSearchQ = useQuery({
+    queryKey: ["stock-count-product-search", productSearch],
+    enabled: productSearch.trim().length >= 2,
+    queryFn: async () => {
+      const term = productSearch.trim();
+      const { data, error } = await supabase
+        .from("products")
+        .select("id,name,sku,barcode,stock,cost_price,unit")
+        .or(`name.ilike.%${term}%,sku.ilike.%${term}%,barcode.ilike.%${term}%`)
+        .limit(8);
+      if (error) throw error;
+      return (data ?? []) as Product[];
+    },
+    staleTime: 10_000,
   });
 
   const session = sessionQ.data;
@@ -224,14 +242,27 @@ function StockCountDetailPage() {
   };
 
   const confirmPending = async () => {
-    if (!pendingBarcode) return;
-    const product = await findProductByBarcode(pendingBarcode);
+    const product = pendingProduct ?? (pendingBarcode ? await findProductByBarcode(pendingBarcode) : null);
     if (!product) return;
     if (!Number.isFinite(pendingQty) || pendingQty < 0) return toast.error("Invalid quantity");
     await upsertCount(product, pendingQty, "set");
     toast.success(`Counted ${fmtQty(pendingQty)} × ${product.name}`);
     setPendingBarcode(null);
+    setPendingProduct(null);
     setPendingQty(1);
+    setScanValue("");
+    scanRef.current?.focus();
+  };
+
+  const selectProductFromSearch = async (product: Product) => {
+    if (scanMode === "increment") {
+      await upsertCount(product, 1, "add");
+      toast.success(`+1 ${product.name}`);
+    } else {
+      setPendingProduct(product);
+      setPendingQty(1);
+    }
+    setProductSearch("");
     setScanValue("");
     scanRef.current?.focus();
   };
@@ -438,23 +469,51 @@ function StockCountDetailPage() {
             </div>
             <div className="hidden md:block h-10 border-l" />
             <div>
-              <Label className="text-xs">Filter list</Label>
-              <div className="flex gap-2">
-                <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All counted</SelectItem>
-                    <SelectItem value="variance">Variance only</SelectItem>
-                    <SelectItem value="missing">Missing (short)</SelectItem>
-                    <SelectItem value="extra">Extra (over)</SelectItem>
-                    <SelectItem value="match">Perfect match</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input className="pl-9" placeholder="Filter…" value={search} onChange={(e) => setSearch(e.target.value)} />
-                </div>
+              <Label className="text-xs">Search product</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search by name, SKU or barcode"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                />
               </div>
+              {productSearch.trim().length >= 2 && (
+                <div className="mt-2 rounded-md border bg-background p-2 space-y-1 max-h-48 overflow-auto">
+                  {productSearchQ.isFetching && <div className="text-xs text-muted-foreground">Searching…</div>}
+                  {!productSearchQ.isFetching && (productSearchQ.data ?? []).length === 0 && (
+                    <div className="text-xs text-muted-foreground">No matching products</div>
+                  )}
+                  {(productSearchQ.data ?? []).map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+                      onClick={() => selectProductFromSearch(product)}
+                    >
+                      <span className="font-medium">{product.name}</span>
+                      <span className="text-xs text-muted-foreground">{product.sku ?? product.barcode ?? "—"}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All counted</SelectItem>
+                <SelectItem value="variance">Variance only</SelectItem>
+                <SelectItem value="missing">Missing (short)</SelectItem>
+                <SelectItem value="extra">Extra (over)</SelectItem>
+                <SelectItem value="match">Perfect match</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Filter counted list…" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
         </Card>
@@ -529,7 +588,12 @@ function StockCountDetailPage() {
       </Card>
 
       {/* Quantity prompt dialog */}
-      <AlertDialog open={!!pendingBarcode} onOpenChange={(o) => !o && setPendingBarcode(null)}>
+      <AlertDialog open={!!pendingBarcode || !!pendingProduct} onOpenChange={(o) => {
+        if (!o) {
+          setPendingBarcode(null);
+          setPendingProduct(null);
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Enter actual quantity</AlertDialogTitle>
