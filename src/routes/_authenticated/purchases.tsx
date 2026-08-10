@@ -575,7 +575,25 @@ function Page() {
   };
 
 
-  const hasDraft = lines.length > 0 || !!note || tax > 0 || billDiscount > 0 || paid > 0 || supplier !== "none";
+  const draftHasContent = (d: Draft | null | undefined) =>
+    !!d && (d.lines.length > 0 || !!d.note || Number(d.tax || 0) > 0 || Number(d.discount || 0) > 0 || Number(d.paid || 0) > 0);
+  const hasParkedDraft = draftHasContent(savedDraft);
+
+  /** Hide the entry form: park it as a draft so "New purchase" opens blank. */
+  const hideKeepDraft = () => {
+    if (draftHasContent(draft)) setSavedDraft({ ...draft, open: false });
+    clearDraft();
+  };
+  const startNewPurchase = () => {
+    // Never resume the parked draft automatically — that only happens on Draft click.
+    if (draftHasContent(draft)) setSavedDraft({ ...draft, open: false });
+    setDraft({ ...emptyDraft, open: true, date: today });
+  };
+  const resumeDraft = () => {
+    if (!savedDraft) return;
+    setDraft({ ...savedDraft, open: true });
+    clearSavedDraft();
+  };
 
   return (
     <div className="p-6 space-y-4">
@@ -585,18 +603,19 @@ function Page() {
           <p className="text-sm text-muted-foreground">Record stock received from suppliers</p>
         </div>
         <div className="flex items-center gap-2">
-          {hasDraft && !open && (
-            <Button variant="outline" onClick={() => setOpen(true)} className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
+          {hasParkedDraft && !open && (
+            <Button variant="outline" onClick={resumeDraft} className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
               <Pencil className="h-4 w-4 mr-2" />
-              Draft ({lines.length} item{lines.length === 1 ? "" : "s"})
+              Draft ({savedDraft?.lines.length ?? 0} item{(savedDraft?.lines.length ?? 0) === 1 ? "" : "s"})
             </Button>
           )}
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New purchase</Button></DialogTrigger>
+        <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />New purchase</Button>
+        <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">
-              <DialogTitle>New purchase{hasDraft ? " · Draft in progress" : ""}</DialogTitle>
+              <DialogTitle>New purchase</DialogTitle>
             </DialogHeader>
+
 
 
             {/* Top bar: compact scan/search + manual add */}
