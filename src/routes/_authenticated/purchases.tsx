@@ -1076,9 +1076,20 @@ function Page() {
         </Dialog>
 
         <Dialog open={newProdOpen} onOpenChange={(v) => { if (!newProdSaving) setNewProdOpen(v); }}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Add new product</DialogTitle></DialogHeader>
             <div className="space-y-3">
+              <div>
+                <Label>Supplier</Label>
+                <select
+                  value={newProd.supplier_id || "none"}
+                  onChange={(e) => setNewProd((prev) => ({ ...prev, supplier_id: e.target.value === "none" ? "" : e.target.value }))}
+                  className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="none">— None —</option>
+                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
               <div>
                 <Label>Name</Label>
                 <Input autoFocus value={newProd.name} onChange={(e) => setNewProd({ ...newProd, name: e.target.value })} />
@@ -1093,11 +1104,17 @@ function Page() {
                   <Input value={newProd.barcode} onChange={(e) => setNewProd({ ...newProd, barcode: e.target.value })} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Category</Label>
+                  <Input value={newProd.category} onChange={(e) => setNewProd({ ...newProd, category: e.target.value })} />
+                </div>
                 <div>
                   <Label>Unit</Label>
                   <Input value={newProd.unit} onChange={(e) => setNewProd({ ...newProd, unit: e.target.value })} />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <Label>Cost</Label>
                   <Input type="number" step="0.01" value={newProd.cost_price || ""} onChange={(e) => setNewProd({ ...newProd, cost_price: Number(e.target.value) })} />
@@ -1106,18 +1123,38 @@ function Page() {
                   <Label>Sell</Label>
                   <Input type="number" step="0.01" value={newProd.sell_price || ""} onChange={(e) => setNewProd({ ...newProd, sell_price: Number(e.target.value) })} />
                 </div>
+                <div>
+                  <Label>Tax %</Label>
+                  <Input type="number" step="0.01" value={newProd.tax_rate || ""} onChange={(e) => setNewProd({ ...newProd, tax_rate: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <Label>Low stock alert</Label>
+                  <Input type="number" step="1" value={newProd.low_stock_threshold || ""} onChange={(e) => setNewProd({ ...newProd, low_stock_threshold: Number(e.target.value) })} />
+                </div>
               </div>
-              <div>
-                <Label>Supplier</Label>
-                <select
-                  value={newProd.supplier_id || "none"}
-                  onChange={(e) => setNewProd((prev) => ({ ...prev, supplier_id: e.target.value === "none" ? "" : e.target.value }))}
-                  className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="none">— None —</option>
-                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label>Batch no</Label>
+                  <Input value={newProd.batch_no} onChange={(e) => setNewProd({ ...newProd, batch_no: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Expiry date</Label>
+                  <Input type="date" value={newProd.expiry_date} onChange={(e) => setNewProd({ ...newProd, expiry_date: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Rack / location</Label>
+                  <Input value={newProd.rack_location} onChange={(e) => setNewProd({ ...newProd, rack_location: e.target.value })} />
+                </div>
               </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={newProd.allow_negative_stock}
+                  onChange={(e) => setNewProd({ ...newProd, allow_negative_stock: e.target.checked })}
+                />
+                Allow selling below zero stock
+              </label>
               <p className="text-xs text-muted-foreground">Opening stock stays 0 — this purchase will add the actual quantity.</p>
             </div>
             <DialogFooter className="gap-2">
