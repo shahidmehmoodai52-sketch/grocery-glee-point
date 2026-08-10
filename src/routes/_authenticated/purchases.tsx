@@ -976,7 +976,7 @@ function Page() {
                 {lines.length} item{lines.length === 1 ? "" : "s"} • Total <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span>
               </div>
               <div className="flex flex-wrap gap-2 justify-end">
-                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
+                <Button variant="ghost" size="sm" onClick={hideKeepDraft}>Hide (keep draft)</Button>
                 <Button variant="outline" size="sm" onClick={clearDraft}>Discard</Button>
                 <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>Record purchase</Button>
               </div>
