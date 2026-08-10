@@ -22,7 +22,7 @@ import { fetchAll } from "@/lib/supabase-page";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
 
 type Draft = {
   open: boolean;
