@@ -62,7 +62,6 @@ function StockCountDetailPage() {
 
   const [search, setSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
-  const [scanValue, setScanValue] = useState("");
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null);
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [pendingQty, setPendingQty] = useState<number>(1);
@@ -223,20 +222,25 @@ function StockCountDetailPage() {
   };
 
   const onScan = async () => {
-    const code = scanValue.trim();
-    if (!code || isLocked) return;
-    const product = await findProductByBarcode(code);
-    if (!product) {
-      toast.error(`No product matches "${code}"`);
+    const term = productSearch.trim();
+    if (!term || isLocked) return;
+
+    const product = await findProductByBarcode(term);
+    const fallbackProduct = product ?? (productSearchQ.data ?? [])[0] ?? null;
+
+    if (!fallbackProduct) {
+      toast.error(`No product matches "${term}"`);
       return;
     }
+
     if (scanMode === "increment") {
-      await upsertCount(product, 1, "add");
-      toast.success(`+1 ${product.name}`);
-      setScanValue("");
+      await upsertCount(fallbackProduct, 1, "add");
+      toast.success(`+1 ${fallbackProduct.name}`);
+      setProductSearch("");
       scanRef.current?.focus();
     } else {
-      setPendingBarcode(code);
+      setPendingBarcode(term);
+      setPendingProduct(fallbackProduct);
       setPendingQty(1);
     }
   };
@@ -250,7 +254,7 @@ function StockCountDetailPage() {
     setPendingBarcode(null);
     setPendingProduct(null);
     setPendingQty(1);
-    setScanValue("");
+    setProductSearch("");
     scanRef.current?.focus();
   };
 
@@ -448,58 +452,52 @@ function StockCountDetailPage() {
       {/* Scan + search */}
       {!isLocked && (
         <Card className="p-3">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 items-end">
+          <div className="space-y-3">
             <div>
-              <Label className="text-xs">Scan or type barcode</Label>
+              <Label className="text-xs">Scan barcode or search product</Label>
               <div className="relative">
-                <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={scanRef}
                   autoFocus
                   className="pl-9"
-                  placeholder={scanMode === "increment" ? "Each scan adds +1" : "Scan then enter quantity"}
-                  value={scanValue}
-                  onChange={(e) => setScanValue(e.target.value)}
+                  placeholder="Type product name, SKU, or scan barcode"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onScan(); } }}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Mode: <span className="font-medium">{scanMode === "increment" ? "Increment (+1 per scan)" : "Prompt for quantity"}</span> — change in Settings.
+                Press Enter to count the match. Mode: <span className="font-medium">{scanMode === "increment" ? "Increment (+1 per scan)" : "Prompt for quantity"}</span>.
               </p>
             </div>
-            <div className="hidden md:block h-10 border-l" />
-            <div>
-              <Label className="text-xs">Search product</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  placeholder="Search by name, SKU or barcode"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                />
+
+            {productSearch.trim().length >= 2 && (
+              <div className="rounded-lg border bg-background/70 p-2 space-y-2 max-h-64 overflow-auto">
+                {productSearchQ.isFetching && <div className="text-xs text-muted-foreground">Searching…</div>}
+                {!productSearchQ.isFetching && (productSearchQ.data ?? []).length === 0 && (
+                  <div className="text-xs text-muted-foreground">No matching products</div>
+                )}
+                {(productSearchQ.data ?? []).map((product) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    className="flex w-full items-start justify-between rounded-lg border border-transparent bg-card px-3 py-3 text-left shadow-sm transition hover:border-primary hover:bg-accent/70"
+                    onClick={() => selectProductFromSearch(product)}
+                  >
+                    <div>
+                      <div className="font-medium">{product.name}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {product.sku ?? "—"} · {product.barcode ?? "—"}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="shrink-0">{fmtQty(product.stock ?? 0)}</Badge>
+                  </button>
+                ))}
               </div>
-              {productSearch.trim().length >= 2 && (
-                <div className="mt-2 rounded-md border bg-background p-2 space-y-1 max-h-48 overflow-auto">
-                  {productSearchQ.isFetching && <div className="text-xs text-muted-foreground">Searching…</div>}
-                  {!productSearchQ.isFetching && (productSearchQ.data ?? []).length === 0 && (
-                    <div className="text-xs text-muted-foreground">No matching products</div>
-                  )}
-                  {(productSearchQ.data ?? []).map((product) => (
-                    <button
-                      key={product.id}
-                      type="button"
-                      className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
-                      onClick={() => selectProductFromSearch(product)}
-                    >
-                      <span className="font-medium">{product.name}</span>
-                      <span className="text-xs text-muted-foreground">{product.sku ?? product.barcode ?? "—"}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
           </div>
+
           <div className="mt-3 flex gap-2">
             <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
               <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
