@@ -241,7 +241,7 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["purchases"] });
   };
   const searchRef = useRef<HTMLInputElement>(null);
-  const focusCell = (kind: "cost" | "qty", i: number) => {
+  const focusCell = (kind: "cost" | "sale" | "qty", i: number) => {
     setTimeout(() => {
       const el = document.getElementById(`purchase-${kind}-${i}`) as HTMLInputElement | null;
       el?.focus();
