@@ -778,7 +778,7 @@ function Page() {
                                   value={l.cost ? l.cost : ""}
                                   placeholder="0"
                                   onChange={(e) => setLine(i, { cost: Number(e.target.value), _total: null })}
-                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("sale", i); } }}
                                   className="h-8 text-right text-sm"
                                 />
                                 {taxShare > 0 && qty > 0 && (
@@ -786,6 +786,31 @@ function Page() {
                                     +tax = {fmtMoney(effCost, sym)}
                                   </div>
                                 )}
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  id={`purchase-sale-${i}`}
+                                  type="number"
+                                  step="0.01"
+                                  value={l.sale_price ? l.sale_price : ""}
+                                  placeholder="0"
+                                  onChange={(e) => setLine(i, { sale_price: Number(e.target.value) })}
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
+                                  className="h-8 text-right text-sm"
+                                  title="Sale price — saved to the product when this purchase is recorded"
+                                />
+                                {(() => {
+                                  const sale = Number(l.sale_price || 0);
+                                  const oldSale = Number(l.old_sale ?? 0);
+                                  if (!sale) return null;
+                                  const margin = cost > 0 ? ((sale - cost) / cost) * 100 : 0;
+                                  return (
+                                    <div className={`mt-0.5 text-right text-[10px] ${sale < cost ? "text-destructive" : "text-muted-foreground"}`}>
+                                      {cost > 0 ? `${margin >= 0 ? "+" : ""}${margin.toFixed(1)}% margin` : ""}
+                                      {oldSale > 0 && sale !== oldSale ? ` · was ${fmtMoney(oldSale, sym)}` : ""}
+                                    </div>
+                                  );
+                                })()}
                               </TableCell>
                               <TableCell>
                                 <Input
