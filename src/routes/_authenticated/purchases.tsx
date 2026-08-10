@@ -1277,6 +1277,14 @@ function Page() {
                     const subtotal = editItems.reduce((s, it) => s + Number(it.qty || 0) * Number(it.cost || 0), 0);
                     const newTax = Number(editRow.tax ?? 0);
                     const newTotal = subtotal + newTax;
+                    // Payment source may have been changed in the dialog.
+                    const chosenPay = editPay && paySourceOptions.some((o) => o.id === editPay) ? editPay : "";
+                    const payPatch: Record<string, any> = {};
+                    if (chosenPay) {
+                      const acc = await resolvePayAccount(chosenPay);
+                      payPatch.account_id = acc.id;
+                      payPatch.payment_method = acc.name;
+                    }
                     const { error: hErr } = await supabase
                       .from("purchases")
                       .update({
@@ -1288,6 +1296,7 @@ function Page() {
                         paid: Number(editRow.paid ?? 0),
                         note: editRow.note ?? null,
                         status: editRow.status ?? "completed",
+                        ...payPatch,
                       })
                       .eq("id", editRow.id);
                     if (hErr) throw hErr;
