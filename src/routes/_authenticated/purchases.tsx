@@ -510,8 +510,9 @@ function Page() {
   const effectivePaySource = paySource || defaultPaySource?.id || "";
 
   /** Turn the selected option into a real cash_accounts row (creating presets on demand). */
-  const resolvePayAccount = async (): Promise<{ id: string | null; name: string }> => {
-    const selected = paySourceOptions.find((a) => a.id === effectivePaySource) ?? defaultPaySource;
+  const resolvePayAccount = async (optionId?: string): Promise<{ id: string | null; name: string }> => {
+    const wanted = optionId || effectivePaySource;
+    const selected = paySourceOptions.find((a) => a.id === wanted) ?? defaultPaySource;
     if (!selected) return { id: null, name: "cash" };
     if (!selected.preset) return { id: selected.id, name: selected.name };
     const { data, error } = await supabase
