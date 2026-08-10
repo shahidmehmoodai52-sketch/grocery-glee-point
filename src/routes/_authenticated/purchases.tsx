@@ -729,7 +729,8 @@ function Page() {
                       <TableHeader className="sticky top-0 bg-background z-10">
                         <TableRow>
                           <TableHead>Name</TableHead>
-                          <TableHead className="w-[120px]">Cost</TableHead>
+                          <TableHead className="w-[120px]">Purchase rate</TableHead>
+                          <TableHead className="w-[120px]">Sale rate</TableHead>
                           <TableHead className="w-[100px]">Qty</TableHead>
                           <TableHead className="w-16 text-right">Old Avg</TableHead>
                           <TableHead className="w-16 text-right">New Avg</TableHead>
