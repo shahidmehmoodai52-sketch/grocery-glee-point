@@ -259,13 +259,15 @@ function Page() {
           name: product.name ?? "",
           qty: 1,
           cost: Number(product.cost_price ?? 0),
+          sale_price: Number(product.sell_price ?? 0),
+          old_sale: Number(product.sell_price ?? 0),
           old_stock: Number(product.stock ?? 0),
           old_cost: Number(product.cost_price ?? 0),
           barcode: product.barcode ?? null,
           item_code: product.sku ?? null,
         }];
       }
-      return [...ls, { product_id: null, name: fallbackName ?? "", qty: 1, cost: 0 }];
+      return [...ls, { product_id: null, name: fallbackName ?? "", qty: 1, cost: 0, sale_price: 0 }];
     });
     setEntrySearch("");
     setEntryActive(false);
