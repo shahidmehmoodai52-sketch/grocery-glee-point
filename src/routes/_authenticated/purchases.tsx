@@ -1170,9 +1170,23 @@ function Page() {
                   </Table>
                 </div>
 
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <div><Label>Tax</Label><Input type="number" step="0.01" value={editRow.tax ?? 0} onChange={(e) => setEditRow({ ...editRow, tax: Number(e.target.value) })} /></div>
                   <div><Label>Paid</Label><Input type="number" step="0.01" value={editRow.paid ?? 0} onChange={(e) => setEditRow({ ...editRow, paid: Number(e.target.value) })} /></div>
+                  <div>
+                    <Label>Pay from</Label>
+                    <Select
+                      value={editPay && paySourceOptions.some((o) => o.id === editPay)
+                        ? editPay
+                        : (paySourceOptions.find((o) => o.name.toLowerCase() === String(editRow.payment_method ?? "").toLowerCase())?.id ?? "")}
+                      onValueChange={setEditPay}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Cash / Cheque / Bank…" /></SelectTrigger>
+                      <SelectContent>
+                        {paySourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div>
                     <Label>Status</Label>
                     <Select value={editRow.status ?? "completed"} onValueChange={(v) => setEditRow({ ...editRow, status: v })}>
