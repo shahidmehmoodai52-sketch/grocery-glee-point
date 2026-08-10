@@ -18,6 +18,7 @@ import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { Receipt, printReceipt } from "@/components/receipt";
 import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
+import { summarizeCustomerLedger } from "@/lib/customer-ledger";
 
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
 
@@ -94,14 +95,14 @@ function Page() {
     return e;
   }, [sales, payments, returns]);
 
-  const filtered = entries.filter((x) => {
+  const initialOB = Number(customer?.opening_balance ?? 0);
+  useEffect(() => { if (customer) setObValue(String(Number(customer.opening_balance ?? 0))); }, [customer?.id, customer?.opening_balance]);
+
+  const filteredEntries = entries.filter((x) => {
     if (from && x.date < from) return false;
     if (to && x.date > to + "T23:59:59") return false;
     return true;
   });
-
-  const initialOB = Number(customer?.opening_balance ?? 0);
-  useEffect(() => { if (customer) setObValue(String(Number(customer.opening_balance ?? 0))); }, [customer?.id, customer?.opening_balance]);
 
   const opening = initialOB + entries
     .filter((x) => from && x.date < from)
@@ -119,12 +120,13 @@ function Page() {
   };
 
   let running = opening;
-  const rows = filtered.map((x) => { running += x.debit - x.credit; return { ...x, balance: running }; });
-  const totalIn = filtered.reduce((s, x) => s + x.debit, 0);
-  const totalOut = filtered.reduce((s, x) => s + x.credit, 0);
-  const closing = opening + totalIn - totalOut;
-  const closingLabel = closing > 0 ? "Outstanding (they owe)" : closing < 0 ? "Advance (credit)" : "Settled";
-  const closingTone = closing > 0 ? "destructive" : closing < 0 ? "success" : "primary";
+  const rows = filteredEntries.map((x) => { running += x.debit - x.credit; return { ...x, balance: running }; });
+  const summary = useMemo(() => summarizeCustomerLedger({ openingBalance: opening, entries: filteredEntries }), [opening, filteredEntries]);
+  const totalIn = summary.totalIn;
+  const totalOut = summary.totalOut;
+  const closing = summary.closing;
+  const closingLabel = summary.closingLabel;
+  const closingTone = summary.closingTone;
 
   const items: LedgerItem[] = useMemo(() => {
     const out: LedgerItem[] = [];
@@ -196,7 +198,7 @@ function Page() {
           <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
           <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />Print</Button>
           <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
-          <Button onClick={() => { setPayDefault(Math.max(Number(customer?.balance ?? 0), 0)); setAddPayOpen(true); }}>
+          <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />Add payment
           </Button>
         </div>
