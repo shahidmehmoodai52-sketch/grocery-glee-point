@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty } from "@/lib/format";
-import { normalizePaymentAllocations, sumPaymentAllocations, type PaymentAllocation } from "@/lib/pos-payments";
+import { deriveDigitalCashBackSummary, normalizePaymentAllocations, sumPaymentAllocations, type PaymentAllocation } from "@/lib/pos-payments";
 import { Receipt, printInvoiceDirect } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
@@ -65,6 +65,8 @@ type Tab = {
   charge_pct: string;
   paid: string;
   note: string;
+  digital_received_amount?: string;
+  digital_account_id?: string | null;
   restored?: boolean;
   editing_sale_id?: string | null;
   editing_invoice_no?: string | null;
@@ -225,6 +227,8 @@ const newTab = (n: number): Tab => ({
   charge_pct: "",
   paid: "",
   note: "",
+  digital_received_amount: "",
+  digital_account_id: null,
 });
 
 const SPLIT_PAYMENT_PREFIX = "split:";
@@ -555,6 +559,11 @@ function POSPage() {
     return () => clearInterval(t);
   }, []);
 
+  const { data: cashAccountOptions = [] } = useQuery({
+    queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
+    queryFn: fetchActiveCashAccounts,
+  });
+
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products", "active"],
     queryFn: () =>
@@ -870,10 +879,14 @@ function POSPage() {
   const paymentRows = Array.isArray((tab as any).payments) && (tab as any).payments.length
     ? (tab as any).payments as PaymentAllocation[]
     : [{ method: tab.payment_method || "cash", amount: Number(tab.paid || 0) }];
+  const digitalCashBackSummary = deriveDigitalCashBackSummary(total, tab.digital_received_amount ?? tab.paid ?? 0);
+  const isDigitalCashBackMode = tab.payment_method === "digital_cash_back";
   const normalizedPayments = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
-  const paidNum = sumPaymentAllocations(normalizedPayments);
-  const change = Math.max(paidNum - total, 0);
-  const due = Math.max(total - paidNum, 0);
+  const paidAmountForBalance = isDigitalCashBackMode ? total : sumPaymentAllocations(normalizedPayments);
+  const paidNum = paidAmountForBalance;
+  const change = Math.max(paidAmountForBalance - total, 0);
+  const due = Math.max(total - paidAmountForBalance, 0);
+  const digitalCashBackAmount = isDigitalCashBackMode ? digitalCashBackSummary.cashBackAmount : 0;
 
   const setPaymentRows = (rows: PaymentAllocation[]) => {
     const nextRows = rows.length ? rows : [{ method: tab.payment_method || "cash", amount: 0 }];
@@ -1212,7 +1225,18 @@ function POSPage() {
 
   const handleSaleInner = async () => {
     if (!tab.items.length) return toast.error("Cart is empty");
-    const isCredit = due > 0;
+    if (isDigitalCashBackMode) {
+      if (!tab.digital_received_amount || Number(tab.digital_received_amount) <= 0) {
+        return toast.error("Enter the amount received in the digital account");
+      }
+      if (!digitalCashBackSummary.isValid) {
+        return toast.error("Digital amount received cannot be less than the sale total");
+      }
+      if (!tab.digital_account_id) {
+        return toast.error("Select a digital account to receive the payment");
+      }
+    }
+    const isCredit = !isDigitalCashBackMode && due > 0;
     if (isCredit && !tab.customer_id && !tab.expense_person_id) return toast.error("Select a customer or a staff/owner for credit sale");
     // Negative-stock guard: block sale if any line would push a non-negative-allowed product below zero.
     // Skip guard when editing an existing invoice — the edit_sale RPC restores original stock before re-decrementing.
@@ -1247,7 +1271,7 @@ function POSPage() {
     setSubmitting(true);
     try {
       const paymentAllocations = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
-      const tenderedAmount = +Math.min(sumPaymentAllocations(paymentAllocations), total).toFixed(2);
+      const tenderedAmount = +Math.min(isDigitalCashBackMode ? total : sumPaymentAllocations(paymentAllocations), total).toFixed(2);
       const paymentMethodLabel = serializePaymentMethod(paymentAllocations, tab.payment_method || "cash", tenderedAmount);
       const items = tab.items.map((i) => ({
         product_id: i.product_id,
@@ -1433,6 +1457,10 @@ function POSPage() {
         expense_person_id: tab.expense_person_id,
         payment_method: paymentMethodLabel,
         tax,
+        digital_cash_back_mode: isDigitalCashBackMode,
+        digital_received_amount: isDigitalCashBackMode ? Number(tab.digital_received_amount || 0) : null,
+        digital_account_id: isDigitalCashBackMode ? tab.digital_account_id : null,
+        cash_back_amount: isDigitalCashBackMode ? digitalCashBackAmount : 0,
         // Combine per-line discounts with cart-level discount so they reach the ledger.
         // Extra charge is applied as a negative discount so the server total matches.
         discount: +(lineDiscountTotal + discount - charge).toFixed(2),
@@ -1483,7 +1511,7 @@ function POSPage() {
             sale_items: localItems,
             discount: +(lineDiscountTotal + discount).toFixed(2),
             charge: +charge.toFixed(2),
-            paid: +paidNum.toFixed(2),
+            paid: +tenderedAmount.toFixed(2),
             change_due: +change.toFixed(2),
           }
         : sale;
@@ -2298,6 +2326,48 @@ function POSPage() {
               value={tab.payment_method}
               onChange={(v) => { setPrimaryPaymentMethod(v); setTimeout(() => searchRef.current?.focus(), 0); }}
             />
+            {isDigitalCashBackMode && (
+              <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Digital cash back</span>
+                  <span className="text-[11px] text-muted-foreground">Sale total {fmtMoney(total, sym)}</span>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-[10px]">Digital account</Label>
+                    <Select
+                      value={tab.digital_account_id ?? ""}
+                      onValueChange={(v) => setTab({ digital_account_id: v || null })}
+                    >
+                      <SelectTrigger className="h-8"><SelectValue placeholder="Select account" /></SelectTrigger>
+                      <SelectContent>
+                        {(() => {
+                          const accounts = ((cashAccountOptions ?? []) as any[]).filter((a: any) => a.type !== "cash");
+                          return accounts.length ? accounts.map((a: any) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          )) : <div className="px-2 py-2 text-xs text-muted-foreground">No digital accounts available</div>;
+                        })()}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px]">Amount received</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={tab.digital_received_amount ?? ""}
+                      onChange={(e) => setTab({ digital_received_amount: e.target.value })}
+                      placeholder={total.toFixed(2)}
+                    />
+                  </div>
+                  <div className="rounded-md border border-dashed bg-background/70 px-2 py-2 text-[11px] space-y-1">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Cash back</span><span className="font-semibold">{fmtMoney(digitalCashBackAmount, sym)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Net digital effect</span><span className="font-semibold text-emerald-600">{fmtMoney(Math.max(0, Number(tab.digital_received_amount || 0) - total), sym)}</span></div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="mt-2 flex items-center justify-between">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Tender</span>
               <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={addPaymentRow}>
@@ -2888,6 +2958,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
     <div className="grid grid-cols-4 gap-1.5 mt-1.5">
       <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>Cash</button>
       <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>Card</button>
+      <button type="button" onClick={() => onChange("digital_cash_back")} className={btn(value === "digital_cash_back")}>Digital + CB</button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" className={`${btn(isOnline)} flex items-center justify-center gap-1 px-1`}>

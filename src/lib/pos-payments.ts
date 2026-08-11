@@ -5,6 +5,46 @@ export type PaymentAllocation = {
   note?: string | null;
 };
 
+export type DigitalCashBackSummary = {
+  isValid: boolean;
+  receivedAmount: number;
+  cashBackAmount: number;
+};
+
+export type DigitalCashBackAccounting = {
+  saleTotal: number;
+  receivedAmount: number;
+  cashBackAmount: number;
+  digitalAccountIn: number;
+  customerCashBackOut: number;
+  netDigitalIncrease: number;
+};
+
+export function deriveDigitalCashBackSummary(saleTotal: string | number | null | undefined, receivedAmount: string | number | null | undefined): DigitalCashBackSummary {
+  const sale = Number(saleTotal ?? 0);
+  const received = Number(receivedAmount ?? 0);
+  const safeSale = Number.isFinite(sale) ? sale : 0;
+  const safeReceived = Number.isFinite(received) ? received : 0;
+  const cashBack = Math.max(0, safeReceived - safeSale);
+  return {
+    isValid: safeReceived >= safeSale,
+    receivedAmount: +safeReceived.toFixed(2),
+    cashBackAmount: +cashBack.toFixed(2),
+  };
+}
+
+export function deriveDigitalCashBackAccounting(saleTotal: string | number | null | undefined, receivedAmount: string | number | null | undefined): DigitalCashBackAccounting {
+  const summary = deriveDigitalCashBackSummary(saleTotal, receivedAmount);
+  return {
+    saleTotal: Number(saleTotal ?? 0),
+    receivedAmount: summary.receivedAmount,
+    cashBackAmount: summary.cashBackAmount,
+    digitalAccountIn: summary.receivedAmount,
+    customerCashBackOut: summary.cashBackAmount,
+    netDigitalIncrease: summary.receivedAmount - Number(saleTotal ?? 0),
+  };
+}
+
 export function buildPaymentAllocation(method: string, amount: string | number | null | undefined): PaymentAllocation {
   const normalizedMethod = (method || "cash").trim() || "cash";
   const normalizedAmount = Number(amount ?? 0);

@@ -148,6 +148,10 @@ export interface CompleteSalePayload {
   discount: number;
   paid: number;
   note: string;
+  digital_cash_back_mode?: boolean;
+  digital_received_amount?: number | null;
+  digital_account_id?: string | null;
+  cash_back_amount?: number | null;
   items: Array<{ product_id: string | null; name: string; qty: number; price: number; cost: number }>;
 }
 
@@ -204,7 +208,8 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload, met
   // Offline path — build a local sale record and enqueue the RPC for sync.
   const subtotal = payload.items.reduce((s, i) => s + i.qty * i.price, 0);
   const total = +(subtotal - payload.discount + payload.tax).toFixed(2);
-  const paid = +Number(payload.paid ?? 0).toFixed(2);
+  const requestedPaid = Number(payload.paid ?? 0);
+  const paid = +(payload.digital_cash_back_mode ? Math.max(total, Math.min(requestedPaid, total)) : Math.min(requestedPaid, total)).toFixed(2);
   const cost_total = +payload.items.reduce((s, i) => s + i.qty * i.cost, 0).toFixed(2);
   const invoice_no = nextLocalInvoiceNo();
   const now = new Date().toISOString();
