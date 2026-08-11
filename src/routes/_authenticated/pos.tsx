@@ -425,8 +425,10 @@ function POSPage() {
   const [quickAdd, setQuickAdd] = useState<{
     open: boolean; barcode: string; name: string; unit: string;
     cost_price: string; sell_price: string; stock: string;
-    category: string; supplier_id: string;
-  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
+    category: string; supplier_id: string; sku: string; barcodes_text: string;
+    low_stock_threshold: string; tax_rate: string; batch_no: string; expiry_date: string;
+    rack_location: string; allow_negative_stock: boolean;
+  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "", sku: "", barcodes_text: "", low_stock_threshold: "5", tax_rate: "0", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true });
 
   const openQuickAdd = (term: string) => {
     const raw = term.trim();
@@ -437,7 +439,9 @@ function POSPage() {
       barcode: looksLikeBarcode ? raw : "",
       name: looksLikeBarcode ? "" : raw,
       unit: "pcs", cost_price: "", sell_price: "", stock: "1",
-      category: "", supplier_id: "",
+      category: "", supplier_id: "", sku: "", barcodes_text: "",
+      low_stock_threshold: "5", tax_rate: "0", batch_no: "", expiry_date: "",
+      rack_location: "", allow_negative_stock: true,
     });
     setQuickAddLookup(raw);
   };
@@ -452,7 +456,7 @@ function POSPage() {
   const selectQuickAddMatch = async (product: any) => {
     addProduct(product);
     toast.success(`Added ${product.name}`);
-    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
+    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "", sku: "", barcodes_text: "", low_stock_threshold: "5", tax_rate: "0", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true });
     setQuickAddLookup("");
     setSearch("");
     setTimeout(() => searchRef.current?.focus(), 0);
@@ -502,9 +506,22 @@ function POSPage() {
     const bc = quickAdd.barcode.trim() || null;
     const category = quickAdd.category.trim() || null;
     const payload = {
-      name, barcode: bc, unit: quickAdd.unit || "pcs", category,
-      cost_price: cost, sell_price: sell, stock, tax_rate: 0, is_active: true,
+      name,
+      sku: quickAdd.sku?.trim() || null,
+      barcode: bc,
+      unit: quickAdd.unit || "pcs",
+      category,
+      cost_price: cost,
+      sell_price: sell,
+      stock,
+      tax_rate: Number(quickAdd.tax_rate || 0),
+      is_active: true,
+      low_stock_threshold: Number(quickAdd.low_stock_threshold || 0),
       preferred_supplier_id: quickAdd.supplier_id || null,
+      batch_no: quickAdd.batch_no.trim() || null,
+      expiry_date: quickAdd.expiry_date || null,
+      rack_location: quickAdd.rack_location.trim() || null,
+      allow_negative_stock: quickAdd.allow_negative_stock,
     };
     let data: any;
     try {
@@ -518,7 +535,7 @@ function POSPage() {
         : `Added "${name}" to catalog`,
     );
     addProduct(data);
-    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "" });
+    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "", sku: "", barcodes_text: "", low_stock_threshold: "5", tax_rate: "0", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true });
     setSearch("");
     setTimeout(() => searchRef.current?.focus(), 0);
     qc.invalidateQueries({ queryKey: ["products"] });
@@ -2582,18 +2599,22 @@ function POSPage() {
         }
       }}>
 
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add new item to catalog</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Search existing item</Label>
-              <Input
-                placeholder="Barcode, item code or name"
-                value={quickAddLookup}
-                onChange={(e) => setQuickAddLookup(e.target.value)}
-              />
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Barcode, item code or name"
+                  value={quickAddLookup}
+                  onChange={(e) => setQuickAddLookup(e.target.value)}
+                />
+              </div>
               {quickAddLookup.trim().length >= 2 && (
                 <div className="mt-2 max-h-48 overflow-auto rounded-md border bg-muted/20 p-2 space-y-2">
                   {quickAddMatchesLoading && <div className="text-xs text-muted-foreground">Searching…</div>}
@@ -2634,32 +2655,36 @@ function POSPage() {
               />
             </div>
             <div className="col-span-2">
-              <Label>Item code</Label>
-              <Input
-                value={quickAdd.barcode}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, barcode: e.target.value }))}
+              <Label>Supplier</Label>
+              <select
+                value={quickAdd.supplier_id || ""}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, supplier_id: e.target.value }))}
+                className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">— None —</option>
+                {quickAddSuppliers.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>SKU</Label>
+              <Input value={quickAdd.sku} onChange={(e) => setQuickAdd((q) => ({ ...q, sku: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Primary barcode</Label>
+              <Input value={quickAdd.barcode} onChange={(e) => setQuickAdd((q) => ({ ...q, barcode: e.target.value }))} />
+            </div>
+            <div className="col-span-2">
+              <Label>Additional barcodes (one per line)</Label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={quickAdd.barcodes_text}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, barcodes_text: e.target.value }))}
+                placeholder={"8964000000001\n8964000000002"}
               />
             </div>
             <div>
-              <Label>Unit</Label>
-              <Input value={quickAdd.unit} onChange={(e) => setQuickAdd((q) => ({ ...q, unit: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Stock</Label>
-              <Input type="number" step="0.001" value={quickAdd.stock}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, stock: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Purchase rate</Label>
-              <Input type="number" step="0.01" value={quickAdd.cost_price}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, cost_price: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Sell price</Label>
-              <Input type="number" step="0.01" value={quickAdd.sell_price}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, sell_price: e.target.value }))} />
-            </div>
-            <div className="col-span-2">
               <Label>Category</Label>
               <Input
                 list="quickadd-category-list"
@@ -2671,21 +2696,59 @@ function POSPage() {
                 {quickAddCategories.map((c) => <option key={c} value={c} />)}
               </datalist>
             </div>
+            <div>
+              <Label>Unit</Label>
+              <Input value={quickAdd.unit} onChange={(e) => setQuickAdd((q) => ({ ...q, unit: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Purchase rate</Label>
+              <Input type="number" step="0.01" value={quickAdd.cost_price}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, cost_price: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Sell price</Label>
+              <Input type="number" step="0.01" value={quickAdd.sell_price}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, sell_price: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Stock</Label>
+              <Input type="number" step="0.001" value={quickAdd.stock}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, stock: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Low-stock alert at</Label>
+              <Input type="number" step="0.001" value={quickAdd.low_stock_threshold}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, low_stock_threshold: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Tax %</Label>
+              <Input type="number" step="0.01" value={quickAdd.tax_rate}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, tax_rate: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Batch #</Label>
+              <Input value={quickAdd.batch_no} onChange={(e) => setQuickAdd((q) => ({ ...q, batch_no: e.target.value }))} placeholder="e.g. B-2026-01" />
+            </div>
+            <div>
+              <Label>Expiry date</Label>
+              <Input type="date" value={quickAdd.expiry_date} onChange={(e) => setQuickAdd((q) => ({ ...q, expiry_date: e.target.value }))} />
+            </div>
             <div className="col-span-2">
-              <Label>Supplier</Label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                value={quickAdd.supplier_id}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, supplier_id: e.target.value }))}
-              >
-                <option value="">— None —</option>
-                {quickAddSuppliers.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Supplier is for your reference. Record actual purchases from the Purchases page to update supplier ledger.
-              </p>
+              <Label>Rack / Shelf location</Label>
+              <Input value={quickAdd.rack_location} onChange={(e) => setQuickAdd((q) => ({ ...q, rack_location: e.target.value }))} placeholder="e.g. A-3, Shelf 2" />
+            </div>
+            <div className="col-span-2 flex items-start gap-2 rounded-md border p-3 bg-muted/30">
+              <input
+                id="quickadd-allow-neg-stock"
+                type="checkbox"
+                className="mt-1 h-4 w-4"
+                checked={quickAdd.allow_negative_stock}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, allow_negative_stock: e.target.checked }))}
+              />
+              <label htmlFor="quickadd-allow-neg-stock" className="text-sm cursor-pointer">
+                <div className="font-medium">Allow negative stock</div>
+                <div className="text-xs text-muted-foreground">If checked, POS can continue selling this item after stock reaches zero.</div>
+              </label>
             </div>
           </div>
 
@@ -2697,7 +2760,6 @@ function POSPage() {
               setTimeout(() => searchRef.current?.focus(), 0);
             }}>Cancel</Button>
             <Button onClick={saveQuickAdd}>Save & add to bill</Button>
-
           </DialogFooter>
         </DialogContent>
       </Dialog>
