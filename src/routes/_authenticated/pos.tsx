@@ -1,16 +1,48 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Search, Trash2, Printer, ShoppingCart, Loader2, Eye, EyeOff, History, Clock, UserCog, PauseCircle, Play, ChevronDown, Pencil } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Plus,
+  X,
+  Search,
+  Trash2,
+  Printer,
+  ShoppingCart,
+  Loader2,
+  Eye,
+  EyeOff,
+  History,
+  Clock,
+  UserCog,
+  PauseCircle,
+  Play,
+  ChevronDown,
+  Pencil,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
@@ -18,22 +50,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty } from "@/lib/format";
-import { deriveDigitalCashBackSummary, normalizePaymentAllocations, sumPaymentAllocations, type PaymentAllocation } from "@/lib/pos-payments";
+import {
+  deriveDigitalCashBackSummary,
+  normalizePaymentAllocations,
+  sumPaymentAllocations,
+  type PaymentAllocation,
+} from "@/lib/pos-payments";
 import { Receipt, printInvoiceDirect } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 import { ShiftBanner } from "@/components/shift-banner";
 import {
-  offlineFirst, cacheProducts, cacheCustomers, cacheProductBarcodes,
-  completeSaleOfflineAware, cacheSuppliers, insertOfflineAware,
+  offlineFirst,
+  cacheProducts,
+  cacheCustomers,
+  cacheProductBarcodes,
+  completeSaleOfflineAware,
+  cacheSuppliers,
+  insertOfflineAware,
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
 import { enqueueWrite } from "@/lib/offline/sync";
 import { isOfflineNow } from "@/lib/offline/session";
 import { searchProductsLocal } from "@/lib/offline/pos";
-
-
-
-
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
@@ -44,12 +82,12 @@ type CartItem = {
   code: string;
   name: string;
   qty: number;
-  price: number;     // Unit rate (editable)
-  mrp: number;       // Original MRP / sell price
-  cost: number;      // Purchase rate (internal only)
-  disc_pct: number;  // line discount %
-  tax_pct: number;   // line tax %
-  disc: number;      // derived flat discount
+  price: number; // Unit rate (editable)
+  mrp: number; // Original MRP / sell price
+  cost: number; // Purchase rate (internal only)
+  disc_pct: number; // line discount %
+  tax_pct: number; // line tax %
+  disc: number; // derived flat discount
 };
 type Tab = {
   id: string;
@@ -116,9 +154,10 @@ async function insertProductOfflineAware(payload: {
   preferred_supplier_id: string | null;
 }) {
   const now = new Date().toISOString();
-  const localId = typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const localId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const product = {
     id: localId,
     ...payload,
@@ -132,7 +171,11 @@ async function insertProductOfflineAware(payload: {
 
   const saveOffline = async () => {
     await offlineDb().products.put(product);
-    await enqueueWrite({ op: "insert", table: "products", payload: { ...product, _offline_pending: undefined } });
+    await enqueueWrite({
+      op: "insert",
+      table: "products",
+      payload: { ...product, _offline_pending: undefined },
+    });
     if (payload.barcode) {
       const barcodeRow = {
         id: `${localId}:${payload.barcode}`,
@@ -146,22 +189,36 @@ async function insertProductOfflineAware(payload: {
         _v: 1,
       } as any;
       await offlineDb().product_barcodes.put(barcodeRow);
-      await enqueueWrite({ op: "insert", table: "product_barcodes", payload: { ...barcodeRow, _offline_pending: undefined } });
+      await enqueueWrite({
+        op: "insert",
+        table: "product_barcodes",
+        payload: { ...barcodeRow, _offline_pending: undefined },
+      });
     }
     return product;
   };
 
   if (!isOfflineNow()) {
     try {
-      const { data, error } = await supabase.from("products").insert(payload).select(PRODUCT_COLUMNS).single();
+      const { data, error } = await supabase
+        .from("products")
+        .insert(payload)
+        .select(PRODUCT_COLUMNS)
+        .single();
       if (error) throw error;
       if (payload.barcode) {
-        await supabase.from("product_barcodes").insert({ product_id: data.id, barcode: payload.barcode });
+        await supabase
+          .from("product_barcodes")
+          .insert({ product_id: data.id, barcode: payload.barcode });
       }
       try {
         await offlineDb().products.put({ ...data, updated_at: now });
         if (payload.barcode) {
-          await offlineDb().product_barcodes.put({ id: `${data.id}:${payload.barcode}`, product_id: data.id, barcode: payload.barcode });
+          await offlineDb().product_barcodes.put({
+            id: `${data.id}:${payload.barcode}`,
+            product_id: data.id,
+            barcode: payload.barcode,
+          });
         }
       } catch {
         // best effort
@@ -169,7 +226,10 @@ async function insertProductOfflineAware(payload: {
       return data;
     } catch (e: any) {
       const msg = String(e?.message ?? e ?? "").toLowerCase();
-      const networkish = /failed to fetch|network(error)?|fetch failed|timeout|timed out|offline|dns|err_(internet|network|name_not_resolved|connection)|socket|aborted|econn|enotfound/.test(msg);
+      const networkish =
+        /failed to fetch|network(error)?|fetch failed|timeout|timed out|offline|dns|err_(internet|network|name_not_resolved|connection)|socket|aborted|econn|enotfound/.test(
+          msg,
+        );
       if (!networkish) throw e;
       return saveOffline();
     }
@@ -237,7 +297,8 @@ function toStoredSplitPayments(allocations: PaymentAllocation[], targetPaid: num
   const positive = (allocations ?? []).filter((entry) => Number(entry.amount ?? 0) > 0);
   const totalInput = positive.reduce((sum, entry) => sum + Number(entry.amount ?? 0), 0);
   const target = +Math.max(0, Number(targetPaid || 0)).toFixed(2);
-  if (positive.length === 0 || totalInput <= 0 || target <= 0) return [] as { method: string; amount: number }[];
+  if (positive.length === 0 || totalInput <= 0 || target <= 0)
+    return [] as { method: string; amount: number }[];
 
   const scaled = positive.map((entry) => ({
     method: (entry.method || "cash").trim() || "cash",
@@ -246,7 +307,10 @@ function toStoredSplitPayments(allocations: PaymentAllocation[], targetPaid: num
   const current = scaled.reduce((sum, entry) => sum + entry.amount, 0);
   const delta = +(target - current).toFixed(2);
   if (scaled.length > 0 && Math.abs(delta) >= 0.01) {
-    scaled[scaled.length - 1] = { ...scaled[scaled.length - 1], amount: +(scaled[scaled.length - 1].amount + delta).toFixed(2) };
+    scaled[scaled.length - 1] = {
+      ...scaled[scaled.length - 1],
+      amount: +(scaled[scaled.length - 1].amount + delta).toFixed(2),
+    };
   }
   return scaled.filter((entry) => entry.amount > 0);
 }
@@ -260,7 +324,10 @@ function serializePaymentMethod(allocations: PaymentAllocation[], fallback: stri
   return `${SPLIT_PAYMENT_PREFIX}${encoded}`;
 }
 
-function parsePaymentMethod(methodValue: string | null | undefined, paidValue: number): PaymentAllocation[] {
+function parsePaymentMethod(
+  methodValue: string | null | undefined,
+  paidValue: number,
+): PaymentAllocation[] {
   const raw = String(methodValue ?? "").trim();
   const paid = +Math.max(0, Number(paidValue || 0)).toFixed(2);
   if (!raw.startsWith(SPLIT_PAYMENT_PREFIX)) {
@@ -301,12 +368,29 @@ async function searchProducts(term: string) {
 }
 
 async function searchProductsOnline(q: string) {
-
   const like = `%${q}%`;
   const [nameRes, skuRes, barcodeRes, extraBarcodeRes] = await Promise.all([
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("name", like).order("name").limit(200),
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("sku", like).order("name").limit(50),
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("barcode", like).order("name").limit(50),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .eq("is_active", true)
+      .ilike("name", like)
+      .order("name")
+      .limit(200),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .eq("is_active", true)
+      .ilike("sku", like)
+      .order("name")
+      .limit(50),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .eq("is_active", true)
+      .ilike("barcode", like)
+      .order("name")
+      .limit(50),
     supabase.from("product_barcodes").select("product_id,barcode").ilike("barcode", like).limit(50),
   ]);
 
@@ -321,7 +405,12 @@ async function searchProductsOnline(q: string) {
 
   const extraIds = Object.keys(matchedBarcodesByProduct);
   const extraProductsRes = extraIds.length
-    ? await supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).in("id", extraIds).limit(24)
+    ? await supabase
+        .from("products")
+        .select(PRODUCT_COLUMNS)
+        .eq("is_active", true)
+        .in("id", extraIds)
+        .limit(24)
     : { data: [], error: null };
   if (extraProductsRes.error) throw extraProductsRes.error;
 
@@ -340,7 +429,6 @@ async function searchProductsOnline(q: string) {
 
   return Array.from(merged.values());
 }
-
 
 function POSPage() {
   const qc = useQueryClient();
@@ -378,7 +466,11 @@ function POSPage() {
   // create duplicate invoices. This ref closes that window.
   const saleLockRef = useRef(false);
   const [undoCandidate, setUndoCandidate] = useState<{
-    sale_id: string; invoice_no: string; total: number; item_count: number; created_at: string;
+    sale_id: string;
+    invoice_no: string;
+    total: number;
+    item_count: number;
+    created_at: string;
   } | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
@@ -409,7 +501,11 @@ function POSPage() {
     const name = newCustomer.name.trim();
     if (!name) return toast.error("Customer name required");
     try {
-      const data = await insertOfflineAware("customers", { name, phone: newCustomer.phone.trim() || null, balance: 0 } as any);
+      const data = await insertOfflineAware("customers", {
+        name,
+        phone: newCustomer.phone.trim() || null,
+        balance: 0,
+      } as any);
       setTab({ customer_id: data.id, payment_method: "credit" });
       toast.success(
         data._offline_pending
@@ -425,14 +521,46 @@ function POSPage() {
     setTimeout(() => searchRef.current?.focus(), 0);
   };
   const [now, setNow] = useState(() => new Date());
-  const [editing, setEditing] = useState<{ idx: number; field: "price" | "qty" | "disc" } | null>(null);
+  const [editing, setEditing] = useState<{ idx: number; field: "price" | "qty" | "disc" } | null>(
+    null,
+  );
   const [quickAdd, setQuickAdd] = useState<{
-    open: boolean; barcode: string; name: string; unit: string;
-    cost_price: string; sell_price: string; stock: string;
-    category: string; supplier_id: string; sku: string; barcodes_text: string;
-    low_stock_threshold: string; tax_rate: string; batch_no: string; expiry_date: string;
-    rack_location: string; allow_negative_stock: boolean;
-  }>({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "", sku: "", barcodes_text: "", low_stock_threshold: "5", tax_rate: "0", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true });
+    open: boolean;
+    barcode: string;
+    name: string;
+    unit: string;
+    cost_price: string;
+    sell_price: string;
+    stock: string;
+    category: string;
+    supplier_id: string;
+    sku: string;
+    barcodes_text: string;
+    low_stock_threshold: string;
+    tax_rate: string;
+    batch_no: string;
+    expiry_date: string;
+    rack_location: string;
+    allow_negative_stock: boolean;
+  }>({
+    open: false,
+    barcode: "",
+    name: "",
+    unit: "pcs",
+    cost_price: "",
+    sell_price: "",
+    stock: "1",
+    category: "",
+    supplier_id: "",
+    sku: "",
+    barcodes_text: "",
+    low_stock_threshold: "5",
+    tax_rate: "0",
+    batch_no: "",
+    expiry_date: "",
+    rack_location: "",
+    allow_negative_stock: true,
+  });
 
   const openQuickAdd = (term: string) => {
     const raw = term.trim();
@@ -442,10 +570,20 @@ function POSPage() {
       open: true,
       barcode: looksLikeBarcode ? raw : "",
       name: looksLikeBarcode ? "" : raw,
-      unit: "pcs", cost_price: "", sell_price: "", stock: "1",
-      category: "", supplier_id: "", sku: "", barcodes_text: "",
-      low_stock_threshold: "5", tax_rate: "0", batch_no: "", expiry_date: "",
-      rack_location: "", allow_negative_stock: true,
+      unit: "pcs",
+      cost_price: "",
+      sell_price: "",
+      stock: "1",
+      category: "",
+      supplier_id: "",
+      sku: "",
+      barcodes_text: "",
+      low_stock_threshold: "5",
+      tax_rate: "0",
+      batch_no: "",
+      expiry_date: "",
+      rack_location: "",
+      allow_negative_stock: true,
     });
     setQuickAddLookup(raw);
   };
@@ -460,7 +598,25 @@ function POSPage() {
   const selectQuickAddMatch = async (product: any) => {
     addProduct(product);
     toast.success(`Added ${product.name}`);
-    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "", sku: "", barcodes_text: "", low_stock_threshold: "5", tax_rate: "0", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true });
+    setQuickAdd({
+      open: false,
+      barcode: "",
+      name: "",
+      unit: "pcs",
+      cost_price: "",
+      sell_price: "",
+      stock: "1",
+      category: "",
+      supplier_id: "",
+      sku: "",
+      barcodes_text: "",
+      low_stock_threshold: "5",
+      tax_rate: "0",
+      batch_no: "",
+      expiry_date: "",
+      rack_location: "",
+      allow_negative_stock: true,
+    });
     setQuickAddLookup("");
     setSearch("");
     setTimeout(() => searchRef.current?.focus(), 0);
@@ -471,11 +627,17 @@ function POSPage() {
     queryFn: () =>
       offlineFirst<any[]>(
         async () => {
-          const { data, error } = await supabase.from("suppliers").select("id,name,phone,balance").order("name");
+          const { data, error } = await supabase
+            .from("suppliers")
+            .select("id,name,phone,balance")
+            .order("name");
           if (error) throw error;
           return data ?? [];
         },
-        async () => (await offlineDb().suppliers.toArray()).sort((a: any, b: any) => String(a.name ?? "").localeCompare(String(b.name ?? ""))),
+        async () =>
+          (await offlineDb().suppliers.toArray()).sort((a: any, b: any) =>
+            String(a.name ?? "").localeCompare(String(b.name ?? "")),
+          ),
         (rows) => cacheSuppliers(rows),
       ),
   });
@@ -485,10 +647,16 @@ function POSPage() {
     queryFn: () =>
       offlineFirst<string[]>(
         async () => {
-          const { data, error } = await supabase.from("products").select("category").not("category", "is", null).limit(1000);
+          const { data, error } = await supabase
+            .from("products")
+            .select("category")
+            .not("category", "is", null)
+            .limit(1000);
           if (error) throw error;
           const set = new Set<string>();
-          (data ?? []).forEach((r: any) => { if (r.category) set.add(String(r.category)); });
+          (data ?? []).forEach((r: any) => {
+            if (r.category) set.add(String(r.category));
+          });
           return Array.from(set).sort();
         },
         async () => {
@@ -539,7 +707,25 @@ function POSPage() {
         : `Added "${name}" to catalog`,
     );
     addProduct(data);
-    setQuickAdd({ open: false, barcode: "", name: "", unit: "pcs", cost_price: "", sell_price: "", stock: "1", category: "", supplier_id: "", sku: "", barcodes_text: "", low_stock_threshold: "5", tax_rate: "0", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true });
+    setQuickAdd({
+      open: false,
+      barcode: "",
+      name: "",
+      unit: "pcs",
+      cost_price: "",
+      sell_price: "",
+      stock: "1",
+      category: "",
+      supplier_id: "",
+      sku: "",
+      barcodes_text: "",
+      low_stock_threshold: "5",
+      tax_rate: "0",
+      batch_no: "",
+      expiry_date: "",
+      rack_location: "",
+      allow_negative_stock: true,
+    });
     setSearch("");
     setTimeout(() => searchRef.current?.focus(), 0);
     qc.invalidateQueries({ queryKey: ["products"] });
@@ -547,10 +733,6 @@ function POSPage() {
     qc.invalidateQueries({ queryKey: ["products", "categories"] });
   };
 
-
-
-
-  
   const searchRef = useRef<HTMLInputElement>(null);
   const paidRef = useRef<HTMLInputElement>(null);
 
@@ -568,15 +750,23 @@ function POSPage() {
     queryKey: ["products", "active"],
     queryFn: () =>
       offlineFirst(
-        () => fetchAll<any>((from, to) =>
-          supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name").range(from, to),
-        ),
-        async () => (await offlineDb().products.toArray()).filter((p: any) => p.is_active !== false).sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
+        () =>
+          fetchAll<any>((from, to) =>
+            supabase
+              .from("products")
+              .select(PRODUCT_COLUMNS)
+              .eq("is_active", true)
+              .order("name")
+              .range(from, to),
+          ),
+        async () =>
+          (await offlineDb().products.toArray())
+            .filter((p: any) => p.is_active !== false)
+            .sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
         (rows) => cacheProducts(rows),
       ),
     staleTime: 5 * 60 * 1000,
   });
-
 
   const { data: remoteProducts = [], isFetching: remoteProductsLoading } = useQuery({
     queryKey: ["products", "pos-search", searchTerm],
@@ -594,15 +784,14 @@ function POSPage() {
     queryKey: ["product_barcodes"],
     queryFn: () =>
       offlineFirst(
-        () => fetchAll<any>((from, to) =>
-          supabase.from("product_barcodes").select("id,product_id,barcode").range(from, to),
-        ),
+        () =>
+          fetchAll<any>((from, to) =>
+            supabase.from("product_barcodes").select("id,product_id,barcode").range(from, to),
+          ),
         () => offlineDb().product_barcodes.toArray(),
         (rows) => cacheProductBarcodes(rows),
       ),
   });
-
-
 
   // product_id -> array of all barcodes (primary + extras)
   const barcodesByProduct = useMemo(() => {
@@ -661,7 +850,9 @@ function POSPage() {
       const sku = cleanItemCode(p.sku);
       if (!sku) return;
       if (p.barcode) m[String(p.barcode)] = sku;
-      (barcodesByProduct[p.id] ?? []).forEach((bc) => { m[String(bc)] = sku; });
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => {
+        m[String(bc)] = sku;
+      });
     });
     return m;
   }, [searchableProducts, barcodesByProduct, libraryItemCodes]);
@@ -669,7 +860,9 @@ function POSPage() {
   const itemCodeForProduct = (p: any) => {
     const sku = cleanItemCode(p?.sku);
     if (sku) return sku;
-    const candidates = Array.from(new Set([p?.barcode, ...(barcodesByProduct[p?.id] ?? [])].filter(Boolean).map(String)));
+    const candidates = Array.from(
+      new Set([p?.barcode, ...(barcodesByProduct[p?.id] ?? [])].filter(Boolean).map(String)),
+    );
     for (const bc of candidates) {
       const itemCode = cleanItemCode(itemCodeByBarcode[bc]);
       if (itemCode && itemCode !== bc) return itemCode;
@@ -681,7 +874,9 @@ function POSPage() {
   const productByBarcode = useMemo(() => {
     const m: Record<string, any> = {};
     searchableProducts.forEach((p) => {
-      (barcodesByProduct[p.id] ?? []).forEach((bc) => { m[bc] = p; });
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => {
+        m[bc] = p;
+      });
     });
     return m;
   }, [searchableProducts, barcodesByProduct]);
@@ -689,7 +884,9 @@ function POSPage() {
   // O(1) id -> product lookup so cart rows never linear-scan the catalogue.
   const productById = useMemo(() => {
     const m: Record<string, any> = {};
-    searchableProducts.forEach((p) => { m[p.id] = p; });
+    searchableProducts.forEach((p) => {
+      m[p.id] = p;
+    });
     return m;
   }, [searchableProducts]);
 
@@ -698,30 +895,35 @@ function POSPage() {
     queryFn: () =>
       offlineFirst(
         async () => {
-          const { data, error } = await supabase.from("customers").select("id,name,balance,phone").order("name");
+          const { data, error } = await supabase
+            .from("customers")
+            .select("id,name,balance,phone")
+            .order("name");
           if (error) throw error;
           return data ?? [];
         },
-        async () => (await offlineDb().customers.toArray()).sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
+        async () =>
+          (await offlineDb().customers.toArray()).sort((a: any, b: any) =>
+            (a.name ?? "").localeCompare(b.name ?? ""),
+          ),
         (rows) => cacheCustomers(rows),
       ),
   });
 
-
   const { data: persons = [] } = useQuery({
     queryKey: ["expense_persons", "active"],
     queryFn: () =>
-      offlineFirst<any[]>(
-        async () => {
-          const { data, error } = await supabase.from("expense_persons")
-            .select("id,name,role,is_active").eq("is_active", true).order("name");
-          if (error) throw error;
-          const rows = data ?? [];
-          await cacheExpensePersons(rows);
-          return rows;
-        },
-        readCachedExpensePersons,
-      ),
+      offlineFirst<any[]>(async () => {
+        const { data, error } = await supabase
+          .from("expense_persons")
+          .select("id,name,role,is_active")
+          .eq("is_active", true)
+          .order("name");
+        if (error) throw error;
+        const rows = data ?? [];
+        await cacheExpensePersons(rows);
+        return rows;
+      }, readCachedExpensePersons),
   });
 
   const filtered = useMemo(() => {
@@ -754,7 +956,10 @@ function POSPage() {
   }, [searchableProducts, search, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
-  useEffect(() => { setHighlight(0); kbNavRef.current = false; }, [search]);
+  useEffect(() => {
+    setHighlight(0);
+    kbNavRef.current = false;
+  }, [search]);
 
   // Scroll highlighted search result into view (accounting for sticky header)
   useEffect(() => {
@@ -767,7 +972,10 @@ function POSPage() {
       if (/(auto|scroll)/.test(s.overflowY)) break;
       scroller = scroller.parentElement;
     }
-    if (!scroller) { el.scrollIntoView({ block: "nearest" }); return; }
+    if (!scroller) {
+      el.scrollIntoView({ block: "nearest" });
+      return;
+    }
     const thead = scroller.querySelector<HTMLElement>("thead");
     const headerH = thead?.offsetHeight ?? 0;
     const rowTop = el.offsetTop;
@@ -783,7 +991,10 @@ function POSPage() {
 
   // Keep cart cursor in range and scroll into view
   useEffect(() => {
-    if (tab.items.length === 0) { setCartCursor(-1); return; }
+    if (tab.items.length === 0) {
+      setCartCursor(-1);
+      return;
+    }
     if (cartCursor >= tab.items.length) setCartCursor(tab.items.length - 1);
   }, [tab.items.length]);
   useEffect(() => {
@@ -797,7 +1008,10 @@ function POSPage() {
       if (/(auto|scroll)/.test(style.overflowY)) break;
       scroller = scroller.parentElement;
     }
-    if (!scroller) { el.scrollIntoView({ block: "nearest" }); return; }
+    if (!scroller) {
+      el.scrollIntoView({ block: "nearest" });
+      return;
+    }
     const thead = scroller.querySelector<HTMLElement>("thead");
     const headerH = thead?.offsetHeight ?? 0;
     const rowTop = el.offsetTop;
@@ -811,8 +1025,6 @@ function POSPage() {
     }
   }, [cartCursor]);
 
-
-
   const setTab = (patch: Partial<Tab>) =>
     setTabs((ts) => ts.map((t) => (t.id === active ? { ...t, ...patch } : t)));
 
@@ -822,7 +1034,11 @@ function POSPage() {
     let idx: number;
     if (exIdx >= 0) {
       const nextCode = itemCodeForProduct(p);
-      items[exIdx] = { ...items[exIdx], code: items[exIdx].code || nextCode, qty: Number(items[exIdx].qty) + 1 };
+      items[exIdx] = {
+        ...items[exIdx],
+        code: items[exIdx].code || nextCode,
+        qty: Number(items[exIdx].qty) + 1,
+      };
       idx = exIdx;
     } else {
       items.push({
@@ -869,20 +1085,28 @@ function POSPage() {
   );
   const lineDiscountTotal = tab.items.reduce((s, i) => s + Number(i.disc || 0), 0);
   // per-line tax sum (overrides global tax)
-  const tax = +tab.items.reduce((s, i) => {
-    const net = Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0);
-    return s + (net * Number(i.tax_pct || 0)) / 100;
-  }, 0).toFixed(2);
+  const tax = +tab.items
+    .reduce((s, i) => {
+      const net = Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0);
+      return s + (net * Number(i.tax_pct || 0)) / 100;
+    }, 0)
+    .toFixed(2);
   const discount = Number(tab.discount || 0);
   const charge = Number(tab.charge || 0);
   const total = +(subtotal + tax - discount + charge).toFixed(2);
-  const paymentRows = Array.isArray((tab as any).payments) && (tab as any).payments.length
-    ? (tab as any).payments as PaymentAllocation[]
-    : [{ method: tab.payment_method || "cash", amount: Number(tab.paid || 0) }];
-  const digitalCashBackSummary = deriveDigitalCashBackSummary(total, tab.digital_received_amount ?? tab.paid ?? 0);
+  const paymentRows =
+    Array.isArray((tab as any).payments) && (tab as any).payments.length
+      ? ((tab as any).payments as PaymentAllocation[])
+      : [{ method: tab.payment_method || "cash", amount: Number(tab.paid || 0) }];
+  const digitalCashBackSummary = deriveDigitalCashBackSummary(
+    total,
+    tab.digital_received_amount ?? tab.paid ?? 0,
+  );
   const isDigitalCashBackMode = tab.payment_method === "digital_cash_back";
   const normalizedPayments = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
-  const paidAmountForBalance = isDigitalCashBackMode ? total : sumPaymentAllocations(normalizedPayments);
+  const paidAmountForBalance = isDigitalCashBackMode
+    ? total
+    : sumPaymentAllocations(normalizedPayments);
   const paidNum = paidAmountForBalance;
   const change = Math.max(paidAmountForBalance - total, 0);
   const due = Math.max(total - paidAmountForBalance, 0);
@@ -905,7 +1129,13 @@ function POSPage() {
   };
 
   const addPaymentRow = () => {
-    const nextRows = [...paymentRows, { method: paymentRows[paymentRows.length - 1]?.method || tab.payment_method || "cash", amount: 0 }];
+    const nextRows = [
+      ...paymentRows,
+      {
+        method: paymentRows[paymentRows.length - 1]?.method || tab.payment_method || "cash",
+        amount: 0,
+      },
+    ];
     setPaymentRows(nextRows);
   };
 
@@ -916,7 +1146,11 @@ function POSPage() {
 
   const setPrimaryPaymentMethod = (method: string) => {
     const nextRows = [...paymentRows];
-    if (nextRows[0]) { nextRows[0] = { ...nextRows[0], method }; } else { nextRows.push({ method, amount: 0 }); }
+    if (nextRows[0]) {
+      nextRows[0] = { ...nextRows[0], method };
+    } else {
+      nextRows.push({ method, amount: 0 });
+    }
     setPaymentRows(nextRows);
   };
 
@@ -941,7 +1175,6 @@ function POSPage() {
     const newCharge = +Math.max(0, (subtotal * n) / 100).toFixed(2);
     setTab({ charge_pct: pct, charge: newCharge });
   };
-
 
   const addTab = () => {
     const t = newTab(tabs.length + 1);
@@ -974,10 +1207,16 @@ function POSPage() {
           return (data as any[]) ?? [];
         },
         async () =>
-          (await offlineDb().held_bills.where("status").equals("held").reverse().sortBy("created_at")) as any[],
+          (await offlineDb()
+            .held_bills.where("status")
+            .equals("held")
+            .reverse()
+            .sortBy("created_at")) as any[],
         async (rows) => {
           try {
-            await offlineDb().held_bills.bulkPut((rows as any[]).map((r) => ({ ...r, status: "held" })));
+            await offlineDb().held_bills.bulkPut(
+              (rows as any[]).map((r) => ({ ...r, status: "held" })),
+            );
           } catch {}
         },
       ),
@@ -986,9 +1225,13 @@ function POSPage() {
 
   const restorePayloadIntoNewTab = (payload: any, labelPrefix = "↺") => {
     if (!payload || !Array.isArray(payload.items)) return;
-    const parsedPayments = Array.isArray(payload.payments) && payload.payments.length
-      ? payload.payments.map((entry: any) => ({ method: entry.method ?? "cash", amount: Number(entry.amount ?? 0) }))
-      : parsePaymentMethod(payload.payment_method, Number(payload.paid ?? 0));
+    const parsedPayments =
+      Array.isArray(payload.payments) && payload.payments.length
+        ? payload.payments.map((entry: any) => ({
+            method: entry.method ?? "cash",
+            amount: Number(entry.amount ?? 0),
+          }))
+        : parsePaymentMethod(payload.payment_method, Number(payload.paid ?? 0));
     const restoredItems: CartItem[] = payload.items.map((i: any) => {
       const qty = Number(i.qty ?? 1);
       const price = Number(i.price ?? 0);
@@ -996,7 +1239,8 @@ function POSPage() {
         product_id: i.product_id ?? null,
         code: i.code ?? "",
         name: String(i.name ?? "Item"),
-        qty, price,
+        qty,
+        price,
         mrp: Number(i.mrp ?? price),
         cost: Number(i.cost ?? 0),
         disc_pct: Number(i.disc_pct ?? 0),
@@ -1039,7 +1283,8 @@ function POSPage() {
         product_id: it.product_id ?? null,
         code: "",
         name: String(it.name ?? "Item"),
-        qty, price,
+        qty,
+        price,
         mrp: price,
         cost: Number(it.cost ?? 0),
         disc_pct: 0,
@@ -1108,7 +1353,6 @@ function POSPage() {
     setActive(restored.id);
   };
 
-
   const resumeHeld = async (id: string) => {
     let payload: any = null;
     if (isOfflineNow()) {
@@ -1132,9 +1376,16 @@ function POSPage() {
     if (!confirm("Discard this held bill?")) return;
     if (isOfflineNow()) {
       await offlineDb().held_bills.delete(id);
-      await enqueueWrite({ op: "rpc", table: "discard_held_bill", payload: { _id: id, _reason: null } });
+      await enqueueWrite({
+        op: "rpc",
+        table: "discard_held_bill",
+        payload: { _id: id, _reason: null },
+      });
     } else {
-      const { error } = await (supabase.rpc as any)("discard_held_bill", { _id: id, _reason: null });
+      const { error } = await (supabase.rpc as any)("discard_held_bill", {
+        _id: id,
+        _reason: null,
+      });
       if (error) return toast.error(error.message);
     }
     refetchHeld();
@@ -1160,9 +1411,7 @@ function POSPage() {
         editing_sale_id: tab.editing_sale_id ?? null,
         editing_invoice_no: tab.editing_invoice_no ?? null,
       };
-      const label = tab.editing_sale_id
-        ? `✎ Edit ${tab.editing_invoice_no ?? tab.name}`
-        : tab.name;
+      const label = tab.editing_sale_id ? `✎ Edit ${tab.editing_invoice_no ?? tab.name}` : tab.name;
       const args = {
         _customer: tab.customer_id as any,
         _item_count: tab.items.length,
@@ -1207,7 +1456,9 @@ function POSPage() {
       localStorage.removeItem("pos:resume_payload");
       restorePayloadIntoNewTab(JSON.parse(raw), "↺");
       toast.success("Bill resumed");
-    } catch {/* noop */}
+    } catch {
+      /* noop */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1237,10 +1488,14 @@ function POSPage() {
       }
     }
     const isCredit = !isDigitalCashBackMode && due > 0;
-    if (isCredit && !tab.customer_id && !tab.expense_person_id) return toast.error("Select a customer or a staff/owner for credit sale");
+    if (isCredit && !tab.customer_id && !tab.expense_person_id)
+      return toast.error("Select a customer or a staff/owner for credit sale");
     // Negative-stock guard: block sale if any line would push a non-negative-allowed product below zero.
     // Skip guard when editing an existing invoice — the edit_sale RPC restores original stock before re-decrementing.
-    if (tab.editing_sale_id) { await doSale(); return; }
+    if (tab.editing_sale_id) {
+      await doSale();
+      return;
+    }
     try {
       const ids = Array.from(new Set(tab.items.map((i) => i.product_id).filter(Boolean)));
       if (ids.length) {
@@ -1259,20 +1514,35 @@ function POSPage() {
           if (!row) continue;
           if (row.allow_negative_stock) continue;
           if (Number(row.stock ?? 0) < qty) {
-            return toast.error(`Insufficient stock for ${row.name} (have ${row.stock}, need ${qty}). Enable "Allow negative stock" on the product to override.`);
+            return toast.error(
+              `Insufficient stock for ${row.name} (have ${row.stock}, need ${qty}). Enable "Allow negative stock" on the product to override.`,
+            );
           }
         }
       }
-    } catch { /* if the check itself fails, fall through to sale so we don't block cashiers when offline */ }
+    } catch {
+      /* if the check itself fails, fall through to sale so we don't block cashiers when offline */
+    }
     await doSale();
   };
 
   const doSale = async () => {
     setSubmitting(true);
     try {
-      const paymentAllocations = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
-      const tenderedAmount = +Math.min(isDigitalCashBackMode ? total : sumPaymentAllocations(paymentAllocations), total).toFixed(2);
-      const paymentMethodLabel = serializePaymentMethod(paymentAllocations, tab.payment_method || "cash", tenderedAmount);
+      const paymentAllocations = normalizePaymentAllocations(
+        paymentRows,
+        tab.payment_method,
+        tab.paid,
+      );
+      const tenderedAmount = +Math.min(
+        isDigitalCashBackMode ? total : sumPaymentAllocations(paymentAllocations),
+        total,
+      ).toFixed(2);
+      const paymentMethodLabel = serializePaymentMethod(
+        paymentAllocations,
+        tab.payment_method || "cash",
+        tenderedAmount,
+      );
       const items = tab.items.map((i) => ({
         product_id: i.product_id,
         name: i.name,
@@ -1287,89 +1557,112 @@ function POSPage() {
           try {
             const saleId = tab.editing_sale_id;
             const nowIso = new Date().toISOString();
-            const subtotalEdited = +tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0).toFixed(2);
+            const subtotalEdited = +tab.items
+              .reduce((s, i) => s + Number(i.qty) * Number(i.price), 0)
+              .toFixed(2);
             const discountEdited = +(lineDiscountTotal + discount - charge).toFixed(2);
             const taxEdited = +Number(tax || 0).toFixed(2);
             const totalEdited = +(subtotalEdited - discountEdited + taxEdited).toFixed(2);
             const paidEdited = +Math.min(paidNum, totalEdited).toFixed(2);
 
-            const existingQueuedCreate = await offlineDb()._queue.where("client_uuid").equals(saleId).first();
+            const existingQueuedCreate = await offlineDb()
+              ._queue.where("client_uuid")
+              .equals(saleId)
+              .first();
 
-            await offlineDb().transaction("rw", offlineDb().sales, offlineDb().sale_items, offlineDb().products, async () => {
-              const prev = await offlineDb().sales.get(saleId);
-              if (!prev) throw new Error("Invoice not available offline");
-              const oldItems = await offlineDb().sale_items.where("sale_id").equals(saleId).toArray();
+            await offlineDb().transaction(
+              "rw",
+              offlineDb().sales,
+              offlineDb().sale_items,
+              offlineDb().products,
+              async () => {
+                const prev = await offlineDb().sales.get(saleId);
+                if (!prev) throw new Error("Invoice not available offline");
+                const oldItems = await offlineDb()
+                  .sale_items.where("sale_id")
+                  .equals(saleId)
+                  .toArray();
 
-              const oldQtyByProduct = new Map<string, number>();
-              const newQtyByProduct = new Map<string, number>();
-              for (const it of oldItems) {
-                if (!it.product_id) continue;
-                oldQtyByProduct.set(it.product_id, (oldQtyByProduct.get(it.product_id) ?? 0) + Number(it.qty || 0));
-              }
-              for (const it of items) {
-                if (!it.product_id) continue;
-                newQtyByProduct.set(it.product_id, (newQtyByProduct.get(it.product_id) ?? 0) + Number(it.qty || 0));
-              }
+                const oldQtyByProduct = new Map<string, number>();
+                const newQtyByProduct = new Map<string, number>();
+                for (const it of oldItems) {
+                  if (!it.product_id) continue;
+                  oldQtyByProduct.set(
+                    it.product_id,
+                    (oldQtyByProduct.get(it.product_id) ?? 0) + Number(it.qty || 0),
+                  );
+                }
+                for (const it of items) {
+                  if (!it.product_id) continue;
+                  newQtyByProduct.set(
+                    it.product_id,
+                    (newQtyByProduct.get(it.product_id) ?? 0) + Number(it.qty || 0),
+                  );
+                }
 
-              const productIds = new Set<string>([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
-              for (const pid of productIds) {
-                const p = await offlineDb().products.get(pid);
-                if (!p) continue;
-                const baseStock =
-                  typeof p.stock === "number"
-                    ? Number(p.stock)
-                    : typeof p.stock_qty === "number"
-                      ? Number(p.stock_qty)
-                      : null;
-                if (baseStock == null) continue;
-                const oldQty = oldQtyByProduct.get(pid) ?? 0;
-                const newQty = newQtyByProduct.get(pid) ?? 0;
-                const nextStock = +(baseStock + oldQty - newQty).toFixed(3);
-                await offlineDb().products.put({
-                  ...p,
-                  stock: nextStock,
-                  ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
+                const productIds = new Set<string>([
+                  ...oldQtyByProduct.keys(),
+                  ...newQtyByProduct.keys(),
+                ]);
+                for (const pid of productIds) {
+                  const p = await offlineDb().products.get(pid);
+                  if (!p) continue;
+                  const baseStock =
+                    typeof p.stock === "number"
+                      ? Number(p.stock)
+                      : typeof p.stock_qty === "number"
+                        ? Number(p.stock_qty)
+                        : null;
+                  if (baseStock == null) continue;
+                  const oldQty = oldQtyByProduct.get(pid) ?? 0;
+                  const newQty = newQtyByProduct.get(pid) ?? 0;
+                  const nextStock = +(baseStock + oldQty - newQty).toFixed(3);
+                  await offlineDb().products.put({
+                    ...p,
+                    stock: nextStock,
+                    ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
+                    _sync: "pending",
+                    _v: (Number(p._v ?? 0) || 0) + 1,
+                    updated_at: nowIso,
+                  });
+                }
+
+                await offlineDb().sale_items.where("sale_id").equals(saleId).delete();
+                const nextItems = items.map((i, idx) => ({
+                  id: `${saleId}:${idx}`,
+                  sale_id: saleId,
+                  tenant_id: prev.tenant_id ?? null,
+                  product_id: i.product_id,
+                  name: i.name,
+                  qty: i.qty,
+                  price: i.price,
+                  cost: i.cost,
                   _sync: "pending",
-                  _v: (Number(p._v ?? 0) || 0) + 1,
+                  _v: 1,
+                  _deleted: 0,
+                }));
+                await offlineDb().sale_items.bulkPut(nextItems);
+
+                await offlineDb().sales.put({
+                  ...prev,
+                  customer_id: tab.customer_id,
+                  expense_person_id: tab.expense_person_id,
+                  payment_method: paymentMethodLabel,
+                  subtotal: subtotalEdited,
+                  discount: discountEdited,
+                  tax: taxEdited,
+                  total: totalEdited,
+                  paid: paidEdited,
+                  status: paidEdited >= totalEdited ? "completed" : "credit",
+                  note: tab.note,
                   updated_at: nowIso,
+                  _sync: "pending",
+                  _offline_pending: true,
+                  _v: (Number(prev._v ?? 0) || 0) + 1,
+                  sale_items: nextItems,
                 });
-              }
-
-              await offlineDb().sale_items.where("sale_id").equals(saleId).delete();
-              const nextItems = items.map((i, idx) => ({
-                id: `${saleId}:${idx}`,
-                sale_id: saleId,
-                tenant_id: prev.tenant_id ?? null,
-                product_id: i.product_id,
-                name: i.name,
-                qty: i.qty,
-                price: i.price,
-                cost: i.cost,
-                _sync: "pending",
-                _v: 1,
-                _deleted: 0,
-              }));
-              await offlineDb().sale_items.bulkPut(nextItems);
-
-              await offlineDb().sales.put({
-                ...prev,
-                customer_id: tab.customer_id,
-                expense_person_id: tab.expense_person_id,
-                payment_method: paymentMethodLabel,
-                subtotal: subtotalEdited,
-                discount: discountEdited,
-                tax: taxEdited,
-                total: totalEdited,
-                paid: paidEdited,
-                status: paidEdited >= totalEdited ? "completed" : "credit",
-                note: tab.note,
-                updated_at: nowIso,
-                _sync: "pending",
-                _offline_pending: true,
-                _v: (Number(prev._v ?? 0) || 0) + 1,
-                sale_items: nextItems,
-              });
-            });
+              },
+            );
 
             if (existingQueuedCreate?.table === "complete_sale") {
               const queuedPayload = (existingQueuedCreate as any).payload?.payload ?? {};
@@ -1405,7 +1698,9 @@ function POSPage() {
               });
             }
 
-            toast.success(`Invoice ${tab.editing_invoice_no ?? ""} updated offline — will sync automatically`);
+            toast.success(
+              `Invoice ${tab.editing_invoice_no ?? ""} updated offline — will sync automatically`,
+            );
             closeTab(active);
             qc.invalidateQueries({ queryKey: ["products"] });
             qc.invalidateQueries({ queryKey: ["sales"] });
@@ -1439,7 +1734,9 @@ function POSPage() {
               note: tab.note,
             })
             .eq("id", tab.editing_sale_id);
-        } catch { /* non-fatal */ }
+        } catch {
+          /* non-fatal */
+        }
         toast.success(`Invoice ${tab.editing_invoice_no ?? ""} updated`);
         closeTab(active);
         qc.invalidateQueries({ queryKey: ["products"] });
@@ -1451,14 +1748,15 @@ function POSPage() {
         return;
       }
 
-
       const payload = {
         customer_id: tab.customer_id,
         expense_person_id: tab.expense_person_id,
         payment_method: paymentMethodLabel,
         tax,
         digital_cash_back_mode: isDigitalCashBackMode,
-        digital_received_amount: isDigitalCashBackMode ? Number(tab.digital_received_amount || 0) : null,
+        digital_received_amount: isDigitalCashBackMode
+          ? Number(tab.digital_received_amount || 0)
+          : null,
         digital_account_id: isDigitalCashBackMode ? tab.digital_account_id : null,
         cash_back_amount: isDigitalCashBackMode ? digitalCashBackAmount : 0,
         // Combine per-line discounts with cart-level discount so they reach the ledger.
@@ -1483,14 +1781,17 @@ function POSPage() {
         const rate = Number(i.tax_pct || 0);
         if (!rate) continue;
         const base = Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0);
-        taxBuckets.set(rate, +( (taxBuckets.get(rate) ?? 0) + base * rate / 100 ).toFixed(2));
+        taxBuckets.set(rate, +((taxBuckets.get(rate) ?? 0) + (base * rate) / 100).toFixed(2));
       }
       const { sale, offline } = await completeSaleOfflineAware(payload as any, {
         charge,
         line_discount_total: lineDiscountTotal,
         bill_discount: discount,
         tax_breakdown: Array.from(taxBuckets, ([rate, amount]) => ({ rate, amount })),
-        payments: paymentAllocations.map((entry) => ({ method: entry.method, amount: +Number(entry.amount ?? 0).toFixed(2) })),
+        payments: paymentAllocations.map((entry) => ({
+          method: entry.method,
+          amount: +Number(entry.amount ?? 0).toFixed(2),
+        })),
         tendered: tenderedAmount,
         change_due: change,
       });
@@ -1555,7 +1856,6 @@ function POSPage() {
       } else {
         setTimeout(() => searchRef.current?.focus(), 50);
       }
-
     } catch (err: any) {
       toast.error(err.message ?? "Failed to complete sale");
     } finally {
@@ -1598,38 +1898,51 @@ function POSPage() {
       if (isOfflineNow()) {
         const sale = await offlineDb().sales.get(undoCandidate.sale_id);
         if (!sale) throw new Error("Sale not available offline");
-        const saleItems = await offlineDb().sale_items.where("sale_id").equals(undoCandidate.sale_id).toArray();
+        const saleItems = await offlineDb()
+          .sale_items.where("sale_id")
+          .equals(undoCandidate.sale_id)
+          .toArray();
 
-        await offlineDb().transaction("rw", offlineDb().sales, offlineDb().sale_items, offlineDb().products, async () => {
-          for (const it of saleItems) {
-            if (!it.product_id) continue;
-            const p = await offlineDb().products.get(it.product_id);
-            if (!p) continue;
-            const baseStock =
-              typeof p.stock === "number"
-                ? Number(p.stock)
-                : typeof p.stock_qty === "number"
-                  ? Number(p.stock_qty)
-                  : null;
-            if (baseStock == null) continue;
-            const nextStock = +(baseStock + Number(it.qty || 0)).toFixed(3);
-            await offlineDb().products.put({
-              ...p,
-              stock: nextStock,
-              ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
-              _sync: "pending",
-              _v: (Number(p._v ?? 0) || 0) + 1,
-              updated_at: new Date().toISOString(),
-            });
-          }
-          await offlineDb().sale_items.where("sale_id").equals(undoCandidate.sale_id).delete();
-          await offlineDb().sales.delete(undoCandidate.sale_id);
-        });
+        await offlineDb().transaction(
+          "rw",
+          offlineDb().sales,
+          offlineDb().sale_items,
+          offlineDb().products,
+          async () => {
+            for (const it of saleItems) {
+              if (!it.product_id) continue;
+              const p = await offlineDb().products.get(it.product_id);
+              if (!p) continue;
+              const baseStock =
+                typeof p.stock === "number"
+                  ? Number(p.stock)
+                  : typeof p.stock_qty === "number"
+                    ? Number(p.stock_qty)
+                    : null;
+              if (baseStock == null) continue;
+              const nextStock = +(baseStock + Number(it.qty || 0)).toFixed(3);
+              await offlineDb().products.put({
+                ...p,
+                stock: nextStock,
+                ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
+                _sync: "pending",
+                _v: (Number(p._v ?? 0) || 0) + 1,
+                updated_at: new Date().toISOString(),
+              });
+            }
+            await offlineDb().sale_items.where("sale_id").equals(undoCandidate.sale_id).delete();
+            await offlineDb().sales.delete(undoCandidate.sale_id);
+          },
+        );
 
         // If this sale was never synced, remove its queued create/edit actions.
         const queueRows = await offlineDb()._queue.toArray();
-        const createRow = queueRows.find((r: any) => r.client_uuid === undoCandidate.sale_id && r.table === "complete_sale");
-        const relatedEditRows = queueRows.filter((r: any) => r.table === "edit_sale" && r.payload?._sale_id === undoCandidate.sale_id);
+        const createRow = queueRows.find(
+          (r: any) => r.client_uuid === undoCandidate.sale_id && r.table === "complete_sale",
+        );
+        const relatedEditRows = queueRows.filter(
+          (r: any) => r.table === "edit_sale" && r.payload?._sale_id === undoCandidate.sale_id,
+        );
         if (createRow?.id != null) await offlineDb()._queue.delete(createRow.id);
         for (const row of relatedEditRows) {
           if (row.id != null) await offlineDb()._queue.delete(row.id);
@@ -1679,12 +1992,19 @@ function POSPage() {
             action: "undo_last_sale.reason",
             entity: "sales",
             entity_id: undoCandidate.sale_id,
-            details: { invoice_no: payload.invoice_no ?? undoCandidate.invoice_no, reason: reasonText },
+            details: {
+              invoice_no: payload.invoice_no ?? undoCandidate.invoice_no,
+              reason: reasonText,
+            },
           } as any);
         }
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
 
-      toast.success(`✓ Sale ${payload.invoice_no ?? undoCandidate.invoice_no} restored successfully`);
+      toast.success(
+        `✓ Sale ${payload.invoice_no ?? undoCandidate.invoice_no} restored successfully`,
+      );
       setUndoCandidate(null);
       setUndoOpen(false);
       setUndoReason(UNDO_REASONS[0]);
@@ -1705,7 +2025,9 @@ function POSPage() {
   // no overlay is actually open.
   useEffect(() => {
     const clearStuck = () => {
-      const hasOverlay = document.querySelector('[role="dialog"][data-state="open"], [role="listbox"][data-state="open"], [data-radix-popper-content-wrapper]');
+      const hasOverlay = document.querySelector(
+        '[role="dialog"][data-state="open"], [role="listbox"][data-state="open"], [data-radix-popper-content-wrapper]',
+      );
       if (!hasOverlay && document.body.style.pointerEvents === "none") {
         document.body.style.pointerEvents = "";
       }
@@ -1713,7 +2035,6 @@ function POSPage() {
     const id = window.setInterval(clearStuck, 300);
     return () => window.clearInterval(id);
   }, []);
-
 
   // F2 add tab, F4 complete, and keep scanner/manual typing routed to search by default.
   useEffect(() => {
@@ -1743,7 +2064,11 @@ function POSPage() {
         searchRef.current?.select();
         return;
       }
-      if (e.key === "F4" && !inDialog) { e.preventDefault(); handleSale(); return; }
+      if (e.key === "F4" && !inDialog) {
+        e.preventDefault();
+        handleSale();
+        return;
+      }
 
       // Ctrl+Z or F10 → undo last sale by current cashier (if still within window).
       const isUndoShortcut =
@@ -1756,7 +2081,17 @@ function POSPage() {
         return;
       }
 
-      if (inDialog || selectOpen || editing || e.ctrlKey || e.metaKey || e.altKey || isSearchInput || isEditableTarget) return;
+      if (
+        inDialog ||
+        selectOpen ||
+        editing ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        isSearchInput ||
+        isEditableTarget
+      )
+        return;
 
       if (e.key.length === 1) {
         e.preventDefault();
@@ -1799,18 +2134,16 @@ function POSPage() {
         }
         openQuickAdd(raw);
       }
-
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   });
 
   return (
-      <div className="min-h-full md:h-full flex flex-col md:overflow-hidden">
+    <div className="min-h-full md:h-full flex flex-col md:overflow-hidden">
       <ShiftBanner />
       {/* Top strip — open bills + clock + reprint (jahaan se sidebar khulti hai us patti ke saath) */}
-        <div className="flex items-center gap-2 px-2 py-1 border-b bg-card/60 no-print shrink-0">
-
+      <div className="flex items-center gap-2 px-2 py-1 border-b bg-card/60 no-print shrink-0">
         <ScrollArea className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
             {tabs.map((t) => (
@@ -1818,17 +2151,24 @@ function POSPage() {
                 key={t.id}
                 onClick={() => setActive(t.id)}
                 className={`group flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs whitespace-nowrap ${
-                  t.id === active ? "bg-background border-primary/40" : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                  t.id === active
+                    ? "bg-background border-primary/40"
+                    : "bg-muted/40 text-muted-foreground hover:bg-muted"
                 }`}
               >
                 <ShoppingCart className="h-3 w-3" />
                 <span>{t.name}</span>
                 {t.items.length > 0 && (
-                  <Badge variant="secondary" className="h-4 px-1 text-[10px]">{t.items.length}</Badge>
+                  <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                    {t.items.length}
+                  </Badge>
                 )}
                 <span
                   role="button"
-                  onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeTab(t.id);
+                  }}
                   className="ml-0.5 rounded p-0.5 opacity-60 hover:opacity-100 hover:bg-destructive/20"
                 >
                   <X className="h-3 w-3" />
@@ -1847,708 +2187,910 @@ function POSPage() {
         {holdBillsEnabled && (
           <>
             <Button
-              size="sm" variant="outline" className="h-7 text-xs shrink-0"
-              onClick={holdCurrent} disabled={holding || !tab.items.length}
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs shrink-0"
+              onClick={holdCurrent}
+              disabled={holding || !tab.items.length}
               title="Hold current bill (park cart)"
             >
               <PauseCircle className="h-3.5 w-3.5 mr-1" /> Hold
             </Button>
             <Button
-              size="sm" variant="outline" className="h-7 text-xs shrink-0"
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs shrink-0"
               onClick={() => setHeldOpen(true)}
               title="Resume a held bill"
             >
               <Play className="h-3.5 w-3.5 mr-1" /> Held
               {heldBills.length > 0 && (
-                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{heldBills.length}</Badge>
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                  {heldBills.length}
+                </Badge>
               )}
             </Button>
           </>
         )}
-        <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setReprintOpen(true)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs shrink-0"
+          onClick={() => setReprintOpen(true)}
+        >
           <History className="h-3.5 w-3.5 mr-1" /> Reprint
         </Button>
       </div>
 
-
       {/* Two-column layout */}
-      <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
         {/* LEFT: items area (maximised) */}
-        <main className="relative flex-1 flex flex-col min-h-[55vh] md:min-h-0 bg-background">
-
-        <div className="relative flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
-          {/* Search / scan */}
-          <div className="relative flex-1 min-w-0 max-w-[560px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              ref={searchRef}
-              autoFocus
-              placeholder="🔍  Scan barcode or search product…  (F3)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") { setSearch(""); setCartCursor(-1); return; }
-                const raw = search.trim();
-                // When search has text, arrows navigate the search results popup
-                if (raw && e.key === "ArrowDown" && filtered.length) {
-                  e.preventDefault(); kbNavRef.current = true;
-                  setHighlight((h) => Math.min(h + 1, filtered.length - 1)); return;
-                }
-                if (raw && e.key === "ArrowUp" && filtered.length) {
-                  e.preventDefault(); kbNavRef.current = true;
-                  setHighlight((h) => Math.max(h - 1, 0)); return;
-                }
-
-                // When search is empty, arrows move the cart line cursor (clamped, no wrap)
-                if (!raw && (e.key === "ArrowDown" || e.key === "ArrowUp") && tab.items.length) {
-                  e.preventDefault();
-                  setCartCursor((c) => {
-                    const n = tab.items.length;
-                    if (e.key === "ArrowDown") {
-                      if (c < 0) return 0;
-                      return Math.min(n - 1, c + 1);
-                    }
-                    // ArrowUp
-                    if (c < 0) return n - 1;
-                    return Math.max(0, c - 1);
-                  });
-                  return;
-                }
-                if (!raw && e.key === "Home" && tab.items.length) {
-                  e.preventDefault(); setCartCursor(0); return;
-                }
-                if (!raw && e.key === "End" && tab.items.length) {
-                  e.preventDefault(); setCartCursor(tab.items.length - 1); return;
-                }
-                if (!raw && (e.key === "Delete" || (e.key === "Backspace" && cartCursor >= 0)) && cartCursor >= 0 && cartCursor < tab.items.length) {
-                  e.preventDefault();
-                  const idx = cartCursor;
-                  removeLine(idx);
-                  setCartCursor((c) => Math.min(c, tab.items.length - 2));
-                  return;
-                }
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                if (!raw) {
-                  // Enter on a highlighted cart row → edit qty
-                  if (cartCursor >= 0 && cartCursor < tab.items.length) {
-                    const idx = cartCursor;
-                    setTimeout(() => setEditing({ idx, field: "qty" }), 0);
+        <main className="relative flex-1 flex flex-col min-h-[55vh] md:min-h-0 bg-background overflow-hidden">
+          <div className="relative flex items-center gap-3 px-4 py-3 border-b bg-card no-print">
+            {/* Search / scan */}
+            <div className="relative flex-1 min-w-0 max-w-[560px]">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                ref={searchRef}
+                autoFocus
+                placeholder="🔍  Scan barcode or search product…  (F3)"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearch("");
+                    setCartCursor(-1);
                     return;
                   }
-                  // Empty search + items in cart → jump to Paid field (Enter there completes sale)
-                  if (tab.items.length > 0) {
-                    setTimeout(() => { paidRef.current?.focus(); paidRef.current?.select(); }, 0);
+                  const raw = search.trim();
+                  // When search has text, arrows navigate the search results popup
+                  if (raw && e.key === "ArrowDown" && filtered.length) {
+                    e.preventDefault();
+                    kbNavRef.current = true;
+                    setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+                    return;
                   }
-                  return;
-                }
-                const exact = productByBarcode[raw];
-                if (exact) { addProduct(exact); setSearch(""); triggerScanFlash(); return; }
-                if (filtered.length >= 1) {
-                  const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
-                  addProduct(pick); setSearch("");
-                  return;
-                }
-                openQuickAdd(raw);
-              }}
-              className={`pl-12 h-14 text-base rounded-xl border-2 shadow-sm transition-all duration-300 ${
-                scanFlash ? "border-success ring-4 ring-success/30 bg-success/5" : "focus:border-primary"
-              }`}
-            />
+                  if (raw && e.key === "ArrowUp" && filtered.length) {
+                    e.preventDefault();
+                    kbNavRef.current = true;
+                    setHighlight((h) => Math.max(h - 1, 0));
+                    return;
+                  }
+
+                  // When search is empty, arrows move the cart line cursor (clamped, no wrap)
+                  if (!raw && (e.key === "ArrowDown" || e.key === "ArrowUp") && tab.items.length) {
+                    e.preventDefault();
+                    setCartCursor((c) => {
+                      const n = tab.items.length;
+                      if (e.key === "ArrowDown") {
+                        if (c < 0) return 0;
+                        return Math.min(n - 1, c + 1);
+                      }
+                      // ArrowUp
+                      if (c < 0) return n - 1;
+                      return Math.max(0, c - 1);
+                    });
+                    return;
+                  }
+                  if (!raw && e.key === "Home" && tab.items.length) {
+                    e.preventDefault();
+                    setCartCursor(0);
+                    return;
+                  }
+                  if (!raw && e.key === "End" && tab.items.length) {
+                    e.preventDefault();
+                    setCartCursor(tab.items.length - 1);
+                    return;
+                  }
+                  if (
+                    !raw &&
+                    (e.key === "Delete" || (e.key === "Backspace" && cartCursor >= 0)) &&
+                    cartCursor >= 0 &&
+                    cartCursor < tab.items.length
+                  ) {
+                    e.preventDefault();
+                    const idx = cartCursor;
+                    removeLine(idx);
+                    setCartCursor((c) => Math.min(c, tab.items.length - 2));
+                    return;
+                  }
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  if (!raw) {
+                    // Enter on a highlighted cart row → edit qty
+                    if (cartCursor >= 0 && cartCursor < tab.items.length) {
+                      const idx = cartCursor;
+                      setTimeout(() => setEditing({ idx, field: "qty" }), 0);
+                      return;
+                    }
+                    // Empty search + items in cart → jump to Paid field (Enter there completes sale)
+                    if (tab.items.length > 0) {
+                      setTimeout(() => {
+                        paidRef.current?.focus();
+                        paidRef.current?.select();
+                      }, 0);
+                    }
+                    return;
+                  }
+                  const exact = productByBarcode[raw];
+                  if (exact) {
+                    addProduct(exact);
+                    setSearch("");
+                    triggerScanFlash();
+                    return;
+                  }
+                  if (filtered.length >= 1) {
+                    const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
+                    addProduct(pick);
+                    setSearch("");
+                    return;
+                  }
+                  openQuickAdd(raw);
+                }}
+                className={`pl-12 h-14 text-base rounded-xl border-2 shadow-sm transition-all duration-300 ${
+                  scanFlash
+                    ? "border-success ring-4 ring-success/30 bg-success/5"
+                    : "focus:border-primary"
+                }`}
+              />
+            </div>
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-semibold truncate">{tab.name}</span>
+              <Badge variant="secondary" className="h-5 px-1.5 text-[11px] shrink-0">
+                {tab.items.length} item{tab.items.length === 1 ? "" : "s"}
+              </Badge>
+              {tab.editing_sale_id && (
+                <Badge className="bg-primary/15 text-primary border border-primary/30 text-[11px] shrink-0 rounded-full">
+                  <Pencil className="h-3 w-3 mr-1" /> EDITING {tab.editing_invoice_no ?? ""}
+                </Badge>
+              )}
+              {tab.restored && !tab.editing_sale_id && (
+                <Badge className="bg-warning text-warning-foreground text-[11px] shrink-0 rounded-full">
+                  ↩ RESTORED SALE
+                </Badge>
+              )}
+              {tab.expense_person_id && (
+                <Badge
+                  variant="outline"
+                  className="border-warning text-warning text-[11px] shrink-0"
+                >
+                  Staff purchase
+                </Badge>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant={showCost ? "secondary" : "ghost"}
+              className="h-9 text-xs shrink-0"
+              onClick={() => setShowCost((v) => !v)}
+            >
+              {showCost ? (
+                <EyeOff className="h-3.5 w-3.5 mr-1" />
+              ) : (
+                <Eye className="h-3.5 w-3.5 mr-1" />
+              )}
+              {showCost ? "Hide" : "Show"} P.Rate
+            </Button>
           </div>
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-sm font-semibold truncate">{tab.name}</span>
-            <Badge variant="secondary" className="h-5 px-1.5 text-[11px] shrink-0">
-              {tab.items.length} item{tab.items.length === 1 ? "" : "s"}
-            </Badge>
-            {tab.editing_sale_id && (
-              <Badge className="bg-primary/15 text-primary border border-primary/30 text-[11px] shrink-0 rounded-full">
-                <Pencil className="h-3 w-3 mr-1" /> EDITING {tab.editing_invoice_no ?? ""}
-              </Badge>
-            )}
-            {tab.restored && !tab.editing_sale_id && (
-              <Badge className="bg-warning text-warning-foreground text-[11px] shrink-0 rounded-full">
-                ↩ RESTORED SALE
-              </Badge>
-            )}
-            {tab.expense_person_id && (
-              <Badge variant="outline" className="border-warning text-warning text-[11px] shrink-0">
-                Staff purchase
-              </Badge>
-            )}
-          </div>
-          <Button
-            size="sm"
-            variant={showCost ? "secondary" : "ghost"}
-            className="h-9 text-xs shrink-0"
-            onClick={() => setShowCost((v) => !v)}
-          >
-            {showCost ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
-            {showCost ? "Hide" : "Show"} P.Rate
-          </Button>
-        </div>
 
-
-
-
-        {/* Item-wise detailed table — FAST SALES style spreadsheet */}
-        <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-background">
-          <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
-            <thead className="sticky top-0 z-10 bg-primary text-primary-foreground text-[11px] uppercase tracking-wide">
-              <tr>
-                <th className="px-2 py-2 text-left w-16">Item No</th>
-                <th className="px-2 py-2 text-left">Item Name</th>
-                <th className="px-2 py-2 text-right w-20">Stock</th>
-                {showCost && (
-                  <th className="px-2 py-2 text-right w-24 no-print" title="Purchase rate (internal)">P.Rate</th>
-                )}
-                <th className="px-2 py-2 text-right w-32">Unit Rate</th>
-                <th className="px-2 py-2 text-right w-28">QTY</th>
-                <th className="px-2 py-2 text-right w-32">Discount</th>
-                <th className="px-2 py-2 text-right w-36">Amount</th>
-                <th className="px-2 py-2 w-8 no-print"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tab.items.length === 0 && !search.trim() && (
+          {/* Item-wise detailed table — FAST SALES style spreadsheet */}
+          <div className="flex-1 min-h-0 overflow-auto bg-white dark:bg-background">
+            <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
+              <thead className="sticky top-0 z-10 bg-primary text-primary-foreground text-[11px] uppercase tracking-wide">
                 <tr>
-                  <td colSpan={showCost ? 9 : 8} className="border-0 py-14">
-                    <div className="mx-auto max-w-md flex flex-col items-center gap-4 text-center animate-in fade-in duration-300">
-                      <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center text-4xl">
-                        📦
-                      </div>
-                      <div>
-                        <div className="text-lg font-semibold">Ready to start</div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          Scan a barcode or search a product to add to this bill.
+                  <th className="px-2 py-2 text-left w-16">Item No</th>
+                  <th className="px-2 py-2 text-left">Item Name</th>
+                  <th className="px-2 py-2 text-right w-20">Stock</th>
+                  {showCost && (
+                    <th
+                      className="px-2 py-2 text-right w-24 no-print"
+                      title="Purchase rate (internal)"
+                    >
+                      P.Rate
+                    </th>
+                  )}
+                  <th className="px-2 py-2 text-right w-32">Unit Rate</th>
+                  <th className="px-2 py-2 text-right w-28">QTY</th>
+                  <th className="px-2 py-2 text-right w-32">Discount</th>
+                  <th className="px-2 py-2 text-right w-36">Amount</th>
+                  <th className="px-2 py-2 w-8 no-print"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tab.items.length === 0 && !search.trim() && (
+                  <tr>
+                    <td colSpan={showCost ? 9 : 8} className="border-0 py-14">
+                      <div className="mx-auto max-w-md flex flex-col items-center gap-4 text-center animate-in fade-in duration-300">
+                        <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center text-4xl">
+                          📦
+                        </div>
+                        <div>
+                          <div className="text-lg font-semibold">Ready to start</div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            Scan a barcode or search a product to add to this bill.
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-2">
+                          <Kbd label="F2" hint="New bill" />
+                          <Kbd label="F3" hint="Search" />
+                          <Kbd label="F4" hint="Complete sale" />
+                          <Kbd label="F10" hint="Undo last sale" />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-2">
-                        <Kbd label="F2" hint="New bill" />
-                        <Kbd label="F3" hint="Search" />
-                        <Kbd label="F4" hint="Complete sale" />
-                        <Kbd label="F10" hint="Undo last sale" />
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {tab.items.map((it, idx) => {
-                const gross = Number(it.qty) * Number(it.price);
-                const lineDisc = Number(it.disc || 0);
-                const net = Math.max(gross - lineDisc, 0);
-                const amount = net;
-                const zebra = idx % 2 === 0 ? "bg-amber-50/60 dark:bg-muted/20" : "bg-white dark:bg-background";
-                const p = it.product_id ? (productById[it.product_id] ?? null) : null;
-                const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
-                const displayCode = it.code || (p ? itemCodeForProduct(p) : "");
-                const subline = p
-                  ? [
-                      bcs[0] ? `BC ${bcs[0]}` : null,
-                      p.category || null,
-                    ].filter(Boolean).join(" · ")
-                  : "";
-                const stockNum = p ? Number(p.stock ?? 0) : null;
-                const isCursor = idx === cartCursor;
-                return (
-                  <tr
-                    key={idx}
-                    ref={(el) => { cartRowRefs.current[idx] = el; }}
-                    onClick={() => setCartCursor(idx)}
-                    className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40 ${isCursor ? "ring-2 ring-inset ring-primary bg-primary/5" : ""}`}
-                  >
-                    <td className="px-2 py-1 font-mono text-xs">{displayCode || "—"}</td>
-                    <td className="px-2 py-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="font-medium text-sm truncate min-w-0 flex-1">{it.name}</div>
-                      </div>
-                      {subline && (
-                        <div className="text-[11px] text-muted-foreground truncate">{subline}</div>
-                      )}
-                    </td>
-                    <td className="px-2 py-1 text-right tabular-nums">
-                      {stockNum !== null ? (
-                        <span className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}>
-                          {fmtQty(stockNum)}
-                          {p?.unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{p.unit}</span> : null}
-                        </span>
-                      ) : <span className="text-muted-foreground">—</span>}
-                    </td>
-                    {showCost && (
-                      <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
-                        {fmtMoney(it.cost, sym)}
-                      </td>
-                    )}
-                    <td className="p-0">
-                      <EditableNumCell
-                        active={editing?.idx === idx && editing.field === "price"}
-                        value={it.price}
-                        step="0.01"
-                        display={fmtMoney(it.price, sym)}
-                        onActivate={() => setEditing({ idx, field: "price" })}
-                        onCommit={(v) => { updateLine(idx, { price: v }); setEditing(null); searchRef.current?.focus(); }}
-                        onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
-                      />
-                    </td>
-                    <td className="p-0">
-                      <EditableNumCell
-                        active={editing?.idx === idx && editing.field === "qty"}
-                        value={it.qty}
-                        step="0.001"
-                        display={fmtQty(it.qty)}
-                        onActivate={() => setEditing({ idx, field: "qty" })}
-                        onCommit={(v) => { updateLine(idx, { qty: v }); setEditing(null); setCartCursor(-1); setTimeout(() => searchRef.current?.focus(), 0); }}
-                        onCancel={() => { setEditing(null); setCartCursor(-1); setTimeout(() => searchRef.current?.focus(), 0); }}
-                      />
-                    </td>
-                    <td className="p-0">
-                      <EditableNumCell
-                        active={editing?.idx === idx && editing.field === "disc"}
-                        value={it.disc}
-                        step="0.01"
-                        min={0}
-                        display={fmtMoney(it.disc, sym)}
-                        onActivate={() => setEditing({ idx, field: "disc" })}
-                        onCommit={(v) => { updateLine(idx, { disc: Math.max(0, v) }); setEditing(null); searchRef.current?.focus(); }}
-                        onCancel={() => { setEditing(null); searchRef.current?.focus(); }}
-                      />
-                    </td>
-                    <td className="px-2 py-1 text-right font-semibold tabular-nums">{fmtMoney(amount, sym)}</td>
-                    <td className="px-1 py-1 text-center no-print border-0">
-                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeLine(idx)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
                     </td>
                   </tr>
-                );
-              })}
-
-            </tbody>
-          </table>
-        </div>
-
-        {/* Floating search results — popup under the search header, fit to header */}
-        {search.trim() && (
-          <div className="absolute left-4 right-4 top-[64px] z-40 rounded-xl border border-primary/30 bg-card shadow-2xl overflow-hidden">
-            <div className="max-h-[60vh] overflow-auto">
-              {filtered.length > 0 ? (
-                <table className="w-full text-sm border-collapse">
-                  <thead className="sticky top-0 z-10 bg-primary text-primary-foreground text-[11px] uppercase tracking-wide">
-                    <tr>
-                      <th className="px-2 py-2 text-left w-24">Code</th>
-                      <th className="px-2 py-2 text-left">Item Name</th>
-                      <th className="px-2 py-2 text-right w-20">Stock</th>
-                      {showCost && <th className="px-2 py-2 text-right w-24">P.Rate</th>}
-                      <th className="px-2 py-2 text-right w-28">Rate</th>
-                      <th className="px-2 py-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((p, i) => {
-                      const rate = Number(p.sell_price ?? 0);
-                      const pRate = Number(p.cost_price ?? 0);
-                      const code = itemCodeForProduct(p) || "—";
-                      const bcs = barcodesByProduct[p.id] ?? [];
-                      const subline = [
-                        bcs[0] ? `BC ${bcs[0]}` : null,
-                        p.category || null,
-                      ].filter(Boolean).join(" · ");
-                      const stockNum = Number(p.stock ?? 0);
-                      const isHi = i === highlight;
-                      return (
-                        <tr
-                          key={`search-${p.id}`}
-                          ref={(el) => { searchRowRefs.current[i] = el; }}
-                          onMouseMove={() => { kbNavRef.current = false; setHighlight(i); }}
-                          onClick={() => { addProduct(p); setSearch(""); }}
-                          className={`cursor-pointer border-b border-border ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
+                )}
+                {tab.items.map((it, idx) => {
+                  const gross = Number(it.qty) * Number(it.price);
+                  const lineDisc = Number(it.disc || 0);
+                  const net = Math.max(gross - lineDisc, 0);
+                  const amount = net;
+                  const zebra =
+                    idx % 2 === 0
+                      ? "bg-amber-50/60 dark:bg-muted/20"
+                      : "bg-white dark:bg-background";
+                  const p = it.product_id ? (productById[it.product_id] ?? null) : null;
+                  const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
+                  const displayCode = it.code || (p ? itemCodeForProduct(p) : "");
+                  const subline = p
+                    ? [bcs[0] ? `BC ${bcs[0]}` : null, p.category || null]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : "";
+                  const stockNum = p ? Number(p.stock ?? 0) : null;
+                  const isCursor = idx === cartCursor;
+                  return (
+                    <tr
+                      key={idx}
+                      ref={(el) => {
+                        cartRowRefs.current[idx] = el;
+                      }}
+                      onClick={() => setCartCursor(idx)}
+                      className={`${zebra} hover:bg-amber-100/60 dark:hover:bg-muted/40 ${isCursor ? "ring-2 ring-inset ring-primary bg-primary/5" : ""}`}
+                    >
+                      <td className="px-2 py-1 font-mono text-xs">{displayCode || "—"}</td>
+                      <td className="px-2 py-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="font-medium text-sm truncate min-w-0 flex-1">
+                            {it.name}
+                          </div>
+                        </div>
+                        {subline && (
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {subline}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-1 text-right tabular-nums">
+                        {stockNum !== null ? (
+                          <span
+                            className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}
+                          >
+                            {fmtQty(stockNum)}
+                            {p?.unit ? (
+                              <span className="text-[10px] text-muted-foreground ml-0.5">
+                                {p.unit}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      {showCost && (
+                        <td className="px-2 py-1 text-right font-mono text-muted-foreground no-print">
+                          {fmtMoney(it.cost, sym)}
+                        </td>
+                      )}
+                      <td className="p-0">
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "price"}
+                          value={it.price}
+                          step="0.01"
+                          display={fmtMoney(it.price, sym)}
+                          onActivate={() => setEditing({ idx, field: "price" })}
+                          onCommit={(v) => {
+                            updateLine(idx, { price: v });
+                            setEditing(null);
+                            searchRef.current?.focus();
+                          }}
+                          onCancel={() => {
+                            setEditing(null);
+                            searchRef.current?.focus();
+                          }}
+                        />
+                      </td>
+                      <td className="p-0">
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "qty"}
+                          value={it.qty}
+                          step="0.001"
+                          display={fmtQty(it.qty)}
+                          onActivate={() => setEditing({ idx, field: "qty" })}
+                          onCommit={(v) => {
+                            updateLine(idx, { qty: v });
+                            setEditing(null);
+                            setCartCursor(-1);
+                            setTimeout(() => searchRef.current?.focus(), 0);
+                          }}
+                          onCancel={() => {
+                            setEditing(null);
+                            setCartCursor(-1);
+                            setTimeout(() => searchRef.current?.focus(), 0);
+                          }}
+                        />
+                      </td>
+                      <td className="p-0">
+                        <EditableNumCell
+                          active={editing?.idx === idx && editing.field === "disc"}
+                          value={it.disc}
+                          step="0.01"
+                          min={0}
+                          display={fmtMoney(it.disc, sym)}
+                          onActivate={() => setEditing({ idx, field: "disc" })}
+                          onCommit={(v) => {
+                            updateLine(idx, { disc: Math.max(0, v) });
+                            setEditing(null);
+                            searchRef.current?.focus();
+                          }}
+                          onCancel={() => {
+                            setEditing(null);
+                            searchRef.current?.focus();
+                          }}
+                        />
+                      </td>
+                      <td className="px-2 py-1 text-right font-semibold tabular-nums">
+                        {fmtMoney(amount, sym)}
+                      </td>
+                      <td className="px-1 py-1 text-center no-print border-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6"
+                          onClick={() => removeLine(idx)}
                         >
-                          <td className="px-2 py-1.5 font-mono text-xs">{code}</td>
-                          <td className="px-2 py-1.5">
-                            <div className="font-medium text-sm truncate">{p.name}</div>
-                            {subline && <div className="text-[11px] text-muted-foreground truncate">{subline}</div>}
-                          </td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">
-                            <span className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}>
-                              {fmtQty(stockNum)}
-                              {p.unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{p.unit}</span> : null}
-                            </span>
-                          </td>
-                          {showCost && (
-                            <td className="px-2 py-1.5 text-right font-mono text-muted-foreground">{fmtMoney(pRate, sym)}</td>
-                          )}
-                          <td className="px-2 py-1.5 text-right tabular-nums text-sm font-semibold">{fmtMoney(rate, sym)}</td>
-                          <td className="px-1 py-1 text-center"><Plus className="h-3.5 w-3.5 mx-auto text-primary" /></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="text-center py-6">
-                  {productsLoading || remoteProductsLoading ? (
-                    <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-3 text-sm">
-                      <span className="text-muted-foreground">No match for "{search}".</span>
-                      <Button size="sm" onClick={() => openQuickAdd(search)}>
-                        <Plus className="h-4 w-4 mr-1" /> Add
-                      </Button>
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* RIGHT: side panel — open bills, party, payment, totals */}
-      <aside className="w-full md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-t md:border-t-0 md:border-l bg-card flex flex-col min-h-0 max-h-[70vh] md:max-h-none overflow-hidden no-print">
-
-        {/* Party + payment */}
-        <div className="p-2.5 border-b space-y-2 shrink-0">
-          <div>
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</Label>
-              {tab.customer_id && (
-                <Link
-                  to="/customers/$id"
-                  params={{ id: tab.customer_id }}
-                  className="text-xs text-primary hover:underline"
-                >
-                  View ledger →
-                </Link>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5 mt-1">
-              <Select
-                value={tab.customer_id ?? "walkin"}
-                onValueChange={(v) => {
-                  const isWalkin = v === "walkin";
-                  setTab({
-                    customer_id: isWalkin ? null : v,
-                    payment_method: isWalkin ? "cash" : "credit",
-                  });
-                  setTimeout(() => searchRef.current?.focus(), 0);
-                }}
-              >
-                <SelectTrigger className="h-9 flex-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="walkin">Walk-in customer</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-9 w-9 shrink-0"
-                title="Quick add customer"
-                onClick={() => setQuickAddCustomerOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            {(() => {
-              const c = tab.customer_id ? customers.find((x: any) => x.id === tab.customer_id) : null;
-              const bal = c ? Number(c.balance ?? 0) : 0;
-              if (!c) return null;
-              return (
-                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                  {tab.payment_method === "credit" && (
-                    <Badge className="bg-warning text-warning-foreground text-[10px] rounded-full px-2">CREDIT</Badge>
-                  )}
-                  {bal > 0 && (
-                    <Badge variant="outline" className="border-warning text-warning text-[11px]">
-                      Previous balance: {fmtMoney(bal, sym)}
-                    </Badge>
-                  )}
-                </div>
-              );
-            })()}
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {(showStaff || tab.expense_person_id) && (
-            <div>
-              <Label className="text-xs text-muted-foreground">Staff / Owner purchase</Label>
-              <Select
-                value={tab.expense_person_id ?? "none"}
-                onValueChange={(v) => {
-                  setTab({
-                    expense_person_id: v === "none" ? null : v,
-                    customer_id: v === "none" ? tab.customer_id : null,
-                  });
-                  setTimeout(() => searchRef.current?.focus(), 0);
-                }}
-              >
-                <SelectTrigger className={`h-9 mt-1 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— Not staff purchase —</SelectItem>
-                  {persons.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} {p.role ? `· ${p.role}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Floating search results — popup under the search header, fit to header */}
+          {search.trim() && (
+            <div className="absolute left-4 right-4 top-[64px] z-40 rounded-xl border border-primary/30 bg-card shadow-2xl overflow-hidden">
+              <div className="max-h-[60vh] overflow-auto">
+                {filtered.length > 0 ? (
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="sticky top-0 z-10 bg-primary text-primary-foreground text-[11px] uppercase tracking-wide">
+                      <tr>
+                        <th className="px-2 py-2 text-left w-24">Code</th>
+                        <th className="px-2 py-2 text-left">Item Name</th>
+                        <th className="px-2 py-2 text-right w-20">Stock</th>
+                        {showCost && <th className="px-2 py-2 text-right w-24">P.Rate</th>}
+                        <th className="px-2 py-2 text-right w-28">Rate</th>
+                        <th className="px-2 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((p, i) => {
+                        const rate = Number(p.sell_price ?? 0);
+                        const pRate = Number(p.cost_price ?? 0);
+                        const code = itemCodeForProduct(p) || "—";
+                        const bcs = barcodesByProduct[p.id] ?? [];
+                        const subline = [bcs[0] ? `BC ${bcs[0]}` : null, p.category || null]
+                          .filter(Boolean)
+                          .join(" · ");
+                        const stockNum = Number(p.stock ?? 0);
+                        const isHi = i === highlight;
+                        return (
+                          <tr
+                            key={`search-${p.id}`}
+                            ref={(el) => {
+                              searchRowRefs.current[i] = el;
+                            }}
+                            onMouseMove={() => {
+                              kbNavRef.current = false;
+                              setHighlight(i);
+                            }}
+                            onClick={() => {
+                              addProduct(p);
+                              setSearch("");
+                            }}
+                            className={`cursor-pointer border-b border-border ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
+                          >
+                            <td className="px-2 py-1.5 font-mono text-xs">{code}</td>
+                            <td className="px-2 py-1.5">
+                              <div className="font-medium text-sm truncate">{p.name}</div>
+                              {subline && (
+                                <div className="text-[11px] text-muted-foreground truncate">
+                                  {subline}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5 text-right tabular-nums">
+                              <span
+                                className={`text-sm font-semibold ${stockNum > 0 ? "text-foreground" : "text-destructive"}`}
+                              >
+                                {fmtQty(stockNum)}
+                                {p.unit ? (
+                                  <span className="text-[10px] text-muted-foreground ml-0.5">
+                                    {p.unit}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </td>
+                            {showCost && (
+                              <td className="px-2 py-1.5 text-right font-mono text-muted-foreground">
+                                {fmtMoney(pRate, sym)}
+                              </td>
+                            )}
+                            <td className="px-2 py-1.5 text-right tabular-nums text-sm font-semibold">
+                              {fmtMoney(rate, sym)}
+                            </td>
+                            <td className="px-1 py-1 text-center">
+                              <Plus className="h-3.5 w-3.5 mx-auto text-primary" />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-6">
+                    {productsLoading || remoteProductsLoading ? (
+                      <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-3 text-sm">
+                        <span className="text-muted-foreground">No match for "{search}".</span>
+                        <Button size="sm" onClick={() => openQuickAdd(search)}>
+                          <Plus className="h-4 w-4 mr-1" /> Add
+                        </Button>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
+        </main>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment</Label>
-              <Button
-                type="button"
-                size="sm"
-                variant={showStaff || tab.expense_person_id ? "secondary" : "ghost"}
-                className="h-6 text-[11px] px-2"
-                title="Charge this bill to a staff/owner expense ledger"
-                onClick={() => {
-                  if (tab.expense_person_id) setTab({ expense_person_id: null });
-                  setShowStaff((v) => !v);
+        {/* RIGHT: side panel — open bills, party, payment, totals */}
+        <aside className="w-full md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-t md:border-t-0 md:border-l bg-card flex flex-col min-h-0 max-h-[70vh] md:max-h-[calc(100vh-8.5rem)] overflow-hidden no-print">
+          {/* Party + payment */}
+          <div className="p-2.5 border-b space-y-2 shrink-0">
+            <div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Customer
+                </Label>
+                {tab.customer_id && (
+                  <Link
+                    to="/customers/$id"
+                    params={{ id: tab.customer_id }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View ledger →
+                  </Link>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1">
+                <Select
+                  value={tab.customer_id ?? "walkin"}
+                  onValueChange={(v) => {
+                    const isWalkin = v === "walkin";
+                    setTab({
+                      customer_id: isWalkin ? null : v,
+                      payment_method: isWalkin ? "cash" : "credit",
+                    });
+                    setTimeout(() => searchRef.current?.focus(), 0);
+                  }}
+                >
+                  <SelectTrigger className="h-9 flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="walkin">Walk-in customer</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-9 w-9 shrink-0"
+                  title="Quick add customer"
+                  onClick={() => setQuickAddCustomerOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {(() => {
+                const c = tab.customer_id
+                  ? customers.find((x: any) => x.id === tab.customer_id)
+                  : null;
+                const bal = c ? Number(c.balance ?? 0) : 0;
+                if (!c) return null;
+                return (
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    {tab.payment_method === "credit" && (
+                      <Badge className="bg-warning text-warning-foreground text-[10px] rounded-full px-2">
+                        CREDIT
+                      </Badge>
+                    )}
+                    {bal > 0 && (
+                      <Badge variant="outline" className="border-warning text-warning text-[11px]">
+                        Previous balance: {fmtMoney(bal, sym)}
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {(showStaff || tab.expense_person_id) && (
+              <div>
+                <Label className="text-xs text-muted-foreground">Staff / Owner purchase</Label>
+                <Select
+                  value={tab.expense_person_id ?? "none"}
+                  onValueChange={(v) => {
+                    setTab({
+                      expense_person_id: v === "none" ? null : v,
+                      customer_id: v === "none" ? tab.customer_id : null,
+                    });
+                    setTimeout(() => searchRef.current?.focus(), 0);
+                  }}
+                >
+                  <SelectTrigger
+                    className={`h-9 mt-1 ${tab.expense_person_id ? "border-warning ring-1 ring-warning/40" : ""}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Not staff purchase —</SelectItem>
+                    {persons.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} {p.role ? `· ${p.role}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Payment
+                </Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showStaff || tab.expense_person_id ? "secondary" : "ghost"}
+                  className="h-6 text-[11px] px-2"
+                  title="Charge this bill to a staff/owner expense ledger"
+                  onClick={() => {
+                    if (tab.expense_person_id) setTab({ expense_person_id: null });
+                    setShowStaff((v) => !v);
+                    setTimeout(() => searchRef.current?.focus(), 0);
+                  }}
+                >
+                  <UserCog className="h-3.5 w-3.5 mr-1" /> Staff
+                </Button>
+              </div>
+              <PaymentMethodGrid
+                value={tab.payment_method}
+                onChange={(v) => {
+                  setPrimaryPaymentMethod(v);
                   setTimeout(() => searchRef.current?.focus(), 0);
                 }}
-              >
-                <UserCog className="h-3.5 w-3.5 mr-1" /> Staff
-              </Button>
-            </div>
-            <PaymentMethodGrid
-              value={tab.payment_method}
-              onChange={(v) => { setPrimaryPaymentMethod(v); setTimeout(() => searchRef.current?.focus(), 0); }}
-            />
-            {isDigitalCashBackMode && (
-              <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Digital cash back</span>
-                  <span className="text-[11px] text-muted-foreground">Sale total {fmtMoney(total, sym)}</span>
-                </div>
-                <div className="space-y-2">
-                  <div>
-                    <Label className="text-[10px]">Digital account</Label>
-                    <Select
-                      value={tab.digital_account_id ?? ""}
-                      onValueChange={(v) => setTab({ digital_account_id: v || null })}
-                    >
-                      <SelectTrigger className="h-8"><SelectValue placeholder="Select account" /></SelectTrigger>
-                      <SelectContent>
-                        {(() => {
-                          const accounts = ((cashAccountOptions ?? []) as any[]).filter((a: any) => a.type !== "cash");
-                          return accounts.length ? accounts.map((a: any) => (
-                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                          )) : <div className="px-2 py-2 text-xs text-muted-foreground">No digital accounts available</div>;
-                        })()}
-                      </SelectContent>
-                    </Select>
+              />
+              {isDigitalCashBackMode && (
+                <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Digital cash back
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Total {fmtMoney(total, sym)}
+                    </span>
                   </div>
-                  <div>
-                    <Label className="text-[10px]">Amount received</Label>
+                  <div className="space-y-1.5">
+                    <div>
+                      <Label className="text-[9px]">Digital account</Label>
+                      <Select
+                        value={tab.digital_account_id ?? ""}
+                        onValueChange={(v) => setTab({ digital_account_id: v || null })}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(() => {
+                            const accounts = ((cashAccountOptions ?? []) as any[]).filter(
+                              (a: any) => a.type !== "cash",
+                            );
+                            return accounts.length ? (
+                              accounts.map((a: any) => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  {a.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="px-2 py-2 text-xs text-muted-foreground">
+                                No digital accounts available
+                              </div>
+                            );
+                          })()}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">Amount received</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={tab.digital_received_amount ?? ""}
+                        onChange={(e) => setTab({ digital_received_amount: e.target.value })}
+                        placeholder={total.toFixed(2)}
+                      />
+                    </div>
+                    <div className="rounded-md border border-dashed bg-background/70 px-2 py-1.5 text-[10px] space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cash back</span>
+                        <span className="font-semibold">
+                          {fmtMoney(digitalCashBackAmount, sym)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Net digital effect</span>
+                        <span className="font-semibold text-emerald-600">
+                          {fmtMoney(
+                            Math.max(0, Number(tab.digital_received_amount || 0) - total),
+                            sym,
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Tender
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-[11px]"
+                  onClick={addPaymentRow}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Split
+                </Button>
+              </div>
+              <div className="mt-1 space-y-1.5">
+                {paymentRows.map((payment, idx) => (
+                  <div key={`${payment.method}-${idx}`} className="flex items-center gap-1.5">
+                    <PaymentMethodSelect
+                      value={payment.method}
+                      onChange={(v) => updatePaymentRow(idx, { method: v })}
+                      className="h-8 flex-1"
+                    />
                     <Input
                       type="number"
                       step="0.01"
                       min="0"
-                      value={tab.digital_received_amount ?? ""}
-                      onChange={(e) => setTab({ digital_received_amount: e.target.value })}
-                      placeholder={total.toFixed(2)}
+                      value={payment.amount}
+                      onChange={(e) =>
+                        updatePaymentRow(idx, { amount: Number(e.target.value || 0) })
+                      }
+                      className="h-8 w-24 text-right text-sm"
                     />
+                    {paymentRows.length > 1 && (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 shrink-0"
+                        onClick={() => removePaymentRow(idx)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    )}
                   </div>
-                  <div className="rounded-md border border-dashed bg-background/70 px-2 py-2 text-[11px] space-y-1">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Cash back</span><span className="font-semibold">{fmtMoney(digitalCashBackAmount, sym)}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Net digital effect</span><span className="font-semibold text-emerald-600">{fmtMoney(Math.max(0, Number(tab.digital_received_amount || 0) - total), sym)}</span></div>
-                  </div>
-                </div>
+                ))}
               </div>
-            )}
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Tender</span>
-              <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={addPaymentRow}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> Split
-              </Button>
             </div>
-            <div className="mt-1 space-y-1.5">
-              {paymentRows.map((payment, idx) => (
-                <div key={`${payment.method}-${idx}`} className="flex items-center gap-1.5">
-                  <PaymentMethodSelect
-                    value={payment.method}
-                    onChange={(v) => updatePaymentRow(idx, { method: v })}
-                    className="h-8 flex-1"
-                  />
+          </div>
+
+          {/* Totals + discount + paid + note */}
+          <div className="flex-1 min-h-0 overflow-auto p-2 space-y-1 bg-muted/10 flex flex-col">
+            <Row
+              label="Items"
+              value={`${tab.items.length} item${tab.items.length === 1 ? "" : "s"}`}
+              muted
+            />
+            <Row label="Subtotal" value={fmtMoney(subtotal, sym)} muted />
+            {lineDiscountTotal > 0 && (
+              <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
+            )}
+
+            <div className="flex items-center justify-between text-sm gap-2">
+              <span className="text-muted-foreground">Discount</span>
+              <div className="flex items-center gap-1.5">
+                <div className="relative">
                   <Input
                     type="number"
                     step="0.01"
-                    min="0"
-                    value={payment.amount}
-                    onChange={(e) => updatePaymentRow(idx, { amount: Number(e.target.value || 0) })}
-                    className="h-8 w-24 text-right text-sm"
+                    value={tab.discount_pct}
+                    onChange={(e) => applyDiscountPct(e.target.value)}
+                    placeholder="0"
+                    className="h-8 w-14 text-right text-sm pr-5"
                   />
-                  {paymentRows.length > 1 && (
-                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removePaymentRow(idx)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  )}
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    %
+                  </span>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Totals + discount + paid + note */}
-        <div className="flex-1 min-h-0 overflow-auto p-2 space-y-1 bg-muted/10 flex flex-col">
-
-          <Row label="Items" value={`${tab.items.length} item${tab.items.length === 1 ? "" : "s"}`} muted />
-          <Row label="Subtotal" value={fmtMoney(subtotal, sym)} muted />
-          {lineDiscountTotal > 0 && (
-            <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
-          )}
-
-          <div className="flex items-center justify-between text-sm gap-2">
-            <span className="text-muted-foreground">Discount</span>
-            <div className="flex items-center gap-1.5">
-              <div className="relative">
                 <Input
                   type="number"
                   step="0.01"
-                  value={tab.discount_pct}
-                  onChange={(e) => applyDiscountPct(e.target.value)}
-                  placeholder="0"
-                  className="h-8 w-14 text-right text-sm pr-5"
+                  value={tab.discount}
+                  onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
+                  className="h-8 w-24 text-right text-sm"
                 />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
               </div>
-              <Input
-                type="number"
-                step="0.01"
-                value={tab.discount}
-                onChange={(e) => setTab({ discount: Number(e.target.value), discount_pct: "" })}
-                className="h-8 w-24 text-right text-sm"
-              />
             </div>
-          </div>
 
-          <div className="flex items-center justify-between text-sm gap-2">
-            <span className="text-muted-foreground">Charges</span>
-            <div className="flex items-center gap-1.5">
-              <div className="relative">
+            <div className="flex items-center justify-between text-sm gap-2">
+              <span className="text-muted-foreground">Charges</span>
+              <div className="flex items-center gap-1.5">
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={tab.charge_pct}
+                    onChange={(e) => applyChargePct(e.target.value)}
+                    placeholder="0"
+                    className="h-8 w-14 text-right text-sm pr-5"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    %
+                  </span>
+                </div>
                 <Input
                   type="number"
                   step="0.01"
-                  value={tab.charge_pct}
-                  onChange={(e) => applyChargePct(e.target.value)}
-                  placeholder="0"
-                  className="h-8 w-14 text-right text-sm pr-5"
+                  value={tab.charge}
+                  onChange={(e) => setTab({ charge: Number(e.target.value), charge_pct: "" })}
+                  className="h-8 w-24 text-right text-sm"
                 />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
               </div>
-              <Input
-                type="number"
-                step="0.01"
-                value={tab.charge}
-                onChange={(e) => setTab({ charge: Number(e.target.value), charge_pct: "" })}
-                className="h-8 w-24 text-right text-sm"
-              />
             </div>
-          </div>
 
-          <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-1 mt-0.5 flex items-baseline justify-between gap-2">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Grand Total</span>
-            <span className="text-xl font-bold text-primary tabular-nums leading-tight">{fmtMoney(total, sym)}</span>
-          </div>
-
-          <div>
-            <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Paid</Label>
-            <div className="flex items-center gap-2 mt-0.5">
-              <Input
-                ref={paidRef}
-                type="number"
-                step="0.01"
-                value={tab.paid}
-                onChange={(e) => {
-                  const nextValue = e.target.value;
-                  const nextRows = [...paymentRows];
-                  if (nextRows[0]) {
-                    nextRows[0] = { ...nextRows[0], amount: Number(nextValue || 0) };
-                  }
-                  setTab({ paid: nextValue, payments: nextRows, payment_method: nextRows[0]?.method || tab.payment_method || "cash" });
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); handleSale(); }
-                }}
-                placeholder={total.toFixed(2)}
-                className="h-9 flex-1 text-sm font-semibold tabular-nums"
-              />
-              <button
-                onClick={() => setTab({ paid: total.toFixed(2) })}
-                className="text-xs text-primary hover:underline shrink-0 font-medium"
-              >
-                Exact
-              </button>
+            <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-1 mt-0.5 flex items-baseline justify-between gap-2">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                Grand Total
+              </span>
+              <span className="text-xl font-bold text-primary tabular-nums leading-tight">
+                {fmtMoney(total, sym)}
+              </span>
             </div>
-            <div className="mt-1">
-              {due > 0
-                ? <div className="rounded bg-destructive/10 border border-destructive/20 px-2 py-1 text-xs text-destructive font-semibold">Due: {fmtMoney(due, sym)}</div>
-                : <div className="rounded bg-success/10 border border-success/20 px-2 py-1 text-sm text-success font-bold tabular-nums">Change: {fmtMoney(change, sym)}</div>}
-            </div>
-          </div>
 
-          <Input
-            value={tab.note}
-            onChange={(e) => setTab({ note: e.target.value })}
-            placeholder="Note / House #, street…"
-            className="h-7 text-xs"
-          />
-
-
-          {tab.items.length > 0 && (() => {
-            const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
-            const cartProfit = subtotal - discount - cartCost;
-            const net = subtotal - discount;
-            const pct = net > 0 ? (cartProfit / net) * 100 : 0;
-            return (
-              <div className="rounded-md border border-dashed bg-background/60 px-2 py-1 text-[11px]">
+            <div>
+              <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Paid
+              </Label>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Input
+                  ref={paidRef}
+                  type="number"
+                  step="0.01"
+                  value={tab.paid}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    const nextRows = [...paymentRows];
+                    if (nextRows[0]) {
+                      nextRows[0] = { ...nextRows[0], amount: Number(nextValue || 0) };
+                    }
+                    setTab({
+                      paid: nextValue,
+                      payments: nextRows,
+                      payment_method: nextRows[0]?.method || tab.payment_method || "cash",
+                    });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSale();
+                    }
+                  }}
+                  placeholder={total.toFixed(2)}
+                  className="h-9 flex-1 text-sm font-semibold tabular-nums"
+                />
                 <button
-                  type="button"
-                  onClick={() => setShowProfit((v) => !v)}
-                  className="flex items-center justify-between w-full text-muted-foreground hover:text-foreground"
+                  onClick={() => setTab({ paid: total.toFixed(2) })}
+                  className="text-xs text-primary hover:underline shrink-0 font-medium"
                 >
-                  <span>{showProfit ? "Hide" : "Show"} profit</span>
-                  {showProfit ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  Exact
                 </button>
-                {showProfit && (
-                  <div className="flex items-center justify-between pt-1 mt-1 border-t">
-                    <span className="text-muted-foreground">Cost <span className="font-mono">{fmtMoney(cartCost, sym)}</span></span>
-                    <span className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}>
-                      {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
-                    </span>
+              </div>
+              <div className="mt-1">
+                {due > 0 ? (
+                  <div className="rounded bg-destructive/10 border border-destructive/20 px-2 py-1 text-xs text-destructive font-semibold">
+                    Due: {fmtMoney(due, sym)}
+                  </div>
+                ) : (
+                  <div className="rounded bg-success/10 border border-success/20 px-2 py-1 text-sm text-success font-bold tabular-nums">
+                    Change: {fmtMoney(change, sym)}
                   </div>
                 )}
               </div>
-            );
-          })()}
-        </div>
+            </div>
 
-        {/* Footer — Complete sale */}
-        <div className="p-2 border-t bg-card shrink-0">
-          <Button
-            className="w-full h-11 text-base font-bold rounded-xl shadow-md hover:shadow-lg transition-shadow"
-            onClick={handleSale}
-            disabled={submitting}
-          >
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {tab.editing_sale_id ? `Save changes · F4` : `Complete Sale · F4`}
-          </Button>
-        </div>
+            <Input
+              value={tab.note}
+              onChange={(e) => setTab({ note: e.target.value })}
+              placeholder="Note / House #, street…"
+              className="h-7 text-xs"
+            />
 
+            {tab.items.length > 0 &&
+              (() => {
+                const cartCost = tab.items.reduce((s, i) => s + Number(i.qty) * Number(i.cost), 0);
+                const cartProfit = subtotal - discount - cartCost;
+                const net = subtotal - discount;
+                const pct = net > 0 ? (cartProfit / net) * 100 : 0;
+                return (
+                  <div className="rounded-md border border-dashed bg-background/60 px-2 py-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setShowProfit((v) => !v)}
+                      className="flex items-center justify-between w-full text-muted-foreground hover:text-foreground"
+                    >
+                      <span>{showProfit ? "Hide" : "Show"} profit</span>
+                      {showProfit ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </button>
+                    {showProfit && (
+                      <div className="flex items-center justify-between pt-1 mt-1 border-t">
+                        <span className="text-muted-foreground">
+                          Cost <span className="font-mono">{fmtMoney(cartCost, sym)}</span>
+                        </span>
+                        <span
+                          className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}
+                        >
+                          {fmtMoney(cartProfit, sym)} ({pct.toFixed(1)}%)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+          </div>
 
-      </aside>
+          {/* Footer — Complete sale */}
+          <div className="p-2 border-t bg-card shrink-0">
+            <Button
+              className="w-full h-11 text-base font-bold rounded-xl shadow-md hover:shadow-lg transition-shadow"
+              onClick={handleSale}
+              disabled={submitting}
+            >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {tab.editing_sale_id ? `Save changes · F4` : `Complete Sale · F4`}
+            </Button>
+          </div>
+        </aside>
       </div>
 
       {/* Keyboard shortcut bar */}
@@ -2560,9 +3102,6 @@ function POSPage() {
         <ShortcutHint k="Esc" label="Clear" />
       </div>
 
-
-
-
       {/* Reprint browser */}
       <ReprintDialog
         open={reprintOpen}
@@ -2573,12 +3112,12 @@ function POSPage() {
         onEdit={(s: any) => loadInvoiceForEdit(s)}
       />
 
-
-
       {/* Held bills tray */}
       <Dialog open={heldOpen} onOpenChange={setHeldOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>Held bills</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Held bills</DialogTitle>
+          </DialogHeader>
           <div className="rounded-md border max-h-[60vh] overflow-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-xs uppercase tracking-wide sticky top-0">
@@ -2593,30 +3132,44 @@ function POSPage() {
               </thead>
               <tbody>
                 {heldBills.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">No held bills</td></tr>
+                  <tr>
+                    <td colSpan={6} className="text-center py-6 text-muted-foreground">
+                      No held bills
+                    </td>
+                  </tr>
                 )}
                 {heldBills.map((b: any) => (
                   <tr key={b.id} className="border-t hover:bg-accent/40">
                     <td className="px-3 py-1.5">
                       <span className="inline-flex items-center gap-1.5">
                         {b.payload?.editing_sale_id ? (
-                          <span className="inline-flex items-center gap-1 text-primary" title="Paused edit — resume to continue editing invoice">
+                          <span
+                            className="inline-flex items-center gap-1 text-primary"
+                            title="Paused edit — resume to continue editing invoice"
+                          >
                             <Clock className="h-3.5 w-3.5" />
                             <Pencil className="h-3 w-3" />
                           </span>
                         ) : null}
                         <span>{b.label || "Untitled"}</span>
                         {b.payload?.editing_sale_id && (
-                          <Badge variant="outline" className="text-[10px] h-4 px-1 border-primary/40 text-primary">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] h-4 px-1 border-primary/40 text-primary"
+                          >
                             Editing {b.payload?.editing_invoice_no ?? ""}
                           </Badge>
                         )}
                       </span>
                     </td>
                     <td className="px-3 py-1.5">{b.customers?.name ?? "Walk-in"}</td>
-                    <td className="px-3 py-1.5 text-xs text-muted-foreground">{new Date(b.created_at).toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                      {new Date(b.created_at).toLocaleString()}
+                    </td>
                     <td className="px-3 py-1.5 text-right">{b.item_count}</td>
-                    <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(b.total, sym)}</td>
+                    <td className="px-3 py-1.5 text-right font-medium tabular-nums">
+                      {fmtMoney(b.total, sym)}
+                    </td>
                     <td className="px-2 py-1 text-right whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => resumeHeld(b.id)}>
                         <Play className="h-3.5 w-3.5 mr-1" /> Resume
@@ -2659,16 +3212,18 @@ function POSPage() {
       />
 
       {/* Quick-add product dialog — for scanned/typed items not yet in catalog */}
-      <Dialog open={quickAdd.open} onOpenChange={(v) => {
-        setQuickAdd((q) => ({ ...q, open: v }));
-        if (!v) {
-          // Cancel / close: clear the unmatched search term so the cashier
-          // can scan the next item — cart items are preserved.
-          setSearch("");
-          setTimeout(() => searchRef.current?.focus(), 0);
-        }
-      }}>
-
+      <Dialog
+        open={quickAdd.open}
+        onOpenChange={(v) => {
+          setQuickAdd((q) => ({ ...q, open: v }));
+          if (!v) {
+            // Cancel / close: clear the unmatched search term so the cashier
+            // can scan the next item — cart items are preserved.
+            setSearch("");
+            setTimeout(() => searchRef.current?.focus(), 0);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add new item to catalog</DialogTitle>
@@ -2687,7 +3242,9 @@ function POSPage() {
               </div>
               {quickAddLookup.trim().length >= 2 && (
                 <div className="mt-2 max-h-48 overflow-auto rounded-md border bg-muted/20 p-2 space-y-2">
-                  {quickAddMatchesLoading && <div className="text-xs text-muted-foreground">Searching…</div>}
+                  {quickAddMatchesLoading && (
+                    <div className="text-xs text-muted-foreground">Searching…</div>
+                  )}
                   {!quickAddMatchesLoading && quickAddMatches.length === 0 && (
                     <div className="text-xs text-muted-foreground">No existing item found</div>
                   )}
@@ -2705,7 +3262,9 @@ function POSPage() {
                         </div>
                       </div>
                       <div className="ml-3 shrink-0 text-right">
-                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Stock</div>
+                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Stock
+                        </div>
                         <div className="font-semibold">{fmtQty(product.stock ?? 0)}</div>
                       </div>
                     </button>
@@ -2721,7 +3280,12 @@ function POSPage() {
                 autoFocus
                 value={quickAdd.name}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, name: e.target.value }))}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveQuickAdd(); } }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    saveQuickAdd();
+                  }
+                }}
               />
             </div>
             <div className="col-span-2">
@@ -2733,17 +3297,25 @@ function POSPage() {
               >
                 <option value="">— None —</option>
                 {quickAddSuppliers.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
               <Label>SKU</Label>
-              <Input value={quickAdd.sku} onChange={(e) => setQuickAdd((q) => ({ ...q, sku: e.target.value }))} />
+              <Input
+                value={quickAdd.sku}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, sku: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Primary barcode</Label>
-              <Input value={quickAdd.barcode} onChange={(e) => setQuickAdd((q) => ({ ...q, barcode: e.target.value }))} />
+              <Input
+                value={quickAdd.barcode}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, barcode: e.target.value }))}
+              />
             </div>
             <div className="col-span-2">
               <Label>Additional barcodes (one per line)</Label>
@@ -2763,49 +3335,88 @@ function POSPage() {
                 onChange={(e) => setQuickAdd((q) => ({ ...q, category: e.target.value }))}
               />
               <datalist id="quickadd-category-list">
-                {quickAddCategories.map((c) => <option key={c} value={c} />)}
+                {quickAddCategories.map((c) => (
+                  <option key={c} value={c} />
+                ))}
               </datalist>
             </div>
             <div>
               <Label>Unit</Label>
-              <Input value={quickAdd.unit} onChange={(e) => setQuickAdd((q) => ({ ...q, unit: e.target.value }))} />
+              <Input
+                value={quickAdd.unit}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, unit: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Purchase rate</Label>
-              <Input type="number" step="0.01" value={quickAdd.cost_price}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, cost_price: e.target.value }))} />
+              <Input
+                type="number"
+                step="0.01"
+                value={quickAdd.cost_price}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, cost_price: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Sell price</Label>
-              <Input type="number" step="0.01" value={quickAdd.sell_price}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, sell_price: e.target.value }))} />
+              <Input
+                type="number"
+                step="0.01"
+                value={quickAdd.sell_price}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, sell_price: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Stock</Label>
-              <Input type="number" step="0.001" value={quickAdd.stock}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, stock: e.target.value }))} />
+              <Input
+                type="number"
+                step="0.001"
+                value={quickAdd.stock}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, stock: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Low-stock alert at</Label>
-              <Input type="number" step="0.001" value={quickAdd.low_stock_threshold}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, low_stock_threshold: e.target.value }))} />
+              <Input
+                type="number"
+                step="0.001"
+                value={quickAdd.low_stock_threshold}
+                onChange={(e) =>
+                  setQuickAdd((q) => ({ ...q, low_stock_threshold: e.target.value }))
+                }
+              />
             </div>
             <div>
               <Label>Tax %</Label>
-              <Input type="number" step="0.01" value={quickAdd.tax_rate}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, tax_rate: e.target.value }))} />
+              <Input
+                type="number"
+                step="0.01"
+                value={quickAdd.tax_rate}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, tax_rate: e.target.value }))}
+              />
             </div>
             <div>
               <Label>Batch #</Label>
-              <Input value={quickAdd.batch_no} onChange={(e) => setQuickAdd((q) => ({ ...q, batch_no: e.target.value }))} placeholder="e.g. B-2026-01" />
+              <Input
+                value={quickAdd.batch_no}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, batch_no: e.target.value }))}
+                placeholder="e.g. B-2026-01"
+              />
             </div>
             <div>
               <Label>Expiry date</Label>
-              <Input type="date" value={quickAdd.expiry_date} onChange={(e) => setQuickAdd((q) => ({ ...q, expiry_date: e.target.value }))} />
+              <Input
+                type="date"
+                value={quickAdd.expiry_date}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, expiry_date: e.target.value }))}
+              />
             </div>
             <div className="col-span-2">
               <Label>Rack / Shelf location</Label>
-              <Input value={quickAdd.rack_location} onChange={(e) => setQuickAdd((q) => ({ ...q, rack_location: e.target.value }))} placeholder="e.g. A-3, Shelf 2" />
+              <Input
+                value={quickAdd.rack_location}
+                onChange={(e) => setQuickAdd((q) => ({ ...q, rack_location: e.target.value }))}
+                placeholder="e.g. A-3, Shelf 2"
+              />
             </div>
             <div className="col-span-2 flex items-start gap-2 rounded-md border p-3 bg-muted/30">
               <input
@@ -2813,22 +3424,31 @@ function POSPage() {
                 type="checkbox"
                 className="mt-1 h-4 w-4"
                 checked={quickAdd.allow_negative_stock}
-                onChange={(e) => setQuickAdd((q) => ({ ...q, allow_negative_stock: e.target.checked }))}
+                onChange={(e) =>
+                  setQuickAdd((q) => ({ ...q, allow_negative_stock: e.target.checked }))
+                }
               />
               <label htmlFor="quickadd-allow-neg-stock" className="text-sm cursor-pointer">
                 <div className="font-medium">Allow negative stock</div>
-                <div className="text-xs text-muted-foreground">If checked, POS can continue selling this item after stock reaches zero.</div>
+                <div className="text-xs text-muted-foreground">
+                  If checked, POS can continue selling this item after stock reaches zero.
+                </div>
               </label>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => {
-              setQuickAdd((q) => ({ ...q, open: false }));
-              setQuickAddLookup("");
-              setSearch("");
-              setTimeout(() => searchRef.current?.focus(), 0);
-            }}>Cancel</Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setQuickAdd((q) => ({ ...q, open: false }));
+                setQuickAddLookup("");
+                setSearch("");
+                setTimeout(() => searchRef.current?.focus(), 0);
+              }}
+            >
+              Cancel
+            </Button>
             <Button onClick={saveQuickAdd}>Save & add to bill</Button>
           </DialogFooter>
         </DialogContent>
@@ -2843,8 +3463,8 @@ function POSPage() {
           {undoCandidate && (
             <div className="space-y-3 text-sm">
               <p className="text-muted-foreground">
-                This will reverse the sale, restore stock and any customer balance,
-                and put the items back in a new bill for editing.
+                This will reverse the sale, restore stock and any customer balance, and put the
+                items back in a new bill for editing.
               </p>
               <div className="rounded-md border bg-muted/40 p-3 space-y-1.5">
                 <Row label="Invoice" value={undoCandidate.invoice_no} />
@@ -2859,9 +3479,15 @@ function POSPage() {
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Reason (optional)</Label>
                 <Select value={undoReason} onValueChange={setUndoReason}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {UNDO_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    {UNDO_REASONS.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {r}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {undoReason === "Other" && (
@@ -2881,7 +3507,9 @@ function POSPage() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUndoOpen(false)} disabled={undoing}>Cancel</Button>
+            <Button variant="outline" onClick={() => setUndoOpen(false)} disabled={undoing}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={confirmUndo}
@@ -2907,7 +3535,12 @@ function POSPage() {
                 autoFocus
                 value={newCustomer.name}
                 onChange={(e) => setNewCustomer((c) => ({ ...c, name: e.target.value }))}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveQuickCustomer(); } }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    saveQuickCustomer();
+                  }
+                }}
               />
             </div>
             <div>
@@ -2919,17 +3552,16 @@ function POSPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setQuickAddCustomerOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setQuickAddCustomerOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={saveQuickCustomer}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }
-
-
 
 function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const accQ = useQuery({
@@ -2948,7 +3580,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
   const activeOnline = online.find((o) => o.v === value);
 
   const btn = (active: boolean) =>
-    `h-9 rounded-lg text-sm font-medium transition-all ${
+    `h-9 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
       active
         ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
         : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
@@ -2956,12 +3588,25 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
 
   return (
     <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-      <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>Cash</button>
-      <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>Card</button>
-      <button type="button" onClick={() => onChange("digital_cash_back")} className={btn(value === "digital_cash_back")}>Digital + CB</button>
+      <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>
+        Cash
+      </button>
+      <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>
+        Card
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("digital_cash_back")}
+        className={`${btn(value === "digital_cash_back")} leading-tight px-1.5`}
+      >
+        Digital + CB
+      </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" className={`${btn(isOnline)} flex items-center justify-center gap-1 px-1`}>
+          <button
+            type="button"
+            className={`${btn(isOnline)} flex items-center justify-center gap-1 px-1`}
+          >
             <span className="truncate">{isOnline ? activeOnline!.label : "Bank"}</span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
           </button>
@@ -2980,12 +3625,22 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>Credit</button>
+      <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>
+        Credit
+      </button>
     </div>
   );
 }
 
-function PaymentMethodSelect({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
+function PaymentMethodSelect({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+}) {
   const accQ = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
     queryFn: fetchActiveCashAccounts,
@@ -2995,15 +3650,21 @@ function PaymentMethodSelect({ value, onChange, className }: { value: string; on
     { value: "cash", label: "Cash" },
     { value: "card", label: "Card" },
     { value: "credit", label: "Credit" },
-    ...accounts.filter((a: any) => a.type !== "cash").map((a: any) => ({ value: a.name, label: a.name })),
+    ...accounts
+      .filter((a: any) => a.type !== "cash")
+      .map((a: any) => ({ value: a.name, label: a.name })),
   ];
 
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={className ?? "h-8 flex-1"}><SelectValue /></SelectTrigger>
+      <SelectTrigger className={className ?? "h-8 flex-1"}>
+        <SelectValue />
+      </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
         ))}
       </SelectContent>
     </Select>
@@ -3022,7 +3683,9 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
 function ShortcutHint({ k, label }: { k: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <kbd className="px-1.5 py-0.5 rounded bg-background border text-[10px] font-mono font-semibold text-foreground">{k}</kbd>
+      <kbd className="px-1.5 py-0.5 rounded bg-background border text-[10px] font-mono font-semibold text-foreground">
+        {k}
+      </kbd>
       <span>{label}</span>
     </span>
   );
@@ -3031,7 +3694,9 @@ function ShortcutHint({ k, label }: { k: string; label: string }) {
 function Kbd({ label, hint }: { label: string; hint: string }) {
   return (
     <div className="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5">
-      <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono font-semibold text-foreground">{label}</kbd>
+      <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono font-semibold text-foreground">
+        {label}
+      </kbd>
       <span>{hint}</span>
     </div>
   );
@@ -3071,7 +3736,13 @@ function PrintPromptDialog({
           if (e.key === "Enter") {
             e.preventDefault();
             (focused === "yes" ? onYes : onNo)();
-          } else if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Tab") {
+          } else if (
+            e.key === "ArrowLeft" ||
+            e.key === "ArrowRight" ||
+            e.key === "ArrowUp" ||
+            e.key === "ArrowDown" ||
+            e.key === "Tab"
+          ) {
             e.preventDefault();
             focus(focused === "yes" ? "no" : "yes");
           } else if (e.key.toLowerCase() === "y") {
@@ -3090,19 +3761,12 @@ function PrintPromptDialog({
           Invoice <span className="font-mono">{sale?.invoice_no}</span> saved. Print it now?
         </div>
         <DialogFooter className="gap-2">
-          <Button
-            ref={noRef}
-            variant={focused === "no" ? "default" : "outline"}
-            onClick={onNo}
-          >
+          <Button ref={noRef} variant={focused === "no" ? "default" : "outline"} onClick={onNo}>
             No
           </Button>
-          <Button
-            ref={yesRef}
-            variant={focused === "yes" ? "default" : "outline"}
-            onClick={onYes}
-          >
-            <Printer className="h-4 w-4 mr-2" />Yes, print
+          <Button ref={yesRef} variant={focused === "yes" ? "default" : "outline"} onClick={onYes}>
+            <Printer className="h-4 w-4 mr-2" />
+            Yes, print
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -3124,16 +3788,23 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
           </div>
         </div>
         <DialogFooter className="no-print">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={() => { printInvoiceDirect(invoice, settings, "sale"); onClose(); }}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          <Button
+            onClick={() => {
+              printInvoiceDirect(invoice, settings, "sale");
+              onClose();
+            }}
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            Print
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-
-
 
 function ReprintDialog({
   open,
@@ -3166,13 +3837,14 @@ function ReprintDialog({
       const asNum = Number(term);
       const filters = [`invoice_no.ilike.${like}`, `payment_method.ilike.${like}`];
       if (isFinite(asNum) && term !== "") filters.push(`total.eq.${asNum}`, `paid.eq.${asNum}`);
-      return await fetchAll<any>((_f, _t) =>
-        supabase
-          .from("sales")
-          .select("*, customers(name), sale_items(*)")
-          .or(filters.join(","))
-          .order("created_at", { ascending: false })
-          .range(_f, _t) as any,
+      return await fetchAll<any>(
+        (_f, _t) =>
+          supabase
+            .from("sales")
+            .select("*, customers(name), sale_items(*)")
+            .or(filters.join(","))
+            .order("created_at", { ascending: false })
+            .range(_f, _t) as any,
       );
     },
   });
@@ -3193,11 +3865,17 @@ function ReprintDialog({
           return data ?? [];
         },
         async () => {
-          const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(pageSize).toArray();
+          const rows = await offlineDb()
+            .sales.orderBy("created_at")
+            .reverse()
+            .limit(pageSize)
+            .toArray();
           return Promise.all(
             rows.map(async (r: any) => ({
               ...r,
-              sale_items: r.sale_items ?? (await offlineDb().sale_items.where("sale_id").equals(r.id).toArray()),
+              sale_items:
+                r.sale_items ??
+                (await offlineDb().sale_items.where("sale_id").equals(r.id).toArray()),
             })),
           ) as any;
         },
@@ -3219,7 +3897,12 @@ function ReprintDialog({
       : sales.filter((s: any) => {
           const asNum = Number(lower);
           const isNum = isFinite(asNum) && lower !== "";
-          if (String(s.invoice_no ?? "").toLowerCase().includes(lower)) return true;
+          if (
+            String(s.invoice_no ?? "")
+              .toLowerCase()
+              .includes(lower)
+          )
+            return true;
           if ((s.customers?.name ?? "").toLowerCase().includes(lower)) return true;
           if ((s.payment_method ?? "").toLowerCase().includes(lower)) return true;
           if (isNum) {
@@ -3235,7 +3918,6 @@ function ReprintDialog({
       String(b.created_at).localeCompare(String(a.created_at)),
     );
   }, [term, sales, serverHits]);
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -3267,47 +3949,79 @@ function ReprintDialog({
               </thead>
               <tbody>
                 {isFetching && (
-                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
+                  <tr>
+                    <td colSpan={5} className="text-center py-6 text-muted-foreground">
+                      Loading…
+                    </td>
+                  </tr>
                 )}
                 {!isFetching && filtered.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No invoices match.</td></tr>
+                  <tr>
+                    <td colSpan={5} className="text-center py-6 text-muted-foreground">
+                      No invoices match.
+                    </td>
+                  </tr>
                 )}
                 {filtered.map((s: any) => (
                   <tr key={s.id} className="border-t hover:bg-accent/40">
                     <td className="px-3 py-1.5 font-mono text-xs">{s.invoice_no}</td>
-                    <td className="px-3 py-1.5 text-xs">{new Date(s.created_at).toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-xs">
+                      {new Date(s.created_at).toLocaleString()}
+                    </td>
                     <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
-                    <td className="px-3 py-1.5 text-right font-medium tabular-nums">{fmtMoney(s.total, sym)}</td>
+                    <td className="px-3 py-1.5 text-right font-medium tabular-nums">
+                      {fmtMoney(s.total, sym)}
+                    </td>
                     <td className="px-2 py-1 text-right whitespace-nowrap">
-                      <Button size="sm" variant="ghost" onClick={() => { onEdit(s); onOpenChange(false); }} title="Edit invoice in POS">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          onEdit(s);
+                          onOpenChange(false);
+                        }}
+                        title="Edit invoice in POS"
+                      >
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={async () => {
-                        if (reprintAuditEnabled) {
-                          try {
-                            await supabase.rpc("log_receipt_reprint", { _sale_id: s.id, _reason: "reprint from POS" });
-                          } catch {/* audit-only */}
-                        }
-                        printInvoiceDirect(s, settings);
-                        onOpenChange(false);
-                      }} title="Reprint invoice">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={async () => {
+                          if (reprintAuditEnabled) {
+                            try {
+                              await supabase.rpc("log_receipt_reprint", {
+                                _sale_id: s.id,
+                                _reason: "reprint from POS",
+                              });
+                            } catch {
+                              /* audit-only */
+                            }
+                          }
+                          printInvoiceDirect(s, settings);
+                          onOpenChange(false);
+                        }}
+                        title="Reprint invoice"
+                      >
                         <Printer className="h-3.5 w-3.5 mr-1" /> Reprint
                       </Button>
                     </td>
-
                   </tr>
                 ))}
                 {sales.length >= pageSize && (
                   <tr className="border-t">
                     <td colSpan={5} className="text-center py-2">
-                      <Button size="sm" variant="outline" onClick={() => setPageSize((n) => n + 300)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPageSize((n) => n + 300)}
+                      >
                         Load older invoices
                       </Button>
                     </td>
                   </tr>
                 )}
               </tbody>
-
             </table>
           </div>
         </div>
@@ -3340,7 +4054,10 @@ function EditableNumCell({
   useEffect(() => {
     if (active) {
       setDraft(String(value));
-      setTimeout(() => { ref.current?.focus(); ref.current?.select(); }, 0);
+      setTimeout(() => {
+        ref.current?.focus();
+        ref.current?.select();
+      }, 0);
     }
   }, [active, value]);
 
@@ -3366,12 +4083,15 @@ function EditableNumCell({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => onCommit(Number(draft))}
       onKeyDown={(e) => {
-        if (e.key === "Enter") { e.preventDefault(); onCommit(Number(draft)); }
-        else if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onCommit(Number(draft));
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          onCancel();
+        }
       }}
       className="h-8 w-full text-right text-sm rounded-none border-0 focus-visible:ring-1"
     />
   );
 }
-
-
