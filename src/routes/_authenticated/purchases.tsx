@@ -574,28 +574,92 @@ function Page() {
     const clientUuid = typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const { error } = await supabase.rpc("complete_purchase", {
-      payload: {
-        supplier_id: supplier && supplier !== "none" ? supplier : null,
-        tax: taxAmt,
-        subtotal: discountedSubtotal,
-        total: discountedSubtotal + taxAmt,
-        paid, note,
-        payment_method: account.name,
-        account_id: account.id ?? undefined,
-        created_at: date || undefined,
-        client_uuid: clientUuid,
-        items: items.map((l) => {
-          const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
-          const discShare = sub > 0 ? billDiscountAmt * (lineNet / sub) : 0;
-          const effCost = l.qty > 0 ? Math.max(0, lineNet - discShare) / l.qty : l.cost;
-          return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
-        }),
-      },
-    });
+    const payload = {
+      supplier_id: supplier && supplier !== "none" ? supplier : null,
+      tax: taxAmt,
+      subtotal: discountedSubtotal,
+      total: discountedSubtotal + taxAmt,
+      paid,
+      note,
+      payment_method: account.name,
+      account_id: account.id ?? undefined,
+      created_at: date || undefined,
+      client_uuid: clientUuid,
+      items: items.map((l) => {
+        const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
+        const discShare = sub > 0 ? billDiscountAmt * (lineNet / sub) : 0;
+        const effCost = l.qty > 0 ? Math.max(0, lineNet - discShare) / l.qty : l.cost;
+        return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
+      }),
+    };
+
+    let rpcError: any = null;
+    try {
+      const { error } = await supabase.rpc("complete_purchase", { payload });
+      rpcError = error;
+    } catch (e) {
+      rpcError = e;
+    }
+
+    if (rpcError) {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const purchaseInsert = {
+          supplier_id: payload.supplier_id,
+          subtotal: payload.subtotal,
+          tax: payload.tax,
+          total: payload.total,
+          paid: payload.paid,
+          note: payload.note,
+          payment_method: payload.payment_method,
+          account_id: payload.account_id,
+          created_at: payload.created_at,
+          user_id: userData?.user?.id ?? undefined,
+        };
+        const { data: purchase, error: purchaseError } = await supabase
+          .from("purchases")
+          .insert(purchaseInsert)
+          .select("id")
+          .single();
+        if (purchaseError || !purchase?.id) throw purchaseError ?? new Error("Unable to save purchase");
+
+        const purchaseItems = payload.items.map((item: any) => ({
+          purchase_id: purchase.id,
+          product_id: item.product_id,
+          name: item.name,
+          qty: item.qty,
+          cost: item.cost,
+          line_total: Number(item.qty || 0) * Number(item.cost || 0),
+        }));
+        const { error: itemsError } = await supabase.from("purchase_items").insert(purchaseItems);
+        if (itemsError) throw itemsError;
+
+        for (const item of payload.items) {
+          if (!item.product_id) continue;
+          const { data: product } = await supabase.from("products").select("stock,cost_price").eq("id", item.product_id).single();
+          const oldStock = Number(product?.stock ?? 0);
+          const oldCost = Number(product?.cost_price ?? 0);
+          const qty = Number(item.qty || 0);
+          const cost = Number(item.cost || 0);
+          const newAvg = oldStock > 0 ? ((oldStock * oldCost) + (qty * cost)) / (oldStock + qty) : cost;
+          await supabase.from("products").update({
+            stock: oldStock + qty,
+            cost_price: Number(newAvg.toFixed(4)),
+            updated_at: new Date().toISOString(),
+          }).eq("id", item.product_id);
+        }
+
+        if (Number(payload.total) > Number(payload.paid) && payload.supplier_id) {
+          await supabase.from("suppliers").update({ balance: Number(payload.total) - Number(payload.paid) }).eq("id", payload.supplier_id);
+        }
+      } catch (fallbackError: any) {
+        setSaving(false);
+        savingRef.current = false;
+        return toast.error(fallbackError?.message ?? "Could not save purchase");
+      }
+    }
     setSaving(false);
     savingRef.current = false;
-    if (error) return toast.error(error.message);
 
     // Push changed sale rates onto the products so retail prices stay current.
     const priceUpdates = items.filter(
