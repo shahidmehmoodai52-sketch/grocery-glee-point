@@ -19,6 +19,7 @@ import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos"
 
 import { db } from "@/lib/offline/db";
 import { fetchAll } from "@/lib/supabase-page";
+import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
@@ -510,14 +511,17 @@ function Page() {
     };
   }, [filteredPurchases]);
 
-  const discountTotal = lines.reduce((s, l) => s + Number(l.discount || 0), 0);
-  const subtotal = lines.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
-  const taxAmt = taxMode === "pct" ? +(subtotal * (Number(tax || 0) / 100)).toFixed(2) : Number(tax || 0);
-  const billDiscountAmt = Math.min(
-    subtotal + taxAmt,
-    Math.max(0, discountMode === "pct" ? +(subtotal * (billDiscount / 100)).toFixed(2) : billDiscount),
+  const { lineDiscountTotal, subtotal, discountedSubtotal, billDiscountAmt, taxAmt, total } = useMemo(
+    () =>
+      calculatePurchaseTotals({
+        lines,
+        tax: Number(tax || 0),
+        taxMode,
+        billDiscount: Number(billDiscount || 0),
+        discountMode,
+      }),
+    [lines, tax, taxMode, billDiscount, discountMode],
   );
-  const total = Math.max(0, subtotal + taxAmt - billDiscountAmt);
 
 
   const setLine = (i: number, patch: Partial<Line>) =>
@@ -550,7 +554,13 @@ function Page() {
     if (!supplier || supplier === "none") return toast.error("Supplier is required");
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
-    const sub = items.reduce((s, l) => s + Math.max(0, l.qty * l.cost - Number(l.discount || 0)), 0);
+    const { lineDiscountTotal: _, subtotal: sub, discountedSubtotal, billDiscountAmt, taxAmt } = calculatePurchaseTotals({
+      lines: items,
+      tax: Number(tax || 0),
+      taxMode,
+      billDiscount: Number(billDiscount || 0),
+      discountMode,
+    });
     savingRef.current = true;
     setSaving(true);
     let account: { id: string | null; name: string };
@@ -567,7 +577,10 @@ function Page() {
     const { error } = await supabase.rpc("complete_purchase", {
       payload: {
         supplier_id: supplier && supplier !== "none" ? supplier : null,
-        tax: taxAmt, paid, note,
+        tax: taxAmt,
+        subtotal: discountedSubtotal,
+        total: discountedSubtotal + taxAmt,
+        paid, note,
         payment_method: account.name,
         account_id: account.id ?? undefined,
         created_at: date || undefined,
@@ -575,8 +588,6 @@ function Page() {
         items: items.map((l) => {
           const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
           const discShare = sub > 0 ? billDiscountAmt * (lineNet / sub) : 0;
-          // Keep per-line cost pre-tax because complete_purchase() stores tax
-          // separately and computes total as subtotal + tax.
           const effCost = l.qty > 0 ? Math.max(0, lineNet - discShare) / l.qty : l.cost;
           return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
         }),
@@ -933,7 +944,7 @@ function Page() {
                 <div className="px-4 py-3 border-b">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · Tax +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · Bill disc −${fmtMoney(billDiscountAmt, sym)}` : ""}{discountTotal > 0 ? ` · Line disc −${fmtMoney(discountTotal, sym)}` : ""}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · Tax +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · Bill disc −${fmtMoney(billDiscountAmt, sym)}` : ""}{lineDiscountTotal > 0 ? ` · Line disc −${fmtMoney(lineDiscountTotal, sym)}` : ""}</div>
                 </div>
                 <div className="px-4 py-3 space-y-3">
                 <div>
