@@ -1161,6 +1161,36 @@ function POSPage() {
     setPaymentRows(nextRows);
   };
 
+  const bindSelectedTenderSource = (method: string) => {
+    const nextMethod = normalizePaymentMethodValue(method);
+    setPrimaryPaymentMethod(nextMethod);
+    setTab({ payment_method: nextMethod });
+  };
+
+  const setDigitalTenderSource = (accountId: string | null) => {
+    const nextAccountId = accountId || null;
+    const account = ((cashAccountOptions ?? []) as any[]).find((a: any) => a.id === nextAccountId);
+    setTab({
+      digital_account_id: nextAccountId,
+      payment_method: "digital_cash_back",
+      payments: [{ method: "digital_cash_back", amount: Number(tab.paid || 0) || 0 }],
+      paid: String(tab.paid || ""),
+    });
+
+    if (account && account.name) {
+      const nextRows = [...paymentRows];
+      const baseMethod = normalizePaymentMethodValue(account.name);
+      if (nextRows[0]) {
+        nextRows[0] = { ...nextRows[0], method: baseMethod || "digital_cash_back" };
+      } else {
+        nextRows.push({ method: baseMethod || "digital_cash_back", amount: Number(tab.paid || 0) || 0 });
+      }
+      setPaymentRows(nextRows);
+    } else {
+      setPrimaryPaymentMethod("digital_cash_back");
+    }
+  };
+
   // Keep cart discount in sync when percentage is typed
   const applyDiscountPct = (pct: string) => {
     const n = Number(pct);
@@ -2817,7 +2847,7 @@ function POSPage() {
                       <Label className="text-[9px]">Digital account</Label>
                       <Select
                         value={tab.digital_account_id ?? ""}
-                        onValueChange={(v) => setTab({ digital_account_id: v || null })}
+                        onValueChange={(v) => setDigitalTenderSource(v || null)}
                       >
                         <SelectTrigger className="h-8">
                           <SelectValue placeholder="Select account" />
@@ -3604,15 +3634,15 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
 
   return (
     <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-      <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>
+      <button type="button" onClick={() => bindSelectedTenderSource("cash")} className={btn(value === "cash")}>
         Cash
       </button>
-      <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>
+      <button type="button" onClick={() => bindSelectedTenderSource("card")} className={btn(value === "card")}>
         Card
       </button>
       <button
         type="button"
-        onClick={() => onChange("digital_cash_back")}
+        onClick={() => bindSelectedTenderSource("digital_cash_back")}
         className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
       >
         Digital + CB
@@ -3628,7 +3658,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onSelect={() => onChange("bank")}> 
+          <DropdownMenuItem onSelect={() => bindSelectedTenderSource("bank")}>
             <span className={normalizedValue === "bank" ? "font-semibold" : ""}>Bank</span>
           </DropdownMenuItem>
           {online.length === 0 ? (
@@ -3637,14 +3667,17 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
             </div>
           ) : (
             online.map((o) => (
-              <DropdownMenuItem key={o.v} onSelect={() => onChange(o.v)}>
+              <DropdownMenuItem
+                key={o.v}
+                onSelect={() => bindSelectedTenderSource(o.v)}
+              >
                 <span className={normalizePaymentMethodValue(value) === normalizePaymentMethodValue(o.v) ? "font-semibold" : ""}>{o.label}</span>
               </DropdownMenuItem>
             ))
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>
+      <button type="button" onClick={() => bindSelectedTenderSource("credit")} className={btn(value === "credit")}>
         Credit
       </button>
     </div>
