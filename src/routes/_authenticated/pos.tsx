@@ -1125,7 +1125,11 @@ function POSPage() {
   const updatePaymentRow = (idx: number, patch: Partial<PaymentAllocation>) => {
     const nextRows = [...paymentRows];
     const current = nextRows[idx] ?? { method: tab.payment_method || "cash", amount: 0 };
-    nextRows[idx] = { ...current, ...patch };
+    const resolvedPatch = { ...patch };
+    if (isDigitalCashBackMode && idx === 0 && resolvedPatch.method) {
+      resolvedPatch.method = "digital_cash_back";
+    }
+    nextRows[idx] = { ...current, ...resolvedPatch };
     setPaymentRows(nextRows);
   };
 
@@ -1147,11 +1151,12 @@ function POSPage() {
 
   const setPrimaryPaymentMethod = (method: string) => {
     const nextMethod = normalizePaymentMethodValue(method);
+    const rowMethod = isDigitalCashBackMode && nextMethod !== "digital_cash_back" ? "digital_cash_back" : nextMethod;
     const nextRows = [...paymentRows];
     if (nextRows[0]) {
-      nextRows[0] = { ...nextRows[0], method: nextMethod };
+      nextRows[0] = { ...nextRows[0], method: rowMethod };
     } else {
-      nextRows.push({ method: nextMethod, amount: 0 });
+      nextRows.push({ method: rowMethod, amount: 0 });
     }
     setPaymentRows(nextRows);
   };
@@ -2887,7 +2892,14 @@ function POSPage() {
                   <div key={`${payment.method}-${idx}`} className="flex items-center gap-1.5">
                     <PaymentMethodSelect
                       value={payment.method}
-                      onChange={(v) => updatePaymentRow(idx, { method: v })}
+                      onChange={(v) => {
+                        const normalized = normalizePaymentMethodValue(v);
+                        if (isDigitalCashBackMode && idx === 0) {
+                          updatePaymentRow(idx, { method: "digital_cash_back" });
+                          return;
+                        }
+                        updatePaymentRow(idx, { method: normalized });
+                      }}
                       className="h-8 flex-1"
                     />
                     <Input
