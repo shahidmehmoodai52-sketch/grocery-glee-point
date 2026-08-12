@@ -53,6 +53,7 @@ import { fmtMoney, fmtQty } from "@/lib/format";
 import {
   deriveDigitalCashBackSummary,
   normalizePaymentAllocations,
+  normalizePaymentMethodValue,
   sumPaymentAllocations,
   type PaymentAllocation,
 } from "@/lib/pos-payments";
@@ -331,7 +332,7 @@ function parsePaymentMethod(
   const raw = String(methodValue ?? "").trim();
   const paid = +Math.max(0, Number(paidValue || 0)).toFixed(2);
   if (!raw.startsWith(SPLIT_PAYMENT_PREFIX)) {
-    return [{ method: raw || "cash", amount: paid }];
+    return [{ method: normalizePaymentMethodValue(raw || "cash"), amount: paid }];
   }
   const body = raw.slice(SPLIT_PAYMENT_PREFIX.length);
   const parts = body.split("|").filter(Boolean);
@@ -344,7 +345,7 @@ function parsePaymentMethod(
       } catch {
         decoded = methodEncoded || "";
       }
-      const method = decoded.trim() || "cash";
+      const method = normalizePaymentMethodValue(decoded.trim() || "cash");
       const amount = +Math.max(0, Number(amountRaw || 0)).toFixed(2);
       return { method, amount };
     })
@@ -1102,7 +1103,7 @@ function POSPage() {
     total,
     tab.digital_received_amount ?? tab.paid ?? 0,
   );
-  const isDigitalCashBackMode = tab.payment_method === "digital_cash_back";
+  const isDigitalCashBackMode = normalizePaymentMethodValue(tab.payment_method) === "digital_cash_back";
   const normalizedPayments = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
   const paidAmountForBalance = isDigitalCashBackMode
     ? total
@@ -1145,11 +1146,12 @@ function POSPage() {
   };
 
   const setPrimaryPaymentMethod = (method: string) => {
+    const nextMethod = normalizePaymentMethodValue(method);
     const nextRows = [...paymentRows];
     if (nextRows[0]) {
-      nextRows[0] = { ...nextRows[0], method };
+      nextRows[0] = { ...nextRows[0], method: nextMethod };
     } else {
-      nextRows.push({ method, amount: 0 });
+      nextRows.push({ method: nextMethod, amount: 0 });
     }
     setPaymentRows(nextRows);
   };
@@ -3576,8 +3578,10 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
     .filter((a: any) => a.type !== "cash")
     .map((a: any) => ({ v: a.name, label: a.name, id: a.id }));
 
-  const isOnline = online.some((o) => o.v === value);
-  const activeOnline = online.find((o) => o.v === value);
+  const normalizedValue = normalizePaymentMethodValue(value);
+  const isOnline = online.some((o) => normalizePaymentMethodValue(o.v) === normalizedValue) || normalizedValue === "bank";
+  const activeOnline = online.find((o) => normalizePaymentMethodValue(o.v) === normalizedValue) ??
+    (normalizedValue === "bank" ? { v: "bank", label: "Bank", id: "bank" } : undefined);
 
   const btn = (active: boolean) =>
     `h-9 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
@@ -3597,7 +3601,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
       <button
         type="button"
         onClick={() => onChange("digital_cash_back")}
-        className={`${btn(value === "digital_cash_back")} leading-tight px-1.5`}
+        className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
       >
         Digital + CB
       </button>
@@ -3607,11 +3611,14 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
             type="button"
             className={`${btn(isOnline)} flex items-center justify-center gap-1 px-1`}
           >
-            <span className="truncate">{isOnline ? activeOnline!.label : "Bank"}</span>
+            <span className="truncate">{activeOnline?.label ?? "Bank"}</span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem onSelect={() => onChange("bank")}> 
+            <span className={normalizedValue === "bank" ? "font-semibold" : ""}>Bank</span>
+          </DropdownMenuItem>
           {online.length === 0 ? (
             <div className="px-2 py-3 text-xs text-muted-foreground">
               No accounts yet. Create a card in Cash Flow — it will appear here automatically.
@@ -3619,7 +3626,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           ) : (
             online.map((o) => (
               <DropdownMenuItem key={o.v} onSelect={() => onChange(o.v)}>
-                <span className={value === o.v ? "font-semibold" : ""}>{o.label}</span>
+                <span className={normalizePaymentMethodValue(value) === normalizePaymentMethodValue(o.v) ? "font-semibold" : ""}>{o.label}</span>
               </DropdownMenuItem>
             ))
           )}
@@ -3649,6 +3656,8 @@ function PaymentMethodSelect({
   const options = [
     { value: "cash", label: "Cash" },
     { value: "card", label: "Card" },
+    { value: "bank", label: "Bank" },
+    { value: "digital_cash_back", label: "Digital + CB" },
     { value: "credit", label: "Credit" },
     ...accounts
       .filter((a: any) => a.type !== "cash")

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { deriveDigitalCashBackAccounting, deriveDigitalCashBackSummary, normalizePaymentAllocations, sumPaymentAllocations } from "./pos-payments";
+import {
+  deriveDigitalCashBackAccounting,
+  deriveDigitalCashBackSummary,
+  normalizePaymentAllocations,
+  normalizePaymentMethodValue,
+  sumPaymentAllocations,
+} from "./pos-payments";
 
 describe("normalizePaymentAllocations", () => {
   it("keeps positive split payments and ignores zero rows", () => {
@@ -27,6 +33,19 @@ describe("sumPaymentAllocations", () => {
       { method: "cash", amount: 12.5 },
       { method: "bank", amount: 7.5 },
     ])).toBe(20);
+  });
+});
+
+describe("normalizePaymentMethodValue", () => {
+  it("keeps generic bank and digital presets stable", () => {
+    expect(normalizePaymentMethodValue("bank")).toBe("bank");
+    expect(normalizePaymentMethodValue("digital_cash_back")).toBe("digital_cash_back");
+    expect(normalizePaymentMethodValue("Digital + CB")).toBe("digital_cash_back");
+  });
+
+  it("preserves real account names that include bank in the title", () => {
+    expect(normalizePaymentMethodValue("HBL Bank")).toBe("HBL Bank");
+    expect(normalizePaymentMethodValue("JazzCash Wallet")).toBe("JazzCash Wallet");
   });
 });
 

@@ -45,8 +45,42 @@ export function deriveDigitalCashBackAccounting(saleTotal: string | number | nul
   };
 }
 
+export function normalizePaymentMethodValue(method: string | null | undefined): string {
+  const raw = String(method ?? "").trim();
+  if (!raw) return "cash";
+
+  const normalized = raw.toLowerCase().replace(/\s+/g, " ").trim();
+  const aliases: Record<string, string> = {
+    cash: "cash",
+    "cash in hand": "cash",
+    till: "cash",
+    "till cash": "cash",
+    card: "card",
+    "credit card": "card",
+    "debit card": "card",
+    credit: "credit",
+    "customer credit": "credit",
+    bank: "bank",
+    "bank account": "bank",
+    "bank transfer": "bank",
+    "online": "bank",
+    digital: "digital_cash_back",
+    "digital cash back": "digital_cash_back",
+    "digital + cb": "digital_cash_back",
+    "digital_cash_back": "digital_cash_back",
+    easypaisa: "easypaisa",
+    "easy paisa": "easypaisa",
+    jazzcash: "jazzcash",
+    "jazz cash": "jazzcash",
+    "mobile wallet": "easypaisa",
+  };
+
+  if (aliases[normalized]) return aliases[normalized];
+  return raw;
+}
+
 export function buildPaymentAllocation(method: string, amount: string | number | null | undefined): PaymentAllocation {
-  const normalizedMethod = (method || "cash").trim() || "cash";
+  const normalizedMethod = normalizePaymentMethodValue(method || "cash");
   const normalizedAmount = Number(amount ?? 0);
   return {
     method: normalizedMethod,
@@ -62,7 +96,7 @@ export function normalizePaymentAllocations(
   const items = (allocations ?? [])
     .filter((entry): entry is PaymentAllocation => !!entry && typeof entry === "object")
     .map((entry) => ({
-      method: (entry.method || fallbackMethod || "cash").trim() || "cash",
+      method: normalizePaymentMethodValue(entry.method || fallbackMethod || "cash"),
       amount: Number(entry.amount ?? 0),
       account_id: entry.account_id ?? null,
       note: entry.note ?? null,
