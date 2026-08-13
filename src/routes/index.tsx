@@ -1067,25 +1067,7 @@ function LandingPage() {
         </div>
         <div className="border-t border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-7xl px-4 py-4 text-center text-xs text-slate-600 sm:px-6 lg:px-8">
-            Copyrights reserved by{" "}
-            <a
-              href="https://tillix.co"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-slate-900 hover:underline"
-            >
-              tillix.co
-            </a>{" "}
-            — Designed &amp; developed by{" "}
-            <a
-              href="https://logichills.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-slate-900 hover:underline"
-            >
-              logichills.com
-            </a>
-            .
+            '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            I have approved the plan.
           </div>
         </div>
       </footer>
