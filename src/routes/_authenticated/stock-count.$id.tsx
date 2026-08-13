@@ -267,7 +267,7 @@ function StockCountDetailPage() {
       setPendingQty(1);
     }
     setProductSearch("");
-    setScanValue("");
+    setSearch("");
     scanRef.current?.focus();
   };
 

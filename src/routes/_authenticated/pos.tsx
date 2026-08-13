@@ -3634,15 +3634,15 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
 
   return (
     <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-      <button type="button" onClick={() => bindSelectedTenderSource("cash")} className={btn(value === "cash")}>
+      <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>
         Cash
       </button>
-      <button type="button" onClick={() => bindSelectedTenderSource("card")} className={btn(value === "card")}>
+      <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>
         Card
       </button>
       <button
         type="button"
-        onClick={() => bindSelectedTenderSource("digital_cash_back")}
+        onClick={() => onChange("digital_cash_back")}
         className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
       >
         Digital + CB
@@ -3658,7 +3658,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onSelect={() => bindSelectedTenderSource("bank")}>
+          <DropdownMenuItem onSelect={() => onChange("bank")}>
             <span className={normalizedValue === "bank" ? "font-semibold" : ""}>Bank</span>
           </DropdownMenuItem>
           {online.length === 0 ? (
@@ -3669,7 +3669,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
             online.map((o) => (
               <DropdownMenuItem
                 key={o.v}
-                onSelect={() => bindSelectedTenderSource(o.v)}
+                onSelect={() => onChange(o.v)}
               >
                 <span className={normalizePaymentMethodValue(value) === normalizePaymentMethodValue(o.v) ? "font-semibold" : ""}>{o.label}</span>
               </DropdownMenuItem>
@@ -3677,7 +3677,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <button type="button" onClick={() => bindSelectedTenderSource("credit")} className={btn(value === "credit")}>
+      <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>
         Credit
       </button>
     </div>
