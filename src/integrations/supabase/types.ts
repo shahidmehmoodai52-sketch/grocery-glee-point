@@ -3275,6 +3275,32 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_sequences: {
+        Row: {
+          last_purchase_value: number
+          last_sale_value: number
+          tenant_id: string
+        }
+        Insert: {
+          last_purchase_value?: number
+          last_sale_value?: number
+          tenant_id: string
+        }
+        Update: {
+          last_purchase_value?: number
+          last_sale_value?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_sequences_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_subscriptions: {
         Row: {
           created_at: string
