@@ -179,7 +179,10 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload, met
   if (!offline) {
     try {
       // Normal online path.
-      const { data, error } = await supabase.rpc("complete_sale", { payload: payload as any });
+      const tenantId = (await getMeta<string>("tenant_id")) ?? null;
+      const { data, error } = await supabase.rpc("complete_sale", {
+        payload: { ...payload, _tenant_id: tenantId } as any,
+      });
       if (error) throw error;
       const { data: sale, error: readErr } = await supabase
         .from("sales")
