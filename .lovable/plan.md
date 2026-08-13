@@ -1,48 +1,45 @@
+# Plan - Multi-Tenant Invoice Isolation and Sequence Fix
 
-## Goal
-Create a dedicated super-admin login page and let the super-admin add admin staff with granular permissions controlling shop management (approve, suspend, expiry, password reset).
+The system currently uses a single global database sequence for invoice numbers across all shops. This causes perceived "gaps" in one shop's numbering when another shop makes a sale simultaneously (e.g., Shop A takes S-5568, Shop B takes S-5569-5572, Shop A takes S-5573). While technically "correct" in a single-table sequence design, it is a poor UX for shop owners who expect continuous numbering.
 
-## New pieces
+## User Review Required
 
-**1. Dedicated admin login route `/admin-login`**
-- Public route, separate from `/auth`.
-- Signs in via Supabase; after login checks `is_super_admin(uid)` OR new `admin_staff` membership. If neither → sign out + error.
-- Redirects to `/admin` on success.
-- `/admin-login` link is unlisted (not shown on landing page); accessible via direct URL only.
+> [!IMPORTANT]
+> To fix the "missing" numbers, we will move to **per-shop invoice sequences**. This means Shop A and Shop B could both have an invoice "S-1001", but they will be isolated by their Shop ID. Existing invoices will NOT be renamed to avoid breaking historical records, but all new invoices will follow a continuous sequence for your shop.
 
-**2. Database (migration)**
-- New table `admin_staff` (per-user admin panel access):
-  - `user_id uuid PK` (FK → `auth.users`)
-  - `added_by uuid`, timestamps
-- New table `admin_staff_permissions`:
-  - `user_id uuid`, `perm text`, PK(user_id, perm)
-- Permissions list (fixed keys): `shops.view`, `shops.approve`, `shops.suspend`, `shops.set_expiry`, `shops.reset_password`, `shops.delete`.
-- Security-definer helpers:
-  - `is_admin_staff(uid)` → true if super_admin OR row in `admin_staff`.
-  - `admin_has_perm(uid, perm)` → true if super_admin OR row in `admin_staff_permissions`.
-- Grants + RLS: only super_admin can read/write these tables; admin_staff can read own row.
+## Proposed Changes
 
-**3. Server functions (`src/lib/admin-staff.functions.ts`)**
-- `listAdminStaff` (super-admin only) — list users + their perms.
-- `addAdminStaff({ email, password, perms })` — create auth user (or attach existing), insert row + perms.
-- `updateAdminStaffPerms({ user_id, perms })`.
-- `removeAdminStaff({ user_id })`.
-- Existing `resetTenantOwnerPassword`, shop approve/suspend/expiry server fns updated to gate on `admin_has_perm` instead of super-admin-only, so delegated staff can perform actions they were granted.
+### Database & Backend
+- Create a new table `tenant_sequences` to track the next invoice number for each shop.
+- Modify the `complete_sale` RPC to fetch and increment the sequence specifically for the calling shop.
+- Add a unique constraint on `(tenant_id, invoice_no)` to ensure no duplicates within a shop, while allowing the same number in different shops.
 
-**4. UI**
-- `src/routes/admin-login.tsx` — dedicated login page (branded "Tillix Admin").
-- New tab inside `/admin` panel: **"Admin staff"** (visible to super_admin only).
-  - Add staff dialog (email + password + permission checkboxes).
-  - Table: email, perms, edit, remove.
-- Existing shop-management buttons on `/admin` gated by the new perm checks via a small `useAdminPerms()` hook so delegated staff only see actions they have.
+### Offline & Sync
+- Update the offline POS logic to generate temporary numbers that don't conflict with server sequences.
+- Ensure the sync engine correctly maps these to the new per-tenant sequence upon upload.
 
-**5. Hook**
-- `src/hooks/use-admin-perms.ts` — queries `is_admin_staff` + list of granted perms; exposes `canAdmin(perm)`.
+## Technical Details
 
-## Out of scope
-- Billing/user/analytics permissions (only shop management was requested).
-- Adding admin login link on the landing page (kept hidden by design).
+### Database Migration
+```sql
+CREATE TABLE public.tenant_sequences (
+  tenant_id UUID PRIMARY KEY REFERENCES public.tenants(id) ON DELETE CASCADE,
+  last_sale_value BIGINT NOT NULL DEFAULT 1000,
+  last_purchase_value BIGINT NOT NULL DEFAULT 1000
+);
 
-## Files touched
-- **New**: `src/routes/admin-login.tsx`, `src/lib/admin-staff.functions.ts`, `src/hooks/use-admin-perms.ts`, migration.
-- **Modified**: `src/routes/_authenticated/admin.tsx` (add staff tab, gate buttons), `src/lib/admin.functions.ts` (perm checks), `src/lib/shop-admin.functions.ts` (perm checks).
+-- Initialize for existing tenants based on their current max invoice
+INSERT INTO public.tenant_sequences (tenant_id, last_sale_value)
+SELECT 
+  tenant_id, 
+  COALESCE(MAX(CAST(SUBSTRING(invoice_no FROM 3) AS BIGINT)), 1000)
+FROM public.sales
+GROUP BY tenant_id
+ON CONFLICT (tenant_id) DO NOTHING;
+```
+
+### RPC Update
+Modify `complete_sale` to:
+1. Lock the `tenant_sequences` row for the `v_tenant_id`.
+2. Increment `last_sale_value`.
+3. Use `S-` || `new_value` as the `invoice_no`.
