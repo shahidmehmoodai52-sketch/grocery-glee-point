@@ -368,8 +368,8 @@ function StockCountDetailPage() {
             <Badge variant="outline" className={sm.classes}>{sm.label}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Started {format(new Date(session.started_at), "PPp")}
-            {session.completed_at ? ` · completed ${format(new Date(session.completed_at), "PPp")}` : ""}
+            Started {fmtDate(session.started_at)}
+            {session.completed_at ? ` · completed ${fmtDate(session.completed_at)}` : ""}
           </p>
           {session.notes && <p className="text-sm text-muted-foreground mt-1">{session.notes}</p>}
         </div>

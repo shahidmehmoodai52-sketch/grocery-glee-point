@@ -1933,6 +1933,7 @@ function POSPage() {
     try {
       let payload: any;
       if (isOfflineNow()) {
+        const nowIso = new Date().toISOString();
         const sale = await offlineDb().sales.get(undoCandidate.sale_id);
         if (!sale) throw new Error("Sale not available offline");
         const saleItems = await offlineDb()
@@ -1964,7 +1965,7 @@ function POSPage() {
                 ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
                 _sync: "pending",
                 _v: (Number(p._v ?? 0) || 0) + 1,
-                updated_at: new Date().toISOString(),
+                updated_at: nowIso,
               });
             }
             await offlineDb().sale_items.where("sale_id").equals(undoCandidate.sale_id).delete();
