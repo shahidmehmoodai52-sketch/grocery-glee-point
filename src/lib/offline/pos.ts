@@ -128,7 +128,7 @@ export async function cacheProductBarcodes(rows: any[]) {
 
 /** Local-generated invoice numbers use OFF-<device>-<epoch>-<counter> so they
  *  never collide with server numbers, nor with another terminal's offline
- *  numbers for the same tenant. Server assigns the final number on sync. */
+ *  numbers for the same tenant. Server assigns the final per-tenant number on sync. */
 function nextLocalInvoiceNo(): string {
   const key = "pos_local_invoice_counter";
   let n = 0;
