@@ -49,7 +49,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
-import { fmtMoney, fmtQty } from "@/lib/format";
+import { fmtMoney, fmtQty, fmtDate } from "@/lib/format";
 import {
   deriveDigitalCashBackSummary,
   normalizePaymentAllocations,
@@ -1933,6 +1933,7 @@ function POSPage() {
     try {
       let payload: any;
       if (isOfflineNow()) {
+        const nowIso = new Date().toISOString();
         const sale = await offlineDb().sales.get(undoCandidate.sale_id);
         if (!sale) throw new Error("Sale not available offline");
         const saleItems = await offlineDb()
@@ -1964,7 +1965,7 @@ function POSPage() {
                 ...(typeof p.stock_qty === "number" ? { stock_qty: nextStock } : {}),
                 _sync: "pending",
                 _v: (Number(p._v ?? 0) || 0) + 1,
-                updated_at: new Date().toISOString(),
+                updated_at: nowIso,
               });
             }
             await offlineDb().sale_items.where("sale_id").equals(undoCandidate.sale_id).delete();
@@ -3208,7 +3209,7 @@ function POSPage() {
                     </td>
                     <td className="px-3 py-1.5">{b.customers?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                      {new Date(b.created_at).toLocaleString()}
+                      {fmtDate(b.created_at)}
                     </td>
                     <td className="px-3 py-1.5 text-right">{b.item_count}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">
@@ -4020,7 +4021,7 @@ function ReprintDialog({
                   <tr key={s.id} className="border-t hover:bg-accent/40">
                     <td className="px-3 py-1.5 font-mono text-xs">{s.invoice_no}</td>
                     <td className="px-3 py-1.5 text-xs">
-                      {new Date(s.created_at).toLocaleString()}
+                      {fmtDate(s.created_at)}
                     </td>
                     <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">
