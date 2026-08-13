@@ -21,7 +21,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtDate } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { cn } from "@/lib/utils";
@@ -269,12 +269,12 @@ function Page() {
 
   const detail = useMemo(() => {
     if (!detailKey) return null;
-    const fmtDate = (d: string) => new Date(d).toLocaleString();
+    const fmtDateStr = (d: string) => fmtDate(d);
     const withProfit = (arr: any[]) => arr.map((s:any)=>({...s, profit: Number(s.total)-Number(s.tax)-Number(s.cost_total)}));
     switch (detailKey) {
       case "revenue":
         return { title: `Revenue · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total"],
-          rows: sales.map((s:any)=>[fmtDate(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
+          rows: sales.map((s:any)=>[fmtDateStr(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
           total: fmtMoney(revenue, sym) };
       case "profit":
         return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
@@ -282,7 +282,7 @@ function Page() {
           total: fmtMoney(profit, sym) };
       case "purch":
         return { title: `Purchases · ${rangeLabel}`, cols: ["Date", "Total", "Paid"],
-          rows: purchases.map((p:any)=>[fmtDate(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
+          rows: purchases.map((p:any)=>[fmtDateStr(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
           total: fmtMoney(purchTotal, sym) };
       case "inventory":
         return { title: "Inventory value", cols: ["Product", "Stock", "Cost", "Value"],
@@ -290,11 +290,11 @@ function Page() {
           total: fmtMoney(inventoryValue, sym) };
       case "returns":
         return { title: `Returns · ${rangeLabel}`, cols: ["Date", "Total", "Refunded"],
-          rows: saleReturns.map((r:any)=>[fmtDate(r.created_at), fmtMoney(Number(r.total), sym), fmtMoney(Number(r.refund_amount), sym)]),
+          rows: saleReturns.map((r:any)=>[fmtDateStr(r.created_at), fmtMoney(Number(r.total), sym), fmtMoney(Number(r.refund_amount), sym)]),
           total: fmtMoney(returnsTotal, sym) };
       case "invoices":
         return { title: `Invoices · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total", "Paid"],
-          rows: sales.map((s:any)=>[fmtDate(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
+          rows: sales.map((s:any)=>[fmtDateStr(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
           total: `${sales.length} invoices` };
       case "net":
         return { title: `Net revenue · ${rangeLabel}`, cols: ["Metric", "Amount"],

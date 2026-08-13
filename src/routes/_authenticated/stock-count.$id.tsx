@@ -27,7 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSettings } from "@/hooks/use-settings";
-import { fmtMoney, fmtQty } from "@/lib/format";
+import { fmtMoney, fmtQty, fmtDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/stock-count/$id")({
   component: StockCountDetailPage,

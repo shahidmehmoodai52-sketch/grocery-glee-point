@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtDate } from "@/lib/format";
 import { Receipt, printReceipt } from "@/components/receipt";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
@@ -238,7 +238,7 @@ function Page() {
             {sales.map((s: any) => (
               <TableRow key={s.id}>
                 <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
-                <TableCell className="text-sm">{new Date(s.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-sm">{fmtDate(s.created_at)}</TableCell>
                 <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
                 <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
@@ -286,7 +286,7 @@ function Page() {
             {returns.map((r: any) => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono text-xs">{r.return_no}</TableCell>
-                <TableCell className="text-sm">{new Date(r.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-sm">{fmtDate(r.created_at)}</TableCell>
                 <TableCell className="font-mono text-xs">{r.sales?.invoice_no ?? "—"}</TableCell>
                 <TableCell>{r.customers?.name ?? "Walk-in"}</TableCell>
                 <TableCell className="text-right font-medium text-destructive">-{fmtMoney(r.total, sym)}</TableCell>

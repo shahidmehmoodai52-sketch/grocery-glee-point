@@ -37,5 +37,15 @@ export function fmtQty(n: number | string | null | undefined) {
 
 
 export function fmtDate(d: string | Date) {
-  return new Date(d).toLocaleString();
+  if (!d) return "—";
+  // Force Pakistan Time (UTC+5) for consistent display regardless of local browser settings.
+  return new Date(d).toLocaleString("en-GB", {
+    timeZone: "Asia/Karachi",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).replace(",", "");
 }
