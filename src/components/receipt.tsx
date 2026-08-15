@@ -237,6 +237,8 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       ? "SALES RETURN"
       : kind === "purchase-return"
       ? "PURCHASE RETURN"
+      : (invoice as any).isPurchase || (kind as any) === "purchase"
+      ? "PURCHASE INVOICE"
       : "SALES INVOICE";
 
   const party = invoice.customers?.name ?? invoice.suppliers?.name;
