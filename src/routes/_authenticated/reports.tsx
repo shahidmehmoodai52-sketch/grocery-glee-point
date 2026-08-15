@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon } from "lucide-react";
+import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon, Package, Search } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -354,10 +354,11 @@ function Page() {
             <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
             <TabsTrigger value="product">Product-wise</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="supplier">Supplier Wise</TabsTrigger>
           </TabsList>
-          {(tab === "invoice" || tab === "product") && (
+          {(tab === "invoice" || tab === "product" || tab === "supplier") && (
             <Input
-              placeholder={tab === "product" ? "Search product name…" : "Search invoice, customer, amount…"}
+              placeholder={tab === "product" ? "Search product name…" : tab === "supplier" ? "Search supplier or product…" : "Search invoice, customer, amount…"}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 max-w-xs"
@@ -749,6 +750,15 @@ function Page() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+        <TabsContent value="supplier">
+          <SupplierWiseReport
+            sales={sales}
+            saleReturns={saleReturns}
+            currencySymbol={sym}
+            onDrill={setDrill}
+            search={search}
+          />
         </TabsContent>
       </Tabs>
 
