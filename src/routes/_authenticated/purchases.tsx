@@ -760,7 +760,7 @@ function Page() {
         <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">
-              <DialogTitle>New purchase</DialogTitle>
+              <DialogTitle>{editingId ? `Edit purchase #${editingId.slice(0, 8)}` : "New purchase"}</DialogTitle>
             </DialogHeader>
 
 
