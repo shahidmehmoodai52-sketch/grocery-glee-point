@@ -1563,6 +1563,15 @@ function POSPage() {
         return toast.error("Select a digital account to receive the payment");
       }
     }
+    if (isDigitalMode) {
+      const hasAccounts = ((cashAccountOptions ?? []) as any[]).some((a: any) => a.type !== "cash");
+      if (hasAccounts && !tab.digital_account_id) {
+        return toast.error("Select the digital account that received the payment");
+      }
+      if (Number(tab.paid || 0) <= 0) {
+        return toast.error("Enter the digital amount received");
+      }
+    }
     const isCredit = !isDigitalCashBackMode && due > 0;
     if (isCredit && !tab.customer_id && !tab.expense_person_id)
       return toast.error("Select a customer or a staff/owner for credit sale");
