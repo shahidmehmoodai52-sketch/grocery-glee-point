@@ -285,7 +285,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
               fontFamily: "'Helvetica Neue', Helvetica, Arial, 'Segoe UI', sans-serif",
               fontSize: "12px",
               lineHeight: 1.25,
-              fontWeight: 500,
+              fontWeight: 600,
               overflow: "hidden",
               WebkitFontSmoothing: "antialiased",
             }
@@ -329,14 +329,14 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       <div className="mt-1 grid grid-cols-2 gap-x-2 text-[10px]">
         <div>
-          <span className="font-semibold">No:</span>{" "}
+          <span className="font-bold">No:</span>{" "}
           <span className="font-mono">{docNo}</span>
         </div>
         <div className="text-right">{date.toLocaleDateString()}</div>
         <div>
           {party ? (
             <>
-              <span className="font-semibold">{partyLabel}:</span> {party}
+              <span className="font-bold">{partyLabel}:</span> {party}
             </>
           ) : (
             <span className="text-black/60">Walk-in</span>
@@ -347,7 +347,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         </div>
         {settings?.show_cashier !== false && invoice.cashier_name && (
           <div className="col-span-2">
-            <span className="font-semibold">Cashier:</span> {invoice.cashier_name}
+            <span className="font-bold">Cashier:</span> {invoice.cashier_name}
           </div>
         )}
       </div>
@@ -363,14 +363,14 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       <div className="divide-y divide-dotted divide-black/30">
         {invoice.sale_items?.map((it, i) => (
           <div key={it.id ?? i} className="py-0.5 grid grid-cols-12 text-[10.5px] items-center">
-            <div className="col-span-5 font-medium leading-tight pr-1 break-words">
+            <div className="col-span-5 font-semibold leading-tight pr-1 break-words">
               {it.name}
             </div>
-            <div className="col-span-2 text-right">
+            <div className="col-span-2 text-right font-semibold">
               {it.price != null ? fmtMoney(it.price, sym) : ""}
             </div>
-            <div className="col-span-2 text-right">{fmtQty(it.qty)}</div>
-            <div className="col-span-3 text-right font-semibold">
+            <div className="col-span-2 text-right font-semibold">{fmtQty(it.qty)}</div>
+            <div className="col-span-3 text-right font-bold">
               {fmtMoney(it.line_total, sym)}
             </div>
           </div>
@@ -524,9 +524,9 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between text-[10.5px]">
+    <div className="flex justify-between text-[10.5px] font-semibold">
       <span>{label}</span>
-      <span className="font-mono">{value}</span>
+      <span className="font-mono font-semibold">{value}</span>
     </div>
   );
 }
