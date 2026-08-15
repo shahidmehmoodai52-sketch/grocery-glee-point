@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
@@ -131,13 +131,15 @@ function Page() {
   const today = new Date().toISOString().slice(0,10);
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
-  // Parked draft. "Hide (keep draft)" moves the current entry here so that
-  // "New purchase" always starts blank; the Draft button brings it back.
-  const [savedDraft, setSavedDraft, clearSavedDraft] = usePersistentState<Draft | null>("purchase-entry-saved", null);
+  // Multiple parked drafts.
+  const [savedDrafts, setSavedDrafts, clearSavedDrafts] = usePersistentState<Draft[]>("purchase-entry-saved-list", []);
+  
   const { open, supplier, lines, tax, paid, note, date } = draft;
   const taxMode: "amt" | "pct" = draft.taxMode ?? "amt";
   const billDiscount = Number(draft.discount ?? 0);
   const discountMode: "amt" | "pct" = draft.discountMode ?? "amt";
+  const editingId = (draft as any).editingId as string | undefined;
+
   const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setDate = (v: string) => setDraft((d) => ({ ...d, date: v }));
@@ -221,34 +223,46 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["product_barcodes"] });
     addProductLine(data as any);
   };
-  const [editRow, setEditRow] = useState<any | null>(null);
-  const [editItems, setEditItems] = useState<any[]>([]);
-  const [editItemsOriginal, setEditItemsOriginal] = useState<any[]>([]);
+  // The old separate edit states are no longer needed
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   // Selected payment source (cash account / preset) while editing a purchase.
   const [editPay, setEditPay] = useState("");
   const openEdit = async (p: any) => {
-    setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" });
-    setEditPay(
-      p.account_id
-        ? String(p.account_id)
-        : p.payment_method
-          ? `preset:${String(p.payment_method)}`
-          : "",
-    );
-    setEditItems([]);
-    setEditItemsOriginal([]);
-    setEditLoading(true);
+    // Reuse the main form for editing
     const { data, error } = await supabase
       .from("purchase_items")
-      .select("id,product_id,name,qty,cost,line_total")
+      .select("product_id,name,qty,cost,products(sell_price,stock,cost_price,barcode,sku)")
       .eq("purchase_id", p.id);
-    setEditLoading(false);
     if (error) { toast.error(error.message); return; }
-    const rows = (data ?? []).map((r: any) => ({ ...r, qty: Number(r.qty), cost: Number(r.cost) }));
-    setEditItems(rows);
-    setEditItemsOriginal(rows.map((r) => ({ ...r })));
+    
+    const formattedLines: Line[] = (data ?? []).map((r: any) => ({
+      product_id: r.product_id,
+      name: r.name,
+      qty: Number(r.qty),
+      cost: Number(r.cost),
+      sale_price: Number(r.products?.sell_price ?? 0),
+      old_sale: Number(r.products?.sell_price ?? 0),
+      old_stock: Number(r.products?.stock ?? 0),
+      old_cost: Number(r.products?.cost_price ?? 0),
+      barcode: r.products?.barcode ?? null,
+      item_code: r.products?.sku ?? null,
+    }));
+
+    setDraft({
+      open: true,
+      editingId: p.id,
+      supplier: p.supplier_id ?? "none",
+      date: p.created_at ? new Date(p.created_at).toISOString().slice(0, 10) : today,
+      lines: formattedLines,
+      tax: Number(p.tax || 0),
+      taxMode: "amt",
+      discount: 0,
+      discountMode: "amt",
+      paid: Number(p.paid || 0),
+      note: p.note || "",
+      paySource: p.account_id ? String(p.account_id) : p.payment_method ? `preset:${p.payment_method}` : "",
+    } as any);
   };
 
   const handleDeletePurchase = async () => {
@@ -571,9 +585,7 @@ function Page() {
       savingRef.current = false;
       return toast.error(e?.message ?? "Could not resolve payment account");
     }
-    const clientUuid = typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    
     const payload = {
       supplier_id: supplier && supplier !== "none" ? supplier : null,
       tax: taxAmt,
@@ -584,7 +596,6 @@ function Page() {
       payment_method: account.name,
       account_id: account.id ?? undefined,
       created_at: date || undefined,
-      client_uuid: clientUuid,
       items: items.map((l) => {
         const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
         const discShare = sub > 0 ? billDiscountAmt * (lineNet / sub) : 0;
@@ -593,70 +604,69 @@ function Page() {
       }),
     };
 
-    let rpcError: any = null;
     try {
-      const { error } = await supabase.rpc("complete_purchase", { payload });
-      rpcError = error;
-    } catch (e) {
-      rpcError = e;
-    }
+      if (editingId) {
+        // --- Edit Flow ---
+        // 1. Get original items to calculate stock deltas
+        const { data: origItems, error: fetchErr } = await supabase
+          .from("purchase_items")
+          .select("product_id,qty")
+          .eq("purchase_id", editingId);
+        if (fetchErr) throw fetchErr;
 
-    if (rpcError) {
-      try {
-        const { data: userData } = await supabase.auth.getUser();
-        const purchaseInsert = {
-          supplier_id: payload.supplier_id,
-          subtotal: payload.subtotal,
-          tax: payload.tax,
-          total: payload.total,
-          paid: payload.paid,
-          note: payload.note,
-          payment_method: payload.payment_method,
-          account_id: payload.account_id,
-          created_at: payload.created_at,
-          user_id: userData?.user?.id ?? undefined,
-        };
-        const { data: purchase, error: purchaseError } = await supabase
+        // 2. Update purchase header
+        const { error: hErr } = await supabase
           .from("purchases")
-          .insert(purchaseInsert)
-          .select("id")
-          .single();
-        if (purchaseError || !purchase?.id) throw purchaseError ?? new Error("Unable to save purchase");
+          .update({
+            supplier_id: payload.supplier_id,
+            subtotal: payload.subtotal,
+            tax: payload.tax,
+            total: payload.total,
+            paid: payload.paid,
+            note: payload.note,
+            payment_method: payload.payment_method,
+            account_id: payload.account_id,
+            created_at: payload.created_at,
+          })
+          .eq("id", editingId);
+        if (hErr) throw hErr;
 
-        const purchaseItems = payload.items.map((item: any) => ({
-          purchase_id: purchase.id,
-          product_id: item.product_id,
-          name: item.name,
-          qty: item.qty,
-          cost: item.cost,
-          line_total: Number(item.qty || 0) * Number(item.cost || 0),
+        // 3. Stock adjustments: reverse old, apply new
+        // Reverse old stock
+        for (const it of origItems || []) {
+          if (!it.product_id) continue;
+          const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
+          await supabase.from("products").update({ stock: Number(p?.stock ?? 0) - Number(it.qty) }).eq("id", it.product_id);
+        }
+
+        // 4. Replace items
+        await supabase.from("purchase_items").delete().eq("purchase_id", editingId);
+        const newItems = payload.items.map(it => ({
+          purchase_id: editingId,
+          product_id: it.product_id,
+          name: it.name,
+          qty: it.qty,
+          cost: it.cost,
+          line_total: Number(it.qty) * Number(it.cost)
         }));
-        const { error: itemsError } = await supabase.from("purchase_items").insert(purchaseItems);
-        if (itemsError) throw itemsError;
+        await supabase.from("purchase_items").insert(newItems);
 
-        for (const item of payload.items) {
-          if (!item.product_id) continue;
-          const { data: product } = await supabase.from("products").select("stock,cost_price").eq("id", item.product_id).single();
-          const oldStock = Number(product?.stock ?? 0);
-          const oldCost = Number(product?.cost_price ?? 0);
-          const qty = Number(item.qty || 0);
-          const cost = Number(item.cost || 0);
-          const newAvg = oldStock > 0 ? ((oldStock * oldCost) + (qty * cost)) / (oldStock + qty) : cost;
-          await supabase.from("products").update({
-            stock: oldStock + qty,
-            cost_price: Number(newAvg.toFixed(4)),
-            updated_at: new Date().toISOString(),
-          }).eq("id", item.product_id);
+        // Apply new stock
+        for (const it of payload.items) {
+          if (!it.product_id) continue;
+          const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
+          await supabase.from("products").update({ stock: Number(p?.stock ?? 0) + Number(it.qty) }).eq("id", it.product_id);
         }
 
-        if (Number(payload.total) > Number(payload.paid) && payload.supplier_id) {
-          await supabase.from("suppliers").update({ balance: Number(payload.total) - Number(payload.paid) }).eq("id", payload.supplier_id);
-        }
-      } catch (fallbackError: any) {
-        setSaving(false);
-        savingRef.current = false;
-        return toast.error(fallbackError?.message ?? "Could not save purchase");
+      } else {
+        // --- New Purchase Flow ---
+        const { error } = await supabase.rpc("complete_purchase", { payload });
+        if (error) throw error;
       }
+    } catch (err: any) {
+      setSaving(false);
+      savingRef.current = false;
+      return toast.error(err?.message ?? "Could not save purchase");
     }
     setSaving(false);
     savingRef.current = false;
@@ -684,22 +694,24 @@ function Page() {
 
   const draftHasContent = (d: Draft | null | undefined) =>
     !!d && (d.lines.length > 0 || !!d.note || Number(d.tax || 0) > 0 || Number(d.discount || 0) > 0 || Number(d.paid || 0) > 0);
-  const hasParkedDraft = draftHasContent(savedDraft);
+  const hasParkedDrafts = savedDrafts.length > 0;
 
-  /** Hide the entry form: park it as a draft so "New purchase" opens blank. */
+  /** Hide the entry form: park it as a draft. */
   const hideKeepDraft = () => {
-    if (draftHasContent(draft)) setSavedDraft({ ...draft, open: false });
+    if (draftHasContent(draft)) {
+      setSavedDrafts((prev) => [...prev, { ...draft, open: false }]);
+    }
     clearDraft();
   };
   const startNewPurchase = () => {
-    // Never resume the parked draft automatically — that only happens on Draft click.
-    if (draftHasContent(draft)) setSavedDraft({ ...draft, open: false });
+    if (draftHasContent(draft)) {
+      setSavedDrafts((prev) => [...prev, { ...draft, open: false }]);
+    }
     setDraft({ ...emptyDraft, open: true, date: today });
   };
-  const resumeDraft = () => {
-    if (!savedDraft) return;
-    setDraft({ ...savedDraft, open: true });
-    clearSavedDraft();
+  const resumeDraft = (d: Draft, index: number) => {
+    setDraft({ ...d, open: true });
+    setSavedDrafts((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -710,17 +722,39 @@ function Page() {
           <p className="text-sm text-muted-foreground">Record stock received from suppliers</p>
         </div>
         <div className="flex items-center gap-2">
-          {hasParkedDraft && !open && (
-            <Button variant="outline" onClick={resumeDraft} className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
-              <Pencil className="h-4 w-4 mr-2" />
-              Draft ({savedDraft?.lines.length ?? 0} item{(savedDraft?.lines.length ?? 0) === 1 ? "" : "s"})
-            </Button>
+          {hasParkedDrafts && !open && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Drafts ({savedDrafts.length})
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Resume Draft</DialogTitle></DialogHeader>
+                <div className="space-y-2 py-4">
+                  {savedDrafts.map((d, i) => (
+                    <button
+                      key={i}
+                      onClick={() => resumeDraft(d, i)}
+                      className="w-full flex items-center justify-between p-3 rounded-md border hover:bg-accent text-left"
+                    >
+                      <div>
+                        <div className="font-medium">{suppliers.find(s => s.id === d.supplier)?.name || "No Supplier"}</div>
+                        <div className="text-xs text-muted-foreground">{d.lines.length} items · {d.date}</div>
+                      </div>
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
         <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />New purchase</Button>
         <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">
-              <DialogTitle>New purchase</DialogTitle>
+              <DialogTitle>{editingId ? `Edit purchase #${editingId.slice(0, 8)}` : "New purchase"}</DialogTitle>
             </DialogHeader>
 
 
@@ -1110,8 +1144,10 @@ function Page() {
               </div>
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button variant="ghost" size="sm" onClick={hideKeepDraft}>Hide (keep draft)</Button>
-                <Button variant="outline" size="sm" onClick={clearDraft}>Discard</Button>
-                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>Record purchase</Button>
+                <Button variant="outline" size="sm" onClick={() => {
+                  if (confirm("Discard this purchase?")) clearDraft();
+                }}>Discard</Button>
+                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>{editingId ? "Save changes" : "Record purchase"}</Button>
               </div>
             </DialogFooter>
           </DialogContent>
@@ -1123,7 +1159,7 @@ function Page() {
 
         <Dialog open={confirmOpen} onOpenChange={(v) => { if (!saving) setConfirmOpen(v); }}>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Confirm purchase</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Confirm changes" : "Confirm purchase"}</DialogTitle></DialogHeader>
             <div className="space-y-2 text-sm">
               <p>Save this purchase with <b>{lines.length}</b> item{lines.length === 1 ? "" : "s"}?</p>
               <p className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span></p>
@@ -1131,7 +1167,7 @@ function Page() {
             </div>
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
-              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : "Yes, save purchase"}</Button>
+              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1241,207 +1277,7 @@ function Page() {
 
 
 
-        <Dialog open={!!editRow} onOpenChange={(v) => { if (!editSaving && !v) { setEditRow(null); setEditItems([]); setEditItemsOriginal([]); } }}>
-          <DialogContent className="w-[96vw] max-w-5xl max-h-[92vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Edit purchase {editRow?.invoice_no}</DialogTitle></DialogHeader>
-            {editRow && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Invoice #</Label>
-                    <Input value={editRow.invoice_no ?? ""} onChange={(e) => setEditRow({ ...editRow, invoice_no: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Supplier</Label>
-                    <select
-                      value={editRow.supplier_id ?? "none"}
-                      onChange={(e) => setEditRow({ ...editRow, supplier_id: e.target.value })}
-                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="none">— None —</option>
-                      {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="border rounded-md overflow-x-auto">
-                  <Table className="min-w-[720px]">
-                    <TableHeader><TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="w-[150px]">Cost</TableHead>
-                      <TableHead className="w-[140px]">Qty</TableHead>
-                      <TableHead className="text-right w-[120px]">Total</TableHead>
-                      <TableHead className="w-11"></TableHead>
-                    </TableRow></TableHeader>
-                    <TableBody>
-                      {editLoading && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground text-sm">Loading items…</TableCell></TableRow>}
-                      {!editLoading && editItems.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground text-sm">No items on this invoice</TableCell></TableRow>}
-                      {editItems.map((it, i) => (
-                        <TableRow key={it.id ?? `new-${i}`}>
-                          <TableCell><Input value={it.name ?? ""} onChange={(e) => setEditItems((xs) => xs.map((r, x) => x === i ? { ...r, name: e.target.value } : r))} className="h-9" /></TableCell>
-                          <TableCell><Input type="number" step="0.01" value={it.cost} onChange={(e) => setEditItems((xs) => xs.map((r, x) => x === i ? { ...r, cost: Number(e.target.value) } : r))} className="h-9 text-right" /></TableCell>
-                          <TableCell><Input type="number" step="0.001" value={it.qty} onChange={(e) => setEditItems((xs) => xs.map((r, x) => x === i ? { ...r, qty: Number(e.target.value) } : r))} className="h-9 text-right" /></TableCell>
-                          <TableCell className="text-right font-medium">{fmtMoney(Number(it.qty || 0) * Number(it.cost || 0), sym)}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon" onClick={() => setEditItems((xs) => xs.filter((_, x) => x !== i))}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <div><Label>Tax</Label><Input type="number" step="0.01" value={editRow.tax ?? 0} onChange={(e) => setEditRow({ ...editRow, tax: Number(e.target.value) })} /></div>
-                  <div><Label>Paid</Label><Input type="number" step="0.01" value={editRow.paid ?? 0} onChange={(e) => setEditRow({ ...editRow, paid: Number(e.target.value) })} /></div>
-                  <div>
-                    <Label>Pay from</Label>
-                    <Select
-                      value={editPay && paySourceOptions.some((o) => o.id === editPay)
-                        ? editPay
-                        : (paySourceOptions.find((o) => o.name.toLowerCase() === String(editRow.payment_method ?? "").toLowerCase())?.id ?? "")}
-                      onValueChange={setEditPay}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Cash / Cheque / Bank…" /></SelectTrigger>
-                      <SelectContent>
-                        {paySourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Status</Label>
-                    <Select value={editRow.status ?? "completed"} onValueChange={(v) => setEditRow({ ...editRow, status: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="completed">completed</SelectItem>
-                        <SelectItem value="pending">pending</SelectItem>
-                        <SelectItem value="cancelled">cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col justify-end">
-                    <div className="text-sm text-muted-foreground">Total</div>
-                    <div className="text-2xl font-semibold text-primary">
-                      {fmtMoney(editItems.reduce((s, it) => s + Number(it.qty || 0) * Number(it.cost || 0), 0) + Number(editRow.tax || 0), sym)}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <Label>Note</Label>
-                  <Input value={editRow.note ?? ""} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Changing item quantity adjusts product stock by the difference. Deleting an item removes its qty from stock. Cost changes update this invoice only (product average cost is not recalculated).
-                </p>
-              </div>
-            )}
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => { setEditRow(null); setEditItems([]); setEditItemsOriginal([]); }} disabled={editSaving}>Cancel</Button>
-              <Button
-                disabled={editSaving || editLoading}
-                onClick={async () => {
-                  if (!editRow) return;
-                  setEditSaving(true);
-                  try {
-                    const origById = new Map(editItemsOriginal.map((r) => [r.id, r]));
-                    const keptIds = new Set(editItems.filter((r) => r.id).map((r) => r.id));
-
-                    // 1) Stock deltas: kept items (new - old) + deleted items (0 - old)
-                    const deltas = new Map<string, number>(); // product_id -> qty delta (positive = add stock)
-                    for (const it of editItems) {
-                      if (!it.product_id) continue;
-                      const orig = it.id ? origById.get(it.id) : null;
-                      const oldQty = orig ? Number(orig.qty) : 0;
-                      const delta = Number(it.qty || 0) - oldQty;
-                      if (delta !== 0) deltas.set(it.product_id, (deltas.get(it.product_id) ?? 0) + delta);
-                    }
-                    for (const orig of editItemsOriginal) {
-                      if (!orig.product_id) continue;
-                      if (keptIds.has(orig.id)) continue;
-                      const delta = -Number(orig.qty);
-                      if (delta !== 0) deltas.set(orig.product_id, (deltas.get(orig.product_id) ?? 0) + delta);
-                    }
-
-                    // Apply stock deltas
-                    if (deltas.size) {
-                      const ids = Array.from(deltas.keys());
-                      const { data: prods, error: pErr } = await supabase.from("products").select("id,stock").in("id", ids);
-                      if (pErr) throw pErr;
-                      for (const p of prods ?? []) {
-                        const newStock = Number(p.stock ?? 0) + (deltas.get(p.id) ?? 0);
-                        const { error: uErr } = await supabase.from("products").update({ stock: newStock }).eq("id", p.id);
-                        if (uErr) throw uErr;
-                      }
-                    }
-
-                    // 2) Delete removed items
-                    const removedIds = editItemsOriginal.filter((r) => !keptIds.has(r.id)).map((r) => r.id);
-                    if (removedIds.length) {
-                      const { error: dErr } = await supabase.from("purchase_items").delete().in("id", removedIds);
-                      if (dErr) throw dErr;
-                    }
-
-                    // 3) Update kept items where changed
-                    for (const it of editItems) {
-                      if (!it.id) continue;
-                      const orig = origById.get(it.id);
-                      if (!orig) continue;
-                      if (orig.name === it.name && Number(orig.qty) === Number(it.qty) && Number(orig.cost) === Number(it.cost)) continue;
-                      const line_total = Number(it.qty || 0) * Number(it.cost || 0);
-                      const { error: iErr } = await supabase.from("purchase_items")
-                        .update({ name: it.name, qty: Number(it.qty || 0), cost: Number(it.cost || 0), line_total })
-                        .eq("id", it.id);
-                      if (iErr) throw iErr;
-                    }
-
-                    // 4) Recompute purchase totals & update header
-                    const subtotal = editItems.reduce((s, it) => s + Number(it.qty || 0) * Number(it.cost || 0), 0);
-                    const newTax = Number(editRow.tax ?? 0);
-                    const newTotal = subtotal + newTax;
-                    // Payment source may have been changed in the dialog.
-                    const chosenPay = editPay && paySourceOptions.some((o) => o.id === editPay) ? editPay : "";
-                    const payPatch: Record<string, any> = {};
-                    if (chosenPay) {
-                      const acc = await resolvePayAccount(chosenPay);
-                      payPatch.account_id = acc.id;
-                      payPatch.payment_method = acc.name;
-                    }
-                    const { error: hErr } = await supabase
-                      .from("purchases")
-                      .update({
-                        invoice_no: editRow.invoice_no,
-                        supplier_id: editRow.supplier_id === "none" ? null : editRow.supplier_id,
-                        subtotal,
-                        tax: newTax,
-                        total: newTotal,
-                        paid: Number(editRow.paid ?? 0),
-                        note: editRow.note ?? null,
-                        status: editRow.status ?? "completed",
-                        ...payPatch,
-                      })
-                      .eq("id", editRow.id);
-                    if (hErr) throw hErr;
-
-                    toast.success("Purchase updated");
-                    setEditRow(null);
-                    setEditItems([]);
-                    setEditItemsOriginal([]);
-                    qc.invalidateQueries({ queryKey: ["purchases"] });
-                    qc.invalidateQueries({ queryKey: ["products"] });
-                  } catch (e: any) {
-                    toast.error(e?.message ?? "Failed to update purchase");
-                  } finally {
-                    setEditSaving(false);
-                  }
-                }}
-              >
-                {editSaving ? "Saving…" : "Save changes"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* The old separate edit dialog is no longer needed since we reuse the main form */}
 
 
       </div>
