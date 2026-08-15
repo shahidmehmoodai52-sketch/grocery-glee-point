@@ -3096,7 +3096,7 @@ function POSPage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setTab({ paid: total.toFixed(2), change_due: 0 });
+                    setTab({ paid: total.toFixed(2) });
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                   className="text-xs text-primary hover:underline shrink-0 font-medium"
