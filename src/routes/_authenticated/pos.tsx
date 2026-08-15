@@ -2752,7 +2752,7 @@ function POSPage() {
         {/* RIGHT: side panel — open bills, party, payment, totals */}
         <aside className="w-full md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-t md:border-t-0 md:border-l bg-card flex flex-col min-h-0 max-h-[70vh] md:max-h-[calc(100vh-8.5rem)] overflow-hidden no-print">
           {/* Party + payment */}
-          <div className="p-2.5 border-b space-y-2 shrink-0">
+          <div className="p-2 border-b space-y-1.5 shrink-0">
             <div>
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2959,7 +2959,7 @@ function POSPage() {
           </div>
 
           {/* Totals + discount + paid + note */}
-          <div className="flex-1 min-h-0 overflow-auto p-2 space-y-1 bg-muted/10 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-auto px-2 py-1.5 space-y-1 bg-muted/10 flex flex-col">
             <Row
               label="Items"
               value={`${tab.items.length} item${tab.items.length === 1 ? "" : "s"}`}
