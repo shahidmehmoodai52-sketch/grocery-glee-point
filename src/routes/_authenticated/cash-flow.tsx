@@ -259,7 +259,7 @@ function Page() {
     queryFn: async () =>
       await fetchAll<Tx>(
         ((fIdx: number, tIdx: number) => supabase.from("cash_transactions").select("*").range(fIdx, tIdx)) as any,
-        1000
+        1000 as any
       ),
     staleTime: 30_000,
   });
@@ -272,7 +272,7 @@ function Page() {
       supabase.from("sales")
         .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
         .range(fIdx, tIdx)) as any,
-      1000
+      1000 as any
     ),
     staleTime: 30_000,
   });
@@ -282,7 +282,7 @@ function Page() {
       supabase.from("sale_returns")
         .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
         .range(fIdx, tIdx)) as any,
-      1000
+      1000 as any
     ),
     staleTime: 30_000,
   });
@@ -292,7 +292,7 @@ function Page() {
       supabase.from("purchases")
         .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
         .range(fIdx, tIdx)) as any,
-      1000
+      1000 as any
     ),
     staleTime: 30_000,
   });
@@ -303,7 +303,7 @@ function Page() {
       supabase.from("purchase_returns")
         .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
         .range(fIdx, tIdx)) as any,
-      1000
+      1000 as any
     ),
     staleTime: 30_000,
   });
@@ -313,7 +313,7 @@ function Page() {
       supabase.from("expenses")
         .select("id,amount,method,category,description,expense_date,created_at")
         .range(fIdx, tIdx)) as any,
-      1000
+      1000 as any
     ),
     staleTime: 30_000,
   });
@@ -323,7 +323,7 @@ function Page() {
       supabase.from("party_payments")
         .select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id")
         .range(fIdx, tIdx)) as any,
-      1000
+      1000 as any
     ),
     staleTime: 30_000,
 
