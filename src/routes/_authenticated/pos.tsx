@@ -3807,6 +3807,8 @@ function PrintPromptDialog({
   const yesRef = useRef<HTMLButtonElement>(null);
   const noRef = useRef<HTMLButtonElement>(null);
   const [focused, setFocused] = useState<"yes" | "no">(defaultAction || "no");
+  const settings = useSettings();
+
   useEffect(() => {
     if (!sale) return;
     setFocused(defaultAction || "no");
@@ -3815,10 +3817,17 @@ function PrintPromptDialog({
     }, 30);
     return () => clearTimeout(t);
   }, [sale, defaultAction]);
+
   const focus = (which: "yes" | "no") => {
     setFocused(which);
     (which === "yes" ? yesRef.current : noRef.current)?.focus();
   };
+
+  const doPrint = () => {
+    printInvoiceDirect(sale, settings);
+    onYes();
+  };
+
   return (
     <Dialog open={!!sale} onOpenChange={(o) => !o && onNo()}>
       <DialogContent
@@ -3826,7 +3835,11 @@ function PrintPromptDialog({
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            (focused === "yes" ? onYes : onNo)();
+            if (focused === "yes") {
+              doPrint();
+            } else {
+              onNo();
+            }
           } else if (
             e.key === "ArrowLeft" ||
             e.key === "ArrowRight" ||
@@ -3838,7 +3851,7 @@ function PrintPromptDialog({
             focus(focused === "yes" ? "no" : "yes");
           } else if (e.key.toLowerCase() === "y") {
             e.preventDefault();
-            onYes();
+            doPrint();
           } else if (e.key.toLowerCase() === "n" || e.key === "Escape") {
             e.preventDefault();
             onNo();
@@ -3855,7 +3868,11 @@ function PrintPromptDialog({
           <Button ref={noRef} variant={focused === "no" ? "default" : "outline"} onClick={onNo}>
             No
           </Button>
-          <Button ref={yesRef} variant={focused === "yes" ? "default" : "outline"} onClick={onYes}>
+          <Button
+            ref={yesRef}
+            variant={focused === "yes" ? "default" : "outline"}
+            onClick={doPrint}
+          >
             <Printer className="h-4 w-4 mr-2" />
             Yes, print
           </Button>
