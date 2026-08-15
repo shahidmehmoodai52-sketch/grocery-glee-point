@@ -1508,3 +1508,13 @@ function Page() {
     </div>
   );
 }
+
+function StatMini({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
+  const colors: Record<string, string> = { success: "text-success", destructive: "text-destructive" };
+  return (
+    <div className="bg-muted/30 p-2 rounded">
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
+      <div className={`text-sm font-bold ${tone ? colors[tone] : ""}`}>{value}</div>
+    </div>
+  );
+}
