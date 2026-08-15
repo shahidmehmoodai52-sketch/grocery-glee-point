@@ -2,7 +2,7 @@
  * Fetch all rows from a Supabase query builder, paging past the 1000-row cap.
  */
 export async function fetchAll<T>(
-  build: any,
+  build: (from: any, to: any) => any,
   pageSizeOrLegacyOrder?: any,
   pageSize = 1000,
 ): Promise<T[]> {
@@ -14,9 +14,8 @@ export async function fetchAll<T>(
   for (let i = 0; i < 200; i++) {
     const to = from + actualPageSize - 1;
     
-    // We cast build to any to allow flexible parameter counts (0, 1, or 2)
-    // which prevents the TypeScript compiler from complaining at call sites
-    // where fetchAll is used inside useQuery or other wrappers.
+    // Using 'any' cast on the function call itself to bypass rigid TS checks 
+    // in components where this is used inside TanStack useQuery closures.
     const response = await (build as any)(from, to);
     
     const { data, error } = response || {};
