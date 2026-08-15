@@ -380,7 +380,7 @@ function Page() {
 
   const { data: sales = [] } = useQuery({
     queryKey: ["report-sales-full", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
       let q = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
         .order("created_at", { ascending: false });
@@ -392,7 +392,7 @@ function Page() {
 
   const { data: purchases = [] } = useQuery({
     queryKey: ["report-purchases", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
       let q = supabase.from("purchases").select("subtotal,tax,total,paid,created_at");
       if (from) q = q.gte("created_at", range.from);
       if (to) q = q.lte("created_at", range.to);
@@ -402,7 +402,7 @@ function Page() {
 
   const { data: expenses = [] } = useQuery({
     queryKey: ["report-expenses", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
       let q = supabase.from("expenses").select("amount,category,expense_date");
       if (from) q = q.gte("expense_date", from);
       if (to) q = q.lte("expense_date", to);
@@ -412,7 +412,7 @@ function Page() {
 
   const { data: partyPayments = [] } = useQuery({
     queryKey: ["report-party-payments", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
       let q = supabase.from("party_payments")
         .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
         .order("created_at", { ascending: false });
@@ -424,7 +424,7 @@ function Page() {
 
   const { data: saleReturns = [] } = useQuery({
     queryKey: ["report-sale-returns", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
       let q = supabase.from("sale_returns")
         .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
         .order("created_at", { ascending: false });

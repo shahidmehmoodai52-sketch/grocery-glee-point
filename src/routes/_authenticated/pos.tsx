@@ -752,7 +752,7 @@ function POSPage() {
     queryFn: () =>
       offlineFirst(
         () =>
-          fetchAll<any>((from, to) =>
+          fetchAll<any>((from: number, to: number) =>
             supabase
               .from("products")
               .select(PRODUCT_COLUMNS)
@@ -786,7 +786,7 @@ function POSPage() {
     queryFn: () =>
       offlineFirst(
         () =>
-          fetchAll<any>((from, to) =>
+          fetchAll<any>((from: number, to: number) =>
             supabase.from("product_barcodes").select("id,product_id,barcode").range(from, to),
           ),
         () => offlineDb().product_barcodes.toArray(),

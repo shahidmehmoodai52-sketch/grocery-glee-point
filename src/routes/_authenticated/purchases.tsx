@@ -451,7 +451,7 @@ function Page() {
     queryKey: ["purchases"],
     staleTime: 30_000,
     queryFn: async () => offlineFirst<any[]>(
-      async () => await fetchAll<any>((from, to) => supabase.from("purchases").select("*, suppliers(name), purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
+      async () => await fetchAll<any>((from: number, to: number) => supabase.from("purchases").select("*, suppliers(name), purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
       async () => {
         const rows = await db().purchases.orderBy("created_at").reverse().toArray();
         const supMap = new Map((await db().suppliers.toArray()).map((s: any) => [s.id, s.name]));
