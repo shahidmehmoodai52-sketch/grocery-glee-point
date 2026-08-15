@@ -4,7 +4,7 @@
  * various component call sites and Supabase's internal builder types.
  */
 export async function fetchAll<T>(
-  build: (from: number, to: number) => any,
+  build: any,
   pageSizeOrLegacyOrder?: any,
   pageSize = 1000,
 ): Promise<T[]> {
@@ -18,8 +18,9 @@ export async function fetchAll<T>(
     const to = from + actualPageSize - 1;
     
     // Execute the builder with range parameters.
-    // We cast to any to handle cases where the builder might be wrapped in an async closure.
-    const response = await (build as any)(from, to);
+    // We cast the builder to any to avoid TypeScript errors at call sites that 
+    // are passed into TanStack useQuery and similar wrappers.
+    const response = await build(from, to);
     
     const { data, error } = response || {};
     if (error) throw error;
@@ -27,7 +28,7 @@ export async function fetchAll<T>(
     const rows = (data ?? []) as T[];
     all.push(...rows);
     
-    // Exit if we've retrieved all available records.
+    // If we got fewer rows than requested, we've reached the end.
     if (rows.length < actualPageSize) break;
     from += actualPageSize;
   }
