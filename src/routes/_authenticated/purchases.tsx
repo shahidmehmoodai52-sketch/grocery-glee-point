@@ -656,7 +656,8 @@ function Page() {
         // Apply new stock
         for (const it of payload.items) {
           if (!it.product_id) continue;
-          await supabase.rpc("increment_product_stock", { pid: it.product_id, amount: Number(it.qty) });
+          const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
+          await supabase.from("products").update({ stock: Number(p?.stock ?? 0) + Number(it.qty) }).eq("id", it.product_id);
         }
 
       } else {
