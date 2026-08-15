@@ -231,26 +231,40 @@ function Page() {
   // Selected payment source (cash account / preset) while editing a purchase.
   const [editPay, setEditPay] = useState("");
   const openEdit = async (p: any) => {
-    setEditRow({ ...p, supplier_id: p.supplier_id ?? "none" });
-    setEditPay(
-      p.account_id
-        ? String(p.account_id)
-        : p.payment_method
-          ? `preset:${String(p.payment_method)}`
-          : "",
-    );
-    setEditItems([]);
-    setEditItemsOriginal([]);
-    setEditLoading(true);
+    // Reuse the main form for editing
     const { data, error } = await supabase
       .from("purchase_items")
-      .select("id,product_id,name,qty,cost,line_total")
+      .select("product_id,name,qty,cost,products(sell_price,stock,cost_price,barcode,sku)")
       .eq("purchase_id", p.id);
-    setEditLoading(false);
     if (error) { toast.error(error.message); return; }
-    const rows = (data ?? []).map((r: any) => ({ ...r, qty: Number(r.qty), cost: Number(r.cost) }));
-    setEditItems(rows);
-    setEditItemsOriginal(rows.map((r) => ({ ...r })));
+    
+    const formattedLines: Line[] = (data ?? []).map((r: any) => ({
+      product_id: r.product_id,
+      name: r.name,
+      qty: Number(r.qty),
+      cost: Number(r.cost),
+      sale_price: Number(r.products?.sell_price ?? 0),
+      old_sale: Number(r.products?.sell_price ?? 0),
+      old_stock: Number(r.products?.stock ?? 0),
+      old_cost: Number(r.products?.cost_price ?? 0),
+      barcode: r.products?.barcode ?? null,
+      item_code: r.products?.sku ?? null,
+    }));
+
+    setDraft({
+      open: true,
+      editingId: p.id,
+      supplier: p.supplier_id ?? "none",
+      date: p.created_at ? new Date(p.created_at).toISOString().slice(0, 10) : today,
+      lines: formattedLines,
+      tax: Number(p.tax || 0),
+      taxMode: "amt",
+      discount: 0,
+      discountMode: "amt",
+      paid: Number(p.paid || 0),
+      note: p.note || "",
+      paySource: p.account_id ? String(p.account_id) : p.payment_method ? `preset:${p.payment_method}` : "",
+    } as any);
   };
 
   const handleDeletePurchase = async () => {
