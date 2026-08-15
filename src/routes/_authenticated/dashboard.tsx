@@ -127,20 +127,20 @@ function Page() {
   const { data: products = [] } = useQuery({
     queryKey: ["dash-products"],
     queryFn: async () =>
-      fetchAll<any>((f, t) =>
+      fetchAll<any>((from: number, to: number) =>
         supabase
           .from("products")
           .select("id,name,stock,sell_price,cost_price,is_active")
           .eq("is_active", true)
-          .range(f, t),
+          .range(from, to),
       ),
   });
   const { data: topItemsRaw = [] } = useQuery({
     queryKey: ["dash-top-items", fromISO, toISO],
     queryFn: async () =>
-      await fetchAll<any>((f, t) =>
+      await fetchAll<any>((from: number, to: number) =>
         supabase.from("sale_items").select("name,qty,line_total,sales!inner(created_at)")
-          .gte("sales.created_at", fromISO).lte("sales.created_at", toISO).range(f, t),
+          .gte("sales.created_at", fromISO).lte("sales.created_at", toISO).range(from, to),
       ),
   });
 

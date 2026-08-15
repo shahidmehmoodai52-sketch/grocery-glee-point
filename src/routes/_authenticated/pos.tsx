@@ -752,7 +752,7 @@ function POSPage() {
     queryFn: () =>
       offlineFirst(
         () =>
-          fetchAll<any>((from, to) =>
+          fetchAll<any>((from: number, to: number) =>
             supabase
               .from("products")
               .select(PRODUCT_COLUMNS)
@@ -786,7 +786,7 @@ function POSPage() {
     queryFn: () =>
       offlineFirst(
         () =>
-          fetchAll<any>((from, to) =>
+          fetchAll<any>((from: number, to: number) =>
             supabase.from("product_barcodes").select("id,product_id,barcode").range(from, to),
           ),
         () => offlineDb().product_barcodes.toArray(),
@@ -3897,13 +3897,13 @@ function ReprintDialog({
       const filters = [`invoice_no.ilike.${like}`, `payment_method.ilike.${like}`];
       if (isFinite(asNum) && term !== "") filters.push(`total.eq.${asNum}`, `paid.eq.${asNum}`);
       return await fetchAll<any>(
-        (_f, _t) =>
+        (from: number, to: number) =>
           supabase
             .from("sales")
             .select("*, customers(name), sale_items(*)")
             .or(filters.join(","))
             .order("created_at", { ascending: false })
-            .range(_f, _t) as any,
+            .range(from, to) as any,
       );
     },
   });

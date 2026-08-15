@@ -39,12 +39,12 @@ function Page() {
   const { data: returns = [] } = useQuery({
     queryKey: ["purchase-returns"],
     queryFn: async () =>
-      await fetchAll<any>((from, to) => supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)),
+      await fetchAll<any>((from: number, to: number) => supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)),
   });
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases-for-return"],
     queryFn: async () =>
-      await fetchAll<any>((from, to) => supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
+      await fetchAll<any>((from: number, to: number) => supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
   });
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
@@ -52,7 +52,7 @@ function Page() {
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => fetchAll<any>((from, to) => supabase.from("products").select("id,name,cost_price").order("name").range(from, to)),
+    queryFn: async () => fetchAll<any>((from: number, to: number) => supabase.from("products").select("id,name,cost_price").order("name").range(from, to)),
   });
 
   useEffect(() => {

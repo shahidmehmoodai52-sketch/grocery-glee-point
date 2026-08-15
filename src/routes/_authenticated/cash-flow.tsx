@@ -258,8 +258,8 @@ function Page() {
     queryKey: ["cash-transactions"],
     queryFn: async () =>
       await fetchAll<Tx>(
-        (fIdx: number, tIdx: number) => supabase.from("cash_transactions").select("*").range(fIdx, tIdx),
-        1000
+        ((fIdx: number, tIdx: number) => supabase.from("cash_transactions").select("*").range(fIdx, tIdx)) as any,
+        1000 as any
       ),
     staleTime: 30_000,
   });
@@ -268,62 +268,62 @@ function Page() {
   // All of these are paged in full: financial history must never be truncated.
   const salesQ = useQuery({
     queryKey: ["cf-sales"],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
+    queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("sales")
         .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
-        .range(fIdx, tIdx),
-      1000
+        .range(fIdx, tIdx)) as any,
+      1000 as any
     ),
     staleTime: 30_000,
   });
   const saleReturnsQ = useQuery({
     queryKey: ["cf-sale-returns"],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
+    queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("sale_returns")
         .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
-        .range(fIdx, tIdx),
-      1000
+        .range(fIdx, tIdx)) as any,
+      1000 as any
     ),
     staleTime: 30_000,
   });
   const purchasesQ = useQuery({
     queryKey: ["cf-purchases"],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
+    queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("purchases")
         .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
-        .range(fIdx, tIdx),
-      1000
+        .range(fIdx, tIdx)) as any,
+      1000 as any
     ),
     staleTime: 30_000,
   });
 
   const purchaseReturnsQ = useQuery({
     queryKey: ["cf-purchase-returns"],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
+    queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("purchase_returns")
         .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
-        .range(fIdx, tIdx),
-      1000
+        .range(fIdx, tIdx)) as any,
+      1000 as any
     ),
     staleTime: 30_000,
   });
   const expensesQ = useQuery({
     queryKey: ["cf-expenses"],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
+    queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("expenses")
         .select("id,amount,method,category,description,expense_date,created_at")
-        .range(fIdx, tIdx),
-      1000
+        .range(fIdx, tIdx)) as any,
+      1000 as any
     ),
     staleTime: 30_000,
   });
   const partyPaymentsQ = useQuery({
     queryKey: ["cf-party-payments"],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
+    queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("party_payments")
         .select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id")
-        .range(fIdx, tIdx),
-      1000
+        .range(fIdx, tIdx)) as any,
+      1000 as any
     ),
     staleTime: 30_000,
 

@@ -477,11 +477,11 @@ function CashDrawer({ settings }: { settings: any }) {
   const { data: events } = useQuery({
     queryKey: ["cash-events"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => sb
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
         .from("cash_drawer_events")
         .select("*")
         .order("created_at", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return data as any[];
     },
@@ -633,12 +633,12 @@ function TasksPanel() {
   const { data } = useQuery({
     queryKey: ["shift-tasks"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => sb
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
         .from("shift_tasks")
         .select("*")
         .order("status", { ascending: true })
         .order("created_at", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return data as any[];
     },
@@ -712,11 +712,11 @@ function NotesPanel() {
   const { data } = useQuery({
     queryKey: ["shift-notes"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => sb
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
         .from("shift_notes")
         .select("*")
         .order("created_at", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return data as any[];
     },
@@ -827,11 +827,11 @@ function ReprintsLog() {
   const { data } = useQuery({
     queryKey: ["reprints"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => sb
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
         .from("receipt_reprints")
         .select("*, sales(invoice_no,total)")
         .order("created_at", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return data as any[];
     },
@@ -865,11 +865,11 @@ function VoidsLog() {
   const { data } = useQuery({
     queryKey: ["voids"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => sb
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
         .from("sale_voids")
         .select("*")
         .order("created_at", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return data as any[];
     },
@@ -957,11 +957,11 @@ function HandoverPanel() {
   const { data: handovers = [], refetch } = useQuery({
     queryKey: ["manager-handovers"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => sb
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
         .from("manager_handovers")
         .select("*")
         .order("created_at", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return data as any[];
     },

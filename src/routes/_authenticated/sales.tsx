@@ -83,7 +83,7 @@ function Page() {
   }, [prevFrom, fromDate, toDate]);
 
   const rangedQuery = (table: "sales" | "sale_returns", cols: string) => async () => {
-    return await fetchAll<any>((fIdx, tIdx) => {
+    return await fetchAll<any>((fIdx: number, tIdx: number) => {
       let q = supabase.from(table).select(cols).order("created_at", { ascending: false });
       if (window.startIso) q = q.gte("created_at", window.startIso);
       if (window.endIso) q = q.lte("created_at", window.endIso);

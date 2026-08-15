@@ -265,8 +265,8 @@ function ImportHistory({ compact = false }: { compact?: boolean }) {
     setLoading(true);
     let data: BatchRow[] = [];
     try {
-      data = await fetchAll<BatchRow>((_f, _t) =>
-        supabase.from("import_batches").select("*").order("created_at", { ascending: false }).range(_f, _t) as any,
+      data = await fetchAll<BatchRow>((from: number, to: number) =>
+        supabase.from("import_batches").select("*").order("created_at", { ascending: false }).range(from, to) as any,
       );
     } catch (e: any) {
       toast.error(e?.message ?? "Import history load nahi hui");

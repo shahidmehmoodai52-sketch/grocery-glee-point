@@ -91,11 +91,11 @@ function Page() {
   const listQ = useQuery({
     queryKey: ["shifts_list", isAdmin],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => supabase
         .from("shift_sessions")
         .select("*")
         .order("opened_at", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return (data ?? []) as ShiftRow[];
     },

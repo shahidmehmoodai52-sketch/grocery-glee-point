@@ -328,7 +328,7 @@ function MineTable({ search, setSearch, showSell = true, showCost = true }: { se
     queryKey: ["global_products", "mine", uid],
     enabled: !!uid,
     queryFn: async () =>
-      fetchAll<GlobalProduct>((from, to) =>
+      fetchAll<GlobalProduct>((from: number, to: number) =>
         supabase
           .from("global_products")
           .select("*")

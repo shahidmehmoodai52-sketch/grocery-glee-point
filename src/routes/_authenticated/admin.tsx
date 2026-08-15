@@ -1111,13 +1111,13 @@ function LibraryTab() {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-library", status],
     queryFn: async () => {
-      const data = await fetchAll<LibraryRow>((_f, _t) => {
+      const data = await fetchAll<LibraryRow>((from: number, to: number) => {
         let q = supabase
           .from("global_products")
           .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at")
           .order("created_at", { ascending: false });
         if (status !== "all") q = q.eq("status", status);
-        return q.range(_f, _t) as any;
+        return q.range(from, to) as any;
       });
       return data ?? [];
     },
