@@ -1372,7 +1372,7 @@ function Page() {
             {filteredPurchases.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
-                <TableCell className="text-sm">{new Date(p.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-sm">{new Date(p.created_at).toLocaleString('en-US', { timeZone: 'Asia/Karachi' })}</TableCell>
                 <TableCell>{p.suppliers?.name ?? "—"}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(p.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
