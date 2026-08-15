@@ -223,9 +223,7 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["product_barcodes"] });
     addProductLine(data as any);
   };
-  const [editRow, setEditRow] = useState<any | null>(null);
-  const [editItems, setEditItems] = useState<any[]>([]);
-  const [editItemsOriginal, setEditItemsOriginal] = useState<any[]>([]);
+  // The old separate edit states are no longer needed
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   // Selected payment source (cash account / preset) while editing a purchase.
