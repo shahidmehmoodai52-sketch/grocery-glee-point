@@ -1378,10 +1378,16 @@ function Page() {
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
                 <TableCell className="text-right space-x-1">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title="Edit purchase">
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(p)}>
+                  <Button variant="ghost" size="icon" onClick={() => {
+                    const printBtn = document.querySelector(`[data-print-id="${p.id}"]`) as HTMLButtonElement;
+                    if (printBtn) printBtn.click();
+                  }} title="Print receipt">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-printer"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(p)} title="Delete purchase">
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </TableCell>
