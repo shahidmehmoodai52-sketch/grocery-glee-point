@@ -136,12 +136,16 @@ export function LowStockAlerts() {
     queryKey: ["low-stock-alerts"],
     refetchInterval: 60_000,
     queryFn: async (): Promise<Row[]> => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase
-        .from("products")
-        .select("id,name,sku,unit,category,sell_price,stock,low_stock_threshold,updated_at")
-        .eq("is_active", true)
-        .order("stock", { ascending: true })
-        .range(_f, _t) as any), error: null as any };
+      const { data, error } = { 
+        data: await fetchAll<any>((from: number, to: number) => supabase
+          .from("products")
+          .select("id,name,sku,unit,category,sell_price,stock,low_stock_threshold,updated_at")
+          .eq("is_active", true)
+          .order("stock", { ascending: true })
+          .range(from, to) as any
+        ), 
+        error: null as any 
+      };
       if (error) throw error;
       return (data ?? []).filter(
         (p: any) => Number(p.stock) <= Number(p.low_stock_threshold ?? 0),
