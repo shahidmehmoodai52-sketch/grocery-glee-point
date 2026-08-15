@@ -3602,7 +3602,35 @@ function POSPage() {
   );
 }
 
-function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function PaymentMethodGrid({
+  value,
+  onChange,
+  sym,
+  total,
+  due,
+  digitalAccountId,
+  digitalAmount,
+  onSelectDigitalAccount,
+  onDigitalAmountChange,
+  cashBackReceived,
+  cashBackAmount,
+  onSelectCashBackAccount,
+  onCashBackReceivedChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  sym: string;
+  total: number;
+  due: number;
+  digitalAccountId: string | null;
+  digitalAmount: string;
+  onSelectDigitalAccount: (accountId: string | null) => void;
+  onDigitalAmountChange: (value: string) => void;
+  cashBackReceived: string;
+  cashBackAmount: number;
+  onSelectCashBackAccount: (accountId: string | null) => void;
+  onCashBackReceivedChange: (value: string) => void;
+}) {
   const accQ = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
     queryFn: fetchActiveCashAccounts,
