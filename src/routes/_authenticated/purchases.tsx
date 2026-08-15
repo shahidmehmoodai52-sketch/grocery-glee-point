@@ -700,22 +700,24 @@ function Page() {
 
   const draftHasContent = (d: Draft | null | undefined) =>
     !!d && (d.lines.length > 0 || !!d.note || Number(d.tax || 0) > 0 || Number(d.discount || 0) > 0 || Number(d.paid || 0) > 0);
-  const hasParkedDraft = draftHasContent(savedDraft);
+  const hasParkedDrafts = savedDrafts.length > 0;
 
-  /** Hide the entry form: park it as a draft so "New purchase" opens blank. */
+  /** Hide the entry form: park it as a draft. */
   const hideKeepDraft = () => {
-    if (draftHasContent(draft)) setSavedDraft({ ...draft, open: false });
+    if (draftHasContent(draft)) {
+      setSavedDrafts((prev) => [...prev, { ...draft, open: false }]);
+    }
     clearDraft();
   };
   const startNewPurchase = () => {
-    // Never resume the parked draft automatically — that only happens on Draft click.
-    if (draftHasContent(draft)) setSavedDraft({ ...draft, open: false });
+    if (draftHasContent(draft)) {
+      setSavedDrafts((prev) => [...prev, { ...draft, open: false }]);
+    }
     setDraft({ ...emptyDraft, open: true, date: today });
   };
-  const resumeDraft = () => {
-    if (!savedDraft) return;
-    setDraft({ ...savedDraft, open: true });
-    clearSavedDraft();
+  const resumeDraft = (d: Draft, index: number) => {
+    setDraft({ ...d, open: true });
+    setSavedDrafts((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
