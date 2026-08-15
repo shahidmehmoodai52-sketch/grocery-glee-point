@@ -238,7 +238,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       ? "SALES RETURN"
       : kind === "purchase-return"
       ? "PURCHASE RETURN"
-      : (invoice as any).isPurchase || (kind as any) === "purchase"
+      : invoice.isPurchase
       ? "PURCHASE INVOICE"
       : "SALES INVOICE";
 
