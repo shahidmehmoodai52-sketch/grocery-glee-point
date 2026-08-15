@@ -637,7 +637,7 @@ function Page() {
         // Reverse old stock
         for (const it of origItems || []) {
           if (!it.product_id) continue;
-          await supabase.rpc("increment_product_stock", { pid: it.product_id, amount: -Number(it.qty) });
+          await supabase.rpc("adjust_product_stock", { p_id: it.product_id, p_delta: -Number(it.qty) });
         }
 
         // 4. Replace items
