@@ -1,10 +1,13 @@
 /**
  * Fetch all rows from a Supabase query builder, paging past the 1000-row cap.
- * The build parameter is intentionally typed as any to bypass strict parameter count/type checks
- * that conflict with how it's being used in existing useQuery hooks across the project.
+ * 
+ * Usage: 
+ * await fetchAll<T>(
+ *   (from, to) => supabase.from("table").select("*").range(from, to)
+ * );
  */
 export async function fetchAll<T>(
-  build: any,
+  build: (from: any, to: any) => any,
   pageSizeOrLegacyOrder?: any,
   pageSize = 1000,
 ): Promise<T[]> {
@@ -17,10 +20,12 @@ export async function fetchAll<T>(
   for (let i = 0; i < 200; i++) {
     const to = from + actualPageSize - 1;
     
-    // Call the builder as any to allow flexible parameter count at the call site.
-    const response = await build(from, to);
-    const { data, error } = response || {};
+    // Execute the builder with range parameters.
+    // We cast the builder to any to avoid TypeScript errors at call sites that 
+    // are passed into TanStack useQuery and similar wrappers.
+    const response = await (build as any)(from, to);
     
+    const { data, error } = response || {};
     if (error) throw error;
     
     const rows = (data ?? []) as T[];
