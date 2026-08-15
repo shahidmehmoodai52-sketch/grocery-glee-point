@@ -25,6 +25,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { cn } from "@/lib/utils";
+import { fetchAll } from "@/lib/supabase-page";
 
 function DateRangeBar({
   preset, from, to, onPreset, onFrom, onTo,
@@ -164,30 +165,13 @@ function parseSalePaymentSplits(methodValue: string | null | undefined, paidValu
 }
 
 /**
- * Fetch an ENTIRE table page-by-page.
- *
  * Cash flow is a financial ledger: a fixed `.limit()` silently drops the OLDEST
  * rows once a shop crosses the cap, which reads to the user as history being
  * deleted. Never cap these reads — page until the server stops returning rows.
+ * Paging uses the shared helper: build(from, to) => query.range(from, to).
  */
 const PAGE_SIZE = 1000;
-const MAX_PAGES = 200; // 200k rows safety ceiling
-async function fetchAll<T = any>(
-  build: () => any,
-  order: { col: string; asc?: boolean }[],
-): Promise<T[]> {
-  const out: T[] = [];
-  for (let page = 0; page < MAX_PAGES; page++) {
-    let q = build();
-    for (const o of order) q = q.order(o.col, { ascending: o.asc ?? false });
-    const { data, error } = await q.range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
-    if (error) throw error;
-    const rows = (data ?? []) as T[];
-    out.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-  }
-  return out;
-}
+
 
 
 function Page() {
@@ -258,8 +242,8 @@ function Page() {
     queryKey: ["cash-transactions"],
     queryFn: async () =>
       await fetchAll<Tx>(
-        ((fIdx: number, tIdx: number) => supabase.from("cash_transactions").select("*").range(fIdx, tIdx)) as any,
-        1000 as any
+        ((fIdx: number, tIdx: number) => supabase.from("cash_transactions").select("*").range(fIdx, tIdx)),
+        PAGE_SIZE
       ),
     staleTime: 30_000,
   });
@@ -271,8 +255,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("sales")
         .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -281,8 +265,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("sale_returns")
         .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -291,8 +275,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("purchases")
         .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -302,8 +286,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("purchase_returns")
         .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -312,8 +296,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("expenses")
         .select("id,amount,method,category,description,expense_date,created_at")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -322,8 +306,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("party_payments")
         .select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
 
