@@ -49,6 +49,7 @@ export type ReceiptInvoice = {
   note?: string | null;
   payment_method?: string;
   refund_method?: string;
+  isPurchase?: boolean;
 };
 
 type Props = {
@@ -237,6 +238,8 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       ? "SALES RETURN"
       : kind === "purchase-return"
       ? "PURCHASE RETURN"
+      : invoice.isPurchase
+      ? "PURCHASE INVOICE"
       : "SALES INVOICE";
 
   const party = invoice.customers?.name ?? invoice.suppliers?.name;

@@ -258,7 +258,7 @@ function Page() {
       lines: formattedLines,
       tax: Number(p.tax || 0),
       taxMode: "amt",
-      discount: Number(p.subtotal || 0) > 0 ? Number(p.subtotal || 0) + Number(p.tax || 0) - Number(p.total || 0) : 0,
+      discount: Number(p.subtotal || 0) > 0 ? Number(p.subtotal || 0) - (Number(p.total || 0) - Number(p.tax || 0)) : 0,
       discountMode: "amt",
       paid: Number(p.paid || 0),
       note: p.note || "",
@@ -600,7 +600,7 @@ function Page() {
       items: (() => {
         // Distribute bill discount across lines proportionally
         let remainingDiscount = billDiscountAmt;
-        const lineTotals = items.map(l => Math.max(0, l.qty * l.cost - Number(l.discount || 0)));
+        const lineTotals = items.map(l => Math.max(0, Number(l.qty || 0) * Number(l.cost || 0) - Number(l.discount || 0)));
         const totalLineSum = lineTotals.reduce((a, b) => a + b, 0);
 
         return items.map((l, idx) => {
@@ -615,14 +615,23 @@ function Page() {
             }
           }
 
-          const effLineTotal = Math.max(0, lineNet - discShare);
+          const lineAfterBillDisc = Math.max(0, lineNet - discShare);
+          
+          // Distribute taxAmt across lines proportionally after bill discount
+          let taxShare = 0;
+          const discountedSubtotal = Math.max(0, totalLineSum - billDiscountAmt);
+          if (discountedSubtotal > 0) {
+            taxShare = +(taxAmt * (lineAfterBillDisc / discountedSubtotal)).toFixed(2);
+          }
+
+          const effLineTotal = +(lineAfterBillDisc + taxShare).toFixed(2);
           const effCost = l.qty > 0 ? effLineTotal / l.qty : l.cost;
           return {
             product_id: l.product_id,
             name: l.name,
             qty: l.qty,
             cost: +effCost.toFixed(4),
-            line_total: +effLineTotal.toFixed(2)
+            line_total: effLineTotal
           };
         });
       })(),
@@ -643,10 +652,10 @@ function Page() {
           .from("purchases")
           .update({
             supplier_id: payload.supplier_id,
-            subtotal: payload.subtotal,
-            tax: payload.tax,
-            total: payload.total,
-            paid: payload.paid,
+            subtotal: +(Number(payload.subtotal || 0).toFixed(2)),
+            tax: +(Number(payload.tax || 0).toFixed(2)),
+            total: +(Number(payload.total || 0).toFixed(2)),
+            paid: +(Number(payload.paid || 0).toFixed(2)),
             note: payload.note,
             payment_method: payload.payment_method,
             account_id: payload.account_id,
@@ -1424,8 +1433,10 @@ function Page() {
                         tax: p.tax,
                         total: p.total,
                         paid: p.paid,
+                        discount: Number(p.subtotal || 0) > 0 ? Number(p.subtotal || 0) - (Number(p.total || 0) - Number(p.tax || 0)) : 0,
                         note: p.note,
                         payment_method: p.payment_method,
+                        isPurchase: true,
                         sale_items: p.purchase_items?.map((it: any) => ({
                           name: it.name,
                           qty: it.qty,

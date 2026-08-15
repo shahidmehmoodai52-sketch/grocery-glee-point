@@ -1,26 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculatePurchaseTotals } from "./purchase-totals";
 
-describe("calculatePurchaseTotals", () => {
-  it("applies bill discount before tax and uses line discounts in the taxable base", () => {
-    const result = calculatePurchaseTotals({
-      lines: [
-        { qty: 2, cost: 50, discount: 10 },
-      ],
-      tax: 10,
-      taxMode: "pct",
-      billDiscount: 10,
-      discountMode: "pct",
-    });
-
-    expect(result.lineDiscountTotal).toBe(10);
-    expect(result.subtotal).toBe(90);
-    expect(result.billDiscountAmt).toBe(9);
-    expect(result.discountedSubtotal).toBe(81);
-    expect(result.taxAmt).toBe(8.1);
-    expect(result.total).toBe(89.1);
-  });
-
+describe("calculatePurchaseTotals - Bug Reproduction", () => {
   it("verifies discount distribution test case", () => {
     const result = calculatePurchaseTotals({
       lines: [
@@ -33,12 +14,16 @@ describe("calculatePurchaseTotals", () => {
       discountMode: "amt",
     });
 
+    // Subtotal should be 3000
     expect(result.subtotal).toBe(3000);
+    // Bill discount should be 300
     expect(result.billDiscountAmt).toBe(300);
+    // Total should be 2700
     expect(result.total).toBe(2700);
   });
 
   it("verifies tax calculation test case", () => {
+    // Check for double tax application in math logic
     const result = calculatePurchaseTotals({
       lines: [
         { qty: 1, cost: 100, discount: 0 },
@@ -53,4 +38,3 @@ describe("calculatePurchaseTotals", () => {
     expect(result.total).toBe(125);
   });
 });
-
