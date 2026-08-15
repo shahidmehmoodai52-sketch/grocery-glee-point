@@ -16,6 +16,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
+import { printInvoiceDirect } from "@/components/receipt";
 
 import { db } from "@/lib/offline/db";
 import { fetchAll } from "@/lib/supabase-page";
@@ -450,7 +451,7 @@ function Page() {
     queryKey: ["purchases"],
     staleTime: 30_000,
     queryFn: async () => offlineFirst<any[]>(
-      async () => await fetchAll<any>((from, to) => supabase.from("purchases").select("*, suppliers(name)").order("created_at", { ascending: false }).range(from, to)),
+      async () => await fetchAll<any>((from, to) => supabase.from("purchases").select("*, suppliers(name), purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
       async () => {
         const rows = await db().purchases.orderBy("created_at").reverse().toArray();
         const supMap = new Map((await db().suppliers.toArray()).map((s: any) => [s.id, s.name]));
@@ -1157,6 +1158,16 @@ function Page() {
                     Paid amount is deducted from this account in Cash Flow.
                   </div>
                 </div>
+                
+                <div className="pt-2">
+                  <Label className="text-xs">Notes</Label>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Add purchase notes..."
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
 
                 <div>
                   <Label className="text-xs">Note</Label>
@@ -1193,9 +1204,28 @@ function Page() {
               <p className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span></p>
               <p className="text-xs text-muted-foreground">Stock and costs will be updated. This cannot be undone.</p>
             </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
-              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
+            <DialogFooter className="gap-2 sm:justify-between">
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
+                <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  if (saving) return;
+                  await submit();
+                  setTimeout(() => {
+                    const latest = purchases[0];
+                    if (latest) {
+                      const printBtn = document.querySelector(`[data-print-id="${latest.id}"]`) as HTMLButtonElement;
+                      if (printBtn) printBtn.click();
+                    }
+                  }, 1500);
+                }}
+                disabled={saving}
+              >
+                {editingId ? "Update & Print" : "Save & Print"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1370,7 +1400,7 @@ function Page() {
           <TableBody>
             {filteredPurchases.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{search.trim() ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
             {filteredPurchases.map((p: any) => (
-              <TableRow key={p.id}>
+              <TableRow key={p.id} data-print-row-id={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
                 <TableCell className="text-sm">{new Date(p.created_at).toLocaleString('en-US', { timeZone: 'Asia/Karachi' })}</TableCell>
                 <TableCell>{p.suppliers?.name ?? "—"}</TableCell>
@@ -1381,10 +1411,31 @@ function Page() {
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title="Edit purchase">
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => {
-                    const printBtn = document.querySelector(`[data-print-id="${p.id}"]`) as HTMLButtonElement;
-                    if (printBtn) printBtn.click();
-                  }} title="Print receipt">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    data-print-id={p.id}
+                    onClick={() => {
+                      printInvoiceDirect({
+                        invoice_no: p.invoice_no,
+                        created_at: p.created_at,
+                        suppliers: p.suppliers,
+                        subtotal: p.subtotal,
+                        tax: p.tax,
+                        total: p.total,
+                        paid: p.paid,
+                        note: p.note,
+                        payment_method: p.payment_method,
+                        sale_items: p.purchase_items?.map((it: any) => ({
+                          name: it.name,
+                          qty: it.qty,
+                          price: it.cost,
+                          line_total: it.line_total
+                        }))
+                      }, settings, "purchase" as any);
+                    }} 
+                    title="Print receipt"
+                  >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-printer"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(p)} title="Delete purchase">
