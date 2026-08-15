@@ -652,10 +652,10 @@ function Page() {
           .from("purchases")
           .update({
             supplier_id: payload.supplier_id,
-            subtotal: payload.subtotal,
-            tax: payload.tax,
-            total: payload.total,
-            paid: payload.paid,
+            subtotal: Number(payload.subtotal || 0).toFixed(2),
+            tax: Number(payload.tax || 0).toFixed(2),
+            total: Number(payload.total || 0).toFixed(2),
+            paid: Number(payload.paid || 0).toFixed(2),
             note: payload.note,
             payment_method: payload.payment_method,
             account_id: payload.account_id,
