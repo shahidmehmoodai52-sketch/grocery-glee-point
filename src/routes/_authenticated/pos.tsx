@@ -1883,7 +1883,7 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["expense_persons"] });
 
       // Post-sale print behaviour, configurable in Settings.
-      const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled !== false;
+      const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled === true;
       const printDefault = ((settings as any)?.pos_print_prompt_default ?? "no") as "yes" | "no";
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
@@ -3058,6 +3058,7 @@ function POSPage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
+                      if (submitting) return;
                       handleSale();
                     }
                   }}
@@ -3065,7 +3066,11 @@ function POSPage() {
                   className="h-9 flex-1 text-sm font-semibold tabular-nums"
                 />
                 <button
-                  onClick={() => setTab({ paid: total.toFixed(2) })}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setTab({ paid: total.toFixed(2) });
+                  }}
                   className="text-xs text-primary hover:underline shrink-0 font-medium"
                 >
                   Exact
@@ -3759,7 +3764,7 @@ function Kbd({ label, hint }: { label: string; hint: string }) {
 
 function PrintPromptDialog({
   sale,
-  defaultAction,
+  defaultAction = "no",
   onYes,
   onNo,
 }: {
@@ -3770,10 +3775,10 @@ function PrintPromptDialog({
 }) {
   const yesRef = useRef<HTMLButtonElement>(null);
   const noRef = useRef<HTMLButtonElement>(null);
-  const [focused, setFocused] = useState<"yes" | "no">(defaultAction);
+  const [focused, setFocused] = useState<"yes" | "no">(defaultAction || "no");
   useEffect(() => {
     if (!sale) return;
-    setFocused(defaultAction);
+    setFocused(defaultAction || "no");
     const t = setTimeout(() => {
       (defaultAction === "yes" ? yesRef.current : noRef.current)?.focus();
     }, 30);
@@ -3849,7 +3854,6 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
           <Button
             onClick={() => {
               printInvoiceDirect(invoice, settings, "sale");
-              onClose();
             }}
           >
             <Printer className="h-4 w-4 mr-2" />
