@@ -63,7 +63,7 @@ export function normalizePaymentMethodValue(method: string | null | undefined): 
     bank: "bank",
     "bank account": "bank",
     "bank transfer": "bank",
-    "online": "bank",
+    online: "bank",
     digital: "digital_cash_back",
     "digital cash back": "digital_cash_back",
     "digital + cb": "digital_cash_back",

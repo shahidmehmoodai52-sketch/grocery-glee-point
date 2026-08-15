@@ -1151,20 +1151,36 @@ function POSPage() {
 
   const setPrimaryPaymentMethod = (method: string) => {
     const nextMethod = normalizePaymentMethodValue(method);
-    const rowMethod = isDigitalCashBackMode && nextMethod !== "digital_cash_back" ? "digital_cash_back" : nextMethod;
-    const nextRows = [...paymentRows];
-    if (nextRows[0]) {
-      nextRows[0] = { ...nextRows[0], method: rowMethod };
-    } else {
-      nextRows.push({ method: rowMethod, amount: 0 });
+    const rowMethod =
+      nextMethod === "digital_cash_back" ? "digital_cash_back" : nextMethod;
+
+    // Reset mutually exclusive states
+    const patch: Partial<Tab> = {
+      payment_method: nextMethod,
+    };
+
+    if (nextMethod !== "credit") {
+      patch.customer_id = null;
     }
-    setPaymentRows(nextRows);
+    if (nextMethod !== "digital_cash_back") {
+      patch.digital_received_amount = "";
+      patch.digital_account_id = null;
+    }
+    // expense_person_id is handled by the Staff button toggle, but we should clear it if switching to others
+    if (nextMethod !== "staff") {
+      patch.expense_person_id = null;
+    }
+
+    const nextRows = [{ method: rowMethod, amount: Number(tab.paid || 0) || 0 }];
+    setTab({
+      ...patch,
+      payments: nextRows,
+      paid: tab.paid,
+    });
   };
 
   const bindSelectedTenderSource = (method: string) => {
-    const nextMethod = normalizePaymentMethodValue(method);
-    setPrimaryPaymentMethod(nextMethod);
-    setTab({ payment_method: nextMethod });
+    setPrimaryPaymentMethod(method);
   };
 
   const setDigitalTenderSource = (accountId: string | null) => {
@@ -2726,6 +2742,7 @@ function POSPage() {
                     setTab({
                       customer_id: isWalkin ? null : v,
                       payment_method: isWalkin ? "cash" : "credit",
+                      expense_person_id: null,
                     });
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
@@ -2782,10 +2799,13 @@ function POSPage() {
                 <Select
                   value={tab.expense_person_id ?? "none"}
                   onValueChange={(v) => {
+                    const isStaff = v !== "none";
                     setTab({
-                      expense_person_id: v === "none" ? null : v,
-                      customer_id: v === "none" ? tab.customer_id : null,
+                      expense_person_id: isStaff ? v : null,
+                      customer_id: null,
+                      payment_method: isStaff ? "staff" : "cash",
                     });
+                    if (!isStaff) setShowStaff(false);
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
@@ -2814,12 +2834,16 @@ function POSPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={showStaff || tab.expense_person_id ? "secondary" : "ghost"}
+                  variant={tab.expense_person_id ? "secondary" : "ghost"}
                   className="h-6 text-[11px] px-2"
                   title="Charge this bill to a staff/owner expense ledger"
                   onClick={() => {
-                    if (tab.expense_person_id) setTab({ expense_person_id: null });
-                    setShowStaff((v) => !v);
+                    if (tab.expense_person_id) {
+                      setTab({ expense_person_id: null, payment_method: "cash" });
+                    } else {
+                      setTab({ expense_person_id: null }); // trigger dropdown show
+                      setShowStaff(true);
+                    }
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
@@ -3622,8 +3646,9 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
 
   const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
   // Only accounts created in Cash Flow are offered here, including card/bank/mobile wallets.
+  // Filter out "Card" if it's a duplicate of the standalone Card button.
   const online = accounts
-    .filter((a: any) => a.type !== "cash")
+    .filter((a: any) => a.type !== "cash" && slug(a.name) !== "card")
     .map((a: any) => ({ v: a.name, label: a.name, id: a.id }));
 
   const normalizedValue = normalizePaymentMethodValue(value);
