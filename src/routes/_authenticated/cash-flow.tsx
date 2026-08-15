@@ -25,6 +25,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { cn } from "@/lib/utils";
+import { fetchAll } from "@/lib/supabase-page";
 
 function DateRangeBar({
   preset, from, to, onPreset, onFrom, onTo,
@@ -241,8 +242,8 @@ function Page() {
     queryKey: ["cash-transactions"],
     queryFn: async () =>
       await fetchAll<Tx>(
-        ((fIdx: number, tIdx: number) => supabase.from("cash_transactions").select("*").range(fIdx, tIdx)) as any,
-        1000 as any
+        ((fIdx: number, tIdx: number) => supabase.from("cash_transactions").select("*").range(fIdx, tIdx)),
+        PAGE_SIZE
       ),
     staleTime: 30_000,
   });
@@ -254,8 +255,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("sales")
         .select("id,invoice_no,total,paid,payment_method,status,created_at,customers(name)")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -264,8 +265,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("sale_returns")
         .select("id,return_no,refund_amount,refund_method,created_at,customers(name)")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -274,8 +275,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("purchases")
         .select("id,invoice_no,total,paid,status,payment_method,account_id,created_at,suppliers(name)")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -285,8 +286,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("purchase_returns")
         .select("id,return_no,refund_amount,refund_method,created_at,suppliers(name)")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -295,8 +296,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("expenses")
         .select("id,amount,method,category,description,expense_date,created_at")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
   });
@@ -305,8 +306,8 @@ function Page() {
     queryFn: async () => await fetchAll<any>(((fIdx: number, tIdx: number) => 
       supabase.from("party_payments")
         .select("id,party_type,party_id,amount,method,note,created_at,cash_transaction_id")
-        .range(fIdx, tIdx)) as any,
-      1000 as any
+        .range(fIdx, tIdx)),
+      PAGE_SIZE
     ),
     staleTime: 30_000,
 
