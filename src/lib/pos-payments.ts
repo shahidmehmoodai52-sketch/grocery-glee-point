@@ -64,7 +64,10 @@ export function normalizePaymentMethodValue(method: string | null | undefined): 
     "bank account": "bank",
     "bank transfer": "bank",
     online: "bank",
-    digital: "digital_cash_back",
+    // "digital" is its own payment method (digital wallet / online account).
+    // It is deliberately NOT an alias of the cash-back flow below.
+    digital: "digital",
+    "digital payment": "digital",
     "digital cash back": "digital_cash_back",
     "digital + cb": "digital_cash_back",
     "digital_cash_back": "digital_cash_back",

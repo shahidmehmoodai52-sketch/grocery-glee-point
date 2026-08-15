@@ -43,6 +43,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
@@ -1104,6 +1105,7 @@ function POSPage() {
     tab.digital_received_amount ?? tab.paid ?? 0,
   );
   const isDigitalCashBackMode = normalizePaymentMethodValue(tab.payment_method) === "digital_cash_back";
+  const isDigitalMode = normalizePaymentMethodValue(tab.payment_method) === "digital";
   const normalizedPayments = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
   const paidAmountForBalance = isDigitalCashBackMode
     ? total
@@ -1151,8 +1153,7 @@ function POSPage() {
 
   const setPrimaryPaymentMethod = (method: string) => {
     const nextMethod = normalizePaymentMethodValue(method);
-    const rowMethod =
-      nextMethod === "digital_cash_back" ? "digital_cash_back" : nextMethod;
+    const rowMethod = nextMethod;
 
     // Reset mutually exclusive states
     const patch: Partial<Tab> = {
@@ -1162,8 +1163,12 @@ function POSPage() {
     if (nextMethod !== "credit") {
       patch.customer_id = null;
     }
+    // Digital and Digital + CB are separate methods; both use digital_account_id
+    // but only the cash-back flow uses digital_received_amount.
     if (nextMethod !== "digital_cash_back") {
       patch.digital_received_amount = "";
+    }
+    if (nextMethod !== "digital_cash_back" && nextMethod !== "digital") {
       patch.digital_account_id = null;
     }
     // expense_person_id is handled by the Staff button toggle, but we should clear it if switching to others
@@ -1179,32 +1184,50 @@ function POSPage() {
     });
   };
 
-  const bindSelectedTenderSource = (method: string) => {
-    setPrimaryPaymentMethod(method);
+  const accountNameById = (accountId: string | null) => {
+    const account = ((cashAccountOptions ?? []) as any[]).find((a: any) => a.id === accountId);
+    return account?.name ? String(account.name) : null;
   };
 
-  const setDigitalTenderSource = (accountId: string | null) => {
-    const nextAccountId = accountId || null;
-    const account = ((cashAccountOptions ?? []) as any[]).find((a: any) => a.id === nextAccountId);
+  /** Plain Digital: sale is fully received in a digital/online account.
+   *  The tender row carries the account name so Cash Flow attributes the
+   *  inflow to that exact account. Never touches the cash-back state. */
+  const setDigitalAccount = (accountId: string | null) => {
+    const name = accountNameById(accountId);
+    const rowMethod = name ? normalizePaymentMethodValue(name) : "digital";
     setTab({
-      digital_account_id: nextAccountId,
-      payment_method: "digital_cash_back",
-      payments: [{ method: "digital_cash_back", amount: Number(tab.paid || 0) || 0 }],
-      paid: String(tab.paid || ""),
+      payment_method: "digital",
+      digital_account_id: accountId || null,
+      digital_received_amount: "",
+      customer_id: null,
+      expense_person_id: null,
+      payments: [{ method: rowMethod, amount: Number(tab.paid || 0) || 0 }],
     });
+  };
 
-    if (account && account.name) {
-      const nextRows = [...paymentRows];
-      const baseMethod = normalizePaymentMethodValue(account.name);
-      if (nextRows[0]) {
-        nextRows[0] = { ...nextRows[0], method: baseMethod || "digital_cash_back" };
-      } else {
-        nextRows.push({ method: baseMethod || "digital_cash_back", amount: Number(tab.paid || 0) || 0 });
-      }
-      setPaymentRows(nextRows);
-    } else {
-      setPrimaryPaymentMethod("digital_cash_back");
-    }
+  /** Digital + CB: the customer sends more than the bill and takes the
+   *  difference back in cash. Keeps its own received/cash-back figures. */
+  const setDigitalCashBackAccount = (accountId: string | null) => {
+    setTab({
+      payment_method: "digital_cash_back",
+      digital_account_id: accountId || null,
+      customer_id: null,
+      expense_person_id: null,
+      payments: [{ method: "digital_cash_back", amount: Number(tab.paid || 0) || 0 }],
+    });
+  };
+
+  /** Amount typed inside the Digital popover — only updates the tender amount. */
+  const setDigitalAmount = (value: string) => {
+    const rowMethod =
+      paymentRows[0]?.method && normalizePaymentMethodValue(tab.payment_method) === "digital"
+        ? paymentRows[0].method
+        : normalizePaymentMethodValue(accountNameById(tab.digital_account_id ?? null) ?? "digital");
+    setTab({
+      paid: value,
+      payment_method: "digital",
+      payments: [{ method: rowMethod, amount: Number(value || 0) || 0 }],
+    });
   };
 
   // Keep cart discount in sync when percentage is typed
@@ -1538,6 +1561,15 @@ function POSPage() {
       }
       if (!tab.digital_account_id) {
         return toast.error("Select a digital account to receive the payment");
+      }
+    }
+    if (isDigitalMode) {
+      const hasAccounts = ((cashAccountOptions ?? []) as any[]).some((a: any) => a.type !== "cash");
+      if (hasAccounts && !tab.digital_account_id) {
+        return toast.error("Select the digital account that received the payment");
+      }
+      if (Number(tab.paid || 0) <= 0) {
+        return toast.error("Enter the digital amount received");
       }
     }
     const isCredit = !isDigitalCashBackMode && due > 0;
@@ -2720,7 +2752,7 @@ function POSPage() {
         {/* RIGHT: side panel — open bills, party, payment, totals */}
         <aside className="w-full md:w-[320px] lg:w-[360px] xl:w-[380px] shrink-0 border-t md:border-t-0 md:border-l bg-card flex flex-col min-h-0 max-h-[70vh] md:max-h-[calc(100vh-8.5rem)] overflow-hidden no-print">
           {/* Party + payment */}
-          <div className="p-2.5 border-b space-y-2 shrink-0">
+          <div className="p-2 border-b space-y-1.5 shrink-0">
             <div>
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2858,78 +2890,18 @@ function POSPage() {
                   setPrimaryPaymentMethod(v);
                   setTimeout(() => searchRef.current?.focus(), 0);
                 }}
+                sym={sym}
+                total={total}
+                due={due}
+                digitalAccountId={tab.digital_account_id ?? null}
+                digitalAmount={tab.paid ?? ""}
+                onSelectDigitalAccount={setDigitalAccount}
+                onDigitalAmountChange={setDigitalAmount}
+                cashBackReceived={tab.digital_received_amount ?? ""}
+                cashBackAmount={digitalCashBackAmount}
+                onSelectCashBackAccount={setDigitalCashBackAccount}
+                onCashBackReceivedChange={(v) => setTab({ digital_received_amount: v })}
               />
-              {isDigitalCashBackMode && (
-                <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2 space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Digital cash back
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Total {fmtMoney(total, sym)}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div>
-                      <Label className="text-[9px]">Digital account</Label>
-                      <Select
-                        value={tab.digital_account_id ?? ""}
-                        onValueChange={(v) => setDigitalTenderSource(v || null)}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(() => {
-                            const accounts = ((cashAccountOptions ?? []) as any[]).filter(
-                              (a: any) => a.type !== "cash",
-                            );
-                            return accounts.length ? (
-                              accounts.map((a: any) => (
-                                <SelectItem key={a.id} value={a.id}>
-                                  {a.name}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <div className="px-2 py-2 text-xs text-muted-foreground">
-                                No digital accounts available
-                              </div>
-                            );
-                          })()}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">Amount received</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={tab.digital_received_amount ?? ""}
-                        onChange={(e) => setTab({ digital_received_amount: e.target.value })}
-                        placeholder={total.toFixed(2)}
-                      />
-                    </div>
-                    <div className="rounded-md border border-dashed bg-background/70 px-2 py-1.5 text-[10px] space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cash back</span>
-                        <span className="font-semibold">
-                          {fmtMoney(digitalCashBackAmount, sym)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Net digital effect</span>
-                        <span className="font-semibold text-emerald-600">
-                          {fmtMoney(
-                            Math.max(0, Number(tab.digital_received_amount || 0) - total),
-                            sym,
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Tender
@@ -2987,7 +2959,7 @@ function POSPage() {
           </div>
 
           {/* Totals + discount + paid + note */}
-          <div className="flex-1 min-h-0 overflow-auto p-2 space-y-1 bg-muted/10 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-auto px-2 py-1.5 space-y-1 bg-muted/10 flex flex-col">
             <Row
               label="Items"
               value={`${tab.items.length} item${tab.items.length === 1 ? "" : "s"}`}
@@ -3641,7 +3613,35 @@ function POSPage() {
   );
 }
 
-function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function PaymentMethodGrid({
+  value,
+  onChange,
+  sym,
+  total,
+  due,
+  digitalAccountId,
+  digitalAmount,
+  onSelectDigitalAccount,
+  onDigitalAmountChange,
+  cashBackReceived,
+  cashBackAmount,
+  onSelectCashBackAccount,
+  onCashBackReceivedChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  sym: string;
+  total: number;
+  due: number;
+  digitalAccountId: string | null;
+  digitalAmount: string;
+  onSelectDigitalAccount: (accountId: string | null) => void;
+  onDigitalAmountChange: (value: string) => void;
+  cashBackReceived: string;
+  cashBackAmount: number;
+  onSelectCashBackAccount: (accountId: string | null) => void;
+  onCashBackReceivedChange: (value: string) => void;
+}) {
   const accQ = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
     queryFn: fetchActiveCashAccounts,
@@ -3659,6 +3659,11 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
   const isOnline = online.some((o) => normalizePaymentMethodValue(o.v) === normalizedValue) || normalizedValue === "bank";
   const activeOnline = online.find((o) => normalizePaymentMethodValue(o.v) === normalizedValue) ??
     (normalizedValue === "bank" ? { v: "bank", label: "Bank", id: "bank" } : undefined);
+
+  const isDigital = normalizedValue === "digital";
+  const isCashBack = normalizedValue === "digital_cash_back";
+  const [digitalOpen, setDigitalOpen] = useState(false);
+  const [cbOpen, setCbOpen] = useState(false);
 
   const btn = (active: boolean) =>
     `h-9 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
@@ -3705,13 +3710,164 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <button
-        type="button"
-        onClick={() => onChange("digital_cash_back")}
-        className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
+      {/* Digital — compact popover, never expands the panel vertically */}
+      <Popover
+        open={digitalOpen}
+        onOpenChange={(open) => {
+          setDigitalOpen(open);
+          if (open && !isDigital) {
+            onSelectDigitalAccount(digitalAccountId ?? online[0]?.id ?? null);
+          }
+        }}
       >
-        Digital + CB
-      </button>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={`${btn(isDigital)} flex items-center justify-center gap-1 px-1`}
+            title="Digital / online payment"
+          >
+            <span className="truncate">Digital</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="font-semibold">Digital payment</span>
+            <span>Total {fmtMoney(total, sym)}</span>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">Digital account</Label>
+            <Select
+              value={digitalAccountId ?? ""}
+              onValueChange={(v) => onSelectDigitalAccount(v || null)}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {online.length ? (
+                  online.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-2 text-xs text-muted-foreground">
+                    No digital accounts yet — create one in Cash Flow.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">Amount received</Label>
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                className="h-8 text-right"
+                value={digitalAmount}
+                onChange={(e) => onDigitalAmountChange(e.target.value)}
+                placeholder={total.toFixed(2)}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 px-2 text-[11px]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onDigitalAmountChange(total.toFixed(2));
+                }}
+              >
+                Exact
+              </Button>
+            </div>
+          </div>
+          <div className="flex justify-between rounded-md border border-dashed px-2 py-1 text-[11px]">
+            <span className="text-muted-foreground">Remaining</span>
+            <span className="font-semibold">{fmtMoney(due, sym)}</span>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Digital + CB — separate method with its own received / cash-back figures */}
+      <Popover
+        open={cbOpen}
+        onOpenChange={(open) => {
+          setCbOpen(open);
+          if (open && !isCashBack) {
+            onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null);
+          }
+        }}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={`${btn(isCashBack)} leading-tight px-1.5 flex items-center justify-center gap-1`}
+            title="Digital payment with cash back"
+          >
+            <span className="truncate">Digital + CB</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="font-semibold">Digital cash back</span>
+            <span>Total {fmtMoney(total, sym)}</span>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">Digital account</Label>
+            <Select
+              value={digitalAccountId ?? ""}
+              onValueChange={(v) => onSelectCashBackAccount(v || null)}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {online.length ? (
+                  online.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-2 text-xs text-muted-foreground">
+                    No digital accounts yet — create one in Cash Flow.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">Amount received</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              className="h-8 text-right"
+              value={cashBackReceived}
+              onChange={(e) => onCashBackReceivedChange(e.target.value)}
+              placeholder={total.toFixed(2)}
+            />
+          </div>
+          <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Cash back</span>
+              <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Net digital effect</span>
+              <span className="font-semibold text-emerald-600">
+                {fmtMoney(Math.max(0, Number(cashBackReceived || 0) - total), sym)}
+              </span>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>
         Credit
       </button>
@@ -3738,6 +3894,7 @@ function PaymentMethodSelect({
     { value: "cash", label: "Cash" },
     { value: "card", label: "Card" },
     { value: "bank", label: "Bank" },
+    { value: "digital", label: "Digital" },
     { value: "digital_cash_back", label: "Digital + CB" },
     { value: "credit", label: "Credit" },
     { value: "staff", label: "Staff" },
