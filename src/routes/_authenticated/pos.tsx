@@ -3824,7 +3824,7 @@ function PrintPromptDialog({
   };
 
   const doPrint = () => {
-    printInvoiceDirect(sale, settings);
+    printInvoiceDirect(sale, settings.data);
     onYes();
   };
 
