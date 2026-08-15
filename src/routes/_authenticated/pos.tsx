@@ -1903,8 +1903,10 @@ function POSPage() {
       const printDefault = "no";
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
-      } else if (printDefault === "yes" && patchedSale) {
-        printInvoiceDirect(patchedSale, settings);
+      } else if (patchedSale) {
+        // If prompt is disabled, follow the explicit default.
+        // Since we now hardcode default to "no", it only prints if explicitly enabled.
+        // But for clarity, we keep the logic structure.
         setTimeout(() => searchRef.current?.focus(), 50);
       } else {
         setTimeout(() => searchRef.current?.focus(), 50);
