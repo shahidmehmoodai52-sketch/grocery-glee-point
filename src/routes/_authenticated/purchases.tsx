@@ -1436,6 +1436,7 @@ function Page() {
                         discount: Number(p.subtotal || 0) > 0 ? Number(p.subtotal || 0) - (Number(p.total || 0) - Number(p.tax || 0)) : 0,
                         note: p.note,
                         payment_method: p.payment_method,
+                        isPurchase: true,
                         sale_items: p.purchase_items?.map((it: any) => ({
                           name: it.name,
                           qty: it.qty,
