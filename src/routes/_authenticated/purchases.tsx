@@ -913,12 +913,14 @@ function Page() {
                           const lineDiscount = Number(l.discount || 0);
                           const lineGross = qty * cost;
                           const lineSub = Math.max(0, lineGross - lineDiscount);
-                          const taxShare = subtotal > 0 ? taxAmt * (lineSub / subtotal) : 0;
-                          const effCost = qty > 0 ? (lineSub + taxShare) / qty : cost;
+                          const billDiscShare = subtotal > 0 ? billDiscountAmt * (lineSub / subtotal) : 0;
+                          const lineAfterBillDisc = Math.max(0, lineSub - billDiscShare);
+                          const taxShare = discountedSubtotal > 0 ? taxAmt * (lineAfterBillDisc / discountedSubtotal) : 0;
+                          const effCost = qty > 0 ? (lineAfterBillDisc + taxShare) / qty : cost;
                           const newAvg = hasProduct
                             ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
                             : effCost;
-                          const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
+                          const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) ? ((newAvg - oldCost) / oldCost) * 100 : 0;
                           const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
                           const totalDisplay = l._total != null ? l._total : (qty && cost ? +lineGross.toFixed(2) : 0);
                           return (
