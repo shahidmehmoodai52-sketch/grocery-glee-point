@@ -3733,6 +3733,7 @@ function PaymentMethodSelect({
     queryFn: fetchActiveCashAccounts,
   });
   const accounts = accQ.data ?? [];
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const options = [
     { value: "cash", label: "Cash" },
     { value: "card", label: "Card" },
@@ -3741,7 +3742,7 @@ function PaymentMethodSelect({
     { value: "credit", label: "Credit" },
     { value: "staff", label: "Staff" },
     ...accounts
-      .filter((a: any) => a.type !== "cash" && slug(a.name) !== "card")
+      .filter((a: any) => a.type !== "cash" && slugify(a.name) !== "card")
       .map((a: any) => ({ value: a.name, label: a.name })),
   ];
 
