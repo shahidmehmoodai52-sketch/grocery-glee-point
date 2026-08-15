@@ -1105,6 +1105,7 @@ function POSPage() {
     tab.digital_received_amount ?? tab.paid ?? 0,
   );
   const isDigitalCashBackMode = normalizePaymentMethodValue(tab.payment_method) === "digital_cash_back";
+  const isDigitalMode = normalizePaymentMethodValue(tab.payment_method) === "digital";
   const normalizedPayments = normalizePaymentAllocations(paymentRows, tab.payment_method, tab.paid);
   const paidAmountForBalance = isDigitalCashBackMode
     ? total
