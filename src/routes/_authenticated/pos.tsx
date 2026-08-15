@@ -3739,8 +3739,9 @@ function PaymentMethodSelect({
     { value: "bank", label: "Bank" },
     { value: "digital_cash_back", label: "Digital + CB" },
     { value: "credit", label: "Credit" },
+    { value: "staff", label: "Staff" },
     ...accounts
-      .filter((a: any) => a.type !== "cash")
+      .filter((a: any) => a.type !== "cash" && slug(a.name) !== "card")
       .map((a: any) => ({ value: a.name, label: a.name })),
   ];
 
