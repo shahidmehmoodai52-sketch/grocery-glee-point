@@ -1110,7 +1110,9 @@ function Page() {
               </div>
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button variant="ghost" size="sm" onClick={hideKeepDraft}>Hide (keep draft)</Button>
-                <Button variant="outline" size="sm" onClick={clearDraft}>Discard</Button>
+                <Button variant="outline" size="sm" onClick={() => {
+                  if (confirm("Discard this purchase?")) clearDraft();
+                }}>Discard</Button>
                 <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>Record purchase</Button>
               </div>
             </DialogFooter>
