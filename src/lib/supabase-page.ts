@@ -1,29 +1,28 @@
 /**
- * Fetch all rows from a Supabase query builder, paging past the 1000-row cap.
+ * Fetch all rows from a Supabase query, paging past PostgREST's 1000-row cap.
+ *
+ * `build(from, to)` MUST apply `.range(from, to)` to the query so each call
+ * returns the next page. Paging stops when a page returns fewer rows than
+ * `pageSize`, so the resulting array contains every matching record.
  */
+type PageResponse = { data: unknown[] | null; error: unknown };
+
 export async function fetchAll<T>(
-  build: any,
-  pageSizeOrOptions: any = 1000,
+  build: (from: number, to: number) => PromiseLike<PageResponse>,
+  pageSize: number = 1000,
 ): Promise<T[]> {
   const all: T[] = [];
   let from = 0;
-  
-  const pageSize = typeof pageSizeOrOptions === 'number' ? pageSizeOrOptions : 1000;
 
-  // Safety cap (200,000 rows max) to prevent UI blocking.
+  // Safety cap (200 pages) to prevent unbounded loops / UI blocking.
   for (let i = 0; i < 200; i++) {
     const to = from + pageSize - 1;
-    
-    // Execute the builder with range parameters.
-    const response = await (build as any)(from, to);
-    
-    const { data, error } = response || {};
+    const { data, error } = await build(from, to);
     if (error) throw error;
-    
+
     const rows = (data ?? []) as T[];
     all.push(...rows);
-    
-    // Exit if we've retrieved all available records.
+
     if (rows.length < pageSize) break;
     from += pageSize;
   }
