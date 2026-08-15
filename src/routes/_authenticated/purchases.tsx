@@ -1165,7 +1165,7 @@ function Page() {
 
         <Dialog open={confirmOpen} onOpenChange={(v) => { if (!saving) setConfirmOpen(v); }}>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Confirm purchase</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Confirm changes" : "Confirm purchase"}</DialogTitle></DialogHeader>
             <div className="space-y-2 text-sm">
               <p>Save this purchase with <b>{lines.length}</b> item{lines.length === 1 ? "" : "s"}?</p>
               <p className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span></p>
