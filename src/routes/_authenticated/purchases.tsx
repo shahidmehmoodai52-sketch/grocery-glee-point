@@ -257,7 +257,7 @@ function Page() {
       lines: formattedLines,
       tax: Number(p.tax || 0),
       taxMode: "amt",
-      discount: 0,
+      discount: Number(p.subtotal || 0) > 0 ? Number(p.subtotal || 0) + Number(p.tax || 0) - Number(p.total || 0) : 0,
       discountMode: "amt",
       paid: Number(p.paid || 0),
       note: p.note || "",
