@@ -83,13 +83,14 @@ function Page() {
   }, [prevFrom, fromDate, toDate]);
 
   const rangedQuery = (table: "sales" | "sale_returns", cols: string) => async () => {
-    return await fetchAll<any>((from, to) => {
+    return await fetchAll<any>((fIdx, tIdx) => {
       let q = supabase.from(table).select(cols).order("created_at", { ascending: false });
       if (window.startIso) q = q.gte("created_at", window.startIso);
       if (window.endIso) q = q.lte("created_at", window.endIso);
-      return q.range(from, to) as any;
-    });
+      return q.range(fIdx, tIdx) as any;
+    }, 1000);
   };
+
 
   const { data: allSales = [] } = useQuery({
     queryKey: ["sales", window.startIso, window.endIso],

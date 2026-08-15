@@ -19,6 +19,8 @@ import { fmtMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
+import { fetchAll } from "@/lib/supabase-page";
+
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: Page });
 
@@ -41,14 +43,20 @@ function SupplierWiseReport({
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["report-suppliers"],
-    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => 
+      supabase.from("suppliers").select("id,name").order("name").range(fIdx, tIdx),
+      1000
+    ),
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ["report-products-minimal"],
-    queryFn: async () =>
-      (await supabase.from("products").select("id,name,category,stock,sell_price,cost_price,preferred_supplier_id")).data ?? [],
+    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => 
+      supabase.from("products").select("id,name,category,stock,sell_price,cost_price,preferred_supplier_id").range(fIdx, tIdx),
+      1000
+    ),
   });
+
 
   const stats = useMemo(() => {
     const pMap = new Map(products.map((p) => [p.id, p]));
@@ -363,45 +371,70 @@ function Page() {
   };
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
-  const range = { from: new Date(from + "T00:00:00").toISOString(), to: new Date(to + "T23:59:59").toISOString() };
+  const range = {
+    from: from ? new Date(from + "T00:00:00").toISOString() : "2000-01-01T00:00:00Z",
+    to: to ? new Date(to + "T23:59:59").toISOString() : new Date().toISOString(),
+  };
+
 
 
   const { data: sales = [] } = useQuery({
     queryKey: ["report-sales-full", from, to],
-    queryFn: async () =>
-      (await supabase
-        .from("sales")
+    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+      let q = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
-        .gte("created_at", range.from).lte("created_at", range.to)
-        .order("created_at", { ascending: false })).data ?? [],
+        .order("created_at", { ascending: false });
+      if (from) q = q.gte("created_at", range.from);
+      if (to) q = q.lte("created_at", range.to);
+      return q.range(fIdx, tIdx);
+    }, 1000),
   });
+
   const { data: purchases = [] } = useQuery({
     queryKey: ["report-purchases", from, to],
-    queryFn: async () =>
-      (await supabase.from("purchases").select("subtotal,tax,total,paid,created_at")
-        .gte("created_at", range.from).lte("created_at", range.to)).data ?? [],
+    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+      let q = supabase.from("purchases").select("subtotal,tax,total,paid,created_at");
+      if (from) q = q.gte("created_at", range.from);
+      if (to) q = q.lte("created_at", range.to);
+      return q.range(fIdx, tIdx);
+    }, 1000),
   });
+
   const { data: expenses = [] } = useQuery({
     queryKey: ["report-expenses", from, to],
-    queryFn: async () =>
-      (await supabase.from("expenses").select("amount,category,expense_date").gte("expense_date", from).lte("expense_date", to)).data ?? [],
+    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+      let q = supabase.from("expenses").select("amount,category,expense_date");
+      if (from) q = q.gte("expense_date", from);
+      if (to) q = q.lte("expense_date", to);
+      return q.range(fIdx, tIdx);
+    }, 1000),
   });
+
   const { data: partyPayments = [] } = useQuery({
     queryKey: ["report-party-payments", from, to],
-    queryFn: async () =>
-      (await supabase.from("party_payments")
+    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+      let q = supabase.from("party_payments")
         .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
-        .gte("created_at", range.from).lte("created_at", range.to)
-        .order("created_at", { ascending: false })).data ?? [],
+        .order("created_at", { ascending: false });
+      if (from) q = q.gte("created_at", range.from);
+      if (to) q = q.lte("created_at", range.to);
+      return q.range(fIdx, tIdx);
+    }, 1000),
   });
+
   const { data: saleReturns = [] } = useQuery({
     queryKey: ["report-sale-returns", from, to],
-    queryFn: async () =>
-      (await supabase.from("sale_returns")
+    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => {
+      let q = supabase.from("sale_returns")
         .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
-        .gte("created_at", range.from).lte("created_at", range.to)
-        .order("created_at", { ascending: false })).data ?? [],
+        .order("created_at", { ascending: false });
+      if (from) q = q.gte("created_at", range.from);
+      if (to) q = q.lte("created_at", range.to);
+      return q.range(fIdx, tIdx);
+    }, 1000),
   });
+
+
 
   // ---- aggregates (net of sale returns)
   const grossRevenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
