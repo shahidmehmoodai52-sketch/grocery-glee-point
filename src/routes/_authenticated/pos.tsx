@@ -3694,13 +3694,164 @@ function PaymentMethodGrid({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <button
-        type="button"
-        onClick={() => onChange("digital_cash_back")}
-        className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
+      {/* Digital — compact popover, never expands the panel vertically */}
+      <Popover
+        open={digitalOpen}
+        onOpenChange={(open) => {
+          setDigitalOpen(open);
+          if (open && !isDigital) {
+            onSelectDigitalAccount(digitalAccountId ?? online[0]?.id ?? null);
+          }
+        }}
       >
-        Digital + CB
-      </button>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={`${btn(isDigital)} flex items-center justify-center gap-1 px-1`}
+            title="Digital / online payment"
+          >
+            <span className="truncate">Digital</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="font-semibold">Digital payment</span>
+            <span>Total {fmtMoney(total, sym)}</span>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">Digital account</Label>
+            <Select
+              value={digitalAccountId ?? ""}
+              onValueChange={(v) => onSelectDigitalAccount(v || null)}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {online.length ? (
+                  online.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-2 text-xs text-muted-foreground">
+                    No digital accounts yet — create one in Cash Flow.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">Amount received</Label>
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                className="h-8 text-right"
+                value={digitalAmount}
+                onChange={(e) => onDigitalAmountChange(e.target.value)}
+                placeholder={total.toFixed(2)}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 px-2 text-[11px]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onDigitalAmountChange(total.toFixed(2));
+                }}
+              >
+                Exact
+              </Button>
+            </div>
+          </div>
+          <div className="flex justify-between rounded-md border border-dashed px-2 py-1 text-[11px]">
+            <span className="text-muted-foreground">Remaining</span>
+            <span className="font-semibold">{fmtMoney(due, sym)}</span>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Digital + CB — separate method with its own received / cash-back figures */}
+      <Popover
+        open={cbOpen}
+        onOpenChange={(open) => {
+          setCbOpen(open);
+          if (open && !isCashBack) {
+            onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null);
+          }
+        }}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={`${btn(isCashBack)} leading-tight px-1.5 flex items-center justify-center gap-1`}
+            title="Digital payment with cash back"
+          >
+            <span className="truncate">Digital + CB</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="font-semibold">Digital cash back</span>
+            <span>Total {fmtMoney(total, sym)}</span>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">Digital account</Label>
+            <Select
+              value={digitalAccountId ?? ""}
+              onValueChange={(v) => onSelectCashBackAccount(v || null)}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {online.length ? (
+                  online.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-2 text-xs text-muted-foreground">
+                    No digital accounts yet — create one in Cash Flow.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">Amount received</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              className="h-8 text-right"
+              value={cashBackReceived}
+              onChange={(e) => onCashBackReceivedChange(e.target.value)}
+              placeholder={total.toFixed(2)}
+            />
+          </div>
+          <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Cash back</span>
+              <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Net digital effect</span>
+              <span className="font-semibold text-emerald-600">
+                {fmtMoney(Math.max(0, Number(cashBackReceived || 0) - total), sym)}
+              </span>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>
         Credit
       </button>
