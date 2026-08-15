@@ -3095,7 +3095,9 @@ function POSPage() {
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
-                    setTab({ paid: total.toFixed(2) });
+                    e.stopPropagation();
+                    setTab({ paid: total.toFixed(2), change_due: 0 });
+                    setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                   className="text-xs text-primary hover:underline shrink-0 font-medium"
                 >
@@ -3666,19 +3668,12 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
     }`;
 
   return (
-    <div className="grid grid-cols-4 gap-1.5 mt-1.5">
+    <div className="grid grid-cols-3 gap-1.5 mt-1.5">
       <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>
         Cash
       </button>
       <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>
         Card
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("digital_cash_back")}
-        className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
-      >
-        Digital + CB
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -3696,7 +3691,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           </DropdownMenuItem>
           {online.length === 0 ? (
             <div className="px-2 py-3 text-xs text-muted-foreground">
-              No accounts yet. Create a card in Cash Flow — it will appear here automatically.
+              No accounts yet. Create a bank account in Cash Flow — it will appear here automatically.
             </div>
           ) : (
             online.map((o) => (
@@ -3710,6 +3705,13 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      <button
+        type="button"
+        onClick={() => onChange("digital_cash_back")}
+        className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
+      >
+        Digital + CB
+      </button>
       <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>
         Credit
       </button>
