@@ -3649,6 +3649,11 @@ function PaymentMethodGrid({
   const activeOnline = online.find((o) => normalizePaymentMethodValue(o.v) === normalizedValue) ??
     (normalizedValue === "bank" ? { v: "bank", label: "Bank", id: "bank" } : undefined);
 
+  const isDigital = normalizedValue === "digital";
+  const isCashBack = normalizedValue === "digital_cash_back";
+  const [digitalOpen, setDigitalOpen] = useState(false);
+  const [cbOpen, setCbOpen] = useState(false);
+
   const btn = (active: boolean) =>
     `h-9 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
       active
