@@ -1066,6 +1066,9 @@ function Page() {
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · Tax +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · Bill disc −${fmtMoney(billDiscountAmt, sym)}` : ""}{lineDiscountTotal > 0 ? ` · Line disc −${fmtMoney(lineDiscountTotal, sym)}` : ""}</div>
+                  {paid > 0 && (
+                    <div className="text-[10px] text-muted-foreground mt-1">Paid {fmtMoney(paid, sym)} · Balance {fmtMoney(Math.max(0, total - paid), sym)}</div>
+                  )}
                 </div>
                 <div className="px-4 py-3 space-y-3">
                 <div>
