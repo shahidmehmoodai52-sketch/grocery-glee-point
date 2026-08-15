@@ -1449,15 +1449,14 @@ function Page() {
                 </div>
 
 
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <span>Entries: <b>{list.length}</b></span>
-                  <span>Opening: <b>{fmt(openingBal)}</b></span>
-                  <span className="text-emerald-600">In: <b>{fmt(inTot)}</b></span>
-                  <span className="text-rose-600">Out: <b>{fmt(outTot)}</b></span>
-                  <span>Net: <b>{fmt(inTot - outTot)}</b></span>
-                  <span>Balance: <b>{fmt(closingBal)}</b></span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 my-2">
+                  <StatMini label="Opening" value={fmt(openingBal)} />
+                  <StatMini label="Period In" value={fmt(inTot)} tone="success" />
+                  <StatMini label="Period Out" value={fmt(outTot)} tone="destructive" />
+                  <StatMini label="Closing" value={fmt(closingBal)} />
                 </div>
-                <div className="flex-1 overflow-auto min-h-0">
+                <div className="flex-1 overflow-auto min-h-0 border rounded-md">
+
                   <Table>
                     <TableHeader>
                       <TableRow>
