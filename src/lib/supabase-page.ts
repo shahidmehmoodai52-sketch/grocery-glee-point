@@ -4,7 +4,7 @@
  * various component call sites and Supabase's internal builder types.
  */
 export async function fetchAll<T>(
-  build: any,
+  build: (from: number, to: number) => any,
   pageSizeOrLegacyOrder?: any,
   pageSize = 1000,
 ): Promise<T[]> {
