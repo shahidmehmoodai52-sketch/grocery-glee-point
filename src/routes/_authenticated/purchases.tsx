@@ -920,7 +920,7 @@ function Page() {
                           const newAvg = hasProduct
                             ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
                             : effCost;
-                          const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) ? ((newAvg - oldCost) / oldCost) * 100 : 0;
+                          const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
                           const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
                           const totalDisplay = l._total != null ? l._total : (qty && cost ? +lineGross.toFixed(2) : 0);
                           return (
