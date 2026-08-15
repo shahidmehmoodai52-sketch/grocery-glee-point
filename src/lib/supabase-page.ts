@@ -14,8 +14,9 @@ export async function fetchAll<T>(
   for (let i = 0; i < 200; i++) {
     const to = from + actualPageSize - 1;
     
-    // We cast build to any and invoke it with (from, to). 
-    // TypeScript will not check the argument count of 'any'.
+    // We cast build to any to allow flexible parameter counts (0, 1, or 2)
+    // which prevents the TypeScript compiler from complaining at call sites
+    // where fetchAll is used inside useQuery or other wrappers.
     const response = await (build as any)(from, to);
     
     const { data, error } = response || {};
