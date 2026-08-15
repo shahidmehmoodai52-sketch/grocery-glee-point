@@ -1153,7 +1153,7 @@ function Page() {
                 <Button variant="outline" size="sm" onClick={() => {
                   if (confirm("Discard this purchase?")) clearDraft();
                 }}>Discard</Button>
-                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>Record purchase</Button>
+                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>{editingId ? "Save changes" : "Record purchase"}</Button>
               </div>
             </DialogFooter>
           </DialogContent>
