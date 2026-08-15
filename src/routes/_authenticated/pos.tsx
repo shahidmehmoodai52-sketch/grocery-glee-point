@@ -3058,6 +3058,7 @@ function POSPage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
+                      if (submitting) return;
                       handleSale();
                     }
                   }}
