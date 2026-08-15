@@ -16,6 +16,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
+import { printInvoiceDirect } from "@/components/receipt";
 
 import { db } from "@/lib/offline/db";
 import { fetchAll } from "@/lib/supabase-page";
@@ -257,7 +258,7 @@ function Page() {
       lines: formattedLines,
       tax: Number(p.tax || 0),
       taxMode: "amt",
-      discount: 0,
+      discount: Number(p.subtotal || 0) > 0 ? Number(p.subtotal || 0) + Number(p.tax || 0) - Number(p.total || 0) : 0,
       discountMode: "amt",
       paid: Number(p.paid || 0),
       note: p.note || "",
@@ -450,7 +451,7 @@ function Page() {
     queryKey: ["purchases"],
     staleTime: 30_000,
     queryFn: async () => offlineFirst<any[]>(
-      async () => await fetchAll<any>((from, to) => supabase.from("purchases").select("*, suppliers(name)").order("created_at", { ascending: false }).range(from, to)),
+      async () => await fetchAll<any>((from, to) => supabase.from("purchases").select("*, suppliers(name), purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
       async () => {
         const rows = await db().purchases.orderBy("created_at").reverse().toArray();
         const supMap = new Map((await db().suppliers.toArray()).map((s: any) => [s.id, s.name]));
@@ -589,19 +590,42 @@ function Page() {
     const payload = {
       supplier_id: supplier && supplier !== "none" ? supplier : null,
       tax: taxAmt,
-      subtotal: discountedSubtotal,
-      total: discountedSubtotal + taxAmt,
+      subtotal: sub, // Original subtotal (after line discounts, before bill discount)
+      total,
       paid,
       note,
       payment_method: account.name,
       account_id: account.id ?? undefined,
       created_at: date || undefined,
-      items: items.map((l) => {
-        const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
-        const discShare = sub > 0 ? billDiscountAmt * (lineNet / sub) : 0;
-        const effCost = l.qty > 0 ? Math.max(0, lineNet - discShare) / l.qty : l.cost;
-        return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
-      }),
+      items: (() => {
+        // Distribute bill discount across lines proportionally
+        let remainingDiscount = billDiscountAmt;
+        const lineTotals = items.map(l => Math.max(0, l.qty * l.cost - Number(l.discount || 0)));
+        const totalLineSum = lineTotals.reduce((a, b) => a + b, 0);
+
+        return items.map((l, idx) => {
+          const lineNet = lineTotals[idx];
+          let discShare = 0;
+          if (totalLineSum > 0) {
+            if (idx === items.length - 1) {
+              discShare = remainingDiscount;
+            } else {
+              discShare = +(billDiscountAmt * (lineNet / totalLineSum)).toFixed(2);
+              remainingDiscount = +(remainingDiscount - discShare).toFixed(2);
+            }
+          }
+
+          const effLineTotal = Math.max(0, lineNet - discShare);
+          const effCost = l.qty > 0 ? effLineTotal / l.qty : l.cost;
+          return {
+            product_id: l.product_id,
+            name: l.name,
+            qty: l.qty,
+            cost: +effCost.toFixed(4),
+            line_total: +effLineTotal.toFixed(2)
+          };
+        });
+      })(),
     };
 
     try {
@@ -647,7 +671,7 @@ function Page() {
           name: it.name,
           qty: it.qty,
           cost: it.cost,
-          line_total: Number(it.qty) * Number(it.cost)
+          line_total: it.line_total
         }));
         await supabase.from("purchase_items").insert(newItems);
 
@@ -890,8 +914,10 @@ function Page() {
                           const lineDiscount = Number(l.discount || 0);
                           const lineGross = qty * cost;
                           const lineSub = Math.max(0, lineGross - lineDiscount);
-                          const taxShare = subtotal > 0 ? taxAmt * (lineSub / subtotal) : 0;
-                          const effCost = qty > 0 ? (lineSub + taxShare) / qty : cost;
+                          const billDiscShare = subtotal > 0 ? billDiscountAmt * (lineSub / subtotal) : 0;
+                          const lineAfterBillDisc = Math.max(0, lineSub - billDiscShare);
+                          const taxShare = discountedSubtotal > 0 ? taxAmt * (lineAfterBillDisc / discountedSubtotal) : 0;
+                          const effCost = qty > 0 ? (lineAfterBillDisc + taxShare) / qty : cost;
                           const newAvg = hasProduct
                             ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
                             : effCost;
@@ -1017,9 +1043,9 @@ function Page() {
                                   title="Base total — cost auto-calculates as total ÷ qty. Tax is added below."
                                   className="h-8 text-right text-sm font-medium"
                                 />
-                                {(taxShare > 0 || lineDiscount > 0) && (
-                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Net line total: gross − discount + tax">
-                                    net = <span className="font-medium text-foreground">{fmtMoney(Math.max(0, totalDisplay - lineDiscount) + taxShare, sym)}</span>
+                                {(taxShare > 0 || lineDiscount > 0 || billDiscShare > 0) && (
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Net line total: gross − line disc − bill disc share + tax share">
+                                    net = <span className="font-medium text-foreground">{fmtMoney(Math.max(0, totalDisplay - lineDiscount - billDiscShare) + taxShare, sym)}</span>
                                   </div>
                                 )}
                               </TableCell>
@@ -1043,6 +1069,9 @@ function Page() {
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · Tax +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · Bill disc −${fmtMoney(billDiscountAmt, sym)}` : ""}{lineDiscountTotal > 0 ? ` · Line disc −${fmtMoney(lineDiscountTotal, sym)}` : ""}</div>
+                  {paid > 0 && (
+                    <div className="text-[10px] text-muted-foreground mt-1">Paid {fmtMoney(paid, sym)} · Balance {fmtMoney(Math.max(0, total - paid), sym)}</div>
+                  )}
                 </div>
                 <div className="px-4 py-3 space-y-3">
                 <div>
@@ -1129,12 +1158,22 @@ function Page() {
                     Paid amount is deducted from this account in Cash Flow.
                   </div>
                 </div>
-
-                  <div>
-                    <Label className="text-xs">Note</Label>
-                    <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
-                  </div>
+                
+                <div className="pt-2">
+                  <Label className="text-xs">Notes</Label>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Add purchase notes..."
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
                 </div>
+
+                <div>
+                  <Label className="text-xs">Note</Label>
+                  <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
+                </div>
+              </div>
               </aside>
             </div>
 
@@ -1165,9 +1204,28 @@ function Page() {
               <p className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span></p>
               <p className="text-xs text-muted-foreground">Stock and costs will be updated. This cannot be undone.</p>
             </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
-              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
+            <DialogFooter className="gap-2 sm:justify-between">
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
+                <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  if (saving) return;
+                  await submit();
+                  setTimeout(() => {
+                    const latest = purchases[0];
+                    if (latest) {
+                      const printBtn = document.querySelector(`[data-print-id="${latest.id}"]`) as HTMLButtonElement;
+                      if (printBtn) printBtn.click();
+                    }
+                  }, 1500);
+                }}
+                disabled={saving}
+              >
+                {editingId ? "Update & Print" : "Save & Print"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1342,18 +1400,45 @@ function Page() {
           <TableBody>
             {filteredPurchases.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{search.trim() ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
             {filteredPurchases.map((p: any) => (
-              <TableRow key={p.id}>
+              <TableRow key={p.id} data-print-row-id={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
-                <TableCell className="text-sm">{new Date(p.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-sm">{new Date(p.created_at).toLocaleString('en-US', { timeZone: 'Asia/Karachi' })}</TableCell>
                 <TableCell>{p.suppliers?.name ?? "—"}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(p.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
                 <TableCell><span className="text-xs">{p.status}</span></TableCell>
                 <TableCell className="text-right space-x-1">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title="Edit purchase">
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(p)}>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    data-print-id={p.id}
+                    onClick={() => {
+                      printInvoiceDirect({
+                        invoice_no: p.invoice_no,
+                        created_at: p.created_at,
+                        suppliers: p.suppliers,
+                        subtotal: p.subtotal,
+                        tax: p.tax,
+                        total: p.total,
+                        paid: p.paid,
+                        note: p.note,
+                        payment_method: p.payment_method,
+                        sale_items: p.purchase_items?.map((it: any) => ({
+                          name: it.name,
+                          qty: it.qty,
+                          price: it.cost,
+                          line_total: it.line_total
+                        }))
+                      }, settings, "purchase" as any);
+                    }} 
+                    title="Print receipt"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-printer"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(p)} title="Delete purchase">
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </TableCell>
