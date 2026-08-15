@@ -1156,11 +1156,11 @@ function Page() {
                   </div>
                 </div>
 
-                  <div>
-                    <Label className="text-xs">Note</Label>
-                    <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
-                  </div>
+                <div>
+                  <Label className="text-xs">Note</Label>
+                  <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
                 </div>
+              </div>
               </aside>
             </div>
 
