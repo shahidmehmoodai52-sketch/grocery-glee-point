@@ -1883,7 +1883,7 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["expense_persons"] });
 
       // Post-sale print behaviour, configurable in Settings.
-      const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled !== false;
+      const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled === true;
       const printDefault = ((settings as any)?.pos_print_prompt_default ?? "no") as "yes" | "no";
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
