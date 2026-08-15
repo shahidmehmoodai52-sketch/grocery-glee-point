@@ -3620,9 +3620,7 @@ function PaymentMethodGrid({
   total,
   due,
   digitalAccountId,
-  digitalAmount,
   onSelectDigitalAccount,
-  onDigitalAmountChange,
   cashBackReceived,
   cashBackAmount,
   onSelectCashBackAccount,
@@ -3648,229 +3646,122 @@ function PaymentMethodGrid({
   });
   const accounts = accQ.data ?? [];
 
-  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  // Only accounts created in Cash Flow are offered here, including card/bank/mobile wallets.
-  // Filter out "Card" if it's a duplicate of the standalone Card button.
+  // Every non-cash payment head comes from THIS shop's Cash Flow accounts.
+  // Nothing is hard-coded and POS never creates an account — it only references
+  // an existing account id.
   const online = accounts
-    .filter((a: any) => a.type !== "cash" && slug(a.name) !== "card")
-    .map((a: any) => ({ v: a.name, label: a.name, id: a.id }));
+    .filter((a: any) => a.type !== "cash")
+    .map((a: any) => ({ v: String(a.name), label: String(a.name), id: String(a.id) }));
 
   const normalizedValue = normalizePaymentMethodValue(value);
-  const isOnline = online.some((o) => normalizePaymentMethodValue(o.v) === normalizedValue) || normalizedValue === "bank";
-  const activeOnline = online.find((o) => normalizePaymentMethodValue(o.v) === normalizedValue) ??
-    (normalizedValue === "bank" ? { v: "bank", label: "Bank", id: "bank" } : undefined);
-
-  const isDigital = normalizedValue === "digital";
   const isCashBack = normalizedValue === "digital_cash_back";
-  const [digitalOpen, setDigitalOpen] = useState(false);
+  const isAccountActive = (o: { v: string; id: string }) =>
+    !isCashBack &&
+    (digitalAccountId === o.id || normalizePaymentMethodValue(o.v) === normalizedValue);
   const [cbOpen, setCbOpen] = useState(false);
 
   const btn = (active: boolean) =>
-    `h-9 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
+    `h-9 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap px-1 ${
       active
         ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
         : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
     }`;
 
   return (
-    <div className="grid grid-cols-3 gap-1.5 mt-1.5">
-      <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>
-        Cash
-      </button>
-      <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>
-        Card
-      </button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+    <div className="mt-1.5 space-y-1.5">
+      <div className="grid grid-cols-3 gap-1.5">
+        <button type="button" onClick={() => onChange("cash")} className={btn(normalizedValue === "cash")}>
+          Cash
+        </button>
+        {online.map((o) => (
           <button
+            key={o.id}
             type="button"
-            className={`${btn(isOnline)} flex items-center justify-center gap-1 px-1`}
+            title={`Receive in ${o.label} (Cash Flow account)`}
+            onClick={() => onSelectDigitalAccount(o.id)}
+            className={btn(isAccountActive(o))}
           >
-            <span className="truncate">{activeOnline?.label ?? "Bank"}</span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+            <span className="block truncate">{o.label}</span>
           </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onSelect={() => onChange("bank")}>
-            <span className={normalizedValue === "bank" ? "font-semibold" : ""}>Bank</span>
-          </DropdownMenuItem>
-          {online.length === 0 ? (
-            <div className="px-2 py-3 text-xs text-muted-foreground">
-              No accounts yet. Create a bank account in Cash Flow — it will appear here automatically.
-            </div>
-          ) : (
-            online.map((o) => (
-              <DropdownMenuItem
-                key={o.v}
-                onSelect={() => onChange(o.v)}
-              >
-                <span className={normalizePaymentMethodValue(value) === normalizePaymentMethodValue(o.v) ? "font-semibold" : ""}>{o.label}</span>
-              </DropdownMenuItem>
-            ))
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {/* Digital — compact popover, never expands the panel vertically */}
-      <Popover
-        open={digitalOpen}
-        onOpenChange={(open) => {
-          setDigitalOpen(open);
-          if (open && !isDigital) {
-            onSelectDigitalAccount(digitalAccountId ?? online[0]?.id ?? null);
-          }
-        }}
-      >
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={`${btn(isDigital)} flex items-center justify-center gap-1 px-1`}
-            title="Digital / online payment"
+        ))}
+        {online.length > 0 && (
+          <Popover
+            open={cbOpen}
+            onOpenChange={(open) => {
+              setCbOpen(open);
+              if (open && !isCashBack) {
+                onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null);
+              }
+            }}
           >
-            <span className="truncate">Digital</span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-            <span className="font-semibold">Digital payment</span>
-            <span>Total {fmtMoney(total, sym)}</span>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px]">Digital account</Label>
-            <Select
-              value={digitalAccountId ?? ""}
-              onValueChange={(v) => onSelectDigitalAccount(v || null)}
-            >
-              <SelectTrigger className="h-8">
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {online.length ? (
-                  online.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.label}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-2 text-xs text-muted-foreground">
-                    No digital accounts yet — create one in Cash Flow.
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px]">Amount received</Label>
-            <div className="flex items-center gap-1.5">
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                className="h-8 text-right"
-                value={digitalAmount}
-                onChange={(e) => onDigitalAmountChange(e.target.value)}
-                placeholder={total.toFixed(2)}
-              />
-              <Button
+            <PopoverTrigger asChild>
+              <button
                 type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 px-2 text-[11px]"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onDigitalAmountChange(total.toFixed(2));
-                }}
+                className={`${btn(isCashBack)} leading-tight flex items-center justify-center gap-1`}
+                title="Digital payment with cash back"
               >
-                Exact
-              </Button>
-            </div>
-          </div>
-          <div className="flex justify-between rounded-md border border-dashed px-2 py-1 text-[11px]">
-            <span className="text-muted-foreground">Remaining</span>
-            <span className="font-semibold">{fmtMoney(due, sym)}</span>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      {/* Digital + CB — separate method with its own received / cash-back figures */}
-      <Popover
-        open={cbOpen}
-        onOpenChange={(open) => {
-          setCbOpen(open);
-          if (open && !isCashBack) {
-            onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null);
-          }
-        }}
-      >
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={`${btn(isCashBack)} leading-tight px-1.5 flex items-center justify-center gap-1`}
-            title="Digital payment with cash back"
-          >
-            <span className="truncate">Digital + CB</span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-            <span className="font-semibold">Digital cash back</span>
-            <span>Total {fmtMoney(total, sym)}</span>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px]">Digital account</Label>
-            <Select
-              value={digitalAccountId ?? ""}
-              onValueChange={(v) => onSelectCashBackAccount(v || null)}
-            >
-              <SelectTrigger className="h-8">
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {online.length ? (
-                  online.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.label}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-2 text-xs text-muted-foreground">
-                    No digital accounts yet — create one in Cash Flow.
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px]">Amount received</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              className="h-8 text-right"
-              value={cashBackReceived}
-              onChange={(e) => onCashBackReceivedChange(e.target.value)}
-              placeholder={total.toFixed(2)}
-            />
-          </div>
-          <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Cash back</span>
-              <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Net digital effect</span>
-              <span className="font-semibold text-emerald-600">
-                {fmtMoney(Math.max(0, Number(cashBackReceived || 0) - total), sym)}
-              </span>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>
-        Credit
-      </button>
+                <span className="truncate">Digital + CB</span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
+              <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+                <span className="font-semibold">Digital cash back</span>
+                <span>Total {fmtMoney(total, sym)}</span>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">Digital account</Label>
+                <Select
+                  value={digitalAccountId ?? ""}
+                  onValueChange={(v) => onSelectCashBackAccount(v || null)}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {online.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">Amount received</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="h-8 text-right"
+                  value={cashBackReceived}
+                  onChange={(e) => onCashBackReceivedChange(e.target.value)}
+                  placeholder={total.toFixed(2)}
+                />
+              </div>
+              <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cash back</span>
+                  <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Remaining</span>
+                  <span className="font-semibold">{fmtMoney(due, sym)}</span>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+        <button type="button" onClick={() => onChange("credit")} className={btn(normalizedValue === "credit")}>
+          Credit
+        </button>
+      </div>
+      {online.length === 0 && (
+        <p className="text-[10px] leading-tight text-muted-foreground">
+          Only Cash and Credit are available. Create payment accounts (Card, Bank, JazzCash…) in Cash
+          Flow and they appear here automatically.
+        </p>
+      )}
     </div>
   );
 }
@@ -3889,19 +3780,18 @@ function PaymentMethodSelect({
     queryFn: fetchActiveCashAccounts,
   });
   const accounts = accQ.data ?? [];
-  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const online = accounts.filter((a: any) => a.type !== "cash");
   const options = [
     { value: "cash", label: "Cash" },
-    { value: "card", label: "Card" },
-    { value: "bank", label: "Bank" },
-    { value: "digital", label: "Digital" },
-    { value: "digital_cash_back", label: "Digital + CB" },
+    ...online.map((a: any) => ({ value: String(a.name), label: String(a.name) })),
+    ...(online.length ? [{ value: "digital_cash_back", label: "Digital + CB" }] : []),
     { value: "credit", label: "Credit" },
     { value: "staff", label: "Staff" },
-    ...accounts
-      .filter((a: any) => a.type !== "cash" && slugify(a.name) !== "card")
-      .map((a: any) => ({ value: a.name, label: a.name })),
   ];
+  // Keep historical / restored tenders selectable even if that head was removed.
+  if (value && !options.some((o) => normalizePaymentMethodValue(o.value) === normalizePaymentMethodValue(value))) {
+    options.push({ value, label: value });
+  }
 
   return (
     <Select value={value} onValueChange={onChange}>
@@ -3918,6 +3808,7 @@ function PaymentMethodSelect({
     </Select>
   );
 }
+
 
 function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
