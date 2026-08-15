@@ -1151,8 +1151,7 @@ function POSPage() {
 
   const setPrimaryPaymentMethod = (method: string) => {
     const nextMethod = normalizePaymentMethodValue(method);
-    const rowMethod =
-      nextMethod === "digital_cash_back" ? "digital_cash_back" : nextMethod;
+    const rowMethod = nextMethod;
 
     // Reset mutually exclusive states
     const patch: Partial<Tab> = {
@@ -1162,8 +1161,12 @@ function POSPage() {
     if (nextMethod !== "credit") {
       patch.customer_id = null;
     }
+    // Digital and Digital + CB are separate methods; both use digital_account_id
+    // but only the cash-back flow uses digital_received_amount.
     if (nextMethod !== "digital_cash_back") {
       patch.digital_received_amount = "";
+    }
+    if (nextMethod !== "digital_cash_back" && nextMethod !== "digital") {
       patch.digital_account_id = null;
     }
     // expense_person_id is handled by the Staff button toggle, but we should clear it if switching to others
@@ -1179,32 +1182,50 @@ function POSPage() {
     });
   };
 
-  const bindSelectedTenderSource = (method: string) => {
-    setPrimaryPaymentMethod(method);
+  const accountNameById = (accountId: string | null) => {
+    const account = ((cashAccountOptions ?? []) as any[]).find((a: any) => a.id === accountId);
+    return account?.name ? String(account.name) : null;
   };
 
-  const setDigitalTenderSource = (accountId: string | null) => {
-    const nextAccountId = accountId || null;
-    const account = ((cashAccountOptions ?? []) as any[]).find((a: any) => a.id === nextAccountId);
+  /** Plain Digital: sale is fully received in a digital/online account.
+   *  The tender row carries the account name so Cash Flow attributes the
+   *  inflow to that exact account. Never touches the cash-back state. */
+  const setDigitalAccount = (accountId: string | null) => {
+    const name = accountNameById(accountId);
+    const rowMethod = name ? normalizePaymentMethodValue(name) : "digital";
     setTab({
-      digital_account_id: nextAccountId,
-      payment_method: "digital_cash_back",
-      payments: [{ method: "digital_cash_back", amount: Number(tab.paid || 0) || 0 }],
-      paid: String(tab.paid || ""),
+      payment_method: "digital",
+      digital_account_id: accountId || null,
+      digital_received_amount: "",
+      customer_id: null,
+      expense_person_id: null,
+      payments: [{ method: rowMethod, amount: Number(tab.paid || 0) || 0 }],
     });
+  };
 
-    if (account && account.name) {
-      const nextRows = [...paymentRows];
-      const baseMethod = normalizePaymentMethodValue(account.name);
-      if (nextRows[0]) {
-        nextRows[0] = { ...nextRows[0], method: baseMethod || "digital_cash_back" };
-      } else {
-        nextRows.push({ method: baseMethod || "digital_cash_back", amount: Number(tab.paid || 0) || 0 });
-      }
-      setPaymentRows(nextRows);
-    } else {
-      setPrimaryPaymentMethod("digital_cash_back");
-    }
+  /** Digital + CB: the customer sends more than the bill and takes the
+   *  difference back in cash. Keeps its own received/cash-back figures. */
+  const setDigitalCashBackAccount = (accountId: string | null) => {
+    setTab({
+      payment_method: "digital_cash_back",
+      digital_account_id: accountId || null,
+      customer_id: null,
+      expense_person_id: null,
+      payments: [{ method: "digital_cash_back", amount: Number(tab.paid || 0) || 0 }],
+    });
+  };
+
+  /** Amount typed inside the Digital popover — only updates the tender amount. */
+  const setDigitalAmount = (value: string) => {
+    const rowMethod =
+      paymentRows[0]?.method && normalizePaymentMethodValue(tab.payment_method) === "digital"
+        ? paymentRows[0].method
+        : normalizePaymentMethodValue(accountNameById(tab.digital_account_id) ?? "digital");
+    setTab({
+      paid: value,
+      payment_method: "digital",
+      payments: [{ method: rowMethod, amount: Number(value || 0) || 0 }],
+    });
   };
 
   // Keep cart discount in sync when percentage is typed
