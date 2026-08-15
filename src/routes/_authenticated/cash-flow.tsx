@@ -1312,7 +1312,7 @@ function Page() {
 
       {/* Details dialog */}
       <Dialog open={!!details} onOpenChange={(o) => !o && setDetails(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] flex flex-col">
           {(() => {
             if (!details) return null;
             if (details.kind === "opening" || details.kind === "balance") {
@@ -1331,7 +1331,7 @@ function Page() {
                 <>
                   <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
                   <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
-                  <div className="max-h-[60vh] overflow-auto">
+                  <div className="flex-1 overflow-auto min-h-0 mt-4">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1423,7 +1423,7 @@ function Page() {
                   <span>Net: <b>{fmt(inTot - outTot)}</b></span>
                   <span>Balance: <b>{fmt(closingBal)}</b></span>
                 </div>
-                <div className="max-h-[60vh] overflow-auto">
+                <div className="flex-1 overflow-auto min-h-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1450,7 +1450,7 @@ function Page() {
                             <TableCell className="whitespace-nowrap">{payLabel(methodOf(t))}</TableCell>
                             <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
 
-                            <TableCell className="max-w-[280px] truncate">
+                            <TableCell className="min-w-[200px] max-w-[400px]">
                               {t.reference && <span className="font-medium">{t.reference}</span>}
                               {t.reference && t.notes && <span> — </span>}
                               {t.notes && <span className="text-muted-foreground">{t.notes}</span>}
