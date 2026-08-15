@@ -122,7 +122,7 @@ function Page() {
       readLocalFirst<any[]>({
         table: "sale_returns",
         cloud: async () =>
-          await fetchAllRows<any>((from, to) =>
+          await fetchAllRows<any>((from: number, to: number) =>
             supabase
               .from("sale_returns")
               .select("*, customers(name), sale_return_items(*)")
@@ -150,7 +150,7 @@ function Page() {
       readLocalFirst<any[]>({
         table: "sales",
         cloud: async () =>
-          await fetchAllRows<any>((from, to) =>
+          await fetchAllRows<any>((from: number, to: number) =>
             supabase
               .from("sales")
               .select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)")

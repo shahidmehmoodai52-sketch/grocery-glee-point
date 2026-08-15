@@ -112,11 +112,11 @@ function IntelligencePage() {
   const intelQ = useQuery({
     queryKey: ["product-intel"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => supabase
         .from("product_intelligence" as any)
         .select("*")
         .order("revenue_90d", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return (data ?? []) as unknown as Intel[];
     },
@@ -368,7 +368,7 @@ function ReorderEditDialog({ product, onClose }: { product: Intel; onClose: () =
   const suppliersQ = useQuery({
     queryKey: ["suppliers-picker"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase.from("suppliers").select("id,name").order("name").range(_f, _t) as any), error: null as any };
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => supabase.from("suppliers").select("id,name").order("name").range(from, to) as any), error: null as any };
       if (error) throw error;
       return data ?? [];
     },
@@ -571,11 +571,11 @@ function SuggestionsTab({ sym }: { sym: string }) {
   const q = useQuery({
     queryKey: ["purchase-suggestions"],
     queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((_f, _t) => supabase
+      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => supabase
         .from("smart_purchase_suggestions" as any)
         .select("*")
         .order("suggested_cost", { ascending: false })
-        .range(_f, _t) as any), error: null as any };
+        .range(from, to) as any), error: null as any };
       if (error) throw error;
       return (data ?? []) as unknown as Suggestion[];
     },

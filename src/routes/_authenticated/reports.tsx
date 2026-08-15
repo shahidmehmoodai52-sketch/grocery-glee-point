@@ -43,7 +43,7 @@ function SupplierWiseReport({
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["report-suppliers"],
-    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => 
+    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
       supabase.from("suppliers").select("id,name").order("name").range(fIdx, tIdx),
       1000
     ),
@@ -51,7 +51,7 @@ function SupplierWiseReport({
 
   const { data: products = [] } = useQuery({
     queryKey: ["report-products-minimal"],
-    queryFn: async () => await fetchAll<any>((fIdx, tIdx) => 
+    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
       supabase.from("products").select("id,name,category,stock,sell_price,cost_price,preferred_supplier_id").range(fIdx, tIdx),
       1000
     ),
