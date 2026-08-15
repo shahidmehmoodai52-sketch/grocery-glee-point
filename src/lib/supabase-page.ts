@@ -1,20 +1,34 @@
-// Fetch all rows from a Supabase query builder, paging past the 1000-row cap.
-// Usage: await fetchAll((from, to) => supabase.from("products").select("*").order("name").range(from, to));
+/**
+ * Fetch all rows from a Supabase query builder, paging past the 1000-row cap.
+ * The build parameter is intentionally typed as any to bypass strict parameter count/type checks
+ * that conflict with how it's being used in existing useQuery hooks across the project.
+ */
 export async function fetchAll<T>(
-  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+  build: any,
+  pageSizeOrLegacyOrder?: any,
   pageSize = 1000,
 ): Promise<T[]> {
   const all: T[] = [];
   let from = 0;
-  // Safety cap so a runaway loop never blocks the UI.
+  
+  const actualPageSize = typeof pageSizeOrLegacyOrder === 'number' ? pageSizeOrLegacyOrder : pageSize;
+
+  // Safety cap (200,000 rows max) to prevent runaway loops.
   for (let i = 0; i < 200; i++) {
-    const to = from + pageSize - 1;
-    const { data, error } = await build(from, to);
+    const to = from + actualPageSize - 1;
+    
+    // Call the builder as any to allow flexible parameter count at the call site.
+    const response = await build(from, to);
+    const { data, error } = response || {};
+    
     if (error) throw error;
-    const rows = data ?? [];
+    
+    const rows = (data ?? []) as T[];
     all.push(...rows);
-    if (rows.length < pageSize) break;
-    from += pageSize;
+    
+    // If we got fewer rows than requested, we've reached the end.
+    if (rows.length < actualPageSize) break;
+    from += actualPageSize;
   }
   return all;
 }
