@@ -1173,7 +1173,7 @@ function Page() {
             </div>
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
-              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : "Yes, save purchase"}</Button>
+              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
