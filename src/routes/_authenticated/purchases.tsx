@@ -131,13 +131,15 @@ function Page() {
   const today = new Date().toISOString().slice(0,10);
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
-  // Parked draft. "Hide (keep draft)" moves the current entry here so that
-  // "New purchase" always starts blank; the Draft button brings it back.
-  const [savedDraft, setSavedDraft, clearSavedDraft] = usePersistentState<Draft | null>("purchase-entry-saved", null);
+  // Multiple parked drafts.
+  const [savedDrafts, setSavedDrafts, clearSavedDrafts] = usePersistentState<Draft[]>("purchase-entry-saved-list", []);
+  
   const { open, supplier, lines, tax, paid, note, date } = draft;
   const taxMode: "amt" | "pct" = draft.taxMode ?? "amt";
   const billDiscount = Number(draft.discount ?? 0);
   const discountMode: "amt" | "pct" = draft.discountMode ?? "amt";
+  const editingId = (draft as any).editingId as string | undefined;
+
   const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setDate = (v: string) => setDraft((d) => ({ ...d, date: v }));
