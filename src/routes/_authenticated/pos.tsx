@@ -3894,6 +3894,7 @@ function PaymentMethodSelect({
     { value: "cash", label: "Cash" },
     { value: "card", label: "Card" },
     { value: "bank", label: "Bank" },
+    { value: "digital", label: "Digital" },
     { value: "digital_cash_back", label: "Digital + CB" },
     { value: "credit", label: "Credit" },
     { value: "staff", label: "Staff" },
