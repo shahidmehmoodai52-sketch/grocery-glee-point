@@ -1220,7 +1220,7 @@ function POSPage() {
     const rowMethod =
       paymentRows[0]?.method && normalizePaymentMethodValue(tab.payment_method) === "digital"
         ? paymentRows[0].method
-        : normalizePaymentMethodValue(accountNameById(tab.digital_account_id) ?? "digital");
+        : normalizePaymentMethodValue(accountNameById(tab.digital_account_id ?? null) ?? "digital");
     setTab({
       paid: value,
       payment_method: "digital",
