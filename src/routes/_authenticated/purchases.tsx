@@ -670,7 +670,7 @@ function Page() {
           name: it.name,
           qty: it.qty,
           cost: it.cost,
-          line_total: Number(it.qty) * Number(it.cost)
+          line_total: it.line_total
         }));
         await supabase.from("purchase_items").insert(newItems);
 
