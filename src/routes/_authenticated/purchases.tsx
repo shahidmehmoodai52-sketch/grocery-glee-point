@@ -589,19 +589,42 @@ function Page() {
     const payload = {
       supplier_id: supplier && supplier !== "none" ? supplier : null,
       tax: taxAmt,
-      subtotal: discountedSubtotal,
-      total: discountedSubtotal + taxAmt,
+      subtotal: sub, // Original subtotal (after line discounts, before bill discount)
+      total,
       paid,
       note,
       payment_method: account.name,
       account_id: account.id ?? undefined,
       created_at: date || undefined,
-      items: items.map((l) => {
-        const lineNet = Math.max(0, l.qty * l.cost - Number(l.discount || 0));
-        const discShare = sub > 0 ? billDiscountAmt * (lineNet / sub) : 0;
-        const effCost = l.qty > 0 ? Math.max(0, lineNet - discShare) / l.qty : l.cost;
-        return { product_id: l.product_id, name: l.name, qty: l.qty, cost: +effCost.toFixed(4) };
-      }),
+      items: (() => {
+        // Distribute bill discount across lines proportionally
+        let remainingDiscount = billDiscountAmt;
+        const lineTotals = items.map(l => Math.max(0, l.qty * l.cost - Number(l.discount || 0)));
+        const totalLineSum = lineTotals.reduce((a, b) => a + b, 0);
+
+        return items.map((l, idx) => {
+          const lineNet = lineTotals[idx];
+          let discShare = 0;
+          if (totalLineSum > 0) {
+            if (idx === items.length - 1) {
+              discShare = remainingDiscount;
+            } else {
+              discShare = +(billDiscountAmt * (lineNet / totalLineSum)).toFixed(2);
+              remainingDiscount = +(remainingDiscount - discShare).toFixed(2);
+            }
+          }
+
+          const effLineTotal = Math.max(0, lineNet - discShare);
+          const effCost = l.qty > 0 ? effLineTotal / l.qty : l.cost;
+          return {
+            product_id: l.product_id,
+            name: l.name,
+            qty: l.qty,
+            cost: +effCost.toFixed(4),
+            line_total: +effLineTotal.toFixed(2)
+          };
+        });
+      })(),
     };
 
     try {
