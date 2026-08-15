@@ -221,13 +221,23 @@ function Page() {
     | { kind: "account"; accountId: string }
     | null
   >(null);
+  const [dFilterAcc, setDFilterAcc] = useState<string>("all");
+  const [dFilterMethod, setDFilterMethod] = useState<string>("all");
+
   const [dPreset, setDPreset] = useState<DatePreset>("all");
   const [dFrom, setDFrom] = useState("");
   const [dTo, setDTo] = useState("");
   const setDetails = (d: typeof details) => {
-    if (d) { setDPreset("all"); setDFrom(""); setDTo(""); }
+    if (d) {
+      setDPreset("all");
+      setDFrom("");
+      setDTo("");
+      setDFilterAcc(d.kind === "account" ? d.accountId : "all");
+      setDFilterMethod("all");
+    }
     setDetailsRaw(d);
   };
+
 
 
   const accountsQ = useQuery({
@@ -1371,6 +1381,8 @@ function Page() {
             const scope = txs.filter((t) => {
               if (dir && t.direction !== dir) return false;
               if (accId && t.account_id !== accId) return false;
+              if (dFilterAcc !== "all" && t.account_id !== dFilterAcc) return false;
+              if (dFilterMethod !== "all" && methodOf(t) !== dFilterMethod) return false;
               return true;
             });
             const list = scope
@@ -1380,6 +1392,7 @@ function Page() {
                 String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")) ||
                 String(b.id).localeCompare(String(a.id)),
               );
+
             const inTot = list.filter((t) => t.direction === "in").reduce((s, t) => s + Number(t.amount), 0);
             const outTot = list.filter((t) => t.direction === "out").reduce((s, t) => s + Number(t.amount), 0);
             const baseOpening = accId
@@ -1413,17 +1426,37 @@ function Page() {
                 <DialogHeader>
                   <DialogTitle>{title}</DialogTitle>
                 </DialogHeader>
-                <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
+                <div className="flex flex-wrap items-center gap-3">
+                  <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
+                  
+                  {!accId && (
+                    <Select value={dFilterAcc} onValueChange={setDFilterAcc}>
+                      <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue placeholder="All Accounts" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Accounts</SelectItem>
+                        {allAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
 
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <span>Entries: <b>{list.length}</b></span>
-                  <span>Opening: <b>{fmt(openingBal)}</b></span>
-                  <span className="text-emerald-600">In: <b>{fmt(inTot)}</b></span>
-                  <span className="text-rose-600">Out: <b>{fmt(outTot)}</b></span>
-                  <span>Net: <b>{fmt(inTot - outTot)}</b></span>
-                  <span>Balance: <b>{fmt(closingBal)}</b></span>
+                  <Select value={dFilterMethod} onValueChange={setDFilterMethod}>
+                    <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue placeholder="All Methods" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Methods</SelectItem>
+                      {PAY_METHODS.map(m => <SelectItem key={m.v} value={m.v}>{m.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex-1 overflow-auto min-h-0">
+
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 my-2">
+                  <StatMini label="Opening" value={fmt(openingBal)} />
+                  <StatMini label="Period In" value={fmt(inTot)} tone="success" />
+                  <StatMini label="Period Out" value={fmt(outTot)} tone="destructive" />
+                  <StatMini label="Closing" value={fmt(closingBal)} />
+                </div>
+                <div className="flex-1 overflow-auto min-h-0 border rounded-md">
+
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1472,6 +1505,16 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function StatMini({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
+  const colors: Record<string, string> = { success: "text-success", destructive: "text-destructive" };
+  return (
+    <div className="bg-muted/30 p-2 rounded">
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
+      <div className={`text-sm font-bold ${tone ? colors[tone] : ""}`}>{value}</div>
     </div>
   );
 }

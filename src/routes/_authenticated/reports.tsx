@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon } from "lucide-react";
+import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon, Package, Search, ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -20,6 +21,286 @@ import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: Page });
+
+function SupplierWiseReport({
+  sales,
+  saleReturns,
+  currencySymbol,
+  onDrill,
+  search,
+}: {
+  sales: any[];
+  saleReturns: any[];
+  currencySymbol: string;
+  onDrill: (drill: any) => void;
+  search: string;
+}) {
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"qty" | "revenue">("revenue");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ["report-suppliers"],
+    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+  });
+
+  const { data: products = [] } = useQuery({
+    queryKey: ["report-products-minimal"],
+    queryFn: async () =>
+      (await supabase.from("products").select("id,name,category,stock,sell_price,cost_price,preferred_supplier_id")).data ?? [],
+  });
+
+  const stats = useMemo(() => {
+    const pMap = new Map(products.map((p) => [p.id, p]));
+    const sMap = new Map<string, {
+      id: string;
+      name: string;
+      qty: number;
+      revenue: number;
+      invoices: Set<string>;
+      products: Map<string, {
+        id: string;
+        name: string;
+        qty: number;
+        revenue: number;
+        invoices: Set<string>;
+        category: string;
+        stock: number;
+        cost: number;
+      }>;
+    }>();
+
+    for (const s of sales) {
+      for (const it of s.sale_items ?? []) {
+        const prod = pMap.get(it.product_id);
+        const sid = prod?.preferred_supplier_id || "unassigned";
+        const sName = suppliers.find((x) => x.id === sid)?.name || (sid === "unassigned" ? "Unassigned" : "Unknown");
+
+        if (!sMap.has(sid)) {
+          sMap.set(sid, { id: sid, name: sName, qty: 0, revenue: 0, invoices: new Set(), products: new Map() });
+        }
+        const sData = sMap.get(sid)!;
+        sData.qty += Number(it.qty);
+        sData.revenue += Number(it.line_total);
+        sData.invoices.add(s.id);
+
+        if (!sData.products.has(it.product_id)) {
+          sData.products.set(it.product_id, {
+            id: it.product_id,
+            name: it.name,
+            qty: 0,
+            revenue: 0,
+            invoices: new Set(),
+            category: prod?.category || "—",
+            stock: Number(prod?.stock || 0),
+            cost: Number(prod?.cost_price || 0),
+          });
+        }
+        const pData = sData.products.get(it.product_id)!;
+        pData.qty += Number(it.qty);
+        pData.revenue += Number(it.line_total);
+        pData.invoices.add(s.id);
+      }
+    }
+
+    // Adjust for returns
+    for (const r of saleReturns) {
+      for (const it of r.sale_return_items ?? []) {
+        const prod = pMap.get(it.product_id);
+        const sid = prod?.preferred_supplier_id || "unassigned";
+        if (!sMap.has(sid)) continue;
+        const sData = sMap.get(sid)!;
+        const pData = sData.products.get(it.product_id);
+        if (!pData) continue;
+
+        const rev = Number(it.qty) * Number(it.price);
+        sData.qty -= Number(it.qty);
+        sData.revenue -= rev;
+        pData.qty -= Number(it.qty);
+        pData.revenue -= rev;
+      }
+    }
+
+    return sMap;
+  }, [sales, saleReturns, products, suppliers]);
+
+  const selectedData = stats.get(selectedSupplierId);
+  const q = search.toLowerCase();
+
+  const productList = useMemo(() => {
+    if (!selectedData) return [];
+    let list = Array.from(selectedData.products.values());
+    if (q) {
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+    }
+    return list.sort((a, b) => {
+      const va = sortBy === "qty" ? a.qty : a.revenue;
+      const vb = sortBy === "qty" ? b.qty : b.revenue;
+      return sortDir === "desc" ? vb - va : va - vb;
+    });
+  }, [selectedData, q, sortBy, sortDir]);
+
+  const toggleSort = (key: "qty" | "revenue") => {
+    if (sortBy === key) setSortDir(sortDir === "desc" ? "asc" : "desc");
+    else { setSortBy(key); setSortDir("desc"); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4 bg-muted/20">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <Label className="text-xs mb-1 block">Filter by Company / Supplier</Label>
+            <select
+              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={selectedSupplierId}
+              onChange={(e) => setSelectedSupplierId(e.target.value)}
+            >
+              <option value="all">Choose a company…</option>
+              {Array.from(stats.values())
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.products.size} items)</option>
+                ))}
+            </select>
+          </div>
+          {selectedData && (
+            <div className="flex gap-4">
+              <StatMini label="Products Sold" value={selectedData.products.size} />
+              <StatMini label="Total Qty" value={selectedData.qty} />
+              <StatMini label="Invoices" value={selectedData.invoices.size} />
+              <StatMini label="Total Sales" value={fmtMoney(selectedData.revenue, currencySymbol)} tone="success" />
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {!selectedData ? (
+        <Card className="p-12 text-center text-muted-foreground border-dashed">
+          <div className="flex flex-col items-center gap-2">
+            <Package className="h-10 w-10 opacity-20" />
+            <p>Select a company to view the sales breakdown</p>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-4">
+            <Card className="p-3">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <h3 className="font-semibold text-sm">Product-wise Breakdown</h3>
+                <div className="text-xs text-muted-foreground">Sorted by {sortBy === "qty" ? "Quantity" : "Sale Amount"}</div>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">
+                      <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("qty")}>
+                        Qty Sold
+                        <ArrowUpDown className={`h-3 w-3 ${sortBy === "qty" ? "opacity-100" : "opacity-30"}`} />
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("revenue")}>
+                        Total Sale
+                        <ArrowUpDown className={`h-3 w-3 ${sortBy === "revenue" ? "opacity-100" : "opacity-30"}`} />
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">%</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {productList.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">No products found</TableCell></TableRow>}
+                  {productList.map((p) => (
+                    <TableRow
+                      key={p.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => onDrill({
+                        title: p.name,
+                        note: `${p.category} · Qty ${p.qty} · Current Stock ${p.stock} · Total Sales ${fmtMoney(p.revenue, currencySymbol)}`,
+                        cols: ["Field", "Value"],
+                        rows: [
+                          ["Category", p.category],
+                          ["Quantity Sold", p.qty],
+                          ["Total Sale Amount", fmtMoney(p.revenue, currencySymbol)],
+                          ["Average Sale Price", fmtMoney(p.qty > 0 ? p.revenue / p.qty : 0, currencySymbol)],
+                          ["Number of Invoices", p.invoices.size],
+                          ["Current Stock", p.stock],
+                          ["Stock Value (Cost)", fmtMoney(p.stock * p.cost, currencySymbol)],
+                        ],
+                      })}
+                    >
+                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{p.category}</TableCell>
+                      <TableCell className="text-right">{p.qty}</TableCell>
+                      <TableCell className="text-right font-medium">{fmtMoney(p.revenue, currencySymbol)}</TableCell>
+                      <TableCell className="text-right text-xs opacity-60">
+                        {selectedData.revenue > 0 ? ((p.revenue / selectedData.revenue) * 100).toFixed(1) : "0"}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
+
+          <div className="space-y-4">
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-success" />
+                Top Selling Products
+              </h3>
+              <div className="space-y-4">
+                {productList.slice(0, 5).map((p, idx) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{p.name}</div>
+                      <div className="text-[10px] text-muted-foreground">{p.qty} sold · {((p.revenue / selectedData.revenue) * 100).toFixed(1)}% of total</div>
+                    </div>
+                    <div className="text-sm font-semibold">{fmtMoney(p.revenue, currencySymbol)}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm mb-4">Summary</h3>
+              <div className="space-y-3">
+                <SummaryRow label="Supplier Sales" value={fmtMoney(selectedData.revenue, currencySymbol)} />
+                <SummaryRow label="Total Invoices" value={selectedData.invoices.size} />
+                <SummaryRow label="Items Sold" value={selectedData.qty} />
+                <SummaryRow label="Avg. Order Value" value={fmtMoney(selectedData.invoices.size > 0 ? selectedData.revenue / selectedData.invoices.size : 0, currencySymbol)} />
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatMini({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
+  const colors: Record<string, string> = { success: "text-success", destructive: "text-destructive" };
+  return (
+    <div>
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
+      <div className={`text-sm font-bold ${tone ? colors[tone] : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
 
 const SPLIT_PAYMENT_PREFIX = "split:";
 
@@ -354,10 +635,11 @@ function Page() {
             <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
             <TabsTrigger value="product">Product-wise</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="supplier">Supplier Wise</TabsTrigger>
           </TabsList>
-          {(tab === "invoice" || tab === "product") && (
+          {(tab === "invoice" || tab === "product" || tab === "supplier") && (
             <Input
-              placeholder={tab === "product" ? "Search product name…" : "Search invoice, customer, amount…"}
+              placeholder={tab === "product" ? "Search product name…" : tab === "supplier" ? "Search supplier or product…" : "Search invoice, customer, amount…"}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 max-w-xs"
@@ -749,6 +1031,15 @@ function Page() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+        <TabsContent value="supplier">
+          <SupplierWiseReport
+            sales={sales}
+            saleReturns={saleReturns}
+            currencySymbol={sym}
+            onDrill={setDrill}
+            search={search}
+          />
         </TabsContent>
       </Tabs>
 
