@@ -49,6 +49,7 @@ export type ReceiptInvoice = {
   note?: string | null;
   payment_method?: string;
   refund_method?: string;
+  isPurchase?: boolean;
 };
 
 type Props = {
