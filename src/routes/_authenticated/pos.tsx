@@ -1151,20 +1151,36 @@ function POSPage() {
 
   const setPrimaryPaymentMethod = (method: string) => {
     const nextMethod = normalizePaymentMethodValue(method);
-    const rowMethod = isDigitalCashBackMode && nextMethod !== "digital_cash_back" ? "digital_cash_back" : nextMethod;
-    const nextRows = [...paymentRows];
-    if (nextRows[0]) {
-      nextRows[0] = { ...nextRows[0], method: rowMethod };
-    } else {
-      nextRows.push({ method: rowMethod, amount: 0 });
+    const rowMethod =
+      nextMethod === "digital_cash_back" ? "digital_cash_back" : nextMethod;
+
+    // Reset mutually exclusive states
+    const patch: Partial<Tab> = {
+      payment_method: nextMethod,
+    };
+
+    if (nextMethod !== "credit") {
+      patch.customer_id = null;
     }
-    setPaymentRows(nextRows);
+    if (nextMethod !== "digital_cash_back") {
+      patch.digital_received_amount = "";
+      patch.digital_account_id = null;
+    }
+    // expense_person_id is handled by the Staff button toggle, but we should clear it if switching to others
+    if (nextMethod !== "staff") {
+      patch.expense_person_id = null;
+    }
+
+    const nextRows = [{ method: rowMethod, amount: Number(tab.paid || 0) || 0 }];
+    setTab({
+      ...patch,
+      payments: nextRows,
+      paid: tab.paid,
+    });
   };
 
   const bindSelectedTenderSource = (method: string) => {
-    const nextMethod = normalizePaymentMethodValue(method);
-    setPrimaryPaymentMethod(nextMethod);
-    setTab({ payment_method: nextMethod });
+    setPrimaryPaymentMethod(method);
   };
 
   const setDigitalTenderSource = (accountId: string | null) => {
@@ -1884,11 +1900,13 @@ function POSPage() {
 
       // Post-sale print behaviour, configurable in Settings.
       const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled === true;
-      const printDefault = ((settings as any)?.pos_print_prompt_default ?? "no") as "yes" | "no";
+      const printDefault = "no";
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
-      } else if (printDefault === "yes" && patchedSale) {
-        printInvoiceDirect(patchedSale, settings);
+      } else if (patchedSale) {
+        // If prompt is disabled, follow the explicit default.
+        // Since we now hardcode default to "no", it only prints if explicitly enabled.
+        // But for clarity, we keep the logic structure.
         setTimeout(() => searchRef.current?.focus(), 50);
       } else {
         setTimeout(() => searchRef.current?.focus(), 50);
@@ -2726,6 +2744,7 @@ function POSPage() {
                     setTab({
                       customer_id: isWalkin ? null : v,
                       payment_method: isWalkin ? "cash" : "credit",
+                      expense_person_id: null,
                     });
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
@@ -2782,10 +2801,13 @@ function POSPage() {
                 <Select
                   value={tab.expense_person_id ?? "none"}
                   onValueChange={(v) => {
+                    const isStaff = v !== "none";
                     setTab({
-                      expense_person_id: v === "none" ? null : v,
-                      customer_id: v === "none" ? tab.customer_id : null,
+                      expense_person_id: isStaff ? v : null,
+                      customer_id: null,
+                      payment_method: isStaff ? "staff" : "cash",
                     });
+                    if (!isStaff) setShowStaff(false);
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
@@ -2814,12 +2836,16 @@ function POSPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={showStaff || tab.expense_person_id ? "secondary" : "ghost"}
+                  variant={tab.expense_person_id ? "secondary" : "ghost"}
                   className="h-6 text-[11px] px-2"
                   title="Charge this bill to a staff/owner expense ledger"
                   onClick={() => {
-                    if (tab.expense_person_id) setTab({ expense_person_id: null });
-                    setShowStaff((v) => !v);
+                    if (tab.expense_person_id) {
+                      setTab({ expense_person_id: null, payment_method: "cash" });
+                    } else {
+                      setTab({ expense_person_id: null }); // trigger dropdown show
+                      setShowStaff(true);
+                    }
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
@@ -3069,7 +3095,9 @@ function POSPage() {
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     setTab({ paid: total.toFixed(2) });
+                    setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                   className="text-xs text-primary hover:underline shrink-0 font-medium"
                 >
@@ -3622,8 +3650,9 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
 
   const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
   // Only accounts created in Cash Flow are offered here, including card/bank/mobile wallets.
+  // Filter out "Card" if it's a duplicate of the standalone Card button.
   const online = accounts
-    .filter((a: any) => a.type !== "cash")
+    .filter((a: any) => a.type !== "cash" && slug(a.name) !== "card")
     .map((a: any) => ({ v: a.name, label: a.name, id: a.id }));
 
   const normalizedValue = normalizePaymentMethodValue(value);
@@ -3639,19 +3668,12 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
     }`;
 
   return (
-    <div className="grid grid-cols-4 gap-1.5 mt-1.5">
+    <div className="grid grid-cols-3 gap-1.5 mt-1.5">
       <button type="button" onClick={() => onChange("cash")} className={btn(value === "cash")}>
         Cash
       </button>
       <button type="button" onClick={() => onChange("card")} className={btn(value === "card")}>
         Card
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("digital_cash_back")}
-        className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
-      >
-        Digital + CB
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -3669,7 +3691,7 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           </DropdownMenuItem>
           {online.length === 0 ? (
             <div className="px-2 py-3 text-xs text-muted-foreground">
-              No accounts yet. Create a card in Cash Flow — it will appear here automatically.
+              No accounts yet. Create a bank account in Cash Flow — it will appear here automatically.
             </div>
           ) : (
             online.map((o) => (
@@ -3683,6 +3705,13 @@ function PaymentMethodGrid({ value, onChange }: { value: string; onChange: (v: s
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      <button
+        type="button"
+        onClick={() => onChange("digital_cash_back")}
+        className={`${btn(normalizePaymentMethodValue(value) === "digital_cash_back")} leading-tight px-1.5`}
+      >
+        Digital + CB
+      </button>
       <button type="button" onClick={() => onChange("credit")} className={btn(value === "credit")}>
         Credit
       </button>
@@ -3704,14 +3733,16 @@ function PaymentMethodSelect({
     queryFn: fetchActiveCashAccounts,
   });
   const accounts = accQ.data ?? [];
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const options = [
     { value: "cash", label: "Cash" },
     { value: "card", label: "Card" },
     { value: "bank", label: "Bank" },
     { value: "digital_cash_back", label: "Digital + CB" },
     { value: "credit", label: "Credit" },
+    { value: "staff", label: "Staff" },
     ...accounts
-      .filter((a: any) => a.type !== "cash")
+      .filter((a: any) => a.type !== "cash" && slugify(a.name) !== "card")
       .map((a: any) => ({ value: a.name, label: a.name })),
   ];
 
@@ -3776,6 +3807,8 @@ function PrintPromptDialog({
   const yesRef = useRef<HTMLButtonElement>(null);
   const noRef = useRef<HTMLButtonElement>(null);
   const [focused, setFocused] = useState<"yes" | "no">(defaultAction || "no");
+  const settings = useSettings();
+
   useEffect(() => {
     if (!sale) return;
     setFocused(defaultAction || "no");
@@ -3784,10 +3817,17 @@ function PrintPromptDialog({
     }, 30);
     return () => clearTimeout(t);
   }, [sale, defaultAction]);
+
   const focus = (which: "yes" | "no") => {
     setFocused(which);
     (which === "yes" ? yesRef.current : noRef.current)?.focus();
   };
+
+  const doPrint = () => {
+    printInvoiceDirect(sale, settings.data);
+    onYes();
+  };
+
   return (
     <Dialog open={!!sale} onOpenChange={(o) => !o && onNo()}>
       <DialogContent
@@ -3795,7 +3835,11 @@ function PrintPromptDialog({
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            (focused === "yes" ? onYes : onNo)();
+            if (focused === "yes") {
+              doPrint();
+            } else {
+              onNo();
+            }
           } else if (
             e.key === "ArrowLeft" ||
             e.key === "ArrowRight" ||
@@ -3807,7 +3851,7 @@ function PrintPromptDialog({
             focus(focused === "yes" ? "no" : "yes");
           } else if (e.key.toLowerCase() === "y") {
             e.preventDefault();
-            onYes();
+            doPrint();
           } else if (e.key.toLowerCase() === "n" || e.key === "Escape") {
             e.preventDefault();
             onNo();
@@ -3824,7 +3868,11 @@ function PrintPromptDialog({
           <Button ref={noRef} variant={focused === "no" ? "default" : "outline"} onClick={onNo}>
             No
           </Button>
-          <Button ref={yesRef} variant={focused === "yes" ? "default" : "outline"} onClick={onYes}>
+          <Button
+            ref={yesRef}
+            variant={focused === "yes" ? "default" : "outline"}
+            onClick={doPrint}
+          >
             <Printer className="h-4 w-4 mr-2" />
             Yes, print
           </Button>
