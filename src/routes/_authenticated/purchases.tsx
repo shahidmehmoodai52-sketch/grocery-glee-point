@@ -728,11 +728,33 @@ function Page() {
           <p className="text-sm text-muted-foreground">Record stock received from suppliers</p>
         </div>
         <div className="flex items-center gap-2">
-          {hasParkedDraft && !open && (
-            <Button variant="outline" onClick={resumeDraft} className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
-              <Pencil className="h-4 w-4 mr-2" />
-              Draft ({savedDraft?.lines.length ?? 0} item{(savedDraft?.lines.length ?? 0) === 1 ? "" : "s"})
-            </Button>
+          {hasParkedDrafts && !open && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Drafts ({savedDrafts.length})
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Resume Draft</DialogTitle></DialogHeader>
+                <div className="space-y-2 py-4">
+                  {savedDrafts.map((d, i) => (
+                    <button
+                      key={i}
+                      onClick={() => resumeDraft(d, i)}
+                      className="w-full flex items-center justify-between p-3 rounded-md border hover:bg-accent text-left"
+                    >
+                      <div>
+                        <div className="font-medium">{suppliers.find(s => s.id === d.supplier)?.name || "No Supplier"}</div>
+                        <div className="text-xs text-muted-foreground">{d.lines.length} items · {d.date}</div>
+                      </div>
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
         <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />New purchase</Button>
         <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
