@@ -1450,7 +1450,7 @@ function Page() {
                             <TableCell className="whitespace-nowrap">{payLabel(methodOf(t))}</TableCell>
                             <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
 
-                            <TableCell className="max-w-[280px] truncate">
+                            <TableCell className="min-w-[200px] max-w-[400px]">
                               {t.reference && <span className="font-medium">{t.reference}</span>}
                               {t.reference && t.notes && <span> — </span>}
                               {t.notes && <span className="text-muted-foreground">{t.notes}</span>}
