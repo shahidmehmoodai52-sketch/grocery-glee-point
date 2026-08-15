@@ -29,7 +29,9 @@ export function calculatePurchaseTotals(input: PurchaseTotalsInput): PurchaseTot
   const taxAmt = input.taxMode === "pct"
     ? +(discountedSubtotal * (Number(input.tax || 0) / 100)).toFixed(2)
     : Number(input.tax || 0);
-  const total = Math.max(0, discountedSubtotal + taxAmt);
+  
+  // Ensure we don't return negative total
+  const total = Math.max(0, +(discountedSubtotal + taxAmt).toFixed(2));
 
   return {
     lineDiscountTotal,
@@ -40,3 +42,4 @@ export function calculatePurchaseTotals(input: PurchaseTotalsInput): PurchaseTot
     total,
   };
 }
+
