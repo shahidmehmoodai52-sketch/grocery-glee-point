@@ -15,7 +15,10 @@ async function runAudit() {
     .limit(1)
     .single();
     
-  if (!p1301) return;
+  if (!p1301) {
+    console.error("P-1301 not found");
+    return;
+  }
   
   const { data: p1301Items } = await supabase
     .from("purchase_items")
@@ -28,18 +31,27 @@ async function runAudit() {
   console.log("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |");
 
   for (const item of p1301Items) {
+    // Check if the product exists first
+    const { data: prod } = await supabase.from("products").select("id, stock").eq("id", item.product_id).single();
+    if (!prod) {
+      console.log(`| ${item.name} | - | - | - | - | - | - | - | - | - | Product Missing |`);
+      continue;
+    }
+
     const { data: movements } = await supabase
       .from("inventory_movements")
-      .select("quantity, balance, description, reference_id")
+      .select("quantity, balance, description, reference_id, created_at")
       .eq("product_id", item.product_id)
       .order("created_at", { ascending: true });
       
-    if (!movements) continue;
+    if (!movements || movements.length === 0) {
+      console.log(`| ${item.name} | ${item.qty} | 0 | 0 | 0 | 0 | 0 | ${prod.stock} | 0 | ${prod.stock} | No History Found |`);
+      continue;
+    }
     
     let p1301Impact = 0;
     let p1302Impact = 0;
     let correctionImpact = 0;
-    let originalQty = 0;
     let firstIdx = -1;
 
     for (let i = 0; i < movements.length; i++) {
@@ -57,22 +69,25 @@ async function runAudit() {
 
       if ((isP1301 || isP1302) && firstIdx === -1) {
         firstIdx = i;
-        originalQty = q;
       }
     }
 
+    let originalQty = 0;
     let stockBefore = 0;
     if (firstIdx !== -1) {
+      originalQty = Number(movements[firstIdx].quantity || 0);
       if (firstIdx > 0) {
         stockBefore = Number(movements[firstIdx - 1].balance || 0);
       } else {
         stockBefore = Number(movements[firstIdx].balance || 0) - originalQty;
       }
+    } else {
+      originalQty = item.qty;
+      stockBefore = 0;
     }
 
     const netImpact = p1301Impact + p1302Impact + correctionImpact;
-    const { data: prod } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
-    const currentStock = Number(prod?.stock || 0);
+    const currentStock = Number(prod.stock || 0);
     const requiredCorrection = -(netImpact - originalQty);
     const expectedFinalStock = currentStock + requiredCorrection;
 
