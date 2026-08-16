@@ -334,6 +334,7 @@ function Page() {
                       value={note} 
                       onChange={(e) => setNote(e.target.value)} 
                     />
+                  </div>
                 </div>
               </div>
             </div>
