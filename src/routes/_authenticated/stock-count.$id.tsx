@@ -199,7 +199,7 @@ function StockCountDetailPage() {
     // Find existing row for this product in this session
     const existing = items.find((i) => i.product_id === product.id);
     if (existing) {
-      const nextQty = mode === "set" ? qty : Number(existing.actual_qty) + qty;
+      const nextQty = roundToTillixQty(mode === "set" ? qty : Number(existing.actual_qty) + qty);
       const { error } = await supabase
         .from("stock_count_items" as any)
         .update({ actual_qty: nextQty, counted_at: new Date().toISOString(), counter_id: user?.id })
