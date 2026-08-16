@@ -71,7 +71,22 @@ function Page() {
   const searchRef = useRef<HTMLInputElement>(null);
   const entryMatchesRef = useRef<HTMLDivElement>(null);
 
-  const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
+  const setOpen = (v: boolean) => {
+    if (v) {
+      window.history.pushState({ modal: true }, "");
+    }
+    setDraft((d) => ({ ...d, open: v }));
+  };
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (open) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [open]);
   const setPurchaseId = (v: string) => setDraft((d) => ({ ...d, purchaseId: v }));
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
