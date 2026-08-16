@@ -3658,7 +3658,11 @@ function PaymentMethodGrid({
   const isAccountActive = (o: { v: string; id: string }) =>
     !isCashBack &&
     (digitalAccountId === o.id || normalizePaymentMethodValue(o.v) === normalizedValue);
-  const [cbOpen, setCbOpen] = useState(false);
+  const [bankOpen, setBankOpen] = useState(false);
+
+  const activeAccount = online.find((o) => isAccountActive(o));
+  const bankActive = isCashBack || !!activeAccount;
+  const bankLabel = isCashBack ? "Digital + CB" : (activeAccount?.label ?? "Bank");
 
   const btn = (active: boolean) =>
     `h-9 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap px-1 ${
@@ -3673,88 +3677,97 @@ function PaymentMethodGrid({
         <button type="button" onClick={() => onChange("cash")} className={btn(normalizedValue === "cash")}>
           Cash
         </button>
-        {online.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            title={`Receive in ${o.label} (Cash Flow account)`}
-            onClick={() => onSelectDigitalAccount(o.id)}
-            className={btn(isAccountActive(o))}
-          >
-            <span className="block truncate">{o.label}</span>
-          </button>
-        ))}
-        {online.length > 0 && (
-          <Popover
-            open={cbOpen}
-            onOpenChange={(open) => {
-              setCbOpen(open);
-              if (open && !isCashBack) {
-                onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null);
-              }
-            }}
-          >
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={`${btn(isCashBack)} leading-tight flex items-center justify-center gap-1`}
-                title="Digital payment with cash back"
-              >
-                <span className="truncate">Digital + CB</span>
-                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
-              <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-                <span className="font-semibold">Digital cash back</span>
-                <span>Total {fmtMoney(total, sym)}</span>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px]">Digital account</Label>
-                <Select
-                  value={digitalAccountId ?? ""}
-                  onValueChange={(v) => onSelectCashBackAccount(v || null)}
-                >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {online.map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px]">Amount received</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="h-8 text-right"
-                  value={cashBackReceived}
-                  onChange={(e) => onCashBackReceivedChange(e.target.value)}
-                  placeholder={total.toFixed(2)}
-                />
-              </div>
-              <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cash back</span>
-                  <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Remaining</span>
-                  <span className="font-semibold">{fmtMoney(due, sym)}</span>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
         <button type="button" onClick={() => onChange("credit")} className={btn(normalizedValue === "credit")}>
           Credit
         </button>
+        <Popover open={bankOpen} onOpenChange={setBankOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              disabled={online.length === 0}
+              className={`${btn(bankActive)} leading-tight flex items-center justify-center gap-1 disabled:opacity-50`}
+              title="Bank / other payment accounts from Cash Flow"
+            >
+              <span className="truncate">{bankLabel}</span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Payment accounts
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {online.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  title={`Receive in ${o.label} (Cash Flow account)`}
+                  onClick={() => {
+                    onSelectDigitalAccount(o.id);
+                    setBankOpen(false);
+                  }}
+                  className={btn(isAccountActive(o))}
+                >
+                  <span className="block truncate">{o.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="border-t pt-2 space-y-1.5">
+              <button
+                type="button"
+                className={`${btn(isCashBack)} w-full`}
+                onClick={() => onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null)}
+              >
+                Digital + CB
+              </button>
+              {isCashBack && (
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">Digital account</Label>
+                    <Select
+                      value={digitalAccountId ?? ""}
+                      onValueChange={(v) => onSelectCashBackAccount(v || null)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {online.map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">Amount received</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="h-8 text-right"
+                      value={cashBackReceived}
+                      onChange={(e) => onCashBackReceivedChange(e.target.value)}
+                      placeholder={total.toFixed(2)}
+                    />
+                  </div>
+                  <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cash back</span>
+                      <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Remaining</span>
+                      <span className="font-semibold">{fmtMoney(due, sym)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
       {online.length === 0 && (
         <p className="text-[10px] leading-tight text-muted-foreground">
