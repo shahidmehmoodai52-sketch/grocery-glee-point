@@ -308,7 +308,10 @@ function Page() {
     setEntrySearch("");
     setEntryActive(false);
     setEntryIndex(0);
-    focusCell("cost", newIndex);
+    // Determine target based on product presence. If it's a new empty row (product is null),
+    // focus the name field instead of cost.
+    const target = product ? "cost" : "name";
+    focusCell(target as any, newIndex);
   };
   const addFromSearch = async () => {
     const term = entrySearch.trim();
