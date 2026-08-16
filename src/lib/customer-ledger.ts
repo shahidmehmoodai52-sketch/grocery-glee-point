@@ -67,16 +67,19 @@ export function buildLedgerEntries({
   }
 
   for (const p of payments) {
-    // Standalone payments are credits
-    entries.push({
-      id: p.id,
-      date: p.created_at,
-      type: "payment",
-      ref: p.method || "Payment",
-      note: p.note ?? "",
-      debit: 0,
-      credit: Number(p.amount || 0),
-    });
+    // Standalone payments (Credit) or Cash Out (Debit)
+    if (p.party_type === "customer") {
+      const isCashOut = p.note?.includes("Cash Out") || p.cash_transaction_id;
+      entries.push({
+        id: p.id,
+        date: p.created_at,
+        type: isCashOut ? "cash_out" : "payment",
+        ref: p.method || (isCashOut ? "Cash Out" : "Payment"),
+        note: p.note ?? "",
+        debit: isCashOut ? Number(p.amount || 0) : 0,
+        credit: isCashOut ? 0 : Number(p.amount || 0),
+      });
+    }
   }
 
   return entries.sort((a, b) => a.date.localeCompare(b.date));
