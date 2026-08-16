@@ -284,59 +284,59 @@ function Page() {
               
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 <div className="space-y-3">
-                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Return Summary</h3>
-                <Card className="p-3 space-y-3 shadow-none border-dashed">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{fmtMoney(subtotal, sym)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">Tax</span>
+                  <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Return Summary</h3>
+                  <Card className="p-3 space-y-3 shadow-none border-dashed">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span>{fmtMoney(subtotal, sym)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-muted-foreground">Tax</span>
+                      <Input 
+                        type="number" 
+                        className="h-8 w-24 text-right" 
+                        value={tax || ""} 
+                        onChange={(e) => setTax(Number(e.target.value))} 
+                      />
+                    </div>
+                    <div className="pt-2 border-t flex justify-between font-bold text-lg text-primary">
+                      <span>Total</span>
+                      <span>{fmtMoney(total, sym)}</span>
+                    </div>
+                  </Card>
+
+                  <div className="space-y-2 pt-2">
+                    <Label>Refund Received</Label>
                     <Input 
                       type="number" 
-                      className="h-8 w-24 text-right" 
-                      value={tax || ""} 
-                      onChange={(e) => setTax(Number(e.target.value))} 
+                      placeholder="0.00" 
+                      value={refund || ""} 
+                      onChange={(e) => setRefund(Number(e.target.value))} 
                     />
                   </div>
-                  <div className="pt-2 border-t flex justify-between font-bold text-lg text-primary">
-                    <span>Total</span>
-                    <span>{fmtMoney(total, sym)}</span>
+
+                  <div className="space-y-2">
+                    <Label>Refund Method</Label>
+                    <Select value={method} onValueChange={setMethod}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="transfer">Transfer</SelectItem>
+                        <SelectItem value="credit">Supplier Credit</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </Card>
 
-                <div className="space-y-2 pt-2">
-                  <Label>Refund Received</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={refund || ""} 
-                    onChange={(e) => setRefund(Number(e.target.value))} 
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Refund Method</Label>
-                  <Select value={method} onValueChange={setMethod}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="transfer">Transfer</SelectItem>
-                      <SelectItem value="credit">Supplier Credit</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Note</Label>
-                  <Input 
-                    placeholder="Reason for return..." 
-                    value={note} 
-                    onChange={(e) => setNote(e.target.value)} 
-                  />
+                  <div className="space-y-2">
+                    <Label>Note</Label>
+                    <Input 
+                      placeholder="Reason for return..." 
+                      value={note} 
+                      onChange={(e) => setNote(e.target.value)} 
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
             <div className="p-4 border-t bg-background">
               <Button 
