@@ -8,40 +8,36 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
 });
 
 async function runAudit() {
-  // First, let's find the tenant by name if code fails
   const { data: tenants } = await supabase
     .from("tenants")
     .select("id, name, code");
     
-  const tenant = tenants?.find(t => t.name?.includes("Hafiz") || t.code?.includes("ba-023"));
+  const tenant = tenants?.find(t => (t.name && t.name.includes("Hafiz")) || (t.code && t.code.includes("ba-023")));
     
   if (!tenant) {
     console.error("Tenant not found. Available tenants:", tenants?.map(t => `${t.name} (${t.code})`).join(", "));
     return;
   }
   
-  // Find P-1301
-  const { data: p1301 } = await supabase
+  let p1301Result = await supabase
     .from("purchases")
-    .select("id, invoice_no")
+    .select("id, invoice_no, tenant_id")
     .eq("invoice_no", "P-1301")
     .eq("tenant_id", tenant.id)
     .single();
     
-  if (!p1301) {
-    // Try without tenant ID just in case
-    const { data: p1301Any } = await supabase
+  if (p1301Result.error) {
+    p1301Result = await supabase
       .from("purchases")
       .select("id, invoice_no, tenant_id")
       .eq("invoice_no", "P-1301")
       .single();
-    
-    if (!p1301Any) {
-      console.error("P-1301 not found anywhere");
-      return;
-    }
-    console.log("Found P-1301 under tenant:", p1301Any.tenant_id);
-    p1301 = p1301Any;
+  }
+  
+  const p1301 = p1301Result.data;
+  if (!p1301) {
+    console.error("P-1301 not found");
+    return;
   }
   
   const { data: p1301Items } = await supabase
