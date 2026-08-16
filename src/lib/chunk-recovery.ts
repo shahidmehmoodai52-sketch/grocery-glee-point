@@ -21,7 +21,7 @@ const FLAG = "tillix:chunk-recovered-at";
 const COOLDOWN_MS = 60_000;
 
 const CHUNK_ERROR_RE =
-  /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed|chunkloaderror|loading chunk [\d\w]+ failed|failed to load module script/i;
+  /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed|chunkloaderror|loading chunk [\d\w]+ failed|failed to load module script|tanstack-start-client-entry/i;
 
 export function isChunkLoadError(reason: unknown): boolean {
   const message =
@@ -61,7 +61,7 @@ export function recoverFromChunkError(): boolean {
         const keys = await caches.keys();
         // Only the app-shell caches; IndexedDB / offline POS data is untouched.
         await Promise.allSettled(
-          keys.filter((k) => /workbox|precache|html-nav|static-assets/i.test(k)).map((k) => caches.delete(k)),
+          keys.filter((k) => /workbox|precache|nav|static|images/i.test(k)).map((k) => caches.delete(k)),
         );
       }
       if ("serviceWorker" in navigator) {
