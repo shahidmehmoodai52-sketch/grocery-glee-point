@@ -26,6 +26,8 @@ export default defineConfig({
         registerType: "autoUpdate",
         injectRegister: null, // registration happens from our guarded wrapper
         strategies: "injectManifest",
+        // client assets are emitted to dist/client by the TanStack/nitro build
+        outDir: "dist/client",
         srcDir: "src",
         filename: "sw.js",
         devOptions: { enabled: false },
