@@ -3643,6 +3643,8 @@ function PaymentMethodGrid({
   cashBackAmount,
   onSelectCashBackAccount,
   onCashBackReceivedChange,
+  expensePersonId,
+  onSelectStaff,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -3650,13 +3652,15 @@ function PaymentMethodGrid({
   total: number;
   due: number;
   digitalAccountId: string | null;
-  digitalAmount: string;
+  digitalAmount?: string;
   onSelectDigitalAccount: (accountId: string | null) => void;
-  onDigitalAmountChange: (value: string) => void;
+  onDigitalAmountChange?: (value: string) => void;
   cashBackReceived: string;
   cashBackAmount: number;
   onSelectCashBackAccount: (accountId: string | null) => void;
   onCashBackReceivedChange: (value: string) => void;
+  expensePersonId: string | null;
+  onSelectStaff: (personId: string | null) => void;
 }) {
   const accQ = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
