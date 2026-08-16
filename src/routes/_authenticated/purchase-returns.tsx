@@ -105,12 +105,18 @@ function Page() {
       await fetchAll<any>((from, to) => supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)),
   });
 
+  const [debouncedPurchaseSearch, setDebouncedPurchaseSearch] = useState(purchaseSearch);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedPurchaseSearch(purchaseSearch), 300);
+    return () => clearTimeout(timer);
+  }, [purchaseSearch]);
+
   const { data: purchases = [] } = useQuery({
-    queryKey: ["purchases-for-return", purchaseSearch],
+    queryKey: ["purchases-for-return", debouncedPurchaseSearch],
     queryFn: async () => {
       let q = supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).limit(50);
-      if (purchaseSearch) {
-        q = q.ilike("invoice_no", `%${purchaseSearch}%`);
+      if (debouncedPurchaseSearch) {
+        q = q.ilike("invoice_no", `%${debouncedPurchaseSearch}%`);
       }
       const { data } = await q;
       return data ?? [];
@@ -122,13 +128,18 @@ function Page() {
     queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
   });
 
-  // Server-side product search for manual line entry
+  const [debouncedEntrySearch, setDebouncedEntrySearch] = useState(entrySearch);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedEntrySearch(entrySearch), 300);
+    return () => clearTimeout(timer);
+  }, [entrySearch]);
+
   const { data: searchResult } = useQuery({
-    queryKey: ["products", "return-search", entrySearch.trim()],
-    enabled: entrySearch.trim().length > 1,
+    queryKey: ["products", "return-search", debouncedEntrySearch.trim()],
+    enabled: debouncedEntrySearch.trim().length > 1,
     staleTime: 30_000,
     queryFn: async () => {
-      const term = entrySearch.trim();
+      const term = debouncedEntrySearch.trim();
       const { data } = await supabase.from("products")
         .select("id,name,sku,barcode,cost_price,sell_price,stock")
         .or(`name.ilike.%${term}%,sku.ilike.%${term}%,barcode.ilike.%${term}%`)
@@ -268,7 +279,7 @@ function Page() {
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Pick a purchase" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
+                  <SelectContent className="max-h-[60vh] overflow-y-auto">
                     <SelectItem value="none">— Manual Entry —</SelectItem>
                     {purchases.map((p: any) => (
                       <SelectItem key={p.id} value={p.id}>
@@ -285,7 +296,7 @@ function Page() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select supplier" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
+                  <SelectContent className="max-h-[60vh] overflow-y-auto">
                     <SelectItem value="none">— Walk-in —</SelectItem>
                     {suppliers.map((s: any) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
