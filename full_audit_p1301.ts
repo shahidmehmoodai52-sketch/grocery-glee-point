@@ -24,94 +24,64 @@ async function runAudit() {
     
   if (!p1301Items) return;
   
-  const results = [];
-  
+  console.log("| Product | Original P-1301 Qty | Stock Before P-1301 | P-1301 Impact | P-1302 Impact | Prev Correction Impact | Net P1301/P1302 Impact | Current Stock | Required Correction | Expected Final Stock | Flags |");
+  console.log("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |");
+
   for (const item of p1301Items) {
     const { data: movements } = await supabase
       .from("inventory_movements")
-      .select("*")
+      .select("quantity, balance, description, reference_id")
       .eq("product_id", item.product_id)
       .order("created_at", { ascending: true });
       
-    if (!movements || movements.length === 0) continue;
+    if (!movements) continue;
     
-    const p1301Movs = movements.filter(m => 
-      (m.reference_id === p1301.id) || 
-      (m.description && m.description.includes("P-1301"))
-    );
-    
-    const p1302Movs = movements.filter(m => 
-      m.description && m.description.includes("P-1302")
-    );
-    
-    const correctionMovs = movements.filter(m => 
-      m.description && (
-        m.description.includes("Correction") || 
-        m.description.includes("Restoration") || 
-        m.description.includes("fix_halve") ||
-        m.description.includes("apply_p1301_correction") ||
-        m.description.includes("Halving quantity") ||
-        m.description.includes("Doubling quantity")
-      )
-    );
-    
-    const firstP130X = movements.find(m => 
-      (m.reference_id === p1301.id) || 
-      (m.description && (m.description.includes("P-1301") || m.description.includes("P-1302")))
-    );
-    
+    let p1301Impact = 0;
+    let p1302Impact = 0;
+    let correctionImpact = 0;
     let originalQty = 0;
-    let stockBefore = 0;
-    
-    if (firstP130X) {
-      originalQty = parseFloat(String(firstP130X.quantity));
-      const idx = movements.indexOf(firstP130X);
-      if (idx > 0) {
-        stockBefore = parseFloat(String(movements[idx-1].balance));
-      } else {
-        stockBefore = parseFloat(String(firstP130X.balance)) - originalQty;
+    let firstIdx = -1;
+
+    for (let i = 0; i < movements.length; i++) {
+      const m = movements[i];
+      const desc = m.description || "";
+      const q = Number(m.quantity || 0);
+      
+      const isP1301 = m.reference_id === p1301.id || desc.includes("P-1301");
+      const isP1302 = desc.includes("P-1302");
+      const isCorrection = desc.includes("Correction") || desc.includes("Restoration") || desc.includes("fix_halve") || desc.includes("apply_p1301_correction") || desc.includes("quantity");
+
+      if (isP1301) p1301Impact += q;
+      if (isP1302) p1302Impact += q;
+      if (isCorrection && !isP1301 && !isP1302) correctionImpact += q;
+
+      if ((isP1301 || isP1302) && firstIdx === -1) {
+        firstIdx = i;
+        originalQty = q;
       }
-    } else {
-      originalQty = parseFloat(String(item.qty));
-      stockBefore = 0;
     }
-    
-    const p1301Impact = p1301Movs.reduce((sum, m) => sum + parseFloat(String(m.quantity)), 0);
-    const p1302Impact = p1302Movs.reduce((sum, m) => sum + parseFloat(String(m.quantity)), 0);
-    const prevCorrectionImpact = correctionMovs.reduce((sum, m) => sum + parseFloat(String(m.quantity)), 0);
-    
-    const netImpact = p1301Impact + p1302Impact + prevCorrectionImpact;
-    
+
+    let stockBefore = 0;
+    if (firstIdx !== -1) {
+      if (firstIdx > 0) {
+        stockBefore = Number(movements[firstIdx - 1].balance || 0);
+      } else {
+        stockBefore = Number(movements[firstIdx].balance || 0) - originalQty;
+      }
+    }
+
+    const netImpact = p1301Impact + p1302Impact + correctionImpact;
     const { data: prod } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
-    const currentStock = prod ? parseFloat(String(prod.stock)) : 0;
-    
+    const currentStock = Number(prod?.stock || 0);
     const requiredCorrection = -(netImpact - originalQty);
     const expectedFinalStock = currentStock + requiredCorrection;
-    
+
     let flags = [];
     if (originalQty % 1 !== 0) flags.push("Fractional Original");
     if (expectedFinalStock % 1 !== 0) flags.push("Fractional Final");
-    if (p1301Movs.length === 0) flags.push("No P-1301 Mov");
+    if (p1301Impact === 0) flags.push("No P-1301 Mov");
     
-    results.push({
-      Product: item.name,
-      OriginalP1301Qty: originalQty,
-      StockBefore: stockBefore,
-      P1301Impact: p1301Impact,
-      P1302Impact: p1302Impact,
-      PrevCorrectionImpact: prevCorrectionImpact,
-      NetImpact: netImpact,
-      CurrentStock: currentStock,
-      RequiredCorrection: requiredCorrection,
-      ExpectedFinalStock: expectedFinalStock,
-      Flags: flags.join(", ")
-    });
-  }
-  
-  console.log("| Product | Original P-1301 Qty | Stock Before P-1301 | P-1301 Impact | P-1302 Impact | Prev Correction Impact | Net P1301/P1302 Impact | Current Stock | Required Correction | Expected Final Stock | Flags |");
-  console.log("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |");
-  for (const r of results) {
-    console.log(`| ${r.Product} | ${r.OriginalP1301Qty} | ${r.StockBefore} | ${r.P1301Impact} | ${r.P1302Impact} | ${r.PrevCorrectionImpact} | ${r.NetImpact} | ${r.CurrentStock} | ${r.RequiredCorrection} | ${r.ExpectedFinalStock} | ${r.Flags} |`);
+    console.log(`| ${item.name} | ${originalQty} | ${stockBefore} | ${p1301Impact} | ${p1302Impact} | ${correctionImpact} | ${netImpact} | ${currentStock} | ${requiredCorrection} | ${expectedFinalStock} | ${flags.join(", ")} |`);
   }
 }
 
