@@ -256,19 +256,19 @@ function Page() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4">
+        <Card className="p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setExpOpen(true)}>
           <div className="text-xs text-muted-foreground flex items-center gap-1"><Wallet className="h-3.5 w-3.5" />Today</div>
           <div className="text-2xl font-semibold mt-1 text-destructive">{fmtMoney(totals.today, sym)}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setExpOpen(true)}>
           <div className="text-xs text-muted-foreground">Period total</div>
           <div className="text-2xl font-semibold mt-1">{fmtMoney(totals.period, sym)}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setExpOpen(true)}>
           <div className="text-xs text-muted-foreground">Entries</div>
           <div className="text-2xl font-semibold mt-1">{rows.length}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setPersonOpen(true)}>
           <div className="text-xs text-muted-foreground">Active persons</div>
           <div className="text-2xl font-semibold mt-1">{persons.length}</div>
         </Card>
