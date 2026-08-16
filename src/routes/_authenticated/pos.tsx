@@ -1377,7 +1377,7 @@ function POSPage() {
       items,
       customer_id: sale.customer_id ?? null,
       expense_person_id: sale.expense_person_id ?? null,
-      payment_method: parsedPayments[0]?.method ?? "cash",
+      payment_method: sale.expense_person_id ? "staff" : parsedPayments[0]?.method ?? "cash",
       payments: parsedPayments,
       discount: Number(sale.discount ?? 0),
       discount_pct: "",
