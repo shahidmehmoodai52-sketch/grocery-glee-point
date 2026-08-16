@@ -18,7 +18,7 @@ import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { Receipt, printReceipt } from "@/components/receipt";
 import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
-import { summarizeCustomerLedger } from "@/lib/customer-ledger";
+import { summarizeCustomerLedger, buildLedgerEntries } from "@/lib/customer-ledger";
 
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
 
@@ -31,9 +31,8 @@ type Entry = {
   note: string;
   debit: number;
   credit: number;
-  sale?: any;
-  paid?: number;
-  total?: number;
+  data?: any;
+  balance?: number;
 };
 
 function Page() {
@@ -78,21 +77,11 @@ function Page() {
   });
 
   const entries: Entry[] = useMemo(() => {
-    const e: Entry[] = [];
-    for (const s of sales as any[]) {
-      e.push({ id: s.id, entity: "sale", date: s.created_at, type: "sale", ref: s.invoice_no, note: s.note ?? "", debit: Number(s.total), credit: 0, sale: s, paid: Number(s.paid), total: Number(s.total) });
-      if (Number(s.paid) > 0) {
-        e.push({ date: s.created_at, type: "payment", ref: `${s.invoice_no} · on-invoice`, note: "Paid at sale", debit: 0, credit: Number(s.paid) });
-      }
-    }
-    for (const r of returns as any[]) {
-      e.push({ id: r.id, entity: "sale_return", date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
-    }
-    for (const p of payments as any[]) {
-      e.push({ id: p.id, entity: "payment", date: p.created_at, type: "payment", ref: p.method, note: p.note ?? "", debit: 0, credit: Number(p.amount) });
-    }
-    e.sort((a, b) => a.date.localeCompare(b.date));
-    return e;
+    return buildLedgerEntries({
+      sales: sales as any[],
+      payments: payments as any[],
+      returns: returns as any[],
+    }) as any[];
   }, [sales, payments, returns]);
 
   const initialOB = Number(customer?.opening_balance ?? 0);
@@ -275,7 +264,7 @@ function Page() {
             </TableRow>
             {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
             {rows.map((x, i) => {
-              const due = x.entity === "sale" ? Math.max(Number(x.total || 0) - Number(x.paid || 0), 0) : 0;
+              const due = x.type === "sale" ? Math.max(Number((x.data as any)?.total || 0) - Number((x.data as any)?.paid || 0), 0) : 0;
               return (
               <TableRow
                 key={i}
@@ -283,8 +272,8 @@ function Page() {
                 onClick={(e) => {
                   // Inline action buttons keep their own behaviour.
                   if ((e.target as HTMLElement).closest("button")) return;
-                  if (x.entity === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
-                  if (x.entity && x.entity !== "payment" && x.id) return setEditEntry({ entity: x.entity as Exclude<LedgerEntity, "payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
+                  if (x.type === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
+                  if (x.type && x.type !== "payment" && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
                 }}
               >
 
@@ -306,30 +295,30 @@ function Page() {
                 </TableCell>
                 <TableCell className="text-right no-print">
                   <div className="flex justify-end gap-1">
-                    {x.type === "sale" && x.sale && (
+                    {x.type === "sale" && x.data && (
                       <>
-                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.sale, customers: { name: customer?.name, phone: customer?.phone } })}>
+                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.data, customers: { name: customer?.name, phone: customer?.phone } })}>
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
-                        {x.sale.status !== "voided" && (
-                          <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => voidSale(x.sale)} disabled={voiding}>
+                        {x.data.status !== "voided" && (
+                          <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => voidSale(x.data)} disabled={voiding}>
                             <Ban className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </>
                     )}
-                    {x.entity === "sale" && due > 0 && (
+                    {x.type === "sale" && due > 0 && (
                       <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>
                         <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
                       </Button>
                     )}
-                    {x.entity === "payment" && x.id && (
+                    {x.type === "payment" && x.id && (
                       <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    {x.entity && x.entity !== "payment" && x.id && (
-                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: x.entity as Exclude<LedgerEntity,"payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
+                    {x.type && x.type !== "payment" && x.id && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: (x.type === "sale" ? "sale" : "sale_return") as any, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}
