@@ -276,8 +276,14 @@ function Page() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-4 space-y-4">
-              <div className="space-y-3">
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="p-4 bg-muted/20 border-b flex items-center justify-between shrink-0">
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Summary</h3>
+                <div className="text-xs text-muted-foreground">{lines.length} items</div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="space-y-3">
                 <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Return Summary</h3>
                 <Card className="p-3 space-y-3 shadow-none border-dashed">
                   <div className="flex justify-between text-sm">
