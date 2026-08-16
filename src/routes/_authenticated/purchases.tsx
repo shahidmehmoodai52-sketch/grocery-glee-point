@@ -568,12 +568,24 @@ function Page() {
     const selected = paySourceOptions.find((a) => a.id === wanted) ?? defaultPaySource;
     if (!selected) return { id: null, name: "cash" };
     if (!selected.preset) return { id: selected.id, name: selected.name };
+    
+    // Check if account already exists locally or in the list to avoid duplicates
+    const existing = cashAccounts.find((a: any) => a.name.toLowerCase() === selected.name.toLowerCase());
+    if (existing) return { id: existing.id, name: existing.name };
+
     const { data, error } = await supabase
       .from("cash_accounts")
       .insert({ name: selected.name, type: guessAccountType(selected.name), opening_balance: 0, is_active: true })
       .select("id,name")
       .single();
-    if (error) throw error;
+    if (error) {
+      // If error is unique violation, fetch the existing one
+      if (error.code === '23505') {
+         const { data: found } = await supabase.from("cash_accounts").select("id,name").eq("name", selected.name).single();
+         if (found) return { id: found.id, name: found.name };
+      }
+      throw error;
+    }
     qc.invalidateQueries({ queryKey: ["cash-accounts"] });
     return { id: data.id as string, name: data.name as string };
   };
@@ -713,8 +725,13 @@ function Page() {
 
       } else {
         // --- New Purchase Flow ---
-        const { error } = await supabase.rpc("complete_purchase", { payload });
+        const { error, data } = await supabase.rpc("complete_purchase", { payload });
         if (error) throw error;
+        
+        // Invalidate queries early to ensure next fetches get fresh data
+        qc.invalidateQueries({ queryKey: ["purchases"] });
+        qc.invalidateQueries({ queryKey: ["products"] });
+        qc.invalidateQueries({ queryKey: ["suppliers"] });
       }
     } catch (err: any) {
       setSaving(false);
@@ -1256,10 +1273,15 @@ function Page() {
                 onClick={async () => {
                   if (saving) return;
                   const success = await submit();
-                  if (success === false) return;
+                  if (!success) return;
+                  
+                  // Invalidate immediately to ensure we have the latest purchase for printing
+                  await qc.invalidateQueries({ queryKey: ["purchases"] });
+                  
                   setTimeout(() => {
-                    // Search in the purchases array (which should have been invalidated/refetched)
-                    const latest = purchases[0];
+                    // Try to find the latest purchase from the query cache
+                    const allPurchases = qc.getQueryData<any[]>(["purchases"]) || purchases;
+                    const latest = allPurchases[0];
                     if (latest) {
                       printInvoiceDirect({
                         invoice_no: latest.invoice_no,
@@ -1280,8 +1302,10 @@ function Page() {
                           line_total: it.line_total
                         }))
                       }, settings, "purchase" as any);
+                    } else {
+                      toast.error("Could not find the purchase record for printing. Please try reprinting from the history.");
                     }
-                  }, 800);
+                  }, 500);
                 }}
                 disabled={saving}
               >
