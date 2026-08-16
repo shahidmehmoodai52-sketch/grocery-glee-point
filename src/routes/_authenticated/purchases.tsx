@@ -598,7 +598,8 @@ function Page() {
     } catch (e: any) {
       setSaving(false);
       savingRef.current = false;
-      return toast.error(e?.message ?? "Could not resolve payment account");
+      toast.error(e?.message ?? "Could not resolve payment account");
+      return false;
     }
     
     const payload = {
