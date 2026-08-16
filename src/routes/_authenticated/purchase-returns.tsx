@@ -507,7 +507,11 @@ function Page() {
       </Card>
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-[400px] p-0 overflow-hidden rounded-xl">
+        <DialogContent 
+          className="max-w-[400px] p-0 overflow-hidden rounded-xl"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader className="p-6 border-b bg-muted/20">
             <DialogTitle className="flex items-center gap-2">
               <Undo2 className="h-5 w-5 text-primary" />
