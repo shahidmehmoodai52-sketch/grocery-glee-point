@@ -3739,57 +3739,16 @@ function PaymentMethodGrid({
             </div>
 
             <div className="border-t pt-2 space-y-1.5">
-              <button
-                type="button"
-                className={`${btn(isCashBack)} w-full`}
-                onClick={() => onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null)}
-              >
-                Digital + CB
-              </button>
-              {isCashBack && (
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Digital account</Label>
-                    <Select
-                      value={digitalAccountId ?? ""}
-                      onValueChange={(v) => onSelectCashBackAccount(v || null)}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select account" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {online.map((o) => (
-                          <SelectItem key={o.id} value={o.id}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px]">Amount received</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="h-8 text-right"
-                      value={cashBackReceived}
-                      onChange={(e) => onCashBackReceivedChange(e.target.value)}
-                      placeholder={total.toFixed(2)}
-                    />
-                  </div>
-                  <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Cash back</span>
-                      <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Remaining</span>
-                      <span className="font-semibold">{fmtMoney(due, sym)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Staff / Owner
+              </div>
+              <StaffSelector
+                value={expensePersonId}
+                onSelect={(id) => {
+                  onSelectStaff(id);
+                  setBankOpen(false);
+                }}
+              />
             </div>
           </PopoverContent>
         </Popover>
@@ -3800,6 +3759,53 @@ function PaymentMethodGrid({
           Flow and they appear here automatically.
         </p>
       )}
+    </div>
+  );
+}
+
+function StaffSelector({
+  value,
+  onSelect,
+}: {
+  value: string | null;
+  onSelect: (id: string | null) => void;
+}) {
+  const { data: persons = [] } = useQuery({
+    queryKey: ["expense_persons"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("expense_persons").select("*").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      <button
+        type="button"
+        onClick={() => onSelect(null)}
+        className={`h-9 rounded-lg text-[11px] font-medium transition-all px-1 ${
+          !value
+            ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+            : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
+        }`}
+      >
+        None
+      </button>
+      {persons.map((p: any) => (
+        <button
+          key={p.id}
+          type="button"
+          onClick={() => onSelect(p.id)}
+          className={`h-9 rounded-lg text-[11px] font-medium transition-all px-1 ${
+            value === p.id
+              ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+              : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
+          }`}
+        >
+          <span className="block truncate">{p.name}</span>
+        </button>
+      ))}
     </div>
   );
 }
