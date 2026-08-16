@@ -1815,6 +1815,7 @@ function POSPage() {
             .from("sales")
             .update({
               customer_id: tab.customer_id,
+              expense_person_id: tab.expense_person_id,
               payment_method: paymentMethodLabel,
               note: tab.note,
             })
