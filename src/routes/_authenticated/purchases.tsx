@@ -568,12 +568,24 @@ function Page() {
     const selected = paySourceOptions.find((a) => a.id === wanted) ?? defaultPaySource;
     if (!selected) return { id: null, name: "cash" };
     if (!selected.preset) return { id: selected.id, name: selected.name };
+    
+    // Check if account already exists locally or in the list to avoid duplicates
+    const existing = cashAccounts.find((a: any) => a.name.toLowerCase() === selected.name.toLowerCase());
+    if (existing) return { id: existing.id, name: existing.name };
+
     const { data, error } = await supabase
       .from("cash_accounts")
       .insert({ name: selected.name, type: guessAccountType(selected.name), opening_balance: 0, is_active: true })
       .select("id,name")
       .single();
-    if (error) throw error;
+    if (error) {
+      // If error is unique violation, fetch the existing one
+      if (error.code === '23505') {
+         const { data: found } = await supabase.from("cash_accounts").select("id,name").eq("name", selected.name).single();
+         if (found) return { id: found.id, name: found.name };
+      }
+      throw error;
+    }
     qc.invalidateQueries({ queryKey: ["cash-accounts"] });
     return { id: data.id as string, name: data.name as string };
   };
