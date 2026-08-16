@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
+import { fetchAll } from "@/lib/supabase-page";
 
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
@@ -58,22 +59,25 @@ function Page() {
   });
   const { data: sales = [] } = useQuery({
     queryKey: ["customer-sales", id],
-    queryFn: async () =>
-      (await supabase.from("sales")
+    queryFn: async () => await fetchAll<any>((f, t) => 
+      supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,paid,change_due,payment_method,status,created_at,note,sale_items(id,name,qty,price,line_total)")
-        .eq("customer_id", id).order("created_at", { ascending: true })).data ?? [],
+        .eq("customer_id", id).order("created_at", { ascending: true }).range(f, t)
+    ),
   });
   const { data: payments = [] } = useQuery({
     queryKey: ["customer-payments", id],
-    queryFn: async () =>
-      (await supabase.from("party_payments").select("id,amount,method,note,created_at,cash_transaction_id")
-        .eq("party_type", "customer").eq("party_id", id).order("created_at", { ascending: true })).data ?? [],
+    queryFn: async () => await fetchAll<any>((f, t) => 
+      supabase.from("party_payments").select("id,amount,method,note,created_at,cash_transaction_id")
+        .eq("party_type", "customer").eq("party_id", id).order("created_at", { ascending: true }).range(f, t)
+    ),
   });
   const { data: returns = [] } = useQuery({
     queryKey: ["customer-returns", id],
-    queryFn: async () =>
-      (await supabase.from("sale_returns").select("id,return_no,total,refund_amount,created_at,note")
-        .eq("customer_id", id).order("created_at", { ascending: true })).data ?? [],
+    queryFn: async () => await fetchAll<any>((f, t) => 
+      supabase.from("sale_returns").select("id,return_no,total,refund_amount,created_at,note")
+        .eq("customer_id", id).order("created_at", { ascending: true }).range(f, t)
+    ),
   });
 
   const entries: Entry[] = useMemo(() => {

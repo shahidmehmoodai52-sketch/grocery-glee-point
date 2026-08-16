@@ -17,6 +17,7 @@ import { offlineFirst, cacheCustomers, insertOfflineAware } from "@/lib/offline/
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db } from "@/lib/offline/db";
 import { summarizeCustomerLedger, buildLedgerEntries } from "@/lib/customer-ledger";
+import { fetchAll } from "@/lib/supabase-page";
 
 
 export const Route = createFileRoute("/_authenticated/customers/")({ component: Page });
@@ -99,15 +100,21 @@ function Page() {
   });
   const { data: sales = [] } = useQuery({
     queryKey: ["customer-list-sales"],
-    queryFn: async () => (await supabase.from("sales").select("id,customer_id,total,paid,created_at,status").order("created_at", { ascending: true })).data ?? [],
+    queryFn: async () => await fetchAll<any>((f, t) => 
+      supabase.from("sales").select("id,customer_id,total,paid,created_at,status").order("created_at", { ascending: true }).range(f, t)
+    ),
   });
   const { data: payments = [] } = useQuery({
     queryKey: ["customer-list-payments"],
-    queryFn: async () => (await supabase.from("party_payments").select("id,party_type,party_id,amount,created_at").eq("party_type", "customer").order("created_at", { ascending: true })).data ?? [],
+    queryFn: async () => await fetchAll<any>((f, t) => 
+      supabase.from("party_payments").select("id,party_type,party_id,amount,created_at").eq("party_type", "customer").order("created_at", { ascending: true }).range(f, t)
+    ),
   });
   const { data: returns = [] } = useQuery({
     queryKey: ["customer-list-returns"],
-    queryFn: async () => (await supabase.from("sale_returns").select("id,customer_id,total,refund_amount,created_at").order("created_at", { ascending: true })).data ?? [],
+    queryFn: async () => await fetchAll<any>((f, t) => 
+      supabase.from("sale_returns").select("id,customer_id,total,refund_amount,created_at").order("created_at", { ascending: true }).range(f, t)
+    ),
   });
 
   const customerBalances = useMemo(() => {
