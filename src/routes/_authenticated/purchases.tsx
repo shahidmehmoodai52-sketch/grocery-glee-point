@@ -742,7 +742,7 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["cf-purchases"] });
     qc.invalidateQueries({ queryKey: ["cash-accounts"] });
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
-
+    return true;
   };
 
 
