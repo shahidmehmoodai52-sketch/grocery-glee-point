@@ -287,7 +287,11 @@ function Page() {
   }, [sales, invoiceSearch]);
 
   const setItem = (i: number, patch: Partial<ItemRow>) =>
-    setItems((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+    setItems((ls) =>
+      ls.map((l, idx) =>
+        idx === i ? { ...l, ...patch, qty: "qty" in patch ? roundToTillixQty(Number(patch.qty)) : l.qty } : l,
+      ),
+    );
 
   const addAdhoc = () =>
     setItems((l) => [...l, { product_id: null, name: "", qty: 1, price: 0, selected: true }]);
