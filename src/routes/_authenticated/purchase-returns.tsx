@@ -128,13 +128,18 @@ function Page() {
     queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
   });
 
-  // Server-side product search for manual line entry
+  const [debouncedEntrySearch, setDebouncedEntrySearch] = useState(entrySearch);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedEntrySearch(entrySearch), 300);
+    return () => clearTimeout(timer);
+  }, [entrySearch]);
+
   const { data: searchResult } = useQuery({
-    queryKey: ["products", "return-search", entrySearch.trim()],
-    enabled: entrySearch.trim().length > 1,
+    queryKey: ["products", "return-search", debouncedEntrySearch.trim()],
+    enabled: debouncedEntrySearch.trim().length > 1,
     staleTime: 30_000,
     queryFn: async () => {
-      const term = entrySearch.trim();
+      const term = debouncedEntrySearch.trim();
       const { data } = await supabase.from("products")
         .select("id,name,sku,barcode,cost_price,sell_price,stock")
         .or(`name.ilike.%${term}%,sku.ilike.%${term}%,barcode.ilike.%${term}%`)
