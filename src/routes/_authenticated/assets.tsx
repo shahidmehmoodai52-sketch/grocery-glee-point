@@ -177,7 +177,7 @@ function Page() {
       category_id: form.category_id || null,
       purchase_date: form.purchase_date || null,
       warranty_expiry: form.warranty_expiry || null,
-      quantity: Number(form.quantity) || 1,
+      quantity: roundToTillixQty(Number(form.quantity)) || 1,
       purchase_price: Number(form.purchase_price) || 0,
       current_value: Number(form.current_value) || Number(form.purchase_price) || 0,
     };
