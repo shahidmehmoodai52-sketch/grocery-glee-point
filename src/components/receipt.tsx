@@ -85,6 +85,7 @@ function setReceiptPrintPageSize(
       html.receipt-printing body > :not(.receipt-print-root) { display: none !important; }
       html.receipt-printing .receipt-print-root {
         display: block !important;
+        visibility: visible !important;
         position: absolute !important;
         top: 0 !important;
         left: 0 !important;
