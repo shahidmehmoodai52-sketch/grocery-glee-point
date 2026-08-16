@@ -1224,12 +1224,32 @@ function Page() {
                   if (saving) return;
                   await submit();
                   setTimeout(() => {
-                    const latest = purchases[0];
-                    if (latest) {
-                      const printBtn = document.querySelector(`[data-print-id="${latest.id}"]`) as HTMLButtonElement;
-                      if (printBtn) printBtn.click();
-                    }
-                  }, 1500);
+                    // Refetch or find the latest purchase from cache
+                    qc.invalidateQueries({ queryKey: ["purchases"] }).then(() => {
+                      const latest = (qc.getQueryData(["purchases"]) as any[])?.[0];
+                      if (latest) {
+                        printInvoiceDirect({
+                          invoice_no: latest.invoice_no,
+                          created_at: latest.created_at,
+                          suppliers: latest.suppliers,
+                          subtotal: latest.subtotal,
+                          tax: latest.tax,
+                          total: latest.total,
+                          paid: latest.paid,
+                          discount: Number(latest.subtotal || 0) > 0 ? Number(latest.subtotal || 0) - (Number(latest.total || 0) - Number(latest.tax || 0)) : 0,
+                          note: latest.note,
+                          payment_method: latest.payment_method,
+                          isPurchase: true,
+                          sale_items: latest.purchase_items?.map((it: any) => ({
+                            name: it.name,
+                            qty: it.qty,
+                            price: it.cost,
+                            line_total: it.line_total
+                          }))
+                        }, settings, "purchase" as any);
+                      }
+                    });
+                  }, 500);
                 }}
                 disabled={saving}
               >
