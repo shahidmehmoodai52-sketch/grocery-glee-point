@@ -25,12 +25,13 @@ export default defineConfig({
       VitePWA({
         registerType: "autoUpdate",
         injectRegister: null, // registration happens from our guarded wrapper
-        srcDir: "public",
+        strategies: "injectManifest",
+        // client assets are emitted to dist/client by the TanStack/nitro build
+        outDir: "dist/client",
+        srcDir: "src",
         filename: "sw.js",
-        // @ts-ignore - 'strategy' property exists in VitePWAOptions but might be missing in older type definitions
-        strategy: "injectManifest",
         devOptions: { enabled: false },
-        includeAssets: ["favicon.png", "offline.html", "manifest.webmanifest"],
+        includeAssets: ["favicon.png", "offline.html"],
         injectManifest: {
           injectionPoint: 'self.__WB_MANIFEST',
         },

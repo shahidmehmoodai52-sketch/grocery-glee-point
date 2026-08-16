@@ -12,7 +12,7 @@ cleanupOutdatedCaches();
 
 // Precache all assets provided by Vite
 // The __WB_MANIFEST variable is a placeholder that Workbox will replace.
-precacheAndRoute(self.__WB_MANIFEST || []);
+precacheAndRoute(self.__WB_MANIFEST);
 
 // Navigation route: NetworkFirst with offline fallback
 registerRoute(
