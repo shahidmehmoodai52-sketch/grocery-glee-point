@@ -1815,6 +1815,7 @@ function POSPage() {
             .from("sales")
             .update({
               customer_id: tab.customer_id,
+              expense_person_id: tab.expense_person_id,
               payment_method: paymentMethodLabel,
               note: tab.note,
             })
@@ -1891,10 +1892,21 @@ function POSPage() {
         line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
       }));
       // Receipt shows the real tendered amount + change; the ledger keeps only the bill amount.
+      const staffPerson = tab.expense_person_id
+        ? (persons as any[]).find((p: any) => p.id === tab.expense_person_id)
+        : null;
+      const customerRow = tab.customer_id
+        ? (customers as any[]).find((c: any) => c.id === tab.customer_id)
+        : null;
       const patchedSale = sale
         ? {
             ...sale,
             sale_items: localItems,
+            customer_id: tab.customer_id ?? (sale as any).customer_id ?? null,
+            customers: (sale as any).customers ?? (customerRow ? { name: customerRow.name } : null),
+            expense_person_id: tab.expense_person_id ?? (sale as any).expense_person_id ?? null,
+            expense_persons:
+              (sale as any).expense_persons ?? (staffPerson ? { name: staffPerson.name } : null),
             discount: +(lineDiscountTotal + discount).toFixed(2),
             charge: +charge.toFixed(2),
             paid: +tenderedAmount.toFixed(2),
@@ -4009,7 +4021,7 @@ function ReprintDialog({
         (from: number, to: number) =>
           supabase
             .from("sales")
-            .select("*, customers(name), sale_items(*)")
+            .select("*, customers(name), expense_persons(name), sale_items(*)")
             .or(filters.join(","))
             .order("created_at", { ascending: false })
             .range(from, to) as any,
@@ -4025,7 +4037,7 @@ function ReprintDialog({
         async () => {
           const { data, error } = await supabase
             .from("sales")
-            .select("*, customers(name), sale_items(*)")
+            .select("*, customers(name), expense_persons(name), sale_items(*)")
             .order("created_at", { ascending: false })
             .order("id", { ascending: false })
             .limit(pageSize);
@@ -4136,7 +4148,7 @@ function ReprintDialog({
                     <td className="px-3 py-1.5 text-xs">
                       {fmtDate(s.created_at)}
                     </td>
-                    <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
+                    <td className="px-3 py-1.5">{s.customers?.name ?? s.expense_persons?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">
                       {fmtMoney(s.total, sym)}
                     </td>
