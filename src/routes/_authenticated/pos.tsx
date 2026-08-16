@@ -1900,9 +1900,6 @@ function POSPage() {
         line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
       }));
       // Receipt shows the real tendered amount + change; the ledger keeps only the bill amount.
-      const staffPerson = tab.expense_person_id
-        ? (persons as any[]).find((p: any) => p.id === tab.expense_person_id)
-        : null;
       const customerRow = tab.customer_id
         ? (customers as any[]).find((c: any) => c.id === tab.customer_id)
         : null;
