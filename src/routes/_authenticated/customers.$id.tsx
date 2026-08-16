@@ -31,9 +31,8 @@ type Entry = {
   note: string;
   debit: number;
   credit: number;
-  sale?: any;
-  paid?: number;
-  total?: number;
+  data?: any;
+  balance?: number;
 };
 
 function Page() {
