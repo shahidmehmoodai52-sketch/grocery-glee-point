@@ -1171,8 +1171,11 @@ function POSPage() {
     if (nextMethod !== "digital_cash_back" && nextMethod !== "digital") {
       patch.digital_account_id = null;
     }
-    // expense_person_id is handled by the Staff button toggle, but we should clear it if switching to others
-    if (nextMethod !== "staff") {
+    // expense_person_id is handled by the Staff button toggle.
+    // Ensure we sync the payment method when selecting staff.
+    if (nextMethod === "staff") {
+      // If we don't have a staff member selected yet, the UI will trigger showStaff=true.
+    } else {
       patch.expense_person_id = null;
     }
 
@@ -1333,7 +1336,7 @@ function POSPage() {
       items: restoredItems,
       customer_id: payload.customer_id ?? null,
       expense_person_id: payload.expense_person_id ?? null,
-      payment_method: parsedPayments[0]?.method ?? "cash",
+      payment_method: payload.expense_person_id ? "staff" : parsedPayments[0]?.method ?? "cash",
       payments: parsedPayments,
       discount: Number(payload.discount ?? 0),
       discount_pct: "",
@@ -1374,7 +1377,7 @@ function POSPage() {
       items,
       customer_id: sale.customer_id ?? null,
       expense_person_id: sale.expense_person_id ?? null,
-      payment_method: parsedPayments[0]?.method ?? "cash",
+      payment_method: sale.expense_person_id ? "staff" : parsedPayments[0]?.method ?? "cash",
       payments: parsedPayments,
       discount: Number(sale.discount ?? 0),
       discount_pct: "",
@@ -1415,7 +1418,7 @@ function POSPage() {
       items: restoredItems,
       customer_id: payload?.customer_id ?? null,
       expense_person_id: payload?.expense_person_id ?? null,
-      payment_method: parsedPayments[0]?.method ?? "cash",
+      payment_method: payload?.expense_person_id ? "staff" : parsedPayments[0]?.method ?? "cash",
       discount: Number(payload?.discount ?? 0),
       discount_pct: "",
       charge: 0,
@@ -1834,6 +1837,10 @@ function POSPage() {
         return;
       }
 
+      const staffPerson = tab.expense_person_id
+        ? (persons as any[]).find((p: any) => p.id === tab.expense_person_id)
+        : null;
+
       const payload = {
         customer_id: tab.customer_id,
         expense_person_id: tab.expense_person_id,
@@ -1851,6 +1858,7 @@ function POSPage() {
         // Change (extra tendered cash) is never recorded — only the bill amount is.
         paid: tenderedAmount,
         note: tab.note,
+        expense_person_name: staffPerson?.name || null,
         items: tab.items.map((i) => ({
           product_id: i.product_id,
           name: i.name,
@@ -1892,9 +1900,6 @@ function POSPage() {
         line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
       }));
       // Receipt shows the real tendered amount + change; the ledger keeps only the bill amount.
-      const staffPerson = tab.expense_person_id
-        ? (persons as any[]).find((p: any) => p.id === tab.expense_person_id)
-        : null;
       const customerRow = tab.customer_id
         ? (customers as any[]).find((c: any) => c.id === tab.customer_id)
         : null;
@@ -2880,14 +2885,15 @@ function POSPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={tab.expense_person_id ? "secondary" : "ghost"}
+                  variant={tab.expense_person_id || showStaff ? "secondary" : "ghost"}
                   className="h-6 text-[11px] px-2"
                   title="Charge this bill to a staff/owner expense ledger"
                   onClick={() => {
-                    if (tab.expense_person_id) {
+                    if (tab.expense_person_id || showStaff) {
                       setTab({ expense_person_id: null, payment_method: "cash" });
+                      setShowStaff(false);
                     } else {
-                      setTab({ expense_person_id: null }); // trigger dropdown show
+                      setTab({ expense_person_id: null, payment_method: "staff" });
                       setShowStaff(true);
                     }
                     setTimeout(() => searchRef.current?.focus(), 0);
@@ -2906,13 +2912,16 @@ function POSPage() {
                 total={total}
                 due={due}
                 digitalAccountId={tab.digital_account_id ?? null}
-                digitalAmount={tab.paid ?? ""}
                 onSelectDigitalAccount={setDigitalAccount}
-                onDigitalAmountChange={setDigitalAmount}
                 cashBackReceived={tab.digital_received_amount ?? ""}
                 cashBackAmount={digitalCashBackAmount}
                 onSelectCashBackAccount={setDigitalCashBackAccount}
                 onCashBackReceivedChange={(v) => setTab({ digital_received_amount: v })}
+                expensePersonId={tab.expense_person_id}
+                onSelectStaff={(id) => {
+                  setTab({ expense_person_id: id, payment_method: id ? "staff" : "cash" });
+                  setShowStaff(!!id);
+                }}
               />
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -3637,6 +3646,8 @@ function PaymentMethodGrid({
   cashBackAmount,
   onSelectCashBackAccount,
   onCashBackReceivedChange,
+  expensePersonId,
+  onSelectStaff,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -3644,13 +3655,15 @@ function PaymentMethodGrid({
   total: number;
   due: number;
   digitalAccountId: string | null;
-  digitalAmount: string;
+  digitalAmount?: string;
   onSelectDigitalAccount: (accountId: string | null) => void;
-  onDigitalAmountChange: (value: string) => void;
+  onDigitalAmountChange?: (value: string) => void;
   cashBackReceived: string;
   cashBackAmount: number;
   onSelectCashBackAccount: (accountId: string | null) => void;
   onCashBackReceivedChange: (value: string) => void;
+  expensePersonId: string | null;
+  onSelectStaff: (personId: string | null) => void;
 }) {
   const accQ = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
@@ -3728,13 +3741,15 @@ function PaymentMethodGrid({
             <div className="border-t pt-2 space-y-1.5">
               <button
                 type="button"
-                className={`${btn(isCashBack)} w-full`}
-                onClick={() => onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null)}
+                className={`${btn(isCashBack)} w-full text-[11px] h-9 mb-1`}
+                onClick={() => {
+                  onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null);
+                }}
               >
                 Digital + CB
               </button>
               {isCashBack && (
-                <div className="space-y-2">
+                <div className="space-y-2 mb-2 bg-muted/30 p-2 rounded-md border border-dashed">
                   <div className="space-y-1">
                     <Label className="text-[10px]">Digital account</Label>
                     <Select
@@ -3777,6 +3792,16 @@ function PaymentMethodGrid({
                   </div>
                 </div>
               )}
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pt-1">
+                Staff / Owner
+              </div>
+              <StaffSelector
+                value={expensePersonId}
+                onSelect={(id) => {
+                  onSelectStaff(id);
+                  setBankOpen(false);
+                }}
+              />
             </div>
           </PopoverContent>
         </Popover>
@@ -3787,6 +3812,53 @@ function PaymentMethodGrid({
           Flow and they appear here automatically.
         </p>
       )}
+    </div>
+  );
+}
+
+function StaffSelector({
+  value,
+  onSelect,
+}: {
+  value: string | null;
+  onSelect: (id: string | null) => void;
+}) {
+  const { data: persons = [] } = useQuery({
+    queryKey: ["expense_persons"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("expense_persons").select("*").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      <button
+        type="button"
+        onClick={() => onSelect(null)}
+        className={`h-9 rounded-lg text-[11px] font-medium transition-all px-1 ${
+          !value
+            ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+            : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
+        }`}
+      >
+        None
+      </button>
+      {persons.map((p: any) => (
+        <button
+          key={p.id}
+          type="button"
+          onClick={() => onSelect(p.id)}
+          className={`h-9 rounded-lg text-[11px] font-medium transition-all px-1 ${
+            value === p.id
+              ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+              : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
+          }`}
+        >
+          <span className="block truncate">{p.name}</span>
+        </button>
+      ))}
     </div>
   );
 }
