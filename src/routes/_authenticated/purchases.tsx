@@ -719,7 +719,8 @@ function Page() {
     } catch (err: any) {
       setSaving(false);
       savingRef.current = false;
-      return toast.error(err?.message ?? "Could not save purchase");
+      toast.error(err?.message ?? "Could not save purchase");
+      return false;
     }
     setSaving(false);
     savingRef.current = false;
