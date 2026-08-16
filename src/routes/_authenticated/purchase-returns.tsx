@@ -334,9 +334,9 @@ function Page() {
                       value={note} 
                       onChange={(e) => setNote(e.target.value)} 
                     />
-                  </div>
                 </div>
               </div>
+            </div>
 
             <div className="p-4 border-t bg-background">
               <Button 
