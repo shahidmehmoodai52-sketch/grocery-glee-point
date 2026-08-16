@@ -3,19 +3,18 @@
  * Managed via vite-plugin-pwa (InjectManifest)
  */
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
-import { registerRoute, NavigationRoute } from 'workbox-routing';
+import { registerRoute } from 'workbox-routing';
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
-// cleanup old caches
+// Cleanup old caches
 cleanupOutdatedCaches();
 
-// The __WB_MANIFEST variable is a placeholder that Workbox will replace with the precache manifest.
-precacheAndRoute(self.__WB_MANIFEST);
+// Precache all assets provided by Vite
+// The __WB_MANIFEST variable is a placeholder that Workbox will replace.
+precacheAndRoute(self.__WB_MANIFEST || []);
 
 // Navigation route: NetworkFirst with offline fallback
-// This ensures that if the network is down (or DNS fails), we serve the precached /offline.html
-// which is designed to boot the SPA shell.
 registerRoute(
   ({ request }) => request.mode === 'navigate',
   async (options) => {
@@ -32,13 +31,17 @@ registerRoute(
 
     try {
       const response = await networkHandler.handle(options);
-      if (response) return response;
+      if (response && response.ok) return response;
     } catch (error) {
       console.log('SW: Network navigation failed, serving offline shell', error);
     }
     
     // Fallback to the precached shell for all navigations when offline
-    return caches.match('/offline.html');
+    const cachedResponse = await caches.match('/offline.html');
+    if (cachedResponse) return cachedResponse;
+    
+    // Last resort: return the index if offline.html isn't found for some reason
+    return caches.match('/');
   }
 );
 
@@ -70,10 +73,11 @@ registerRoute(
   })
 );
 
-// Handle offline page fallback
-self.addEventListener('install', (event) => {
-  const offlinePagePath = '/offline.html';
-  event.waitUntil(
-    caches.open('tillix-offline-fallback').then((cache) => cache.add(offlinePagePath))
-  );
+// Force immediate activation
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
 });
