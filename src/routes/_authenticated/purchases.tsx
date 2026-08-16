@@ -712,17 +712,8 @@ function Page() {
 
       } else {
         // --- New Purchase Flow ---
-        // Prevent double-save by checking if we are already saving
-        if (savingRef.current) return;
-        savingRef.current = true;
-        setSaving(true);
-
         const { error } = await supabase.rpc("complete_purchase", { payload });
-        if (error) {
-          savingRef.current = false;
-          setSaving(false);
-          throw error;
-        }
+        if (error) throw error;
       }
     } catch (err: any) {
       setSaving(false);
