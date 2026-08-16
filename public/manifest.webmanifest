@@ -1,0 +1,26 @@
+{
+  "name": "Tillix POS",
+  "short_name": "Tillix",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0b1220",
+  "description": "Smart Retail Starts Here | Cloud POS & Retail Management",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "orientation": "any",
+  "scope": "/",
+  "categories": ["business", "finance"]
+}

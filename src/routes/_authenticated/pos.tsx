@@ -126,22 +126,26 @@ const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,ca
 const STAFF_CACHE_KEY = "pos:expense-persons:cache";
 const POS_CASH_ACCOUNTS_QUERY_KEY = ["cash-accounts", "pos-payment"] as const;
 
-async function readCachedExpensePersons(): Promise<any[]> {
-  try {
-    const raw = window.localStorage.getItem(STAFF_CACHE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function cacheExpensePersons(rows: any[]) {
-  try {
-    window.localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(rows ?? []));
-  } catch {
-    // best effort
-  }
+async function fetchExpensePersons(): Promise<any[]> {
+  return offlineFirst(
+    async () => {
+      const { data, error } = await supabase
+        .from("expense_persons")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    async () => {
+      // Fallback to localStorage cache for staff
+      const raw = window.localStorage.getItem(STAFF_CACHE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    },
+    async (rows) => {
+      window.localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(rows));
+    }
+  );
 }
 
 async function insertProductOfflineAware(payload: {
