@@ -5,7 +5,7 @@
 const SW_PATH = "/sw.js";
 
 function isRefusedHost(hostname: string): boolean {
-  if (hostname.startsWith("id-preview--") || hostname.startsWith("preview--")) return false; // Allowed for testing offline in previews
+  if (hostname.startsWith("id-preview--") || hostname.startsWith("preview--") || hostname === "tillix.co") return false; // Allowed for testing offline in previews and production
   if (hostname === "lovableproject.com" || hostname.endsWith(".lovableproject.com")) return true;
   if (hostname === "lovableproject-dev.com" || hostname.endsWith(".lovableproject-dev.com")) return true;
   if (hostname === "beta.lovable.dev" || hostname.endsWith(".beta.lovable.dev")) return true;
