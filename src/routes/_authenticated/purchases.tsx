@@ -1261,10 +1261,15 @@ function Page() {
                 onClick={async () => {
                   if (saving) return;
                   const success = await submit();
-                  if (success === false) return;
+                  if (!success) return;
+                  
+                  // Invalidate immediately to ensure we have the latest purchase for printing
+                  await qc.invalidateQueries({ queryKey: ["purchases"] });
+                  
                   setTimeout(() => {
-                    // Search in the purchases array (which should have been invalidated/refetched)
-                    const latest = purchases[0];
+                    // Try to find the latest purchase from the query cache
+                    const allPurchases = qc.getQueryData<any[]>(["purchases"]) || purchases;
+                    const latest = allPurchases[0];
                     if (latest) {
                       printInvoiceDirect({
                         invoice_no: latest.invoice_no,
@@ -1285,8 +1290,10 @@ function Page() {
                           line_total: it.line_total
                         }))
                       }, settings, "purchase" as any);
+                    } else {
+                      toast.error("Could not find the purchase record for printing. Please try reprinting from the history.");
                     }
-                  }, 800);
+                  }, 500);
                 }}
                 disabled={saving}
               >
