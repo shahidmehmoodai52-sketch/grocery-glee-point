@@ -1059,6 +1059,10 @@ function POSPage() {
     }
     setTab({ items });
     setCartCursor(idx);
+    
+    // Auto-focus search field after adding to ensure fast billing
+    setTimeout(() => searchRef.current?.focus(), 10);
+    
     return idx;
   };
 
@@ -2222,6 +2226,8 @@ function POSPage() {
       if (e.key === "Enter" && search.trim()) {
         e.preventDefault();
         const raw = search.trim();
+        
+        // 1. Exact barcode check
         const exact = productByBarcode[raw];
         if (exact) {
           addProduct(exact);
@@ -2230,6 +2236,24 @@ function POSPage() {
           searchRef.current?.focus();
           return;
         }
+        
+        // 2. Exact match in filtered results (e.g. if scan matches exactly even if not indexed in productByBarcode)
+        const exactFiltered = filtered.find(p => {
+          const sku = (p.sku ?? "").toLowerCase();
+          const bcs = (barcodesByProduct[p.id] ?? []).map(b => b.toLowerCase());
+          const lRaw = raw.toLowerCase();
+          return sku === lRaw || bcs.includes(lRaw);
+        });
+        
+        if (exactFiltered) {
+          addProduct(exactFiltered);
+          setSearch("");
+          triggerScanFlash();
+          searchRef.current?.focus();
+          return;
+        }
+
+        // 3. Highlighted selection
         if (filtered.length >= 1) {
           const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
           addProduct(pick);
@@ -2237,6 +2261,8 @@ function POSPage() {
           searchRef.current?.focus();
           return;
         }
+        
+        // 4. Quick add (only if search is not just numbers or common scan length)
         openQuickAdd(raw);
       }
     };
@@ -2424,6 +2450,22 @@ function POSPage() {
                     triggerScanFlash();
                     return;
                   }
+                  
+                  // Double-check exact match in filtered results
+                  const exactFiltered = filtered.find(p => {
+                    const sku = (p.sku ?? "").toLowerCase();
+                    const bcs = (barcodesByProduct[p.id] ?? []).map(b => b.toLowerCase());
+                    const lRaw = raw.toLowerCase();
+                    return sku === lRaw || bcs.includes(lRaw);
+                  });
+                  
+                  if (exactFiltered) {
+                    addProduct(exactFiltered);
+                    setSearch("");
+                    triggerScanFlash();
+                    return;
+                  }
+
                   if (filtered.length >= 1) {
                     const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
                     addProduct(pick);
@@ -3346,7 +3388,7 @@ function POSPage() {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <Label>Item name</Label>
+              <Label>Item name <span className="text-destructive">*</span></Label>
               <Input
                 autoFocus
                 value={quickAdd.name}
@@ -3354,9 +3396,14 @@ function POSPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    saveQuickAdd();
+                    if (quickAdd.name.trim()) {
+                      saveQuickAdd();
+                    } else {
+                      toast.error("Please enter item name");
+                    }
                   }
                 }}
+                className={!quickAdd.name.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
               />
             </div>
             <div className="col-span-2">
