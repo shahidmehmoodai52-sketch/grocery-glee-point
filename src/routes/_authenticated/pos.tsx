@@ -2883,14 +2883,15 @@ function POSPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={tab.expense_person_id ? "secondary" : "ghost"}
+                  variant={tab.expense_person_id || showStaff ? "secondary" : "ghost"}
                   className="h-6 text-[11px] px-2"
                   title="Charge this bill to a staff/owner expense ledger"
                   onClick={() => {
-                    if (tab.expense_person_id) {
+                    if (tab.expense_person_id || showStaff) {
                       setTab({ expense_person_id: null, payment_method: "cash" });
+                      setShowStaff(false);
                     } else {
-                      setTab({ expense_person_id: null }); // trigger dropdown show
+                      setTab({ expense_person_id: null, payment_method: "staff" });
                       setShowStaff(true);
                     }
                     setTimeout(() => searchRef.current?.focus(), 0);
