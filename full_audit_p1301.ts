@@ -8,35 +8,19 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
 });
 
 async function runAudit() {
-  const { data: tenants } = await supabase
-    .from("tenants")
-    .select("id, name, code");
-    
-  const tenant = tenants?.find(t => (t.name && t.name.includes("Hafiz")) || (t.code && t.code.includes("ba-023")));
-    
-  if (!tenant) {
-    console.error("Tenant not found. Available tenants:", tenants?.map(t => `${t.name} (${t.code})`).join(", "));
-    return;
-  }
-  
-  let p1301Result = await supabase
+  // Try to find the purchase directly by invoice_no
+  const { data: p1301, error: pError } = await supabase
     .from("purchases")
     .select("id, invoice_no, tenant_id")
     .eq("invoice_no", "P-1301")
-    .eq("tenant_id", tenant.id)
+    .limit(1)
     .single();
     
-  if (p1301Result.error) {
-    p1301Result = await supabase
-      .from("purchases")
-      .select("id, invoice_no, tenant_id")
-      .eq("invoice_no", "P-1301")
-      .single();
-  }
-  
-  const p1301 = p1301Result.data;
-  if (!p1301) {
-    console.error("P-1301 not found");
+  if (pError || !p1301) {
+    console.error("P-1301 not found by invoice_no:", pError?.message);
+    // List some purchases to see what's available
+    const { data: someP } = await supabase.from("purchases").select("invoice_no").limit(5);
+    console.log("Recent purchases:", someP?.map(p => p.invoice_no).join(", "));
     return;
   }
   
