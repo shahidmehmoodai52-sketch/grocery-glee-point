@@ -30,6 +30,8 @@ export type ReceiptInvoice = {
   created_at?: string | Date;
   customers?: { name?: string; phone?: string } | null;
   suppliers?: { name?: string; phone?: string } | null;
+  expense_persons?: { name?: string } | null;
+  expense_person_name?: string | null;
   cashier_name?: string | null;
   sale_items?: Array<{
     id?: string;
