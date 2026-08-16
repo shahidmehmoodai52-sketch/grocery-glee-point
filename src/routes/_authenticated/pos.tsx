@@ -4392,7 +4392,9 @@ function EditableNumCell({
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          onCommit(Number(draft));
+          const n = Number(draft);
+          const final = display.includes("qty") || display.includes("Qty") || String(display).match(/^\d+(\.\d+)?$/) && step === "0.001" ? roundToTillixQty(n) : n;
+          onCommit(final);
         } else if (e.key === "Escape") {
           e.preventDefault();
           onCancel();
