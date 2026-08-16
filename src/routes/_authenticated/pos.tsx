@@ -2988,15 +2988,24 @@ function POSPage() {
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Tender
                 </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2 text-[11px]"
-                  onClick={addPaymentRow}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Split
-                </Button>
+                <div className="flex items-center gap-1">
+                  <CashOutDialog
+                    activeTab={tab}
+                    onComplete={() => {
+                      // Optionally refresh customer list to show new balance
+                      qc.invalidateQueries({ queryKey: ["customers"] });
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={addPaymentRow}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Split
+                  </Button>
+                </div>
               </div>
               <div className="mt-1 space-y-1.5">
                 {paymentRows.map((payment, idx) => (
