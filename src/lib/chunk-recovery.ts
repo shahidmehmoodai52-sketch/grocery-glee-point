@@ -61,7 +61,7 @@ export function recoverFromChunkError(): boolean {
         const keys = await caches.keys();
         // Only the app-shell caches; IndexedDB / offline POS data is untouched.
         await Promise.allSettled(
-          keys.filter((k) => /workbox|precache|html-nav|static-assets/i.test(k)).map((k) => caches.delete(k)),
+          keys.filter((k) => /workbox|precache|nav|static|images/i.test(k)).map((k) => caches.delete(k)),
         );
       }
       if ("serviceWorker" in navigator) {
