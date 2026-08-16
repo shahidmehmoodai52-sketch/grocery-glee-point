@@ -13,6 +13,75 @@ export type CustomerLedgerSummary = {
   closingTone: 'destructive' | 'success' | 'primary';
 };
 
+/**
+ * Builds ledger entries from raw database rows.
+ * This ensures consistency between the list and detail views.
+ */
+export function buildLedgerEntries({
+  sales,
+  payments,
+  returns,
+}: {
+  sales: any[];
+  payments: any[];
+  returns: any[];
+}) {
+  const entries: Array<{ date: string; debit: number; credit: number; type: string; ref: string; note: string; id?: string; data?: any }> = [];
+
+  for (const s of sales) {
+    // Sales are debits (customer owes)
+    entries.push({
+      id: s.id,
+      date: s.created_at,
+      type: "sale",
+      ref: s.invoice_no,
+      note: s.note ?? "",
+      debit: Number(s.total || 0),
+      credit: 0,
+      data: s,
+    });
+    // On-invoice payments are credits (reduces what they owe)
+    if (Number(s.paid || 0) > 0) {
+      entries.push({
+        date: s.created_at,
+        type: "payment",
+        ref: `${s.invoice_no} · on-invoice`,
+        note: "Paid at sale",
+        debit: 0,
+        credit: Number(s.paid || 0),
+      });
+    }
+  }
+
+  for (const r of returns) {
+    // Returns are credits (reduces what they owe)
+    entries.push({
+      id: r.id,
+      date: r.created_at,
+      type: "return",
+      ref: r.return_no || "Return",
+      note: r.note ?? "",
+      debit: 0,
+      credit: Number(r.total || 0),
+    });
+  }
+
+  for (const p of payments) {
+    // Standalone payments are credits
+    entries.push({
+      id: p.id,
+      date: p.created_at,
+      type: "payment",
+      ref: p.method || "Payment",
+      note: p.note ?? "",
+      debit: 0,
+      credit: Number(p.amount || 0),
+    });
+  }
+
+  return entries.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function summarizeCustomerLedger({
   openingBalance,
   entries,
