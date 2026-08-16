@@ -35,7 +35,7 @@ async function runAudit() {
       
     if (!movements) continue;
     
-    // Exact identifying strings for various impact phases
+    // IMPACT TRACING
     const p1301Movs = movements.filter(m => 
       (m.reference_id === p1301.id) || 
       (m.description && m.description.includes("P-1301"))
@@ -45,7 +45,6 @@ async function runAudit() {
       m.description && m.description.includes("P-1302")
     );
     
-    // Previous correction attempts: halving, restoration, fix_halve, apply_p1301_correction, etc.
     const correctionMovs = movements.filter(m => 
       m.description && (
         m.description.includes("Correction") || 
@@ -57,34 +56,37 @@ async function runAudit() {
       )
     );
     
+    // FINDING ORIGINAL QUANTITY (The first P-130X movement)
     const firstP130X = movements.find(m => 
       (m.reference_id === p1301.id) || 
       (m.description && (m.description.includes("P-1301") || m.description.includes("P-1302")))
     );
     
     let originalQty = 0;
-    if (firstP130X) {
-      originalQty = Number(firstP130X.quantity);
-    } else {
-      originalQty = Number(item.qty);
-    }
-    
     let stockBefore = 0;
+    
     if (firstP130X) {
+      originalQty = parseFloat(firstP130X.quantity.toString());
       const idx = movements.indexOf(firstP130X);
-      stockBefore = idx > 0 ? Number(movements[idx-1].balance) : (Number(firstP130X.balance) - Number(firstP130X.quantity));
+      if (idx > 0) {
+        stockBefore = parseFloat(movements[idx-1].balance.toString());
+      } else {
+        stockBefore = parseFloat(firstP130X.balance.toString()) - originalQty;
+      }
+    } else {
+      originalQty = parseFloat(item.qty.toString());
+      stockBefore = 0; // Unknown
     }
     
-    const p1301Impact = p1301Movs.reduce((sum, m) => sum + Number(m.quantity), 0);
-    const p1302Impact = p1302Movs.reduce((sum, m) => sum + Number(m.quantity), 0);
-    const prevCorrectionImpact = correctionMovs.reduce((sum, m) => sum + Number(m.quantity), 0);
+    const p1301Impact = p1301Movs.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
+    const p1302Impact = p1302Movs.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
+    const prevCorrectionImpact = correctionMovs.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
     
     const netImpact = p1301Impact + p1302Impact + prevCorrectionImpact;
     
     const { data: prod } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
-    const currentStock = Number(prod ? prod.stock : 0);
+    const currentStock = prod ? parseFloat(prod.stock.toString()) : 0;
     
-    // Correct Stock = Current Stock - (Net Impact - Original Qty)
     const requiredCorrection = -(netImpact - originalQty);
     const expectedFinalStock = currentStock + requiredCorrection;
     
@@ -92,7 +94,6 @@ async function runAudit() {
     if (originalQty % 1 !== 0) flags.push("Fractional Original");
     if (expectedFinalStock % 1 !== 0) flags.push("Fractional Final");
     if (p1301Movs.length === 0) flags.push("No P-1301 Mov");
-    if (p1302Movs.length > 0 && p1302Movs.some(m => Number(m.quantity) === 0)) flags.push("Conflicting Movs");
     
     results.push({
       Product: item.name,
@@ -109,7 +110,6 @@ async function runAudit() {
     });
   }
   
-  // Format as Markdown table
   console.log("| Product | Original P-1301 Qty | Stock Before P-1301 | P-1301 Impact | P-1302 Impact | Prev Correction Impact | Net P1301/P1302 Impact | Current Stock | Required Correction | Expected Final Stock | Flags |");
   console.log("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |");
   for (const r of results) {
