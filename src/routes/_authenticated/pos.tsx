@@ -51,6 +51,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty, fmtDate } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import {
   deriveDigitalCashBackSummary,
   normalizePaymentAllocations,
@@ -1039,7 +1040,7 @@ function POSPage() {
       items[exIdx] = {
         ...items[exIdx],
         code: items[exIdx].code || nextCode,
-        qty: Number(items[exIdx].qty) + 1,
+        qty: roundToTillixQty(Number(items[exIdx].qty) + 1),
       };
       idx = exIdx;
     } else {
@@ -1070,6 +1071,9 @@ function POSPage() {
     const items = tab.items.map((it, i) => {
       if (i !== idx) return it;
       const next = { ...it, ...patch };
+      if ("qty" in patch) {
+        next.qty = roundToTillixQty(Number(patch.qty));
+      }
       const gross = Number(next.qty) * Number(next.price);
       if ("disc" in patch) {
         // flat discount typed directly — derive %
@@ -4380,11 +4384,17 @@ function EditableNumCell({
       min={min}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => onCommit(Number(draft))}
+      onBlur={() => {
+        const n = Number(draft);
+        const final = display.includes("qty") || display.includes("Qty") || String(display).match(/^\d+(\.\d+)?$/) && step === "0.001" ? roundToTillixQty(n) : n;
+        onCommit(final);
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          onCommit(Number(draft));
+          const n = Number(draft);
+          const final = display.includes("qty") || display.includes("Qty") || String(display).match(/^\d+(\.\d+)?$/) && step === "0.001" ? roundToTillixQty(n) : n;
+          onCommit(final);
         } else if (e.key === "Escape") {
           e.preventDefault();
           onCancel();

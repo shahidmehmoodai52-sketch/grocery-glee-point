@@ -25,13 +25,14 @@ export function fmtMoney(n: number | string | null | undefined, symbol?: string)
   return `${withSpace}${fmtNumber(n, 2)}`;
 }
 
+import { roundToTillixQty } from "./quantity-rounding";
+
 export function fmtQty(n: number | string | null | undefined) {
-  const v = Number(n ?? 0);
+  const v = roundToTillixQty(Number(n ?? 0));
   if (Number.isInteger(v)) return v.toLocaleString("en-US");
-  const decimals = Math.min(3, (v.toFixed(3).replace(/0+$/, "").split(".")[1] ?? "").length || 1);
   return v.toLocaleString("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   });
 }
 

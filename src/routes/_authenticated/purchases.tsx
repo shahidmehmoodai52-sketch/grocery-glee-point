@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
 import { printInvoiceDirect } from "@/components/receipt";
@@ -145,7 +146,13 @@ function Page() {
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setDate = (v: string) => setDraft((d) => ({ ...d, date: v }));
   const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
-    setDraft((d) => ({ ...d, lines: typeof updater === "function" ? (updater as any)(d.lines) : updater }));
+    setDraft((d) => {
+      const nextLines = typeof updater === "function" ? (updater as any)(d.lines) : updater;
+      return {
+        ...d,
+        lines: (nextLines as Line[]).map(l => ({ ...l, qty: roundToTillixQty(l.qty) }))
+      };
+    });
   const setTax = (v: number) => setDraft((d) => ({ ...d, tax: v }));
   const setTaxMode = (v: "amt" | "pct") => setDraft((d) => ({ ...d, taxMode: v }));
   const setBillDiscount = (v: number) => setDraft((d) => ({ ...d, discount: v }));

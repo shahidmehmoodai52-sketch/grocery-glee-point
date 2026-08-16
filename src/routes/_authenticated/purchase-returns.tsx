@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { Receipt, printReceipt } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
 
@@ -75,7 +76,17 @@ function Page() {
 
   const addLine = () => setLines((l) => [...l, { product_id: null, name: "", qty: 1, cost: 0 }]);
   const setLine = (i: number, patch: Partial<Line>) =>
-    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+    setLines((ls) =>
+      ls.map((l, idx) =>
+        idx === i
+          ? {
+              ...l,
+              ...patch,
+              qty: "qty" in patch ? roundToTillixQty(Number(patch.qty)) : l.qty,
+            }
+          : l
+      )
+    );
 
   const reset = () => {
     setOpen(false); setLines([]); setPurchaseId("none"); setSupplier("none");

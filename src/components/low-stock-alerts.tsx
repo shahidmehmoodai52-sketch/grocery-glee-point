@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { fmtQty, fmtMoney } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { useSettings } from "@/hooks/use-settings";
 import { fetchAll } from "@/lib/supabase-page";
 
@@ -48,7 +49,7 @@ function AlertRow({
   const [saving, setSaving] = useState(false);
 
   const saveStock = async () => {
-    const add = Number(qty);
+    const add = roundToTillixQty(Number(qty));
     if (!add || add <= 0) return toast.error("Enter a positive quantity");
     setSaving(true);
     const newStock = Number(p.stock) + add;

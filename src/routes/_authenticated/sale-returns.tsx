@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { Receipt, printReceipt } from "@/components/receipt";
 import { searchProductsLocal } from "@/lib/offline/pos";
 import { readLocalFirst } from "@/lib/offline/data-access";
@@ -286,7 +287,11 @@ function Page() {
   }, [sales, invoiceSearch]);
 
   const setItem = (i: number, patch: Partial<ItemRow>) =>
-    setItems((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+    setItems((ls) =>
+      ls.map((l, idx) =>
+        idx === i ? { ...l, ...patch, qty: "qty" in patch ? roundToTillixQty(Number(patch.qty)) : l.qty } : l,
+      ),
+    );
 
   const addAdhoc = () =>
     setItems((l) => [...l, { product_id: null, name: "", qty: 1, price: 0, selected: true }]);

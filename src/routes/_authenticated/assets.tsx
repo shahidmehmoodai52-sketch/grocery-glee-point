@@ -16,7 +16,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtQty } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 
 export const Route = createFileRoute("/_authenticated/assets")({
   component: Page,
@@ -176,7 +177,7 @@ function Page() {
       category_id: form.category_id || null,
       purchase_date: form.purchase_date || null,
       warranty_expiry: form.warranty_expiry || null,
-      quantity: Number(form.quantity) || 1,
+      quantity: roundToTillixQty(Number(form.quantity)) || 1,
       purchase_price: Number(form.purchase_price) || 0,
       current_value: Number(form.current_value) || Number(form.purchase_price) || 0,
     };
@@ -334,7 +335,7 @@ function Page() {
                         <div className="text-sm">{a.model_number || "—"}</div>
                         {a.serial_number && <div className="text-xs text-muted-foreground">SN: {a.serial_number}</div>}
                       </TableCell>
-                      <TableCell className="text-right">{Number(a.quantity)}</TableCell>
+                      <TableCell className="text-right">{fmtQty(a.quantity)}</TableCell>
                       <TableCell className="text-right">{fmtMoney(Number(a.purchase_price) * Number(a.quantity || 1), sym)}</TableCell>
                       <TableCell className="text-right font-medium">{fmtMoney(Number(a.current_value) * Number(a.quantity || 1), sym)}</TableCell>
                       <TableCell><Badge variant="outline">{a.condition}</Badge></TableCell>
@@ -417,14 +418,14 @@ function Page() {
                 {byCategory.map((r) => (
                   <TableRow key={r.name}>
                     <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-right">{r.count}</TableCell>
+                    <TableCell className="text-right">{fmtQty(r.count)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(r.worth, sym)}</TableCell>
                   </TableRow>
                 ))}
                 {byCategory.length > 0 && (
                   <TableRow>
                     <TableCell className="font-semibold">Total</TableCell>
-                    <TableCell className="text-right font-semibold">{totals.count}</TableCell>
+                    <TableCell className="text-right font-semibold">{fmtQty(totals.count)}</TableCell>
                     <TableCell className="text-right font-semibold">{fmtMoney(totals.current, sym)}</TableCell>
                   </TableRow>
                 )}

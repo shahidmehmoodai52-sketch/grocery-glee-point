@@ -28,6 +28,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty, fmtDate } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 
 export const Route = createFileRoute("/_authenticated/stock-count/$id")({
   component: StockCountDetailPage,
@@ -198,14 +199,14 @@ function StockCountDetailPage() {
     // Find existing row for this product in this session
     const existing = items.find((i) => i.product_id === product.id);
     if (existing) {
-      const nextQty = mode === "set" ? qty : Number(existing.actual_qty) + qty;
+      const nextQty = roundToTillixQty(mode === "set" ? qty : Number(existing.actual_qty) + qty);
       const { error } = await supabase
         .from("stock_count_items" as any)
         .update({ actual_qty: nextQty, counted_at: new Date().toISOString(), counter_id: user?.id })
         .eq("id", existing.id);
       if (error) return toast.error(error.message);
     } else {
-      const nextQty = mode === "set" ? qty : qty;
+      const nextQty = roundToTillixQty(mode === "set" ? qty : qty);
       const { error } = await supabase
         .from("stock_count_items" as any)
         .insert({
@@ -249,8 +250,9 @@ function StockCountDetailPage() {
     const product = pendingProduct ?? (pendingBarcode ? await findProductByBarcode(pendingBarcode) : null);
     if (!product) return;
     if (!Number.isFinite(pendingQty) || pendingQty < 0) return toast.error("Invalid quantity");
-    await upsertCount(product, pendingQty, "set");
-    toast.success(`Counted ${fmtQty(pendingQty)} × ${product.name}`);
+    const finalQty = roundToTillixQty(pendingQty);
+    await upsertCount(product, finalQty, "set");
+    toast.success(`Counted ${fmtQty(finalQty)} × ${product.name}`);
     setPendingBarcode(null);
     setPendingProduct(null);
     setPendingQty(1);
@@ -271,7 +273,8 @@ function StockCountDetailPage() {
     scanRef.current?.focus();
   };
 
-  const updateActual = async (item: Item, value: number) => {
+  const updateActual = async (item: Item, rawValue: number) => {
+    const value = roundToTillixQty(rawValue);
     const { error } = await supabase
       .from("stock_count_items" as any)
       .update({ actual_qty: value, counted_at: new Date().toISOString(), counter_id: user?.id })
