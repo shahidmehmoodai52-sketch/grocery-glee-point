@@ -4167,7 +4167,7 @@ function CashOutDialog({
           <Button
             variant="destructive"
             onClick={handleCashOut}
-            disabled={submitting || !amount || !accountId}
+            disabled={submitting || !amount || Number(amount) <= 0 || !accountId}
           >
             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Complete Cash Out
