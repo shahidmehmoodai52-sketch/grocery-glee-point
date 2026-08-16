@@ -2912,13 +2912,16 @@ function POSPage() {
                 total={total}
                 due={due}
                 digitalAccountId={tab.digital_account_id ?? null}
-                digitalAmount={tab.paid ?? ""}
                 onSelectDigitalAccount={setDigitalAccount}
-                onDigitalAmountChange={setDigitalAmount}
                 cashBackReceived={tab.digital_received_amount ?? ""}
                 cashBackAmount={digitalCashBackAmount}
                 onSelectCashBackAccount={setDigitalCashBackAccount}
                 onCashBackReceivedChange={(v) => setTab({ digital_received_amount: v })}
+                expensePersonId={tab.expense_person_id}
+                onSelectStaff={(id) => {
+                  setTab({ expense_person_id: id, payment_method: id ? "staff" : "cash" });
+                  setShowStaff(!!id);
+                }}
               />
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
