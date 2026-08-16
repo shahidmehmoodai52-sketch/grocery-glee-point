@@ -335,7 +335,7 @@ function Page() {
                         <div className="text-sm">{a.model_number || "—"}</div>
                         {a.serial_number && <div className="text-xs text-muted-foreground">SN: {a.serial_number}</div>}
                       </TableCell>
-                      <TableCell className="text-right">{Number(a.quantity)}</TableCell>
+                      <TableCell className="text-right">{fmtQty(a.quantity)}</TableCell>
                       <TableCell className="text-right">{fmtMoney(Number(a.purchase_price) * Number(a.quantity || 1), sym)}</TableCell>
                       <TableCell className="text-right font-medium">{fmtMoney(Number(a.current_value) * Number(a.quantity || 1), sym)}</TableCell>
                       <TableCell><Badge variant="outline">{a.condition}</Badge></TableCell>
