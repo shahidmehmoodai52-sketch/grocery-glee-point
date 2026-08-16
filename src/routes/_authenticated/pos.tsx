@@ -4073,12 +4073,14 @@ function CashOutDialog({
         // CRITICAL: Update customer balance directly since we aren't using an RPC 
         // that handles the ledger math (like record_payment does for credits).
         // Cash Out is a DEBIT, so balance increases (assuming balance > 0 means they owe).
-        const { error: balErr } = await supabase
-          .from("customers")
-          .update({ balance: Number(selectedCustomer.balance || 0) + amt })
-          .eq("id", activeTab.customer_id);
-          
-        if (balErr) console.error("Balance update failed:", balErr);
+        if (selectedCustomer) {
+          const { error: balErr } = await supabase
+            .from("customers")
+            .update({ balance: Number(selectedCustomer.balance || 0) + amt })
+            .eq("id", activeTab.customer_id);
+            
+          if (balErr) console.error("Balance update failed:", balErr);
+        }
 
         toast.success("Cash Out successful");
       }
