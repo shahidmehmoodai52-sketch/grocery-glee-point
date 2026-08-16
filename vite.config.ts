@@ -25,39 +25,28 @@ export default defineConfig({
       VitePWA({
         registerType: "autoUpdate",
         injectRegister: null, // registration happens from our guarded wrapper
-        filename: "sw.js", strategy: "injectManifest", srcDir: "public",
+        srcDir: "public",
+        filename: "sw.js",
+        strategy: "injectManifest" as const,
         devOptions: { enabled: false },
         includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest", "sw.js"],
-        workbox: {
-          cleanupOutdatedCaches: true,
-          // No navigateFallback: this is an SSR app, so there is no precached
-          // index.html to fall back to. Offline navigations are served from the
-          // "html-nav" runtime cache, pre-warmed on first online visit, and
-          // fall back to the precached /offline.html page as a last resort.
-          globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2}"],
-          runtimeCaching: [
-            {
-              urlPattern: ({ request }) => request.mode === "navigate",
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "html-nav",
-                networkTimeoutSeconds: 3,
-                matchOptions: { ignoreSearch: true },
-                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
-                precacheFallback: { fallbackURL: "/offline.html" },
-              },
-            },
-            {
-              urlPattern: ({ url, sameOrigin }) =>
-                sameOrigin && /\.(?:js|css|woff2?|png|svg|ico|webmanifest)$/.test(url.pathname),
-              handler: "CacheFirst",
-              options: {
-                cacheName: "static-assets",
-                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              },
-            },
+        injectManifest: {
+          injectionPoint: undefined, // sw.js is fully custom and does not use precache injection
+        },
+        manifest: {
+          name: "Tillix POS",
+          short_name: "Tillix",
+          start_url: "/",
+          scope: "/",
+          display: "standalone",
+          background_color: "#ffffff",
+          theme_color: "#ffffff",
+          icons: [
+            { src: "/favicon.png", sizes: "512x512", type: "image/png", purpose: "any" },
+            { src: "/favicon.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
           ],
         },
+      }),
         manifest: {
           name: "Tillix POS",
           short_name: "Tillix",
