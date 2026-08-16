@@ -3739,7 +3739,60 @@ function PaymentMethodGrid({
             </div>
 
             <div className="border-t pt-2 space-y-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <button
+                type="button"
+                className={`${btn(isCashBack)} w-full text-[11px] h-9 mb-1`}
+                onClick={() => {
+                  onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null);
+                }}
+              >
+                Digital + CB
+              </button>
+              {isCashBack && (
+                <div className="space-y-2 mb-2 bg-muted/30 p-2 rounded-md border border-dashed">
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">Digital account</Label>
+                    <Select
+                      value={digitalAccountId ?? ""}
+                      onValueChange={(v) => onSelectCashBackAccount(v || null)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {online.map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">Amount received</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="h-8 text-right"
+                      value={cashBackReceived}
+                      onChange={(e) => onCashBackReceivedChange(e.target.value)}
+                      placeholder={total.toFixed(2)}
+                    />
+                  </div>
+                  <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cash back</span>
+                      <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Remaining</span>
+                      <span className="font-semibold">{fmtMoney(due, sym)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pt-1">
                 Staff / Owner
               </div>
               <StaffSelector
