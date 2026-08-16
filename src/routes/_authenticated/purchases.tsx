@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
 import { printInvoiceDirect } from "@/components/receipt";
