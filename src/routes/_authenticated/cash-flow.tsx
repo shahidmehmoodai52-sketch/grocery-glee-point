@@ -1385,7 +1385,7 @@ function Page() {
                   <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
                   <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
                   <div className="flex-1 overflow-auto min-h-0 mt-4">
-                    <Table>
+                    <Table className="w-full">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Account</TableHead>
@@ -1500,10 +1500,10 @@ function Page() {
                 </div>
                 <div className="flex-1 overflow-auto min-h-0 border rounded-md">
 
-                  <Table>
+                  <Table className="w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead className="w-[100px]">Date</TableHead>
                         {!accId && <TableHead>Account</TableHead>}
                         <TableHead>Method</TableHead>
                         <TableHead>Category</TableHead>
@@ -1521,12 +1521,12 @@ function Page() {
                         const acc = accById(t.account_id);
                         return (
                           <TableRow key={t.id}>
-                            <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
-                            {!accId && <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>}
-                            <TableCell className="whitespace-nowrap">{payLabel(methodOf(t))}</TableCell>
+                            <TableCell>{t.occurred_on}</TableCell>
+                            {!accId && <TableCell>{acc?.name ?? "—"}</TableCell>}
+                            <TableCell>{payLabel(methodOf(t))}</TableCell>
                             <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
 
-                            <TableCell className="min-w-[200px] max-w-[400px]">
+                            <TableCell className="max-w-[260px] break-words">
                               {t.reference && <span className="font-medium">{t.reference}</span>}
                               {t.reference && t.notes && <span> — </span>}
                               {t.notes && <span className="text-muted-foreground">{t.notes}</span>}
