@@ -91,11 +91,16 @@ function Page() {
     if (!exp.amount || exp.amount <= 0) return toast.error("Amount required");
     const payload: any = { ...exp };
     if (!payload.person_id) payload.person_id = null;
-    if (editingId) payload.id = editingId;
-    
+
     try {
-      const row = await insertOfflineAware("expenses", payload);
-      toast.success(row._offline_pending ? "Expense saved offline — will sync" : (editingId ? "Expense updated" : "Expense recorded"));
+      if (editingId) {
+        const { error } = await supabase.from("expenses").update(payload).eq("id", editingId);
+        if (error) throw error;
+        toast.success("Expense updated");
+      } else {
+        const row = await insertOfflineAware("expenses", payload);
+        toast.success(row._offline_pending ? "Expense saved offline — will sync" : "Expense recorded");
+      }
     } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
     setExpOpen(false);
     setEditingId(null);
