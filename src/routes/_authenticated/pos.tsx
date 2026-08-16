@@ -1171,8 +1171,11 @@ function POSPage() {
     if (nextMethod !== "digital_cash_back" && nextMethod !== "digital") {
       patch.digital_account_id = null;
     }
-    // expense_person_id is handled by the Staff button toggle, but we should clear it if switching to others
-    if (nextMethod !== "staff") {
+    // expense_person_id is handled by the Staff button toggle.
+    // Ensure we sync the payment method when selecting staff.
+    if (nextMethod === "staff") {
+      // If we don't have a staff member selected yet, the UI will trigger showStaff=true.
+    } else {
       patch.expense_person_id = null;
     }
 
