@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { fmtQty, fmtMoney } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { useSettings } from "@/hooks/use-settings";
 import { fetchAll } from "@/lib/supabase-page";
 
