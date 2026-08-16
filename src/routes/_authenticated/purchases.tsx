@@ -939,7 +939,19 @@ function Page() {
                           return (
                             <TableRow key={i}>
                               <TableCell>
-                                <Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8 text-sm" />
+                                <Input
+                                  id={`purchase-name-${i}`}
+                                  value={l.name}
+                                  onChange={(e) => setLine(i, { name: e.target.value })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      focusCell("cost", i);
+                                    }
+                                  }}
+                                  className="h-8 text-sm"
+                                />
                                 {(l.item_code || l.barcode) && (
                                   <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
                                     {l.item_code ? `Code ${l.item_code}` : `BC ${l.barcode}`} · stock {oldStock}
