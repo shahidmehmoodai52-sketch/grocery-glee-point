@@ -146,7 +146,13 @@ function Page() {
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setDate = (v: string) => setDraft((d) => ({ ...d, date: v }));
   const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
-    setDraft((d) => ({ ...d, lines: typeof updater === "function" ? (updater as any)(d.lines) : updater }));
+    setDraft((d) => {
+      const nextLines = typeof updater === "function" ? (updater as any)(d.lines) : updater;
+      return {
+        ...d,
+        lines: (nextLines as Line[]).map(l => ({ ...l, qty: roundToTillixQty(l.qty) }))
+      };
+    });
   const setTax = (v: number) => setDraft((d) => ({ ...d, tax: v }));
   const setTaxMode = (v: "amt" | "pct") => setDraft((d) => ({ ...d, taxMode: v }));
   const setBillDiscount = (v: number) => setDraft((d) => ({ ...d, discount: v }));
