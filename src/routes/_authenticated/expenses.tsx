@@ -90,24 +90,55 @@ function Page() {
   const saveExpense = async () => {
     if (!exp.amount || exp.amount <= 0) return toast.error("Amount required");
     const payload: any = { ...exp };
-    if (!payload.person_id) delete payload.person_id;
+    if (!payload.person_id) payload.person_id = null;
+    if (editingId) payload.id = editingId;
+    
     try {
       const row = await insertOfflineAware("expenses", payload);
-      toast.success(row._offline_pending ? "Expense saved offline — will sync" : "Expense recorded");
+      toast.success(row._offline_pending ? "Expense saved offline — will sync" : (editingId ? "Expense updated" : "Expense recorded"));
     } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
     setExpOpen(false);
+    setEditingId(null);
     setExp({ person_id: "", category: "general", amount: 0, description: "", method: "cash", expense_date: today() });
     qc.invalidateQueries({ queryKey: ["expenses"] });
   };
 
+  const openEditExpense = (r: any) => {
+    setEditingId(r.id);
+    setExp({
+      person_id: r.person_id || "",
+      category: r.category || "general",
+      amount: Number(r.amount),
+      description: r.description || "",
+      method: r.method || "cash",
+      expense_date: r.expense_date || today(),
+    });
+    setExpOpen(true);
+  };
+
   const savePerson = async () => {
     if (!person.name) return toast.error("Name required");
-    const { error } = await supabase.from("expense_persons").insert(person);
+    const payload: any = { ...person };
+    if (editingPersonId) payload.id = editingPersonId;
+
+    const { error } = await supabase.from("expense_persons").upsert(payload);
     if (error) return toast.error(error.message);
-    toast.success("Person added");
+    toast.success(editingPersonId ? "Person updated" : "Person added");
     setPersonOpen(false);
+    setEditingPersonId(null);
     setPerson({ name: "", role: "staff", phone: "", notes: "" });
     qc.invalidateQueries({ queryKey: ["expense-persons"] });
+  };
+
+  const openEditPerson = (p: any) => {
+    setEditingPersonId(p.id);
+    setPerson({
+      name: p.name || "",
+      role: p.role || "staff",
+      phone: p.phone || "",
+      notes: p.notes || "",
+    });
+    setPersonOpen(true);
   };
 
   const remove = async (id: string) => {
