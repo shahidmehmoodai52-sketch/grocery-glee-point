@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "./src/integrations/supabase/client.server";
 
 async function run() {
-  const supabase = await supabaseAdmin();
+  const supabase = supabaseAdmin; // It's a Proxy, not a function
   
   console.log("Searching for purchase P-1301...");
   const { data: purchase, error: pError } = await supabase
@@ -43,14 +43,14 @@ async function run() {
   for (const key in productGroups) {
     const group = productGroups[key];
     if (group.length > 1) {
-      console.log(`Product ${key} has ${group.length} entries.`);
+      console.log(`Product ${key} (${group[0].name}) has ${group.length} entries.`);
       // Keep one, delete the rest (assuming they are identical duplicates as requested)
       toKeep.push(group[0]);
       for (let i = 1; i < group.length; i++) {
         toDelete.push(group[i]);
       }
     } else {
-      toKeep.push(group[group[0]]);
+      toKeep.push(group[0]);
     }
   }
   
@@ -82,10 +82,10 @@ async function run() {
   
   // Update purchase totals
   const newSubtotal = toKeep.reduce((acc, item) => acc + (Number(item.qty || 0) * Number(item.cost || 0)), 0);
-  // We should also adjust the total proportionally if there were tax/discounts
-  const ratio = purchase.subtotal > 0 ? newSubtotal / purchase.subtotal : 0.5;
+  
+  // If items were truly doubled, we expect newSubtotal to be about half of purchase.subtotal
+  const ratio = purchase.subtotal > 0 ? newSubtotal / purchase.subtotal : 1;
   const newTotal = purchase.total * ratio;
-  const newPaid = purchase.paid * ratio; // Optional: depends if payment was also doubled
   
   console.log(`Updating purchase totals: Subtotal ${purchase.subtotal} -> ${newSubtotal}, Total ${purchase.total} -> ${newTotal}`);
   
@@ -93,8 +93,7 @@ async function run() {
     .from("purchases")
     .update({ 
       subtotal: newSubtotal,
-      total: newTotal,
-      // paid: newPaid // Keep original paid if it was a single payment but double items
+      total: newTotal
     })
     .eq("id", purchase.id);
     
