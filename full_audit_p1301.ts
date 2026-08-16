@@ -36,7 +36,7 @@ async function runAudit() {
     if (!movements || movements.length === 0) {
       results.push({
         Product: item.name,
-        OriginalP1301Qty: item.qty,
+        OriginalP1301Qty: 0,
         StockBefore: 0,
         P1301Impact: 0,
         P1302Impact: 0,
@@ -50,7 +50,7 @@ async function runAudit() {
       continue;
     }
     
-    // FIND ORIGINAL P130X
+    // TRACING
     const p1301Movs = movements.filter(m => 
       (m.reference_id === p1301.id) || 
       (m.description && m.description.includes("P-1301"))
@@ -80,21 +80,21 @@ async function runAudit() {
     let stockBefore = 0;
     
     if (firstP130X) {
-      originalQty = Number(firstP130X.quantity || 0);
+      originalQty = Number(firstP130X.quantity);
       const idx = movements.indexOf(firstP130X);
       if (idx > 0) {
-        stockBefore = Number(movements[idx-1].balance || 0);
+        stockBefore = Number(movements[idx-1].balance);
       } else {
-        stockBefore = Number(firstP130X.balance || 0) - originalQty;
+        stockBefore = Number(firstP130X.balance) - originalQty;
       }
     } else {
-      originalQty = Number(item.qty || 0);
+      originalQty = 0;
       stockBefore = 0;
     }
     
-    const p1301Impact = p1301Movs.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
-    const p1302Impact = p1302Movs.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
-    const prevCorrectionImpact = correctionMovs.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+    const p1301Impact = p1301Movs.reduce((sum, m) => sum + Number(m.quantity), 0);
+    const p1302Impact = p1302Movs.reduce((sum, m) => sum + Number(m.quantity), 0);
+    const prevCorrectionImpact = correctionMovs.reduce((sum, m) => sum + Number(m.quantity), 0);
     
     const netImpact = p1301Impact + p1302Impact + prevCorrectionImpact;
     
@@ -108,6 +108,7 @@ async function runAudit() {
     if (originalQty % 1 !== 0) flags.push("Fractional Original");
     if (expectedFinalStock % 1 !== 0) flags.push("Fractional Final");
     if (p1301Movs.length === 0) flags.push("No P-1301 Mov");
+    if (p1302Movs.length === 0) flags.push("No P-1302 Mov Found");
     
     results.push({
       Product: item.name,
