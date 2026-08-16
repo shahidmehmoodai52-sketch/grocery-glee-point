@@ -579,10 +579,10 @@ function Page() {
   };
 
   const submit = async () => {
-    if (savingRef.current) return;
-    if (!supplier || supplier === "none") return toast.error("Supplier is required");
+    if (savingRef.current) return false;
+    if (!supplier || supplier === "none") { toast.error("Supplier is required"); return false; }
     const items = lines.filter((l) => l.name && l.qty > 0);
-    if (!items.length) return toast.error("Add at least one item");
+    if (!items.length) { toast.error("Add at least one item"); return false; }
     const { lineDiscountTotal: _, subtotal: sub, discountedSubtotal, billDiscountAmt, taxAmt } = calculatePurchaseTotals({
       lines: items,
       tax: Number(tax || 0),
@@ -598,7 +598,8 @@ function Page() {
     } catch (e: any) {
       setSaving(false);
       savingRef.current = false;
-      return toast.error(e?.message ?? "Could not resolve payment account");
+      toast.error(e?.message ?? "Could not resolve payment account");
+      return false;
     }
     
     const payload = {
@@ -712,22 +713,14 @@ function Page() {
 
       } else {
         // --- New Purchase Flow ---
-        // Prevent double-save by checking if we are already saving
-        if (savingRef.current) return;
-        savingRef.current = true;
-        setSaving(true);
-
         const { error } = await supabase.rpc("complete_purchase", { payload });
-        if (error) {
-          savingRef.current = false;
-          setSaving(false);
-          throw error;
-        }
+        if (error) throw error;
       }
     } catch (err: any) {
       setSaving(false);
       savingRef.current = false;
-      return toast.error(err?.message ?? "Could not save purchase");
+      toast.error(err?.message ?? "Could not save purchase");
+      return false;
     }
     setSaving(false);
     savingRef.current = false;
@@ -749,7 +742,7 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["cf-purchases"] });
     qc.invalidateQueries({ queryKey: ["cash-accounts"] });
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
-
+    return true;
   };
 
 
@@ -1256,13 +1249,14 @@ function Page() {
             <DialogFooter className="gap-2 sm:justify-between">
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
-                <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
+                <Button onClick={() => submit()} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
               </div>
               <Button
                 variant="secondary"
                 onClick={async () => {
                   if (saving) return;
-                  await submit();
+                  const success = await submit();
+                  if (success === false) return;
                   setTimeout(() => {
                     // Search in the purchases array (which should have been invalidated/refetched)
                     const latest = purchases[0];
