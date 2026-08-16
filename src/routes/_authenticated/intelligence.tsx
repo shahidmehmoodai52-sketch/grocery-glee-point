@@ -38,6 +38,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { fetchAll } from "@/lib/supabase-page";
 
