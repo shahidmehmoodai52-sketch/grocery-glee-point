@@ -671,10 +671,9 @@ function Page() {
         // Reverse old stock
         for (const it of origItems || []) {
           if (!it.product_id) continue;
-          // Use RPC to atomatically update stock to avoid race conditions and ensure accuracy
-          await supabase.rpc("increment_product_stock", { 
-            prod_id: it.product_id, 
-            amount: -Number(it.qty) 
+          await supabase.rpc("adjust_product_stock", { 
+            p_id: it.product_id, 
+            qty_delta: -Number(it.qty) 
           });
         }
 
