@@ -17,6 +17,7 @@ import { offlineFirst, cacheCustomers, insertOfflineAware } from "@/lib/offline/
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db } from "@/lib/offline/db";
 import { summarizeCustomerLedger, buildLedgerEntries } from "@/lib/customer-ledger";
+import { fetchAll } from "@/lib/supabase-page";
 
 
 export const Route = createFileRoute("/_authenticated/customers/")({ component: Page });
