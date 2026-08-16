@@ -10,6 +10,7 @@ import { db } from "./db";
 import { getDeviceId, getMeta } from "./device";
 import { getOfflineStatus } from "./status";
 import { enqueueWrite } from "./sync";
+import { roundToTillixQty } from "../quantity-rounding";
 
 function isOffline() {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
