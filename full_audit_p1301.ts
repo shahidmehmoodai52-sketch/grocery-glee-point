@@ -8,21 +8,14 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
 });
 
 async function runAudit() {
-  // Try to find the purchase directly by invoice_no
-  const { data: p1301, error: pError } = await supabase
+  const { data: p1301 } = await supabase
     .from("purchases")
     .select("id, invoice_no, tenant_id")
     .eq("invoice_no", "P-1301")
     .limit(1)
     .single();
     
-  if (pError || !p1301) {
-    console.error("P-1301 not found by invoice_no:", pError?.message);
-    // List some purchases to see what's available
-    const { data: someP } = await supabase.from("purchases").select("invoice_no").limit(5);
-    console.log("Recent purchases:", someP?.map(p => p.invoice_no).join(", "));
-    return;
-  }
+  if (!p1301) return;
   
   const { data: p1301Items } = await supabase
     .from("purchase_items")
@@ -42,6 +35,7 @@ async function runAudit() {
       
     if (!movements) continue;
     
+    // Impact calculations
     const p1301Movs = movements.filter(m => 
       (m.reference_id === p1301.id) || 
       (m.description && m.description.includes("P-1301"))
@@ -90,26 +84,33 @@ async function runAudit() {
     const requiredCorrection = -(netP1301P1302Impact - originalQty);
     const expectedFinalStock = currentStock + requiredCorrection;
     
-    let flag = "";
-    if (originalQty % 1 !== 0) flag += "[Fractional Original] ";
-    if (expectedFinalStock % 1 !== 0) flag += "[Fractional Final] ";
+    let flags = [];
+    if (originalQty % 1 !== 0) flags.push("Fractional Original");
+    if (expectedFinalStock % 1 !== 0) flags.push("Fractional Final");
+    if (p1301Movs.length === 0) flags.push("No P-1301 Mov");
+    if (p1302Movs.length > 0 && p1302Movs.some(m => m.quantity === 0)) flags.push("Conflicting Movs");
     
     results.push({
-      product: item.name,
-      originalQty,
-      stockBefore,
-      p1301Impact,
-      p1302Impact,
-      prevCorrectionImpact,
-      netP1301P1302Impact,
-      currentStock,
-      requiredCorrection,
-      expectedFinalStock,
-      flag
+      Product: item.name,
+      OriginalP1301Qty: originalQty,
+      StockBefore: stockBefore,
+      P1301Impact: p1301Impact,
+      P1302Impact: p1302Impact,
+      PrevCorrectionImpact: prevCorrectionImpact,
+      NetImpact: netP1301P1302Impact,
+      CurrentStock: currentStock,
+      RequiredCorrection: requiredCorrection,
+      ExpectedFinalStock: expectedFinalStock,
+      Flags: flags.join(", ")
     });
   }
   
-  console.log(JSON.stringify(results, null, 2));
+  // Format as Markdown table
+  console.log("| Product | Original P-1301 Qty | Stock Before P-1301 | P-1301 Impact | P-1302 Impact | Prev Correction Impact | Net P1301/P1302 Impact | Current Stock | Required Correction | Expected Final Stock | Flags |");
+  console.log("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |");
+  for (const r of results) {
+    console.log(`| ${r.Product} | ${r.OriginalP1301Qty} | ${r.StockBefore} | ${r.P1301Impact} | ${r.P1302Impact} | ${r.PrevCorrectionImpact} | ${r.NetImpact} | ${r.CurrentStock} | ${r.RequiredCorrection} | ${r.ExpectedFinalStock} | ${r.Flags} |`);
+  }
 }
 
 runAudit();
