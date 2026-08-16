@@ -353,12 +353,12 @@ function Page() {
               <TableBody>
                 {persons.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No people added yet</TableCell></TableRow>}
                 {persons.map((p: any) => (
-                  <TableRow key={p.id}>
+                  <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openEditPerson(p)}>
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{p.role ?? "—"}</Badge></TableCell>
                     <TableCell>{p.phone ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.notes ?? "—"}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <Button asChild size="sm" variant="ghost"><Link to="/expense-persons/$id" params={{ id: p.id }}>Open ledger</Link></Button>
                     </TableCell>
                   </TableRow>
