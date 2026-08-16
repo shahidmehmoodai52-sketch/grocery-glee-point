@@ -425,7 +425,7 @@ function Page() {
                 {byCategory.length > 0 && (
                   <TableRow>
                     <TableCell className="font-semibold">Total</TableCell>
-                    <TableCell className="text-right font-semibold">{totals.count}</TableCell>
+                    <TableCell className="text-right font-semibold">{fmtQty(totals.count)}</TableCell>
                     <TableCell className="text-right font-semibold">{fmtMoney(totals.current, sym)}</TableCell>
                   </TableRow>
                 )}
