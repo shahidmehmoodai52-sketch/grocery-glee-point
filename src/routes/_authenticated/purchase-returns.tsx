@@ -105,12 +105,18 @@ function Page() {
       await fetchAll<any>((from, to) => supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)),
   });
 
+  const [debouncedPurchaseSearch, setDebouncedPurchaseSearch] = useState(purchaseSearch);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedPurchaseSearch(purchaseSearch), 300);
+    return () => clearTimeout(timer);
+  }, [purchaseSearch]);
+
   const { data: purchases = [] } = useQuery({
-    queryKey: ["purchases-for-return", purchaseSearch],
+    queryKey: ["purchases-for-return", debouncedPurchaseSearch],
     queryFn: async () => {
       let q = supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).limit(50);
-      if (purchaseSearch) {
-        q = q.ilike("invoice_no", `%${purchaseSearch}%`);
+      if (debouncedPurchaseSearch) {
+        q = q.ilike("invoice_no", `%${debouncedPurchaseSearch}%`);
       }
       const { data } = await q;
       return data ?? [];
