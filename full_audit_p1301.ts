@@ -33,9 +33,24 @@ async function runAudit() {
       .eq("product_id", item.product_id)
       .order("created_at", { ascending: true });
       
-    if (!movements) continue;
+    if (!movements || movements.length === 0) {
+      results.push({
+        Product: item.name,
+        OriginalP1301Qty: item.qty,
+        StockBefore: 0,
+        P1301Impact: 0,
+        P1302Impact: 0,
+        PrevCorrectionImpact: 0,
+        NetImpact: 0,
+        CurrentStock: 0,
+        RequiredCorrection: 0,
+        ExpectedFinalStock: 0,
+        Flags: "No movements found"
+      });
+      continue;
+    }
     
-    // IMPACT TRACING
+    // FIND ORIGINAL P130X
     const p1301Movs = movements.filter(m => 
       (m.reference_id === p1301.id) || 
       (m.description && m.description.includes("P-1301"))
@@ -56,7 +71,6 @@ async function runAudit() {
       )
     );
     
-    // FINDING ORIGINAL QUANTITY (The first P-130X movement)
     const firstP130X = movements.find(m => 
       (m.reference_id === p1301.id) || 
       (m.description && (m.description.includes("P-1301") || m.description.includes("P-1302")))
@@ -66,26 +80,26 @@ async function runAudit() {
     let stockBefore = 0;
     
     if (firstP130X) {
-      originalQty = parseFloat(firstP130X.quantity.toString());
+      originalQty = Number(firstP130X.quantity || 0);
       const idx = movements.indexOf(firstP130X);
       if (idx > 0) {
-        stockBefore = parseFloat(movements[idx-1].balance.toString());
+        stockBefore = Number(movements[idx-1].balance || 0);
       } else {
-        stockBefore = parseFloat(firstP130X.balance.toString()) - originalQty;
+        stockBefore = Number(firstP130X.balance || 0) - originalQty;
       }
     } else {
-      originalQty = parseFloat(item.qty.toString());
-      stockBefore = 0; // Unknown
+      originalQty = Number(item.qty || 0);
+      stockBefore = 0;
     }
     
-    const p1301Impact = p1301Movs.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
-    const p1302Impact = p1302Movs.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
-    const prevCorrectionImpact = correctionMovs.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
+    const p1301Impact = p1301Movs.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+    const p1302Impact = p1302Movs.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+    const prevCorrectionImpact = correctionMovs.reduce((sum, m) => sum + Number(m.quantity || 0), 0);
     
     const netImpact = p1301Impact + p1302Impact + prevCorrectionImpact;
     
     const { data: prod } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
-    const currentStock = prod ? parseFloat(prod.stock.toString()) : 0;
+    const currentStock = Number(prod?.stock || 0);
     
     const requiredCorrection = -(netImpact - originalQty);
     const expectedFinalStock = currentStock + requiredCorrection;
