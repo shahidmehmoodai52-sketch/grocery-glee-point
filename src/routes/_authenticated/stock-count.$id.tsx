@@ -206,7 +206,7 @@ function StockCountDetailPage() {
         .eq("id", existing.id);
       if (error) return toast.error(error.message);
     } else {
-      const nextQty = mode === "set" ? qty : qty;
+      const nextQty = roundToTillixQty(mode === "set" ? qty : qty);
       const { error } = await supabase
         .from("stock_count_items" as any)
         .insert({
