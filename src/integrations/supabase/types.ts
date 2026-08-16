@@ -3904,6 +3904,7 @@ export type Database = {
         }[]
       }
       delete_party_payment: { Args: { _id: string }; Returns: undefined }
+      delete_purchase_v2: { Args: { _purchase_id: string }; Returns: undefined }
       discard_held_bill: {
         Args: { _id: string; _reason: string }
         Returns: undefined
