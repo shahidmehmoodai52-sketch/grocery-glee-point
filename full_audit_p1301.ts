@@ -3,29 +3,24 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  process.exit(1);
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    persistSession: false
-  }
+const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: { persistSession: false }
 });
 
 async function runAudit() {
-  const shopCode = "hafiz-super-store-ba-023";
-  const { data: tenant } = await supabase
+  // First, let's find the tenant by name if code fails
+  const { data: tenants } = await supabase
     .from("tenants")
-    .select("id")
-    .eq("code", shopCode)
-    .single();
+    .select("id, name, code");
+    
+  const tenant = tenants?.find(t => t.name?.includes("Hafiz") || t.code?.includes("ba-023"));
     
   if (!tenant) {
-    console.error("Tenant not found");
+    console.error("Tenant not found. Available tenants:", tenants?.map(t => `${t.name} (${t.code})`).join(", "));
     return;
   }
   
+  // Find P-1301
   const { data: p1301 } = await supabase
     .from("purchases")
     .select("id, invoice_no")
@@ -34,8 +29,19 @@ async function runAudit() {
     .single();
     
   if (!p1301) {
-    console.error("P-1301 not found");
-    return;
+    // Try without tenant ID just in case
+    const { data: p1301Any } = await supabase
+      .from("purchases")
+      .select("id, invoice_no, tenant_id")
+      .eq("invoice_no", "P-1301")
+      .single();
+    
+    if (!p1301Any) {
+      console.error("P-1301 not found anywhere");
+      return;
+    }
+    console.log("Found P-1301 under tenant:", p1301Any.tenant_id);
+    p1301 = p1301Any;
   }
   
   const { data: p1301Items } = await supabase
@@ -74,14 +80,12 @@ async function runAudit() {
       )
     );
     
-    // The very first movement related to this mess
     const firstP130X = movements.find(m => 
       (m.reference_id === p1301.id) || 
       (m.description && (m.description.includes("P-1301") || m.description.includes("P-1302")))
     );
     
     let originalQty = 0;
-    // We assume the first ever movement of either P-1301 or P-1302 is the original intended qty
     if (firstP130X) {
       originalQty = firstP130X.quantity;
     } else {
@@ -103,16 +107,12 @@ async function runAudit() {
     const { data: prod } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
     const currentStock = prod ? prod.stock : 0;
     
-    // The correct state is: StockBefore + OriginalQty + (Any legitimate movements AFTER the P1301 mess)
-    // Legitimate movements = All movements - (P-1301 impact, P-1302 impact, Correction impact)
-    // Correct Stock = Current Stock - (Net Impact - Original Qty)
     const requiredCorrection = -(netP1301P1302Impact - originalQty);
     const expectedFinalStock = currentStock + requiredCorrection;
     
     let flag = "";
     if (originalQty % 1 !== 0) flag += "[Fractional Original] ";
     if (expectedFinalStock % 1 !== 0) flag += "[Fractional Final] ";
-    if (p1301Movs.length === 0) flag += "[No P-1301 Mov] ";
     
     results.push({
       product: item.name,
