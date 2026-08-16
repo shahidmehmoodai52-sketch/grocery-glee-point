@@ -4021,7 +4021,7 @@ function ReprintDialog({
         (from: number, to: number) =>
           supabase
             .from("sales")
-            .select("*, customers(name), sale_items(*)")
+            .select("*, customers(name), expense_persons(name), sale_items(*)")
             .or(filters.join(","))
             .order("created_at", { ascending: false })
             .range(from, to) as any,
@@ -4037,7 +4037,7 @@ function ReprintDialog({
         async () => {
           const { data, error } = await supabase
             .from("sales")
-            .select("*, customers(name), sale_items(*)")
+            .select("*, customers(name), expense_persons(name), sale_items(*)")
             .order("created_at", { ascending: false })
             .order("id", { ascending: false })
             .limit(pageSize);
@@ -4148,7 +4148,7 @@ function ReprintDialog({
                     <td className="px-3 py-1.5 text-xs">
                       {fmtDate(s.created_at)}
                     </td>
-                    <td className="px-3 py-1.5">{s.customers?.name ?? "Walk-in"}</td>
+                    <td className="px-3 py-1.5">{s.customers?.name ?? s.expense_persons?.name ?? "Walk-in"}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">
                       {fmtMoney(s.total, sym)}
                     </td>
