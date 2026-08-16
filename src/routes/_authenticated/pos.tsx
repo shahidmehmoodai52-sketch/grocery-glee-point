@@ -18,7 +18,10 @@ import {
   Play,
   ChevronDown,
   Pencil,
+  Banknote,
+  Coins,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -3937,6 +3940,16 @@ function StaffSelector({
     </div>
   );
 }
+
+const ACC_TYPES = [
+  { v: "cash", label: "Cash / Till", Icon: Banknote },
+  { v: "card", label: "Card terminal", Icon: CreditCard },
+  { v: "bank", label: "Bank account", Icon: Building2 },
+  { v: "mobile_wallet", label: "Mobile wallet (EasyPaisa/JazzCash)", Icon: Smartphone },
+  { v: "other", label: "Other", Icon: Wallet },
+] as const;
+
+const labelFor = (t: string) => ACC_TYPES.find((x) => x.v === t)?.label ?? t;
 
 function CashOutDialog({
   activeTab,
