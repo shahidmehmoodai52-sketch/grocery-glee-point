@@ -233,7 +233,11 @@ function Page() {
 
   if (open) {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in fade-in zoom-in duration-200">
+      <div 
+        className="fixed inset-0 z-50 bg-background flex flex-col animate-in fade-in zoom-in duration-200"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="h-14 border-b flex items-center justify-between px-6 bg-muted/40 shrink-0">
           <div className="flex items-center gap-4">
             <h2 className="font-semibold text-lg">New Purchase Return</h2>
