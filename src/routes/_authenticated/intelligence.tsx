@@ -378,11 +378,11 @@ function ReorderEditDialog({ product, onClose }: { product: Intel; onClose: () =
   const save = async () => {
     setSaving(true);
     const { error } = await supabase.from("products").update({
-      min_stock: minStock === "" ? null : Number(minStock),
-      max_stock: maxStock === "" ? null : Number(maxStock),
-      safety_stock: safety === "" ? 0 : Number(safety),
+      min_stock: minStock === "" ? null : roundToTillixQty(Number(minStock)),
+      max_stock: maxStock === "" ? null : roundToTillixQty(Number(maxStock)),
+      safety_stock: safety === "" ? 0 : roundToTillixQty(Number(safety)),
       lead_time_days: lead === "" ? 7 : Number(lead),
-      reorder_qty: reorder === "" ? null : Number(reorder),
+      reorder_qty: reorder === "" ? null : roundToTillixQty(Number(reorder)),
       preferred_supplier_id: supplierId || null,
     }).eq("id", product.product_id);
     setSaving(false);
