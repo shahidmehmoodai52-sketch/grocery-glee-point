@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { logAppError } from "@/lib/log-app-error";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
+import { isChunkLoadError, recoverFromChunkError } from "@/lib/chunk-recovery";
 
 type Props = {
   children: ReactNode;
@@ -25,6 +26,8 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error(error);
+    // A route chunk that no longer exists after a deployment: refresh once.
+    if (isChunkLoadError(error) && recoverFromChunkError()) return;
     reportLovableError(error, { boundary: "app_error_boundary" });
     void logAppError({
       errorType: "react_render",
