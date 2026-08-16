@@ -418,7 +418,7 @@ function Page() {
                 {byCategory.map((r) => (
                   <TableRow key={r.name}>
                     <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-right">{r.count}</TableCell>
+                    <TableCell className="text-right">{fmtQty(r.count)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(r.worth, sym)}</TableCell>
                   </TableRow>
                 ))}
