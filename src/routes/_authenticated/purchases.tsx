@@ -308,7 +308,10 @@ function Page() {
     setEntrySearch("");
     setEntryActive(false);
     setEntryIndex(0);
-    focusCell("cost", newIndex);
+    // Determine target based on product presence. If it's a new empty row (product is null),
+    // focus the name field instead of cost.
+    const target = product ? "cost" : "name";
+    focusCell(target as any, newIndex);
   };
   const addFromSearch = async () => {
     const term = entrySearch.trim();
@@ -669,7 +672,8 @@ function Page() {
         for (const it of origItems || []) {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
-          await supabase.from("products").update({ stock: Number(p?.stock ?? 0) - Number(it.qty) }).eq("id", it.product_id);
+          const currentStock = Number(p?.stock ?? 0);
+          await supabase.from("products").update({ stock: currentStock - Number(it.qty) }).eq("id", it.product_id);
         }
 
         // 4. Replace items
@@ -688,7 +692,8 @@ function Page() {
         for (const it of payload.items) {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
-          await supabase.from("products").update({ stock: Number(p?.stock ?? 0) + Number(it.qty) }).eq("id", it.product_id);
+          const currentStock = Number(p?.stock ?? 0);
+          await supabase.from("products").update({ stock: currentStock + Number(it.qty) }).eq("id", it.product_id);
         }
 
       } else {
@@ -936,7 +941,19 @@ function Page() {
                           return (
                             <TableRow key={i}>
                               <TableCell>
-                                <Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8 text-sm" />
+                                <Input
+                                  id={`purchase-name-${i}`}
+                                  value={l.name}
+                                  onChange={(e) => setLine(i, { name: e.target.value })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      focusCell("cost", i);
+                                    }
+                                  }}
+                                  className="h-8 text-sm"
+                                />
                                 {(l.item_code || l.barcode) && (
                                   <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
                                     {l.item_code ? `Code ${l.item_code}` : `BC ${l.barcode}`} · stock {oldStock}
@@ -1224,12 +1241,30 @@ function Page() {
                   if (saving) return;
                   await submit();
                   setTimeout(() => {
+                    // Search in the purchases array (which should have been invalidated/refetched)
                     const latest = purchases[0];
                     if (latest) {
-                      const printBtn = document.querySelector(`[data-print-id="${latest.id}"]`) as HTMLButtonElement;
-                      if (printBtn) printBtn.click();
+                      printInvoiceDirect({
+                        invoice_no: latest.invoice_no,
+                        created_at: latest.created_at,
+                        suppliers: latest.suppliers,
+                        subtotal: latest.subtotal,
+                        tax: latest.tax,
+                        total: latest.total,
+                        paid: latest.paid,
+                        discount: Number(latest.subtotal || 0) > 0 ? Number(latest.subtotal || 0) - (Number(latest.total || 0) - Number(latest.tax || 0)) : 0,
+                        note: latest.note,
+                        payment_method: latest.payment_method,
+                        isPurchase: true,
+                        sale_items: latest.purchase_items?.map((it: any) => ({
+                          name: it.name,
+                          qty: it.qty,
+                          price: it.cost,
+                          line_total: it.line_total
+                        }))
+                      }, settings, "purchase" as any);
                     }
-                  }, 1500);
+                  }, 800);
                 }}
                 disabled={saving}
               >
