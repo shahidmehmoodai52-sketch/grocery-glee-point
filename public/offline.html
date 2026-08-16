@@ -41,14 +41,14 @@
     // Since the JS assets are precached, the browser will execute them and
     // TanStack Router will handle the current URL.
     window.addEventListener('load', () => {
-      // Small delay to ensure SW has finished its work if needed
-      setTimeout(() => {
-        // If the JS didn't load (e.g., manifest error), we might need to retry
-        if (!window.__TILLIX_BOOTED && navigator.onLine) {
-           // window.location.reload(); 
-        }
-      }, 5000);
+      // Check if we are actually offline and the app hasn't booted
+      if (!window.__TILLIX_BOOTED) {
+        console.log('Offline shell loaded. Waiting for SPA to hydrate...');
+      }
     });
+
+    // If we're stuck here, it might be because the main JS bundle failed to load.
+    // However, the SW precaches all assets, so they should be available.
   </script>
 </body>
 </html>
