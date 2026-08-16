@@ -16,7 +16,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtQty } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 
 export const Route = createFileRoute("/_authenticated/assets")({
   component: Page,
