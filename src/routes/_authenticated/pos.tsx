@@ -4084,26 +4084,24 @@ function CashOutDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7 px-2 text-[11px] text-rose-600 border-rose-200 hover:bg-rose-50"
-            title="Give cash to customer (record as debit)"
-            onClick={() => {
-              if (!activeTab.customer_id) {
-                toast.error("Please select a customer first");
-                return;
-              }
-              setOpen(true);
-            }}
-          >
-            Cash Out
-          </Button>
-        </PopoverTrigger>
-      </Popover>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-[11px] text-rose-600 border-rose-200 hover:bg-rose-50"
+          title="Give cash to customer (record as debit)"
+          onClick={(e) => {
+            if (!activeTab.customer_id) {
+              e.preventDefault();
+              toast.error("Please select a customer first");
+              return;
+            }
+          }}
+        >
+          Cash Out
+        </Button>
+      </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Cash Out to Customer</DialogTitle>
