@@ -293,14 +293,14 @@ function Page() {
               <TableBody>
                 {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No expenses in this period</TableCell></TableRow>}
                 {rows.map((r: any) => (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openEditExpense(r)}>
                     <TableCell>{r.expense_date}</TableCell>
                     <TableCell>{r.expense_persons?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell><Badge variant="secondary">{r.category}</Badge></TableCell>
                     <TableCell className="max-w-[300px] truncate">{r.description ?? "—"}</TableCell>
                     <TableCell className="text-xs uppercase text-muted-foreground">{r.method}</TableCell>
                     <TableCell className="text-right font-medium text-destructive">{fmtMoney(r.amount, sym)}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <Button size="icon" variant="ghost" onClick={() => remove(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </TableCell>
                   </TableRow>
