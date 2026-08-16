@@ -70,11 +70,11 @@ import {
   completeSaleOfflineAware,
   cacheSuppliers,
   insertOfflineAware,
+  searchProductsLocal,
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
 import { enqueueWrite } from "@/lib/offline/sync";
 import { isOfflineNow } from "@/lib/offline/session";
-import { searchProductsLocal } from "@/lib/offline/pos";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
@@ -142,7 +142,7 @@ async function fetchExpensePersons(): Promise<any[]> {
       const raw = window.localStorage.getItem(STAFF_CACHE_KEY);
       return raw ? JSON.parse(raw) : [];
     },
-    async (rows) => {
+    async (rows: any[]) => {
       window.localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(rows));
     }
   );
@@ -754,7 +754,7 @@ function POSPage() {
       offlineFirst(
         fetchActiveCashAccounts,
         async () => (await offlineDb().cash_accounts.toArray()).filter((a) => a.is_active !== false),
-        async (rows) => {
+        async (rows: any[]) => {
           await offlineDb().cash_accounts.bulkPut(rows);
         },
       ),
@@ -2110,6 +2110,21 @@ function POSPage() {
               reason: reasonText,
             },
           } as any);
+        } else {
+          // Queue audit log for offline
+          await enqueueWrite({
+            op: "insert",
+            table: "audit_logs",
+            payload: {
+              action: "undo_last_sale.reason",
+              entity: "sales",
+              entity_id: undoCandidate.sale_id,
+              details: {
+                invoice_no: payload.invoice_no ?? undoCandidate.invoice_no,
+                reason: reasonText,
+              },
+            },
+          });
         }
       } catch {
         /* noop */
