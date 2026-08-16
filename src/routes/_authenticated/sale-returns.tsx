@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { Receipt, printReceipt } from "@/components/receipt";
 import { searchProductsLocal } from "@/lib/offline/pos";
 import { readLocalFirst } from "@/lib/offline/data-access";
