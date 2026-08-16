@@ -51,6 +51,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty, fmtDate } from "@/lib/format";
+import { roundToTillixQty } from "@/lib/quantity-rounding";
 import {
   deriveDigitalCashBackSummary,
   normalizePaymentAllocations,
