@@ -88,12 +88,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Tillix – Smart Retail Starts Here | Cloud POS & Retail Management" },
-      { name: "description", content: "Tillix is a cloud POS and retail management platform for grocery, supermarkets, pharmacies, restaurants and multi-store businesses. Billing, inventory, barcodes, loyalty and analytics in one." },
+      { title: "Tillix – Smart Retail Starts Here | Cloud POS & Retail Management Software" },
+      { name: "description", content: "Tillix is a modern cloud POS for grocery, supermarkets, retail shops, pharmacies, restaurants, wholesalers and multi-store businesses. Billing, inventory, barcodes, loyalty, suppliers, purchases and real-time analytics in one platform." },
       { name: "theme-color", content: "#0b1220" },
       { property: "og:site_name", content: "Tillix" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "Tillix – Smart Retail Starts Here | Cloud POS & Retail Management Software" },
+      { name: "twitter:title", content: "Tillix – Smart Retail Starts Here | Cloud POS & Retail Management Software" },
+      { property: "og:description", content: "Tillix is a modern cloud POS for grocery, supermarkets, retail shops, pharmacies, restaurants, wholesalers and multi-store businesses. Billing, inventory, barcodes, loyalty, suppliers, purchases and real-time analytics in one platform." },
+      { name: "twitter:description", content: "Tillix is a modern cloud POS for grocery, supermarkets, retail shops, pharmacies, restaurants, wholesalers and multi-store businesses. Billing, inventory, barcodes, loyalty, suppliers, purchases and real-time analytics in one platform." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d30009239dc2e80714d9e6903bbb0041/id-preview-c1260d7c--0d8742ce-c858-4431-94b6-b23eb34b18b4.lovable.app-1786896983784.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d30009239dc2e80714d9e6903bbb0041/id-preview-c1260d7c--0d8742ce-c858-4431-94b6-b23eb34b18b4.lovable.app-1786896983784.png" },
     ],
     scripts: [
       {
