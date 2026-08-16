@@ -754,7 +754,9 @@ function POSPage() {
       offlineFirst(
         fetchActiveCashAccounts,
         async () => (await offlineDb().cash_accounts.toArray()).filter((a) => a.is_active !== false),
-        (rows) => offlineDb().cash_accounts.bulkPut(rows),
+        async (rows) => {
+          await offlineDb().cash_accounts.bulkPut(rows);
+        },
       ),
   });
 
