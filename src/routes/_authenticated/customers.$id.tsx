@@ -295,12 +295,12 @@ function Page() {
                 </TableCell>
                 <TableCell className="text-right no-print">
                   <div className="flex justify-end gap-1">
-                    {x.type === "sale" && x.sale && (
+                    {x.type === "sale" && x.data && (
                       <>
                         <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setOpenInvoice({ ...x.data, customers: { name: customer?.name, phone: customer?.phone } })}>
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
-                        {x.sale.status !== "voided" && (
+                        {x.data.status !== "voided" && (
                           <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => voidSale(x.data)} disabled={voiding}>
                             <Ban className="h-3.5 w-3.5" />
                           </Button>
