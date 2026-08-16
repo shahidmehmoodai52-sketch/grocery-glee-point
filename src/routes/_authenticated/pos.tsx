@@ -1071,6 +1071,9 @@ function POSPage() {
     const items = tab.items.map((it, i) => {
       if (i !== idx) return it;
       const next = { ...it, ...patch };
+      if ("qty" in patch) {
+        next.qty = roundToTillixQty(Number(patch.qty));
+      }
       const gross = Number(next.qty) * Number(next.price);
       if ("disc" in patch) {
         // flat discount typed directly — derive %
