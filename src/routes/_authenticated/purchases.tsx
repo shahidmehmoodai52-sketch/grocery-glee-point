@@ -579,10 +579,10 @@ function Page() {
   };
 
   const submit = async () => {
-    if (savingRef.current) return;
-    if (!supplier || supplier === "none") return toast.error("Supplier is required");
+    if (savingRef.current) return false;
+    if (!supplier || supplier === "none") { toast.error("Supplier is required"); return false; }
     const items = lines.filter((l) => l.name && l.qty > 0);
-    if (!items.length) return toast.error("Add at least one item");
+    if (!items.length) { toast.error("Add at least one item"); return false; }
     const { lineDiscountTotal: _, subtotal: sub, discountedSubtotal, billDiscountAmt, taxAmt } = calculatePurchaseTotals({
       lines: items,
       tax: Number(tax || 0),
