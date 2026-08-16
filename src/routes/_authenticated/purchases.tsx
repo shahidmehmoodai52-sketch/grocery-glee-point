@@ -1247,13 +1247,14 @@ function Page() {
             <DialogFooter className="gap-2 sm:justify-between">
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
-                <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
+                <Button onClick={() => submit()} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
               </div>
               <Button
                 variant="secondary"
                 onClick={async () => {
                   if (saving) return;
-                  await submit();
+                  const success = await submit();
+                  if (success === false) return;
                   setTimeout(() => {
                     // Search in the purchases array (which should have been invalidated/refetched)
                     const latest = purchases[0];
