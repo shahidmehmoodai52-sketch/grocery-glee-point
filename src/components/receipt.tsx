@@ -244,8 +244,14 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       ? "PURCHASE INVOICE"
       : "SALES INVOICE";
 
-  const party = invoice.customers?.name ?? invoice.suppliers?.name;
-  const partyLabel = kind === "purchase-return" ? "Supplier" : "Customer";
+  const staffName = invoice.expense_persons?.name ?? invoice.expense_person_name ?? null;
+  const party = invoice.customers?.name ?? invoice.suppliers?.name ?? staffName ?? undefined;
+  const partyLabel =
+    kind === "purchase-return"
+      ? "Supplier"
+      : !invoice.customers?.name && !invoice.suppliers?.name && staffName
+        ? "Staff"
+        : "Customer";
   const savings = Number(invoice.discount ?? 0);
 
   useEffect(() => {
