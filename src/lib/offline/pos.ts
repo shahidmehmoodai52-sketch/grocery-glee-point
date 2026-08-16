@@ -286,7 +286,7 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload, met
     tenant_id,
     product_id: i.product_id,
     name: i.name,
-    qty: i.qty,
+    qty: roundToTillixQty(i.qty),
     price: i.price,
     cost: i.cost,
     _sync: "pending",
