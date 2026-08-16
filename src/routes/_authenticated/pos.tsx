@@ -1837,6 +1837,10 @@ function POSPage() {
         return;
       }
 
+      const staffPerson = tab.expense_person_id
+        ? (persons as any[]).find((p: any) => p.id === tab.expense_person_id)
+        : null;
+
       const payload = {
         customer_id: tab.customer_id,
         expense_person_id: tab.expense_person_id,
