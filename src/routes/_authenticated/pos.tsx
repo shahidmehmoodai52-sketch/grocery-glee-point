@@ -3938,6 +3938,230 @@ function StaffSelector({
   );
 }
 
+function CashOutDialog({
+  activeTab,
+  onComplete,
+}: {
+  activeTab: Tab;
+  onComplete: () => void;
+}) {
+  const qc = useQueryClient();
+  const { data: settings } = useSettings();
+  const sym = settings?.currency_symbol ?? "Rs";
+  const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [accountId, setAccountId] = useState<string | null>(null);
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("customers").select("*").order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
+    queryFn: fetchActiveCashAccounts,
+  });
+
+  const selectedCustomer = customers.find((c) => c.id === activeTab.customer_id);
+
+  const handleCashOut = async () => {
+    if (!activeTab.customer_id) return toast.error("Select a customer first");
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return toast.error("Enter a valid amount");
+    if (!accountId) return toast.error("Select a payment source account");
+
+    setSubmitting(true);
+    try {
+      const acc = accounts.find((a: any) => a.id === accountId);
+      const cashOutNote = `Cash Out: ${note}`.trim();
+
+      if (isOfflineNow()) {
+        const txId = crypto.randomUUID();
+        const payId = crypto.randomUUID();
+        const now = new Date().toISOString();
+
+        // 1. Queue Cash Flow record (reduce shop cash)
+        await enqueueWrite({
+          op: "insert",
+          table: "cash_transactions",
+          payload: {
+            id: txId,
+            account_id: accountId,
+            direction: "out",
+            amount: amt,
+            category: "adjustment",
+            reference: "Cash Out",
+            notes: `${selectedCustomer?.name}: ${note}`,
+            occurred_on: now.slice(0, 10),
+            created_at: now,
+          },
+        });
+
+        // 2. Queue Ledger record (debit customer)
+        await enqueueWrite({
+          op: "insert",
+          table: "party_payments",
+          payload: {
+            id: payId,
+            party_type: "customer",
+            party_id: activeTab.customer_id,
+            amount: amt,
+            method: acc?.name || "Cash",
+            note: cashOutNote,
+            cash_transaction_id: txId,
+            created_at: now,
+          },
+        });
+
+        toast.success("Cash Out recorded offline");
+      } else {
+        // Online: use record_payment RPC if it supports out-direction or manual inserts
+        // The requirement is NO sale/invoice. We'll do direct inserts.
+        const { data: tx, error: txErr } = await supabase
+          .from("cash_transactions")
+          .insert({
+            account_id: accountId,
+            direction: "out",
+            amount: amt,
+            category: "adjustment",
+            reference: "Cash Out",
+            notes: `${selectedCustomer?.name}: ${note}`,
+            occurred_on: new Date().toISOString().slice(0, 10),
+          })
+          .select()
+          .single();
+
+        if (txErr) throw txErr;
+
+        const { error: payErr } = await supabase.from("party_payments").insert({
+          party_type: "customer",
+          party_id: activeTab.customer_id,
+          amount: amt,
+          method: acc?.name || "Cash",
+          note: cashOutNote,
+          cash_transaction_id: tx.id,
+        });
+
+        if (payErr) throw payErr;
+        toast.success("Cash Out successful");
+      }
+
+      setOpen(false);
+      setAmount("");
+      setNote("");
+      onComplete();
+      qc.invalidateQueries({ queryKey: ["cash-transactions"] });
+      qc.invalidateQueries({ queryKey: ["cf-party-payments"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to record Cash Out");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-[11px] text-rose-600 border-rose-200 hover:bg-rose-50"
+            title="Give cash to customer (record as debit)"
+            onClick={() => {
+              if (!activeTab.customer_id) {
+                toast.error("Please select a customer first");
+                return;
+              }
+              setOpen(true);
+            }}
+          >
+            Cash Out
+          </Button>
+        </PopoverTrigger>
+      </Popover>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Cash Out to Customer</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="rounded-md bg-muted/40 p-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Customer:</span>
+              <span className="font-medium">{selectedCustomer?.name || "None"}</span>
+            </div>
+            {selectedCustomer && (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Current Balance:</span>
+                <span className={cn("font-medium", Number(selectedCustomer.balance) > 0 ? "text-destructive" : "text-success")}>
+                  {fmtMoney(selectedCustomer.balance, sym)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Source Account (Shop Cash/Bank)</Label>
+            <Select value={accountId || ""} onValueChange={setAccountId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((a: any) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name} ({labelFor(a.type)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Amount to give</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Reason / Note</Label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Personal loan, withdrawal"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleCashOut}
+            disabled={submitting || !amount || !accountId}
+          >
+            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Complete Cash Out
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PaymentMethodSelect({
   value,
   onChange,
