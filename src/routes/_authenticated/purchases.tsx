@@ -276,12 +276,16 @@ function Page() {
   const handleDeletePurchase = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
-    const { error } = await supabase.from("purchases").delete().eq("id", deleteTarget.id);
+    // Use the RPC to ensure atomic stock reversal and financial cleanup
+    const { error } = await supabase.rpc("delete_purchase_v2", { _purchase_id: deleteTarget.id });
     setDeleting(false);
     if (error) return toast.error(error.message);
-    toast.success("Purchase deleted");
+    toast.success("Purchase deleted and stock restored");
     setDeleteTarget(null);
     qc.invalidateQueries({ queryKey: ["purchases"] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["suppliers"] });
+    qc.invalidateQueries({ queryKey: ["cash-transactions"] });
   };
   const searchRef = useRef<HTMLInputElement>(null);
   const focusCell = (kind: "cost" | "sale" | "qty", i: number) => {
@@ -675,6 +679,9 @@ function Page() {
         if (hErr) throw hErr;
 
         // 3. Stock adjustments: reverse old, apply new
+        // We set a flag to avoid redundant trigger movements if possible,
+        // but here we are doing manual updates so we just proceed carefully.
+        
         // Reverse old stock
         for (const it of origItems || []) {
           if (!it.product_id) continue;
@@ -705,8 +712,17 @@ function Page() {
 
       } else {
         // --- New Purchase Flow ---
+        // Prevent double-save by checking if we are already saving
+        if (savingRef.current) return;
+        savingRef.current = true;
+        setSaving(true);
+
         const { error } = await supabase.rpc("complete_purchase", { payload });
-        if (error) throw error;
+        if (error) {
+          savingRef.current = false;
+          setSaving(false);
+          throw error;
+        }
       }
     } catch (err: any) {
       setSaving(false);
