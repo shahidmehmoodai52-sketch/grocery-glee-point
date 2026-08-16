@@ -671,10 +671,9 @@ function Page() {
         // Reverse old stock
         for (const it of origItems || []) {
           if (!it.product_id) continue;
-          await supabase.rpc("adjust_product_stock", { 
-            p_id: it.product_id, 
-            qty_delta: -Number(it.qty) 
-          });
+          const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
+          const currentStock = Number(p?.stock ?? 0);
+          await supabase.from("products").update({ stock: currentStock - Number(it.qty) }).eq("id", it.product_id);
         }
 
         // 4. Replace items
@@ -693,7 +692,8 @@ function Page() {
         for (const it of payload.items) {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
-          await supabase.from("products").update({ stock: Number(p?.stock ?? 0) + Number(it.qty) }).eq("id", it.product_id);
+          const currentStock = Number(p?.stock ?? 0);
+          await supabase.from("products").update({ stock: currentStock + Number(it.qty) }).eq("id", it.product_id);
         }
 
       } else {
