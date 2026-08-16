@@ -14,18 +14,33 @@ cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 // Navigation route: NetworkFirst with offline fallback
-// This ensures that if the network is down, we serve the last cached version of the page.
-const navigationHandler = new NetworkFirst({
-  cacheName: 'tillix-nav',
-  networkTimeoutSeconds: 5, // give it 5s before falling back to cache
-  plugins: [
-    new ExpirationPlugin({
-      maxEntries: 50,
-      maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
-    }),
-  ],
-});
-registerRoute(new NavigationRoute(navigationHandler));
+// This ensures that if the network is down (or DNS fails), we serve the precached /offline.html
+// which is designed to boot the SPA shell.
+registerRoute(
+  ({ request }) => request.mode === 'navigate',
+  async (options) => {
+    const networkHandler = new NetworkFirst({
+      cacheName: 'tillix-nav',
+      networkTimeoutSeconds: 5,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 50,
+          maxAgeSeconds: 7 * 24 * 60 * 60,
+        }),
+      ],
+    });
+
+    try {
+      const response = await networkHandler.handle(options);
+      if (response) return response;
+    } catch (error) {
+      console.log('SW: Network navigation failed, serving offline shell', error);
+    }
+    
+    // Fallback to the precached shell for all navigations when offline
+    return caches.match('/offline.html');
+  }
+);
 
 // Cache static assets (JS, CSS, fonts) with CacheFirst
 registerRoute(

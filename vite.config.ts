@@ -30,9 +30,9 @@ export default defineConfig({
         // @ts-ignore - 'strategy' property exists in VitePWAOptions but might be missing in older type definitions
         strategy: "injectManifest",
         devOptions: { enabled: false },
-        includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest", "sw.js"],
+        includeAssets: ["favicon.png", "offline.html", "manifest.webmanifest"],
         injectManifest: {
-          injectionPoint: undefined, // sw.js is fully custom and does not use precache injection
+          injectionPoint: 'self.__WB_MANIFEST',
         },
         manifest: {
           name: "Tillix POS",
