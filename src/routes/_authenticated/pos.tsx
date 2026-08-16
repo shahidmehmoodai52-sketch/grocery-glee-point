@@ -4384,7 +4384,11 @@ function EditableNumCell({
       min={min}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => onCommit(Number(draft))}
+      onBlur={() => {
+        const n = Number(draft);
+        const final = display.includes("qty") || display.includes("Qty") || String(display).match(/^\d+(\.\d+)?$/) && step === "0.001" ? roundToTillixQty(n) : n;
+        onCommit(final);
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
