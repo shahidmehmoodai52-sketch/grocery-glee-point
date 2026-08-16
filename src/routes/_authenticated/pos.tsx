@@ -1040,7 +1040,7 @@ function POSPage() {
       items[exIdx] = {
         ...items[exIdx],
         code: items[exIdx].code || nextCode,
-        qty: Number(items[exIdx].qty) + 1,
+        qty: roundToTillixQty(Number(items[exIdx].qty) + 1),
       };
       idx = exIdx;
     } else {
