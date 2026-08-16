@@ -1854,6 +1854,7 @@ function POSPage() {
         // Change (extra tendered cash) is never recorded — only the bill amount is.
         paid: tenderedAmount,
         note: tab.note,
+        expense_person_name: staffPerson?.name || null,
         items: tab.items.map((i) => ({
           product_id: i.product_id,
           name: i.name,
