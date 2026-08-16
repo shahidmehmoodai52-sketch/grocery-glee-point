@@ -190,10 +190,16 @@ function Page() {
               <DialogFooter><Button variant="outline" onClick={() => setPersonOpen(false)}>Cancel</Button><Button onClick={savePerson}>Save</Button></DialogFooter>
             </DialogContent>
           </Dialog>
-          <Dialog open={expOpen} onOpenChange={setExpOpen}>
+          <Dialog open={expOpen} onOpenChange={(open) => {
+            setExpOpen(open);
+            if (!open) {
+              setEditingId(null);
+              setExp({ person_id: "", category: "general", amount: 0, description: "", method: "cash", expense_date: today() });
+            }
+          }}>
             <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New expense</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Record expense</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{editingId ? "Edit expense" : "Record expense"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
