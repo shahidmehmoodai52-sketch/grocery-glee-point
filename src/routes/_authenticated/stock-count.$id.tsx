@@ -273,7 +273,8 @@ function StockCountDetailPage() {
     scanRef.current?.focus();
   };
 
-  const updateActual = async (item: Item, value: number) => {
+  const updateActual = async (item: Item, rawValue: number) => {
+    const value = roundToTillixQty(rawValue);
     const { error } = await supabase
       .from("stock_count_items" as any)
       .update({ actual_qty: value, counted_at: new Date().toISOString(), counter_id: user?.id })
