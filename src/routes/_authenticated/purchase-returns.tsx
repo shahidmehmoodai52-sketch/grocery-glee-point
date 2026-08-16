@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Eye, Printer, Undo2 } from "lucide-react";
+import { Plus, Trash2, Eye, Printer, Undo2, Search, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,44 +17,111 @@ import { fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { Receipt, printReceipt } from "@/components/receipt";
 import { fetchAll } from "@/lib/supabase-page";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/purchase-returns")({ component: Page });
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number };
+type Line = { 
+  product_id: string | null; 
+  name: string; 
+  qty: number; 
+  cost: number;
+  barcode?: string | null;
+  sku?: string | null;
+};
+
+type Draft = {
+  open: boolean;
+  purchaseId: string;
+  supplier: string;
+  lines: Line[];
+  tax: number;
+  refund: number;
+  method: string;
+  note: string;
+};
+
+const emptyDraft: Draft = {
+  open: false,
+  purchaseId: "none",
+  supplier: "none",
+  lines: [],
+  tax: 0,
+  refund: 0,
+  method: "cash",
+  note: "",
+};
 
 function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
 
-  const [open, setOpen] = useState(false);
-  const [purchaseId, setPurchaseId] = useState<string>("none");
-  const [supplier, setSupplier] = useState<string>("none");
-  const [lines, setLines] = useState<Line[]>([]);
-  const [tax, setTax] = useState(0);
-  const [refund, setRefund] = useState(0);
-  const [method, setMethod] = useState("cash");
-  const [note, setNote] = useState("");
+  const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-return-entry", emptyDraft);
+  const { open, purchaseId, supplier, lines, tax, refund, method, note } = draft;
+
   const [viewing, setViewing] = useState<any>(null);
+  const [entrySearch, setEntrySearch] = useState("");
+  const [entryActive, setEntryActive] = useState(false);
+  const [entryIndex, setEntryIndex] = useState(0);
+  const [purchaseSearch, setPurchaseSearch] = useState("");
+  const [processing, setProcessing] = useState(false);
+  
+  const searchRef = useRef<HTMLInputElement>(null);
+  const entryMatchesRef = useRef<HTMLDivElement>(null);
+
+  const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
+  const setPurchaseId = (v: string) => setDraft((d) => ({ ...d, purchaseId: v }));
+  const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
+  const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
+    setDraft((d) => ({
+      ...d,
+      lines: typeof updater === "function" ? updater(d.lines) : updater,
+    }));
+  const setTax = (v: number) => setDraft((d) => ({ ...d, tax: v }));
+  const setRefund = (v: number) => setDraft((d) => ({ ...d, refund: v }));
+  const setMethod = (v: string) => setDraft((d) => ({ ...d, method: v }));
+  const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
   const { data: returns = [] } = useQuery({
     queryKey: ["purchase-returns"],
     queryFn: async () =>
-      await fetchAll<any>((from: number, to: number) => supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)),
+      await fetchAll<any>((from, to) => supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)),
   });
+
   const { data: purchases = [] } = useQuery({
-    queryKey: ["purchases-for-return"],
-    queryFn: async () =>
-      await fetchAll<any>((from: number, to: number) => supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
+    queryKey: ["purchases-for-return", purchaseSearch],
+    queryFn: async () => {
+      let q = supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).limit(50);
+      if (purchaseSearch) {
+        q = q.ilike("invoice_no", `%${purchaseSearch}%`);
+      }
+      const { data } = await q;
+      return data ?? [];
+    },
   });
+
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
     queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
   });
-  const { data: products = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => fetchAll<any>((from: number, to: number) => supabase.from("products").select("id,name,cost_price").order("name").range(from, to)),
+
+  // Server-side product search for manual line entry
+  const { data: searchResult } = useQuery({
+    queryKey: ["products", "return-search", entrySearch.trim()],
+    enabled: entrySearch.trim().length > 1,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const term = entrySearch.trim();
+      const { data } = await supabase.from("products")
+        .select("id,name,sku,barcode,cost_price,sell_price,stock")
+        .or(`name.ilike.%${term}%,sku.ilike.%${term}%,barcode.ilike.%${term}%`)
+        .limit(20);
+      return data ?? [];
+    },
   });
+  const searchMatches = searchResult ?? [];
 
   useEffect(() => {
     if (purchaseId === "none") return;
@@ -74,7 +141,16 @@ function Page() {
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.qty * l.cost, 0), [lines]);
   const total = subtotal + Number(tax || 0);
 
-  const addLine = () => setLines((l) => [...l, { product_id: null, name: "", qty: 1, cost: 0 }]);
+  const addLine = (p?: any) => {
+    if (p) {
+      setLines((ls) => [...ls, { product_id: p.id, name: p.name, qty: 1, cost: Number(p.cost_price || 0), barcode: p.barcode, sku: p.sku }]);
+      setEntrySearch("");
+      setEntryActive(false);
+    } else {
+      setLines((ls) => [...ls, { product_id: null, name: "", qty: 1, cost: 0 }]);
+    }
+  };
+
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) =>
       ls.map((l, idx) =>
@@ -89,155 +165,334 @@ function Page() {
     );
 
   const reset = () => {
-    setOpen(false); setLines([]); setPurchaseId("none"); setSupplier("none");
-    setTax(0); setRefund(0); setMethod("cash"); setNote("");
+    clearDraft();
+    setEntrySearch("");
+    setEntryActive(false);
+    setProcessing(false);
   };
 
   const submit = async () => {
+    if (processing) return;
     const items = lines.filter((l) => l.name && l.qty > 0);
     if (!items.length) return toast.error("Add at least one item");
-    if (refund > total) return toast.error("Refund cannot exceed total");
-    const { error } = await supabase.rpc("complete_purchase_return" as any, {
-      payload: {
-        purchase_id: purchaseId === "none" ? null : purchaseId,
-        supplier_id: supplier === "none" ? null : supplier,
-        tax, refund_amount: refund, refund_method: method, note,
-        items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
-      },
-    });
-    if (error) return toast.error(error.message);
-    toast.success("Purchase return recorded, stock removed");
-    reset();
-    qc.invalidateQueries({ queryKey: ["purchase-returns"] });
-    qc.invalidateQueries({ queryKey: ["products"] });
-    qc.invalidateQueries({ queryKey: ["suppliers"] });
+    if (refund > total + 0.01) return toast.error("Refund cannot exceed total");
+    
+    setProcessing(true);
+    try {
+      const { error } = await supabase.rpc("complete_purchase_return" as any, {
+        payload: {
+          purchase_id: purchaseId === "none" ? null : purchaseId,
+          supplier_id: supplier === "none" ? null : supplier,
+          tax, refund_amount: refund, refund_method: method, note,
+          items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
+        },
+      });
+      if (error) throw error;
+      toast.success("Purchase return recorded, stock removed");
+      reset();
+      qc.invalidateQueries({ queryKey: ["purchase-returns"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to process return");
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Purchase Returns</h1>
-          <p className="text-sm text-muted-foreground">Send stock back to suppliers</p>
-        </div>
-        <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New return</Button></DialogTrigger>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader><DialogTitle>New purchase return</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Original purchase (optional)</Label>
-                  <Select value={purchaseId} onValueChange={setPurchaseId}>
-                    <SelectTrigger><SelectValue placeholder="Pick a purchase to copy items" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {purchases.map((p: any) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.invoice_no} · {fmtMoney(p.total, sym)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Supplier</Label>
-                  <Select value={supplier} onValueChange={setSupplier}>
-                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+  const handleEntryKey = (e: React.KeyboardEvent) => {
+    if (!entryActive || !searchMatches.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setEntryIndex((i) => (i + 1) % searchMatches.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setEntryIndex((i) => (i - 1 + searchMatches.length) % searchMatches.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      addLine(searchMatches[entryIndex]);
+    } else if (e.key === "Escape") {
+      setEntryActive(false);
+    }
+  };
 
-              <div className="border rounded-md">
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Product</TableHead><TableHead>Name</TableHead>
-                    <TableHead className="w-24">Qty</TableHead><TableHead className="w-28">Cost</TableHead>
-                    <TableHead className="text-right w-28">Total</TableHead><TableHead className="w-10"></TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {lines.map((l, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <Select
-                            value={l.product_id ?? "new"}
-                            onValueChange={(v) => {
-                              if (v === "new") { setLine(i, { product_id: null }); return; }
-                              const p = products.find((p: any) => p.id === v);
-                              setLine(i, { product_id: v, name: p?.name ?? "", cost: Number(p?.cost_price ?? 0) });
-                            }}
-                          >
-                            <SelectTrigger className="h-8"><SelectValue placeholder="Pick…" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="new">— Ad-hoc —</SelectItem>
-                              {products.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell><Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} className="h-8" /></TableCell>
-                        <TableCell><Input type="number" step="0.001" value={l.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} className="h-8" /></TableCell>
-                        <TableCell><Input type="number" step="0.01" value={l.cost} onChange={(e) => setLine(i, { cost: Number(e.target.value) })} className="h-8" /></TableCell>
-                        <TableCell className="text-right font-medium">{fmtMoney(l.qty * l.cost, sym)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" onClick={() => setLines(lines.filter((_, x) => x !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
-                      </TableRow>
+  if (open) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in fade-in zoom-in duration-200">
+        <header className="h-14 border-b flex items-center justify-between px-6 bg-muted/40 shrink-0">
+          <div className="flex items-center gap-4">
+            <h2 className="font-semibold text-lg">New Purchase Return</h2>
+            <Badge variant="outline" className="bg-background">Draft</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Close Draft</Button>
+            <Button variant="outline" size="sm" onClick={reset} className="text-destructive border-destructive/20 hover:bg-destructive/10">Clear All</Button>
+          </div>
+        </header>
+
+        <main className="flex-1 flex min-h-0">
+          {/* Left: Search & Summary */}
+          <div className="w-[350px] border-r flex flex-col shrink-0 bg-muted/10">
+            <div className="p-4 space-y-4 border-b bg-background">
+              <div className="space-y-2">
+                <Label>Original Purchase</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search invoice #..." 
+                    className="pl-8" 
+                    value={purchaseSearch}
+                    onChange={(e) => setPurchaseSearch(e.target.value)}
+                  />
+                </div>
+                <Select value={purchaseId} onValueChange={setPurchaseId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Pick a purchase" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="none">— Manual Entry —</SelectItem>
+                    {purchases.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.invoice_no} ({fmtMoney(p.total, sym)})
+                      </SelectItem>
                     ))}
-                  </TableBody>
-                </Table>
-                <div className="p-2"><Button variant="outline" size="sm" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" />Add row</Button></div>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
-                <div><Label>Tax</Label><Input type="number" step="0.01" value={tax || ""} onChange={(e) => setTax(Number(e.target.value))} /></div>
-                <div><Label>Refund received</Label><Input type="number" step="0.01" value={refund || ""} onChange={(e) => setRefund(Number(e.target.value))} /></div>
-                <div>
-                  <Label>Method</Label>
+              <div className="space-y-2">
+                <Label>Supplier</Label>
+                <Select value={supplier} onValueChange={setSupplier}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="none">— Walk-in —</SelectItem>
+                    {suppliers.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 space-y-4">
+              <div className="space-y-3">
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Return Summary</h3>
+                <Card className="p-3 space-y-3 shadow-none border-dashed">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{fmtMoney(subtotal, sym)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-muted-foreground">Tax</span>
+                    <Input 
+                      type="number" 
+                      className="h-8 w-24 text-right" 
+                      value={tax || ""} 
+                      onChange={(e) => setTax(Number(e.target.value))} 
+                    />
+                  </div>
+                  <div className="pt-2 border-t flex justify-between font-bold text-lg text-primary">
+                    <span>Total</span>
+                    <span>{fmtMoney(total, sym)}</span>
+                  </div>
+                </Card>
+
+                <div className="space-y-2 pt-2">
+                  <Label>Refund Received</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={refund || ""} 
+                    onChange={(e) => setRefund(Number(e.target.value))} 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Refund Method</Label>
                   <Select value={method} onValueChange={setMethod}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="transfer">Transfer</SelectItem>
-                      <SelectItem value="credit">Supplier credit</SelectItem>
+                      <SelectItem value="credit">Supplier Credit</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col justify-end">
-                  <div className="text-sm text-muted-foreground">Total</div>
-                  <div className="text-2xl font-semibold text-primary">{fmtMoney(total, sym)}</div>
+
+                <div className="space-y-2">
+                  <Label>Note</Label>
+                  <Input 
+                    placeholder="Reason for return..." 
+                    value={note} 
+                    onChange={(e) => setNote(e.target.value)} 
+                  />
                 </div>
               </div>
-              <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={reset}>Cancel</Button>
-              <Button onClick={submit}><Undo2 className="h-4 w-4 mr-2" />Process return</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+
+            <div className="p-4 border-t bg-background">
+              <Button 
+                className="w-full h-12 text-lg font-bold" 
+                onClick={submit}
+                disabled={processing || lines.length === 0}
+              >
+                {processing ? "Processing..." : "Process Return"}
+                {!processing && <Undo2 className="ml-2 h-5 w-5" />}
+              </Button>
+            </div>
+          </div>
+
+          {/* Right: Return Cart */}
+          <div className="flex-1 flex flex-col bg-background">
+            <div className="p-4 border-b flex items-center gap-4">
+              <div className="relative flex-1 max-w-xl">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchRef}
+                  placeholder="Scan barcode or type product name to add..."
+                  className="pl-10 h-10"
+                  value={entrySearch}
+                  onChange={(e) => {
+                    setEntrySearch(e.target.value);
+                    setEntryActive(true);
+                    setEntryIndex(0);
+                  }}
+                  onKeyDown={handleEntryKey}
+                  onFocus={() => setEntryActive(true)}
+                />
+                
+                {entryActive && searchMatches.length > 0 && (
+                  <div 
+                    ref={entryMatchesRef}
+                    className="absolute top-full left-0 right-0 z-[100] mt-1 bg-popover border rounded-md shadow-xl overflow-hidden max-h-[400px] overflow-y-auto"
+                  >
+                    {searchMatches.map((m: any, i) => (
+                      <div
+                        key={m.id}
+                        className={cn(
+                          "px-4 py-2.5 flex items-center justify-between cursor-pointer border-b last:border-0",
+                          i === entryIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+                        )}
+                        onClick={() => addLine(m)}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{m.name}</span>
+                          <span className="text-xs text-muted-foreground">{m.sku || m.barcode || "No Code"}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-sm">{fmtMoney(m.cost_price, sym)}</div>
+                          <div className="text-[10px] text-muted-foreground">Stock: {m.stock}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button variant="secondary" onClick={() => addLine()}>
+                <Plus className="h-4 w-4 mr-2" /> Add Ad-hoc Item
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              <Table>
+                <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                  <TableRow>
+                    <TableHead className="w-12 text-center">#</TableHead>
+                    <TableHead>Item Details</TableHead>
+                    <TableHead className="w-32 text-center">Qty</TableHead>
+                    <TableHead className="w-32 text-right">Cost ({sym})</TableHead>
+                    <TableHead className="w-32 text-right">Total ({sym})</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lines.map((l, i) => (
+                    <MemoizedRow 
+                      key={i} 
+                      index={i} 
+                      line={l} 
+                      onUpdate={(patch) => setLine(i, patch)}
+                      onRemove={() => setLines(lines.filter((_, idx) => idx !== i))}
+                      sym={sym}
+                    />
+                  ))}
+                  {lines.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-64 text-center">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <Undo2 className="h-12 w-12 mb-2 opacity-20" />
+                          <p>Return cart is empty.</p>
+                          <p className="text-sm">Search for products or pick a purchase to start.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <footer className="h-12 border-t px-6 flex items-center justify-between text-sm bg-muted/20 shrink-0">
+              <div className="flex items-center gap-6">
+                <span>Items: <span className="font-bold">{lines.length}</span></span>
+                <span>Total Qty: <span className="font-bold">{lines.reduce((a, b) => a + b.qty, 0)}</span></span>
+              </div>
+              <div className="text-muted-foreground italic">
+                Tip: Press <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">Esc</kbd> to close picker.
+              </div>
+            </footer>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-4 max-w-[1400px] mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Purchase Returns</h1>
+          <p className="text-muted-foreground">Manage and track inventory sent back to suppliers</p>
+        </div>
+        <Button size="lg" onClick={() => setOpen(true)} className="shadow-lg hover:shadow-xl transition-all">
+          <Plus className="h-5 w-5 mr-2" />New Return
+        </Button>
       </div>
 
-      <Card className="p-3">
+      <Card className="overflow-hidden border-none shadow-md ring-1 ring-border">
         <Table>
-          <TableHeader><TableRow>
-            <TableHead>Return #</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
-            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Refund</TableHead>
-            <TableHead>Method</TableHead><TableHead></TableHead>
-          </TableRow></TableHeader>
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead className="pl-6">Return #</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Supplier</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Refund</TableHead>
+              <TableHead>Method</TableHead>
+              <TableHead className="pr-6 text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
           <TableBody>
-            {returns.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No returns yet</TableCell></TableRow>}
+            {returns.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
+                  No purchase returns recorded yet.
+                </TableCell>
+              </TableRow>
+            )}
             {returns.map((r: any) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-mono text-xs">{r.return_no}</TableCell>
-                <TableCell className="text-sm">{new Date(r.created_at).toLocaleString()}</TableCell>
-                <TableCell>{r.suppliers?.name ?? "—"}</TableCell>
-                <TableCell className="text-right font-medium">{fmtMoney(r.total, sym)}</TableCell>
-                <TableCell className="text-right">{fmtMoney(r.refund_amount, sym)}</TableCell>
-                <TableCell><Badge variant="outline" className="capitalize">{r.refund_method}</Badge></TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => setViewing(r)}><Eye className="h-4 w-4" /></Button>
+              <TableRow key={r.id} className="group hover:bg-muted/30 transition-colors">
+                <TableCell className="pl-6 font-mono text-xs font-semibold text-primary">{r.return_no}</TableCell>
+                <TableCell className="text-sm">{new Date(r.created_at).toLocaleDateString()} <span className="text-muted-foreground ml-1 text-[10px]">{new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></TableCell>
+                <TableCell>{r.suppliers?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell className="text-right font-bold text-base">{fmtMoney(r.total, sym)}</TableCell>
+                <TableCell className="text-right font-medium text-green-600 dark:text-green-400">{fmtMoney(r.refund_amount, sym)}</TableCell>
+                <TableCell><Badge variant="outline" className="capitalize bg-background">{r.refund_method}</Badge></TableCell>
+                <TableCell className="pr-6 text-right">
+                  <Button variant="ghost" size="icon" onClick={() => setViewing(r)} className="hover:bg-primary/10 hover:text-primary transition-colors">
+                    <Eye className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -246,11 +501,16 @@ function Page() {
       </Card>
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Return {viewing?.return_no}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-[400px] p-0 overflow-hidden rounded-xl">
+          <DialogHeader className="p-6 border-b bg-muted/20">
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-primary" />
+              Return {viewing?.return_no}
+            </DialogTitle>
+          </DialogHeader>
           {viewing && (
-            <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
-              <div className="print-area">
+            <div className="p-6 max-h-[70vh] overflow-y-auto bg-background">
+              <div className="print-area mx-auto">
                 <Receipt
                   kind="purchase-return"
                   invoice={{
@@ -264,11 +524,85 @@ function Page() {
               </div>
             </div>
           )}
-          <DialogFooter className="no-print">
-            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          <DialogFooter className="p-4 border-t bg-muted/20 gap-2 no-print flex-row">
+            <Button variant="outline" className="flex-1" onClick={() => setViewing(null)}>Close</Button>
+            <Button className="flex-1" onClick={() => printReceipt()}>
+              <Printer className="h-4 w-4 mr-2" />Print Receipt
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+const MemoizedRow = memo(function Row({ 
+  index, 
+  line, 
+  onUpdate, 
+  onRemove, 
+  sym 
+}: { 
+  index: number; 
+  line: Line; 
+  onUpdate: (p: Partial<Line>) => void; 
+  onRemove: () => void;
+  sym: string;
+}) {
+  return (
+    <TableRow className="group border-b">
+      <TableCell className="text-center text-muted-foreground font-mono text-xs">{index + 1}</TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-1">
+          {line.product_id ? (
+            <>
+              <span className="font-semibold text-sm leading-none">{line.name}</span>
+              <span className="text-[10px] text-muted-foreground font-mono">{line.barcode || line.sku || "Custom Item"}</span>
+            </>
+          ) : (
+            <Input 
+              value={line.name} 
+              onChange={(e) => onUpdate({ name: e.target.value })} 
+              className="h-8 text-sm" 
+              placeholder="Item name..."
+              autoFocus
+            />
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="text-center">
+        <Input 
+          type="number" 
+          step="0.001" 
+          value={line.qty || ""} 
+          onChange={(e) => onUpdate({ qty: Number(e.target.value) })} 
+          className="h-8 w-24 mx-auto text-center font-bold" 
+          onFocus={(e) => e.target.select()}
+        />
+      </TableCell>
+      <TableCell className="text-right">
+        <Input 
+          type="number" 
+          step="0.01" 
+          value={line.cost || ""} 
+          onChange={(e) => onUpdate({ cost: Number(e.target.value) })} 
+          className="h-8 w-24 ml-auto text-right font-mono text-sm" 
+          onFocus={(e) => e.target.select()}
+        />
+      </TableCell>
+      <TableCell className="text-right font-mono font-bold text-sm">
+        {fmtMoney(line.qty * line.cost, sym)}
+      </TableCell>
+      <TableCell className="pr-4">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onRemove}
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+});
