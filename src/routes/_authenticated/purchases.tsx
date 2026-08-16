@@ -713,8 +713,13 @@ function Page() {
 
       } else {
         // --- New Purchase Flow ---
-        const { error } = await supabase.rpc("complete_purchase", { payload });
+        const { error, data } = await supabase.rpc("complete_purchase", { payload });
         if (error) throw error;
+        
+        // Invalidate queries early to ensure next fetches get fresh data
+        qc.invalidateQueries({ queryKey: ["purchases"] });
+        qc.invalidateQueries({ queryKey: ["products"] });
+        qc.invalidateQueries({ queryKey: ["suppliers"] });
       }
     } catch (err: any) {
       setSaving(false);
