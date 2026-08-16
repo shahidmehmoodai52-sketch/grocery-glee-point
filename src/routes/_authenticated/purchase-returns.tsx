@@ -162,6 +162,8 @@ function Page() {
         cost: Number(it.cost),
       })),
     );
+    // Auto-set refund amount to the total of the original purchase
+    setRefund(Number(p.total || 0));
   }, [purchaseId, purchases]);
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.qty * l.cost, 0), [lines]);
