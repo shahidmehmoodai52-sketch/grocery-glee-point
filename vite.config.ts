@@ -27,26 +27,12 @@ export default defineConfig({
         injectRegister: null, // registration happens from our guarded wrapper
         srcDir: "public",
         filename: "sw.js",
-        strategy: "injectManifest" as const,
+        strategy: "injectManifest",
         devOptions: { enabled: false },
         includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest", "sw.js"],
         injectManifest: {
           injectionPoint: undefined, // sw.js is fully custom and does not use precache injection
         },
-        manifest: {
-          name: "Tillix POS",
-          short_name: "Tillix",
-          start_url: "/",
-          scope: "/",
-          display: "standalone",
-          background_color: "#ffffff",
-          theme_color: "#ffffff",
-          icons: [
-            { src: "/favicon.png", sizes: "512x512", type: "image/png", purpose: "any" },
-            { src: "/favicon.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
-          ],
-        },
-      }),
         manifest: {
           name: "Tillix POS",
           short_name: "Tillix",
