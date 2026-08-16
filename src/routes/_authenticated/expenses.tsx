@@ -158,10 +158,16 @@ function Page() {
         <div className="flex items-end gap-2">
           <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
           <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Dialog open={personOpen} onOpenChange={setPersonOpen}>
+          <Dialog open={personOpen} onOpenChange={(open) => {
+            setPersonOpen(open);
+            if (!open) {
+              setEditingPersonId(null);
+              setPerson({ name: "", role: "staff", phone: "", notes: "" });
+            }
+          }}>
             <DialogTrigger asChild><Button variant="outline"><UsersIcon className="h-4 w-4 mr-2" />New person</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Add expense person</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{editingPersonId ? "Edit person" : "Add expense person"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div><Label>Name</Label><Input value={person.name} onChange={(e) => setPerson({ ...person, name: e.target.value })} /></div>
                 <div className="grid grid-cols-2 gap-3">
