@@ -671,9 +671,11 @@ function Page() {
         // Reverse old stock
         for (const it of origItems || []) {
           if (!it.product_id) continue;
-          const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
-          // Decrease stock by the original purchase quantity
-          await supabase.from("products").update({ stock: Number(p?.stock ?? 0) - Number(it.qty) }).eq("id", it.product_id);
+          // Use RPC to atomatically update stock to avoid race conditions and ensure accuracy
+          await supabase.rpc("increment_product_stock", { 
+            prod_id: it.product_id, 
+            amount: -Number(it.qty) 
+          });
         }
 
         // 4. Replace items
