@@ -750,7 +750,12 @@ function POSPage() {
 
   const { data: cashAccountOptions = [] } = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
-    queryFn: fetchActiveCashAccounts,
+    queryFn: () =>
+      offlineFirst(
+        fetchActiveCashAccounts,
+        async () => (await offlineDb().cash_accounts.toArray()).filter((a) => a.is_active !== false),
+        (rows) => offlineDb().cash_accounts.bulkPut(rows),
+      ),
   });
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
@@ -919,18 +924,7 @@ function POSPage() {
 
   const { data: persons = [] } = useQuery({
     queryKey: ["expense_persons", "active"],
-    queryFn: () =>
-      offlineFirst<any[]>(async () => {
-        const { data, error } = await supabase
-          .from("expense_persons")
-          .select("id,name,role,is_active")
-          .eq("is_active", true)
-          .order("name");
-        if (error) throw error;
-        const rows = data ?? [];
-        await cacheExpensePersons(rows);
-        return rows;
-      }, readCachedExpensePersons),
+    queryFn: fetchExpensePersons,
   });
 
   const filtered = useMemo(() => {
