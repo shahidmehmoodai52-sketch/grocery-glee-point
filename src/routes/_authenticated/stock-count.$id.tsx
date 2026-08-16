@@ -250,8 +250,9 @@ function StockCountDetailPage() {
     const product = pendingProduct ?? (pendingBarcode ? await findProductByBarcode(pendingBarcode) : null);
     if (!product) return;
     if (!Number.isFinite(pendingQty) || pendingQty < 0) return toast.error("Invalid quantity");
-    await upsertCount(product, pendingQty, "set");
-    toast.success(`Counted ${fmtQty(pendingQty)} × ${product.name}`);
+    const finalQty = roundToTillixQty(pendingQty);
+    await upsertCount(product, finalQty, "set");
+    toast.success(`Counted ${fmtQty(finalQty)} × ${product.name}`);
     setPendingBarcode(null);
     setPendingProduct(null);
     setPendingQty(1);
