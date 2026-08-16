@@ -268,7 +268,7 @@ function Page() {
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Pick a purchase" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
+                  <SelectContent className="max-h-[60vh] overflow-y-auto">
                     <SelectItem value="none">— Manual Entry —</SelectItem>
                     {purchases.map((p: any) => (
                       <SelectItem key={p.id} value={p.id}>
