@@ -3267,12 +3267,12 @@ function POSPage() {
       {/* Post-sale print prompt — Enter triggers the default action (Settings > POS). */}
       <PrintPromptDialog
         sale={printAsk}
-        defaultAction={((settings as any)?.pos_print_prompt_default ?? "no") as "yes" | "no"}
+        defaultAction="no"
         onYes={() => {
           const s = printAsk;
           setPrintAsk(null);
           if (s) {
-            printInvoiceDirect(s, settings);
+            printInvoiceDirect(s, settings, "sale");
           }
           setTimeout(() => searchRef.current?.focus(), 50);
         }}
@@ -3969,7 +3969,7 @@ function PrintPromptDialog({
   };
 
   const doPrint = () => {
-    printInvoiceDirect(sale, settings.data);
+    printInvoiceDirect(sale, settings.data, "sale");
     onYes();
   };
 
