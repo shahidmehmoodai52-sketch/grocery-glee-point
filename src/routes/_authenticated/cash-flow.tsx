@@ -1385,7 +1385,7 @@ function Page() {
                   <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
                   <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
                   <div className="flex-1 overflow-auto min-h-0 mt-4">
-                    <Table>
+                    <Table className="w-full">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Account</TableHead>
