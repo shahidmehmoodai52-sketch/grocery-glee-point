@@ -1,9 +1,19 @@
-import { supabaseAdmin } from "./src/integrations/supabase/client.server";
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    persistSession: false
+  }
+});
 
 async function runAudit() {
-  const supabase = await supabaseAdmin();
-  
-  // 1. Get the shop/tenant info
   const shopCode = "hafiz-super-store-ba-023";
   const { data: tenant } = await supabase
     .from("tenants")
@@ -16,7 +26,6 @@ async function runAudit() {
     return;
   }
   
-  // 2. Get P-1301 purchase info
   const { data: p1301 } = await supabase
     .from("purchases")
     .select("id, invoice_no")
@@ -29,7 +38,6 @@ async function runAudit() {
     return;
   }
   
-  // 3. Get all items for P-1301
   const { data: p1301Items } = await supabase
     .from("purchase_items")
     .select("id, product_id, qty, cost, name")
@@ -40,7 +48,6 @@ async function runAudit() {
   const results = [];
   
   for (const item of p1301Items) {
-    // 4. Trace inventory movements for this product
     const { data: movements } = await supabase
       .from("inventory_movements")
       .select("*")
@@ -49,24 +56,37 @@ async function runAudit() {
       
     if (!movements) continue;
     
-    // Find movements related to P-1301 and P-1302
-    // P-1301 impact (the original one)
-    // P-1302/Duplicate impact (the one that was deleted)
-    // Previous Correction Impact (the halving etc)
+    const p1301Movs = movements.filter(m => 
+      (m.reference_id === p1301.id) || 
+      (m.description && m.description.includes("P-1301"))
+    );
     
-    // P-1301 movements usually have reference = 'P-1301' or similar in description
-    const p1301Movs = movements.filter(m => m.reference_id === p1301.id || (m.description && m.description.includes("P-1301")));
-    const p1302Movs = movements.filter(m => m.description && m.description.includes("P-1302"));
-    const correctionMovs = movements.filter(m => m.description && (m.description.includes("Correction") || m.description.includes("Restoration") || m.description.includes("fix_halve")));
+    const p1302Movs = movements.filter(m => 
+      m.description && m.description.includes("P-1302")
+    );
     
-    // Original Qty: The first P-1301 movement amount
-    const originalQty = p1301Movs.length > 0 ? p1301Movs[0].quantity : item.qty;
+    const correctionMovs = movements.filter(m => 
+      m.description && (
+        m.description.includes("Correction") || 
+        m.description.includes("Restoration") || 
+        m.description.includes("fix_halve") ||
+        m.description.includes("apply_p1301_correction")
+      )
+    );
     
-    // Stock Before P-1301: The balance before the first P-1301 or P-1302 movement
+    // The very first movement related to this mess
     const firstP130X = movements.find(m => 
       (m.reference_id === p1301.id) || 
       (m.description && (m.description.includes("P-1301") || m.description.includes("P-1302")))
     );
+    
+    let originalQty = 0;
+    // We assume the first ever movement of either P-1301 or P-1302 is the original intended qty
+    if (firstP130X) {
+      originalQty = firstP130X.quantity;
+    } else {
+      originalQty = item.qty;
+    }
     
     let stockBefore = 0;
     if (firstP130X) {
@@ -83,16 +103,16 @@ async function runAudit() {
     const { data: prod } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
     const currentStock = prod ? prod.stock : 0;
     
-    // Expected Final Stock = Stock Before + Original Qty - (Legitimate movements after P-1301/P-1302/Corrections)
-    // Or simpler: Corrected Stock = Current Stock - (Net Impact - Original Qty)
+    // The correct state is: StockBefore + OriginalQty + (Any legitimate movements AFTER the P1301 mess)
+    // Legitimate movements = All movements - (P-1301 impact, P-1302 impact, Correction impact)
+    // Correct Stock = Current Stock - (Net Impact - Original Qty)
     const requiredCorrection = -(netP1301P1302Impact - originalQty);
     const expectedFinalStock = currentStock + requiredCorrection;
     
-    // Flagging
     let flag = "";
     if (originalQty % 1 !== 0) flag += "[Fractional Original] ";
     if (expectedFinalStock % 1 !== 0) flag += "[Fractional Final] ";
-    if (p1301Movs.length === 0) flag += "[No P-1301 Mov Found] ";
+    if (p1301Movs.length === 0) flag += "[No P-1301 Mov] ";
     
     results.push({
       product: item.name,
