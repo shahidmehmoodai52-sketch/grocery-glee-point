@@ -27,7 +27,7 @@ export default defineConfig({
         injectRegister: null, // registration happens from our guarded wrapper
         filename: "sw.js",
         devOptions: { enabled: false },
-        includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest"],
+        includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest", "sw.js"],
         workbox: {
           cleanupOutdatedCaches: true,
           // No navigateFallback: this is an SSR app, so there is no precached

@@ -70,11 +70,11 @@ import {
   completeSaleOfflineAware,
   cacheSuppliers,
   insertOfflineAware,
+  searchProductsLocal,
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
 import { enqueueWrite } from "@/lib/offline/sync";
 import { isOfflineNow } from "@/lib/offline/session";
-import { searchProductsLocal } from "@/lib/offline/pos";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
@@ -126,22 +126,26 @@ const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,ca
 const STAFF_CACHE_KEY = "pos:expense-persons:cache";
 const POS_CASH_ACCOUNTS_QUERY_KEY = ["cash-accounts", "pos-payment"] as const;
 
-async function readCachedExpensePersons(): Promise<any[]> {
-  try {
-    const raw = window.localStorage.getItem(STAFF_CACHE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function cacheExpensePersons(rows: any[]) {
-  try {
-    window.localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(rows ?? []));
-  } catch {
-    // best effort
-  }
+async function fetchExpensePersons(): Promise<any[]> {
+  return offlineFirst(
+    async () => {
+      const { data, error } = await supabase
+        .from("expense_persons")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    async () => {
+      // Fallback to localStorage cache for staff
+      const raw = window.localStorage.getItem(STAFF_CACHE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    },
+    async (rows: any[]) => {
+      window.localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(rows));
+    }
+  );
 }
 
 async function insertProductOfflineAware(payload: {
@@ -746,7 +750,14 @@ function POSPage() {
 
   const { data: cashAccountOptions = [] } = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
-    queryFn: fetchActiveCashAccounts,
+    queryFn: () =>
+      offlineFirst(
+        fetchActiveCashAccounts,
+        async () => (await offlineDb().cash_accounts.toArray()).filter((a) => a.is_active !== false),
+        async (rows: any[]) => {
+          await offlineDb().cash_accounts.bulkPut(rows);
+        },
+      ),
   });
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
@@ -915,18 +926,7 @@ function POSPage() {
 
   const { data: persons = [] } = useQuery({
     queryKey: ["expense_persons", "active"],
-    queryFn: () =>
-      offlineFirst<any[]>(async () => {
-        const { data, error } = await supabase
-          .from("expense_persons")
-          .select("id,name,role,is_active")
-          .eq("is_active", true)
-          .order("name");
-        if (error) throw error;
-        const rows = data ?? [];
-        await cacheExpensePersons(rows);
-        return rows;
-      }, readCachedExpensePersons),
+    queryFn: fetchExpensePersons,
   });
 
   const filtered = useMemo(() => {
@@ -2110,6 +2110,21 @@ function POSPage() {
               reason: reasonText,
             },
           } as any);
+        } else {
+          // Queue audit log for offline
+          await enqueueWrite({
+            op: "insert",
+            table: "audit_logs",
+            payload: {
+              action: "undo_last_sale.reason",
+              entity: "sales",
+              entity_id: undoCandidate.sale_id,
+              details: {
+                invoice_no: payload.invoice_no ?? undoCandidate.invoice_no,
+                reason: reasonText,
+              },
+            },
+          });
         }
       } catch {
         /* noop */
