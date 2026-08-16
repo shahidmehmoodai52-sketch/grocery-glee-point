@@ -32,12 +32,14 @@ function Page() {
   const [to, setTo] = useState(today());
 
   const [expOpen, setExpOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [exp, setExp] = useState({
     person_id: "", category: "general", amount: 0, description: "",
     method: "cash", expense_date: today(),
   });
 
   const [personOpen, setPersonOpen] = useState(false);
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [person, setPerson] = useState({ name: "", role: "staff", phone: "", notes: "" });
 
   const { data: persons = [] } = useQuery({
