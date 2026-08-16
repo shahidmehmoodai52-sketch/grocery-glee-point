@@ -20,6 +20,10 @@ import {
   Pencil,
   Banknote,
   Coins,
+  CreditCard,
+  Building2,
+  Smartphone,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
