@@ -146,6 +146,12 @@ function RootComponent() {
   useEnterAsClick();
   useSessionHeartbeat();
 
+  // Recover once from stale route chunks after a new deployment.
+  useEffect(() => {
+    installChunkRecovery();
+  }, []);
+
+
   useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | undefined;
