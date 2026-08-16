@@ -71,7 +71,22 @@ function Page() {
   const searchRef = useRef<HTMLInputElement>(null);
   const entryMatchesRef = useRef<HTMLDivElement>(null);
 
-  const setOpen = (v: boolean) => setDraft((d) => ({ ...d, open: v }));
+  const setOpen = (v: boolean) => {
+    if (v) {
+      window.history.pushState({ modal: true }, "");
+    }
+    setDraft((d) => ({ ...d, open: v }));
+  };
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (open) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [open]);
   const setPurchaseId = (v: string) => setDraft((d) => ({ ...d, purchaseId: v }));
   const setSupplier = (v: string) => setDraft((d) => ({ ...d, supplier: v }));
   const setLines = (updater: Line[] | ((l: Line[]) => Line[])) =>
@@ -218,7 +233,11 @@ function Page() {
 
   if (open) {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in fade-in zoom-in duration-200">
+      <div 
+        className="fixed inset-0 z-50 bg-background flex flex-col animate-in fade-in zoom-in duration-200"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="h-14 border-b flex items-center justify-between px-6 bg-muted/40 shrink-0">
           <div className="flex items-center gap-4">
             <h2 className="font-semibold text-lg">New Purchase Return</h2>
@@ -507,7 +526,11 @@ function Page() {
       </Card>
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-[400px] p-0 overflow-hidden rounded-xl">
+        <DialogContent 
+          className="max-w-[400px] p-0 overflow-hidden rounded-xl"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader className="p-6 border-b bg-muted/20">
             <DialogTitle className="flex items-center gap-2">
               <Undo2 className="h-5 w-5 text-primary" />
