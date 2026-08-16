@@ -162,6 +162,8 @@ function Page() {
         cost: Number(it.cost),
       })),
     );
+    // Auto-set refund amount to the total of the original purchase
+    setRefund(Number(p.total || 0));
   }, [purchaseId, purchases]);
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.qty * l.cost, 0), [lines]);
@@ -261,8 +263,108 @@ function Page() {
         </header>
 
         <main className="flex-1 flex min-h-0">
-          {/* Left: Search & Summary */}
-          <div className="w-[350px] border-r flex flex-col shrink-0 bg-muted/10">
+          {/* Left: Return Cart */}
+          <div className="flex-1 flex flex-col bg-background border-r">
+            <div className="p-4 border-b flex items-center gap-4">
+              <div className="relative flex-1 max-w-xl">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchRef}
+                  placeholder="Scan barcode or type product name to add..."
+                  className="pl-10 h-10"
+                  value={entrySearch}
+                  onChange={(e) => {
+                    setEntrySearch(e.target.value);
+                    setEntryActive(true);
+                    setEntryIndex(0);
+                  }}
+                  onKeyDown={handleEntryKey}
+                  onFocus={() => setEntryActive(true)}
+                />
+                
+                {entryActive && searchMatches.length > 0 && (
+                  <div 
+                    ref={entryMatchesRef}
+                    className="absolute top-full left-0 right-0 z-[100] mt-1 bg-popover border rounded-md shadow-xl overflow-hidden max-h-[400px] overflow-y-auto"
+                  >
+                    {searchMatches.map((m: any, i) => (
+                      <div
+                        key={m.id}
+                        className={cn(
+                          "px-4 py-2.5 flex items-center justify-between cursor-pointer border-b last:border-0",
+                          i === entryIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+                        )}
+                        onClick={() => addLine(m)}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{m.name}</span>
+                          <span className="text-xs text-muted-foreground">{m.sku || m.barcode || "No Code"}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-sm">{fmtMoney(m.cost_price, sym)}</div>
+                          <div className="text-[10px] text-muted-foreground">Stock: {m.stock}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button variant="secondary" onClick={() => addLine()}>
+                <Plus className="h-4 w-4 mr-2" /> Add Ad-hoc Item
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              <Table>
+                <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                  <TableRow>
+                    <TableHead className="w-12 text-center">#</TableHead>
+                    <TableHead>Item Details</TableHead>
+                    <TableHead className="w-32 text-center">Qty</TableHead>
+                    <TableHead className="w-32 text-right">Cost ({sym})</TableHead>
+                    <TableHead className="w-32 text-right">Total ({sym})</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lines.map((l, i) => (
+                    <MemoizedRow 
+                      key={i} 
+                      index={i} 
+                      line={l} 
+                      onUpdate={(patch) => setLine(i, patch)}
+                      onRemove={() => setLines(lines.filter((_, idx) => idx !== i))}
+                      sym={sym}
+                    />
+                  ))}
+                  {lines.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-64 text-center">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <Undo2 className="h-12 w-12 mb-2 opacity-20" />
+                          <p>Return cart is empty.</p>
+                          <p className="text-sm">Search for products or pick a purchase to start.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <footer className="h-12 border-t px-6 flex items-center justify-between text-sm bg-muted/20 shrink-0">
+              <div className="flex items-center gap-6">
+                <span>Items: <span className="font-bold">{lines.length}</span></span>
+                <span>Total Qty: <span className="font-bold">{lines.reduce((a, b) => a + b.qty, 0)}</span></span>
+              </div>
+              <div className="text-muted-foreground italic">
+                Tip: Press <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">Esc</kbd> to close picker.
+              </div>
+            </footer>
+          </div>
+
+          {/* Right: Search & Summary */}
+          <div className="w-[350px] border-l flex flex-col shrink-0 bg-muted/10">
             <div className="p-4 space-y-4 border-b bg-background">
               <div className="space-y-2">
                 <Label>Original Purchase</Label>
@@ -378,106 +480,6 @@ function Page() {
                 {!processing && <Undo2 className="ml-2 h-5 w-5" />}
               </Button>
             </div>
-          </div>
-
-          {/* Right: Return Cart */}
-          <div className="flex-1 flex flex-col bg-background">
-            <div className="p-4 border-b flex items-center gap-4">
-              <div className="relative flex-1 max-w-xl">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  ref={searchRef}
-                  placeholder="Scan barcode or type product name to add..."
-                  className="pl-10 h-10"
-                  value={entrySearch}
-                  onChange={(e) => {
-                    setEntrySearch(e.target.value);
-                    setEntryActive(true);
-                    setEntryIndex(0);
-                  }}
-                  onKeyDown={handleEntryKey}
-                  onFocus={() => setEntryActive(true)}
-                />
-                
-                {entryActive && searchMatches.length > 0 && (
-                  <div 
-                    ref={entryMatchesRef}
-                    className="absolute top-full left-0 right-0 z-[100] mt-1 bg-popover border rounded-md shadow-xl overflow-hidden max-h-[400px] overflow-y-auto"
-                  >
-                    {searchMatches.map((m: any, i) => (
-                      <div
-                        key={m.id}
-                        className={cn(
-                          "px-4 py-2.5 flex items-center justify-between cursor-pointer border-b last:border-0",
-                          i === entryIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted"
-                        )}
-                        onClick={() => addLine(m)}
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{m.name}</span>
-                          <span className="text-xs text-muted-foreground">{m.sku || m.barcode || "No Code"}</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-mono text-sm">{fmtMoney(m.cost_price, sym)}</div>
-                          <div className="text-[10px] text-muted-foreground">Stock: {m.stock}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <Button variant="secondary" onClick={() => addLine()}>
-                <Plus className="h-4 w-4 mr-2" /> Add Ad-hoc Item
-              </Button>
-            </div>
-
-            <div className="flex-1 overflow-auto">
-              <Table>
-                <TableHeader className="bg-muted/30 sticky top-0 z-10">
-                  <TableRow>
-                    <TableHead className="w-12 text-center">#</TableHead>
-                    <TableHead>Item Details</TableHead>
-                    <TableHead className="w-32 text-center">Qty</TableHead>
-                    <TableHead className="w-32 text-right">Cost ({sym})</TableHead>
-                    <TableHead className="w-32 text-right">Total ({sym})</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lines.map((l, i) => (
-                    <MemoizedRow 
-                      key={i} 
-                      index={i} 
-                      line={l} 
-                      onUpdate={(patch) => setLine(i, patch)}
-                      onRemove={() => setLines(lines.filter((_, idx) => idx !== i))}
-                      sym={sym}
-                    />
-                  ))}
-                  {lines.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-64 text-center">
-                        <div className="flex flex-col items-center justify-center text-muted-foreground">
-                          <Undo2 className="h-12 w-12 mb-2 opacity-20" />
-                          <p>Return cart is empty.</p>
-                          <p className="text-sm">Search for products or pick a purchase to start.</p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-
-            <footer className="h-12 border-t px-6 flex items-center justify-between text-sm bg-muted/20 shrink-0">
-              <div className="flex items-center gap-6">
-                <span>Items: <span className="font-bold">{lines.length}</span></span>
-                <span>Total Qty: <span className="font-bold">{lines.reduce((a, b) => a + b.qty, 0)}</span></span>
-              </div>
-              <div className="text-muted-foreground italic">
-                Tip: Press <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">Esc</kbd> to close picker.
-              </div>
-            </footer>
           </div>
         </main>
       </div>
