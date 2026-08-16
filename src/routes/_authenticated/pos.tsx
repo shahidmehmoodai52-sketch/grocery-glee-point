@@ -4039,8 +4039,9 @@ function CashOutDialog({
 
         toast.success("Cash Out recorded offline");
       } else {
-        // Online: use record_payment RPC if it supports out-direction or manual inserts
-        // The requirement is NO sale/invoice. We'll do direct inserts.
+        // Online: Directly record both records. 
+        // We ensure tenant_id is set via trigger or we can pass it if we have it, 
+        // but current_tenant_id() trigger is active for these tables.
         const { data: tx, error: txErr } = await supabase
           .from("cash_transactions")
           .insert({
@@ -4057,6 +4058,7 @@ function CashOutDialog({
 
         if (txErr) throw txErr;
 
+        // Record the payment which hits the customer ledger (debit)
         const { error: payErr } = await supabase.from("party_payments").insert({
           party_type: "customer",
           party_id: activeTab.customer_id,
@@ -4067,6 +4069,19 @@ function CashOutDialog({
         });
 
         if (payErr) throw payErr;
+
+        // CRITICAL: Update customer balance directly since we aren't using an RPC 
+        // that handles the ledger math (like record_payment does for credits).
+        // Cash Out is a DEBIT, so balance increases (assuming balance > 0 means they owe).
+        if (selectedCustomer) {
+          const { error: balErr } = await supabase
+            .from("customers")
+            .update({ balance: Number(selectedCustomer.balance || 0) + amt })
+            .eq("id", activeTab.customer_id);
+            
+          if (balErr) console.error("Balance update failed:", balErr);
+        }
+
         toast.success("Cash Out successful");
       }
 
@@ -4074,8 +4089,13 @@ function CashOutDialog({
       setAmount("");
       setNote("");
       onComplete();
+      
+      // Invalidate everything that might show this data
       qc.invalidateQueries({ queryKey: ["cash-transactions"] });
       qc.invalidateQueries({ queryKey: ["cf-party-payments"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["customer-ledger"] });
+      qc.invalidateQueries({ queryKey: ["ledger"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to record Cash Out");
     } finally {
