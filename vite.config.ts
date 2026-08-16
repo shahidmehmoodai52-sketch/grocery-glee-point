@@ -25,7 +25,7 @@ export default defineConfig({
       VitePWA({
         registerType: "autoUpdate",
         injectRegister: null, // registration happens from our guarded wrapper
-        filename: "sw.js",
+        filename: "sw.js", strategy: "injectManifest", srcDir: "public",
         devOptions: { enabled: false },
         includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest", "sw.js"],
         workbox: {
