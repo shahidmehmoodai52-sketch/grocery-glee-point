@@ -672,6 +672,7 @@ function Page() {
         for (const it of origItems || []) {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
+          // Decrease stock by the original purchase quantity
           await supabase.from("products").update({ stock: Number(p?.stock ?? 0) - Number(it.qty) }).eq("id", it.product_id);
         }
 
