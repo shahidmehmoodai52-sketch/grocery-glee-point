@@ -1,33 +1,64 @@
-import { precacheAndRoute } from 'workbox-precaching';
+/**
+ * Tillix Service Worker
+ * Managed via vite-plugin-pwa (InjectManifest)
+ */
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
-import { NetworkFirst, CacheFirst } from 'workbox-strategies';
+import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
-// Precache assets injected by vite-plugin-pwa
-precacheAndRoute(self.__WB_MANIFEST || []);
+// cleanup old caches
+cleanupOutdatedCaches();
 
-// Navigation caching (App Shell)
+// The __WB_MANIFEST variable is a placeholder that Workbox will replace with the precache manifest.
+precacheAndRoute(self.__WB_MANIFEST);
+
+// Navigation route: NetworkFirst with offline fallback
+// This ensures that if the network is down, we serve the last cached version of the page.
 const navigationHandler = new NetworkFirst({
-  cacheName: 'html-nav',
-  networkTimeoutSeconds: 3,
+  cacheName: 'tillix-nav',
+  networkTimeoutSeconds: 5, // give it 5s before falling back to cache
   plugins: [
-    new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 7 * 24 * 60 * 60 }),
+    new ExpirationPlugin({
+      maxEntries: 50,
+      maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
+    }),
   ],
 });
 registerRoute(new NavigationRoute(navigationHandler));
 
-// Static assets caching
+// Cache static assets (JS, CSS, fonts) with CacheFirst
 registerRoute(
-  ({ url, sameOrigin }) => sameOrigin && /\.(?:js|css|woff2?|png|svg|ico|webmanifest)$/.test(url.pathname),
+  ({ request }) => request.destination === 'script' || request.destination === 'style' || request.destination === 'font',
   new CacheFirst({
-    cacheName: 'static-assets',
+    cacheName: 'tillix-static',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 }),
+      new ExpirationPlugin({
+        maxEntries: 100,
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+      }),
     ],
   })
 );
 
-// Fallback for offline navigation
+// Cache images with StaleWhileRevalidate
+registerRoute(
+  ({ request }) => request.destination === 'image',
+  new StaleWhileRevalidate({
+    cacheName: 'tillix-images',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 100,
+        maxAgeSeconds: 30 * 24 * 60 * 60,
+      }),
+    ],
+  })
+);
+
+// Handle offline page fallback
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open('static-assets').then((cache) => cache.add('/offline.html')));
+  const offlinePagePath = '/offline.html';
+  event.waitUntil(
+    caches.open('tillix-offline-fallback').then((cache) => cache.add(offlinePagePath))
+  );
 });
