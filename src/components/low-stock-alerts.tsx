@@ -49,7 +49,7 @@ function AlertRow({
   const [saving, setSaving] = useState(false);
 
   const saveStock = async () => {
-    const add = Number(qty);
+    const add = roundToTillixQty(Number(qty));
     if (!add || add <= 0) return toast.error("Enter a positive quantity");
     setSaving(true);
     const newStock = Number(p.stock) + add;
