@@ -26,6 +26,8 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error(error);
+    // A route chunk that no longer exists after a deployment: refresh once.
+    if (isChunkLoadError(error) && recoverFromChunkError()) return;
     reportLovableError(error, { boundary: "app_error_boundary" });
     void logAppError({
       errorType: "react_render",
