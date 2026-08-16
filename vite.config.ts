@@ -27,6 +27,7 @@ export default defineConfig({
         injectRegister: null, // registration happens from our guarded wrapper
         srcDir: "public",
         filename: "sw.js",
+        // @ts-ignore - 'strategy' property exists in VitePWAOptions but might be missing in older type definitions
         strategy: "injectManifest",
         devOptions: { enabled: false },
         includeAssets: ["favicon.svg", "favicon.png", "offline.html", "manifest.webmanifest", "sw.js"],
