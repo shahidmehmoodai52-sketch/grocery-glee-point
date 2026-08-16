@@ -85,6 +85,7 @@ function setReceiptPrintPageSize(
       html.receipt-printing body > :not(.receipt-print-root) { display: none !important; }
       html.receipt-printing .receipt-print-root {
         display: block !important;
+        visibility: visible !important;
         position: absolute !important;
         top: 0 !important;
         left: 0 !important;
@@ -167,6 +168,7 @@ export function printReceipt(sourceElement?: HTMLElement | null) {
   printRoot.style.left = "-10000px";
   printRoot.style.top = "0";
   printRoot.style.pointerEvents = "none";
+  printRoot.style.visibility = "hidden"; // Ensure it's hidden from layout
   const clonedSource = source.cloneNode(true) as HTMLElement;
   printRoot.appendChild(clonedSource);
   document.body.appendChild(printRoot);
@@ -191,11 +193,11 @@ export function printReceipt(sourceElement?: HTMLElement | null) {
   setReceiptPrintPageSize(styleEl, "80mm", printRoot);
   requestAnimationFrame(() => {
     void tryDirectPrint().then(() => {
-      // Silent desktop printing never fires afterprint — clean up ourselves.
-      window.setTimeout(cleanup, 400);
+      // Small delay to ensure browser print dialog has handed off or desktop bridge finished
+      setTimeout(cleanup, 1000);
     });
-    // Safety net in case the print call never settles.
-    window.setTimeout(cleanup, 8000);
+    // Safety net
+    window.setTimeout(cleanup, 10000);
   });
 }
 
