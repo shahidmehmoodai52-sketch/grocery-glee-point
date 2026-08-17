@@ -279,10 +279,12 @@ function LandingPage() {
   
   // Ensure the page reflects the current language on mount
   useEffect(() => {
-    const lng = i18n.language;
-    const rtlLanguages = ['ur', 'ar'];
-    document.documentElement.dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
-    document.documentElement.lang = lng;
+    if (typeof document !== 'undefined') {
+      const lng = i18n.language;
+      const rtlLanguages = ['ur', 'ar'];
+      document.documentElement.dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
+      document.documentElement.lang = lng;
+    }
   }, [i18n.language]);
 
 
