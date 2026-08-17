@@ -394,11 +394,23 @@ export async function scheduleRetryPass(delayMs?: number): Promise<void> {
 }
 
 /** Wipe local mirror — used on logout or when the active tenant/user changes. */
-export async function wipeLocalMirror() {
+export async function wipeLocalMirror(opts: { includeQueue?: boolean } = { includeQueue: true }) {
   for (const t of MIRRORED_TABLES) {
     try { await (db() as any)[t].clear(); } catch {}
   }
   await db()._sync_state.clear();
-  await db()._queue.clear();
+  if (opts.includeQueue) {
+    await db()._queue.clear();
+  }
   await refreshPendingCount();
 }
+
+/** Check if the sync queue has pending items. */
+export async function getPendingQueueCount(): Promise<number> {
+  try {
+    return await db()._queue.where("status").anyOf(ACTIVE_STATUSES as unknown as string[]).count();
+  } catch {
+    return 0;
+  }
+}
+

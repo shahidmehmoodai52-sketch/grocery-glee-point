@@ -12,7 +12,9 @@ const MAP: Record<string, string[][]> = {
     ["dash-products"],
     ["product-intel"],
     ["purchase-suggestions"],
-    ["low-stock-alerts"],
+    // ["low-stock-alerts"] removed from automatic realtime invalidation
+    // to prevent heavy refetches during rapid inventory movement.
+
     ["products-picker"],
     ["stock-count-products"],
     ["report-sales-full"],
