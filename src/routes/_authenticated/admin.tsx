@@ -238,8 +238,12 @@ function TenantsTab() {
     );
     if (typed === null) return;
     if (typed !== name) return toast.error("Confirmation did not match — nothing deleted");
-    const { error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: id, _confirm: typed });
-    if (error) return toast.error(error.message);
+    let done = false;
+    while (!done) {
+      const { data, error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: id, _confirm: typed });
+      if (error) return toast.error(error.message);
+      done = Boolean(data && typeof data === "object" && "done" in data && data.done);
+    }
     toast.success(`Deleted "${name}"`);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
   };
