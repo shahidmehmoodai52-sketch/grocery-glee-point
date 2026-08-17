@@ -28,5 +28,18 @@
     "expenses": "Utgifter",
     "reports": "Rapporter",
     "settings": "Innstillinger"
+  },
+  "pos": {
+    "search_placeholder": "🔍 Skann strekkode eller søk produkt... (F3)",
+    "item_no": "Varenr.",
+    "item_name": "Navn",
+    "stock": "Lager",
+    "p_rate": "Innkjøpspris",
+    "unit_rate": "Enhetspris",
+    "qty": "Antall",
+    "discount": "Rabatt",
+    "amount": "Beløp",
+    "complete_sale": "Fullfør salg",
+    "save_changes": "Lagre endringer"
   }
 }

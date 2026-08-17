@@ -28,5 +28,18 @@
     "expenses": "Gastos",
     "reports": "Informes",
     "settings": "Ajustes"
+  },
+  "pos": {
+    "search_placeholder": "🔍 Escanee el código de barras o busque el producto... (F3)",
+    "item_no": "Nº Artículo",
+    "item_name": "Nombre",
+    "stock": "Stock",
+    "p_rate": "P. Compra",
+    "unit_rate": "P. Unitario",
+    "qty": "Cant.",
+    "discount": "Descuento",
+    "amount": "Total",
+    "complete_sale": "Completar Venta",
+    "save_changes": "Guardar cambios"
   }
 }

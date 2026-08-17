@@ -28,5 +28,18 @@
     "expenses": "Ausgaben",
     "reports": "Berichte",
     "settings": "Einstellungen"
+  },
+  "pos": {
+    "search_placeholder": "🔍 Barcode scannen oder Produkt suchen... (F3)",
+    "item_no": "Art.-Nr.",
+    "item_name": "Name",
+    "stock": "Bestand",
+    "p_rate": "Einkaufspreis",
+    "unit_rate": "Einzelpreis",
+    "qty": "Menge",
+    "discount": "Rabatt",
+    "amount": "Betrag",
+    "complete_sale": "Verkauf abschließen",
+    "save_changes": "Änderungen speichern"
   }
 }
