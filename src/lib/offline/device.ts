@@ -73,21 +73,23 @@ export async function clearOfflineDataOnLogout(opts: { includeQueue?: boolean } 
   try {
     const { wipeLocalMirror } = await import("./sync");
     const { resetLocalFirstSession } = await import("./data-access");
+    // Only wipe the queue if includeQueue is explicitly true
     await wipeLocalMirror({ includeQueue: opts.includeQueue });
     resetLocalFirstSession();
+    
+    // We only clear tenant/user meta if we're also clearing the queue.
+    // If we preserve the queue, we must keep these so a return sync knows whose they are.
     if (opts.includeQueue) {
       await setMeta("tenant_id", null);
       await setMeta("user_id", null);
+      try {
+        window.localStorage.removeItem("tillix_offline_auth_user");
+      } catch {
+        /* ignore */
+      }
     }
   } catch {
     /* never block sign-out */
-  }
-  if (opts.includeQueue) {
-    try {
-      window.localStorage.removeItem("tillix_offline_auth_user");
-    } catch {
-      /* ignore */
-    }
   }
 }
 
