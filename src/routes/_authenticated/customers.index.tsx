@@ -107,7 +107,7 @@ function Page() {
   const { data: payments = [] } = useQuery({
     queryKey: ["customer-list-payments"],
     queryFn: async () => await fetchAll<any>((f, t) => 
-      supabase.from("party_payments").select("id,party_type,party_id,amount,created_at").eq("party_type", "customer").order("created_at", { ascending: true }).range(f, t)
+      supabase.from("party_payments").select("id,party_type,party_id,amount,note,method,created_at").eq("party_type", "customer").order("created_at", { ascending: true }).range(f, t)
     ),
   });
   const { data: returns = [] } = useQuery({
