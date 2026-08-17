@@ -724,8 +724,8 @@ function LandingPage() {
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
           <SectionTitle
             eyebrow="Pricing"
-            title="Simple plans that grow with your shop"
-            sub={`Launch offer — save 50% for a limited time. Prices shown in your local currency (${cur.code}).`}
+            title={t('landing.pricing.title', 'Simple plans that grow with your shop')}
+            sub={t('landing.pricing.sub', `Launch offer — save 50% for a limited time. Prices shown in your local currency (${cur.code}).`, { code: cur.code })}
           />
 
           <div className="mt-4 flex justify-center">
@@ -741,14 +741,14 @@ function LandingPage() {
                 onClick={() => setBilling("monthly")}
                 className={`rounded-full px-4 py-1.5 transition ${billing === "monthly" ? "bg-tx-navy text-white" : "text-slate-600 hover:text-tx-navy"}`}
               >
-                Monthly
+                {t('landing.pricing.monthly', 'Monthly')}
               </button>
               <button
                 type="button"
                 onClick={() => setBilling("yearly")}
                 className={`rounded-full px-4 py-1.5 transition ${billing === "yearly" ? "bg-tx-navy text-white" : "text-slate-600 hover:text-tx-navy"}`}
               >
-                Yearly <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">SAVE</span>
+                {t('landing.pricing.yearly', 'Yearly')} <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">{t('landing.pricing.save', 'SAVE')}</span>
               </button>
             </div>
           </div>
@@ -757,14 +757,14 @@ function LandingPage() {
             {/* BASIC */}
             <div className="relative flex flex-col rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
               <h3 className="text-lg font-bold text-tx-navy">Basic</h3>
-              <p className="mt-1 text-sm text-slate-500">Perfect for a single shop getting started.</p>
+              <p className="mt-1 text-sm text-slate-500">{t('landing.pricing.basic_sub', 'Perfect for a single shop getting started.')}</p>
               <div className="mt-6 flex items-end gap-3">
                 <span className="text-4xl font-extrabold text-tx-navy">{formatPrice(basicPrice, cur)}</span>
                 <span className="pb-2 text-sm text-slate-500">{perLabel}</span>
               </div>
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-sm text-slate-400 line-through">{formatPrice(basicOrig, cur)}</span>
-                <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">SAVE 50%</span>
+                <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">{t('landing.pricing.save_pct', 'SAVE 50%')}</span>
               </div>
               <ul className="mt-6 space-y-2.5 text-sm text-slate-700">
                 {[
@@ -786,14 +786,14 @@ function LandingPage() {
                 to="/auth"
                 className="mt-8 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-tx-navy transition hover:bg-slate-50"
               >
-                Start 7-day free trial
+                {t('landing.pricing.start_trial', 'Start 7-day free trial')}
               </Link>
             </div>
 
             {/* RECOMMENDED */}
             <div className="relative flex flex-col rounded-3xl border-2 border-tx-green bg-tx-navy p-8 text-white shadow-xl shadow-emerald-900/10">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-tx-green px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow">
-                Recommended
+                {t('landing.pricing.recommended', 'Recommended')}
               </div>
               <h3 className="text-lg font-bold">Pro</h3>
               <p className="mt-1 text-sm text-slate-300">For growing shops & multi-cashier teams.</p>
