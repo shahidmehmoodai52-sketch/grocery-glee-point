@@ -758,17 +758,26 @@ function POSPage() {
     return () => clearInterval(t);
   }, []);
 
-  const { data: cashAccountOptions = [] } = useQuery({
+  const { data: cashAccountOptions = [], refetch: refetchAccounts } = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
     queryFn: () =>
       offlineFirst(
         fetchActiveCashAccounts,
         async () => (await offlineDb().cash_accounts.toArray()).filter((a) => a.is_active !== false),
         async (rows: any[]) => {
-          await offlineDb().cash_accounts.bulkPut(rows);
+          try {
+            await offlineDb().cash_accounts.bulkPut(rows);
+          } catch {}
         },
       ),
   });
+
+  // Re-sync accounts when the POS page gains focus or mounts to ensure new Cash Flow cards appear
+  useEffect(() => {
+    const handleFocus = () => refetchAccounts();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [refetchAccounts]);
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products", "active"],
@@ -3763,7 +3772,7 @@ function PaymentMethodGrid({
   // Nothing is hard-coded and POS never creates an account — it only references
   // an existing account id.
   const online = accounts
-    .filter((a: any) => a.type !== "cash")
+    .filter((a: any) => a.type !== "cash" && a.is_active !== false)
     .map((a: any) => ({ v: String(a.name), label: String(a.name), id: String(a.id) }));
 
   const normalizedValue = normalizePaymentMethodValue(value);
