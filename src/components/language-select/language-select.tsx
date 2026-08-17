@@ -27,12 +27,12 @@ export function LanguageSelect({ className }: { className?: string }) {
       console.log('Changing language to:', code);
       await i18n.changeLanguage(code);
       const lang = languages.find((l) => l.code === code);
-      if (lang) {
+      if (lang && typeof document !== 'undefined') {
         document.documentElement.dir = lang.dir;
         document.documentElement.lang = lang.code;
+        // Persistence
+        localStorage.setItem('i18nextLng', code);
       }
-      // We removed window.location.reload() to prevent potential loops/stuck states.
-      // React-i18next will update the UI components automatically.
     } catch (err) {
       console.error('Failed to change language:', err);
     }

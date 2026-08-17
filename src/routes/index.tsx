@@ -277,13 +277,17 @@ function LandingPage() {
   const { t, i18n } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   
-  // Ensure the page reflects the current language on mount
+  // Ensure the page reflects the current language on mount and when i18n language changes
   useEffect(() => {
     if (typeof document !== 'undefined') {
-      const lng = i18n.language;
+      const lng = i18n.language || 'en';
       const rtlLanguages = ['ur', 'ar'];
-      document.documentElement.dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
-      document.documentElement.lang = lng;
+      const dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
+      
+      if (document.documentElement.dir !== dir || document.documentElement.lang !== lng) {
+        document.documentElement.dir = dir;
+        document.documentElement.lang = lng;
+      }
     }
   }, [i18n.language]);
 

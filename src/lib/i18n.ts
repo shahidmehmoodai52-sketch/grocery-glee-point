@@ -12,6 +12,14 @@ const syncDir = (lng: string) => {
   if (typeof document !== 'undefined') {
     document.documentElement.dir = dir;
     document.documentElement.lang = lng;
+    // Force a small layout recalc for some browsers that struggle with dynamic dir change
+    const body = document.body;
+    if (body) {
+      body.style.display = 'none';
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      body.offsetHeight; // trigger reflow
+      body.style.display = '';
+    }
   }
   
   if (typeof window !== 'undefined') {
