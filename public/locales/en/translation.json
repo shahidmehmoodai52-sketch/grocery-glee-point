@@ -26,6 +26,86 @@
       "save_pct": "SAVE 50%",
       "start_trial": "Start 7-day free trial",
       "recommended": "Recommended"
+    },
+    "industries": {
+      "eyebrow": "Built for every retailer",
+      "title": "One POS. Every kind of shop.",
+      "sub": "From a corner store to a nationwide chain — Tillix adapts to your business, not the other way around.",
+      "grocery": "Grocery Stores",
+      "supermarket": "Supermarkets",
+      "pharmacy": "Pharmacies",
+      "restaurant": "Restaurants & Cafes",
+      "retail": "Retail Shops",
+      "wholesale": "Wholesalers",
+      "multi_store": "Multi-Store Chains",
+      "mini_mart": "Mini Marts"
+    },
+    "features_sec": {
+      "eyebrow": "Features",
+      "title": "Everything you need to run a modern shop",
+      "sub": "Tillix replaces a stack of tools with one clean platform — POS, inventory, purchasing, customers, staff and analytics.",
+      "f1_title": "Fast Billing & Receipts",
+      "f1_text": "Ring up sales in seconds with a keyboard-first POS, thermal receipt printing and instant hold/resume.",
+      "f2_title": "Barcode Scanning",
+      "f2_text": "Scan any barcode, generate your own labels, and print price tags for bulk items.",
+      "f3_title": "Smart Inventory",
+      "f3_text": "Real-time stock, low-stock alerts, batch and expiry tracking, damages and wastage — always accurate.",
+      "f4_title": "Customers & Loyalty",
+      "f4_text": "Customer accounts, khata/ledger, discounts and repeat-buyer rewards that grow your basket size.",
+      "f5_title": "Suppliers & Purchases",
+      "f5_text": "Track suppliers, purchase orders, returns and outstanding payables in one clean workflow.",
+      "f6_title": "Real-Time Analytics",
+      "f6_text": "Live dashboards for sales, profit, best-sellers, cash flow and shift performance — from any device.",
+      "f7_title": "Roles & Permissions",
+      "f7_text": "Owner, manager and cashier roles with granular permissions and full audit logs.",
+      "f8_title": "Cloud + Offline",
+      "f8_text": "Cloud-first with resilient offline mode — keep selling when the internet is down.",
+      "f9_title": "Multi-Store Ready",
+      "f9_text": "Manage one shop or a hundred. Central catalog, pricing, stock transfers and per-branch reports."
+    },
+    "global": {
+      "eyebrow": "🌍 Global Ready",
+      "title": "Sell Anywhere with Multi-Currency Support",
+      "sub": "One POS Platform. Multiple Countries. Multiple Currencies. Tillix is a cloud POS and retail management software built for businesses operating across different countries and regions.",
+      "perfect": "Perfect for businesses operating in:",
+      "supported_cur": "Supported Currencies",
+      "bill_in": "Bill in the currency your customers use",
+      "adapt": "From Pakistan POS to UAE POS software, Saudi Arabia POS and USA POS software — Tillix adapts to your market."
+    },
+    "why": {
+      "eyebrow": "Why Tillix",
+      "title": "Automate operations. Increase sales. Sleep better.",
+      "sub": "Retail runs on tiny decisions made a thousand times a day. Tillix removes the friction from every one of them — so you spend time growing, not fixing.",
+      "b1": "Automate day-to-day operations end to end",
+      "b2": "Cut errors with barcode-driven billing",
+      "b3": "Reduce stock loss with live inventory & alerts",
+      "b4": "Understand profit, not just sales",
+      "b5": "Onboard new cashiers in minutes",
+      "b6": "Grow from 1 till to 100 without switching tools",
+      "manager": "Manager on the go",
+      "sales_week": "Sales this week",
+      "low_stock": "Low stock items",
+      "review": "review now",
+      "new_cust": "New customers"
+    },
+    "how": {
+      "eyebrow": "How it works",
+      "title": "Live in three simple steps",
+      "s1_title": "Create your account",
+      "s1_text": "Sign up in under a minute — no credit card required.",
+      "s2_title": "Add products & staff",
+      "s2_text": "Import your catalog by CSV or scan barcodes, then invite cashiers with the right permissions.",
+      "s3_title": "Start selling smarter",
+      "s3_text": "Ring up sales, track stock, reward customers and watch profits grow — from any device, anywhere."
+    },
+    "team": {
+      "eyebrow": "Meet the Team",
+      "title": "The people behind Tillix",
+      "sub": "A dedicated crew building, supporting and scaling retail technology you can rely on."
+    },
+    "footer": {
+      "desc": "Tillix — Smart Retail Starts Here. Cloud POS and retail management software for modern retailers, worldwide.",
+      "copyright": "All rights saved by tillix.co"
     }
   },
   "common": {
