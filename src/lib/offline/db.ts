@@ -157,7 +157,7 @@ class PosOfflineDB extends Dexie {
     this.version(2).stores({
       products: "id, name, barcode, sku, item_code, category, updated_at",
       held_bills: "id, status, created_at",
-      cash_accounts: "id, name, slug",
+      cash_accounts: "id, name, slug, tenant_id, _sync, _deleted, updated_at",
       _meta: "key",
       _queue: "++id, status, table, local_created_at, client_uuid",
     });
