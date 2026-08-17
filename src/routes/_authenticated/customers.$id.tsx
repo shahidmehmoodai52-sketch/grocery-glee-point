@@ -27,7 +27,7 @@ type Entry = {
   id?: string;
   entity?: LedgerEntity;
   date: string;
-  type: "sale" | "payment" | "return";
+  type: "sale" | "payment" | "return" | "cash_out";
   ref: string;
   note: string;
   debit: number;
@@ -35,6 +35,7 @@ type Entry = {
   data?: any;
   balance?: number;
 };
+
 
 function Page() {
   const { id } = Route.useParams();
@@ -277,15 +278,18 @@ function Page() {
                   // Inline action buttons keep their own behaviour.
                   if ((e.target as HTMLElement).closest("button")) return;
                   if (x.type === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
-                  if (x.type && x.type !== "payment" && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
+                  if (x.type === "cash_out" && x.id) return setEditPayment({ id: x.id, amount: x.debit, method: x.ref, note: x.note, created_at: x.date });
+                  if (x.type && !["payment", "cash_out"].includes(x.type) && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
+
                 }}
               >
 
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
                 <TableCell>
-                  <Badge variant={x.type === "sale" ? "default" : x.type === "return" ? "secondary" : "outline"} className="capitalize">
-                    {x.type}
+                  <Badge variant={x.type === "sale" ? "default" : x.type === "return" ? "secondary" : x.type === "cash_out" ? "destructive" : "outline"} className="capitalize">
+                    {x.type?.replace("_", " ")}
                   </Badge>
+
                 </TableCell>
                 <TableCell className="font-mono text-xs">{x.ref}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
@@ -316,16 +320,17 @@ function Page() {
                         <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
                       </Button>
                     )}
-                    {x.type === "payment" && x.id && (
-                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date })}>
+                    {(x.type === "payment" || x.type === "cash_out") && x.id && (
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.type === "payment" ? x.credit : x.debit, method: x.ref, note: x.note, created_at: x.date })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    {x.type && x.type !== "payment" && x.id && (
+                    {x.type && !["payment", "cash_out"].includes(x.type) && x.id && (
                       <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: (x.type === "sale" ? "sale" : "sale_return") as any, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}
+
                   </div>
                 </TableCell>
               </TableRow>
