@@ -30,4 +30,8 @@ i18n.on('languageChanged', (lng) => {
   document.documentElement.lang = lng;
 });
 
+if (typeof window !== 'undefined') {
+  (window as any).i18next = i18n;
+}
+
 export default i18n;
