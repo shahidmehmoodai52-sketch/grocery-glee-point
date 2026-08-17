@@ -1370,11 +1370,11 @@ function Page() {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <Label>Cost</Label>
+                  <Label>Purchase rate (Cost)</Label>
                   <Input type="number" step="0.01" value={newProd.cost_price || ""} onChange={(e) => setNewProd({ ...newProd, cost_price: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <Label>Sell</Label>
+                  <Label>Sell price</Label>
                   <Input type="number" step="0.01" value={newProd.sell_price || ""} onChange={(e) => setNewProd({ ...newProd, sell_price: Number(e.target.value) })} />
                 </div>
                 <div>
