@@ -31,19 +31,20 @@ export function LanguageSelect({ className }: { className?: string }) {
         document.documentElement.dir = lang.dir;
         document.documentElement.lang = lang.code;
       }
-      // Force a reload of the current route to ensure all translations are updated
-      window.location.reload();
+      // We removed window.location.reload() to prevent potential loops/stuck states.
+      // React-i18next will update the UI components automatically.
     } catch (err) {
       console.error('Failed to change language:', err);
     }
   };
 
-
   const currentLang = languages.find((l) => l.code === i18n.language) || languages[0];
 
   React.useEffect(() => {
-    document.documentElement.dir = currentLang.dir;
-    document.documentElement.lang = currentLang.code;
+    if (typeof document !== 'undefined') {
+      document.documentElement.dir = currentLang.dir;
+      document.documentElement.lang = currentLang.code;
+    }
   }, [currentLang]);
 
   return (
@@ -58,7 +59,11 @@ export function LanguageSelect({ className }: { className?: string }) {
         {languages.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
-            onClick={() => changeLanguage(lang.code)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              changeLanguage(lang.code);
+            }}
             className={cn(
               "cursor-pointer",
               i18n.language === lang.code && "bg-accent font-semibold"
