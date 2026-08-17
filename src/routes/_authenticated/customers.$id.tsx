@@ -27,7 +27,7 @@ type Entry = {
   id?: string;
   entity?: LedgerEntity;
   date: string;
-  type: "sale" | "payment" | "return";
+  type: "sale" | "payment" | "return" | "cash_out";
   ref: string;
   note: string;
   debit: number;
@@ -35,6 +35,7 @@ type Entry = {
   data?: any;
   balance?: number;
 };
+
 
 function Page() {
   const { id } = Route.useParams();
