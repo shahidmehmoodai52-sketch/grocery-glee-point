@@ -2867,6 +2867,7 @@ function POSPage() {
                       payment_method: isWalkin ? "cash" : "credit",
                       expense_person_id: null,
                     });
+                    if (!isWalkin) setShowStaff(false);
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
