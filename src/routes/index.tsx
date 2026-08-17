@@ -330,9 +330,9 @@ function LandingPage() {
   ];
 
   const testimonials = [
-    { quote: "Tillix cut our billing time in half and finally gave us real numbers on which products actually make money.", name: "Ahmed R.", role: "Supermarket owner, Dubai" },
-    { quote: "We run three branches on Tillix. Central stock and one dashboard — it's a night-and-day upgrade from spreadsheets.", name: "Sara K.", role: "Retail chain manager, Karachi" },
-    { quote: "Offline mode saved a whole weekend of sales during an outage. Everything synced perfectly when we came back online.", name: "Miguel A.", role: "Grocery owner, Madrid" },
+    { quote: t('landing.testimonials.t1_quote', "Tillix cut our billing time in half and finally gave us real numbers on which products actually make money."), name: t('landing.testimonials.t1_name', "Ahmed R."), role: t('landing.testimonials.t1_role', "Supermarket owner, Dubai") },
+    { quote: t('landing.testimonials.t2_quote', "We run three branches on Tillix. Central stock and one dashboard — it's a night-and-day upgrade from spreadsheets."), name: t('landing.testimonials.t2_name', "Sara K."), role: t('landing.testimonials.t2_role', "Retail chain manager, Karachi") },
+    { quote: t('landing.testimonials.t3_quote', "Offline mode saved a whole weekend of sales during an outage. Everything synced perfectly when we came back online."), name: t('landing.testimonials.t3_name', "Miguel A."), role: t('landing.testimonials.t3_role', "Grocery owner, Madrid") },
   ];
 
   return (
@@ -466,9 +466,9 @@ function LandingPage() {
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   {[
-                    { l: "Today's Sales", v: formatPrice(4286, cur) },
-                    { l: "Bills", v: "142" },
-                    { l: "Profit", v: formatPrice(981, cur) },
+                    { l: t('landing.hero.card_sales', "Today's Sales"), v: formatPrice(4286, cur) },
+                    { l: t('landing.hero.card_bills', "Bills"), v: "142" },
+                    { l: t('landing.hero.card_profit', "Profit"), v: formatPrice(981, cur) },
                   ].map((k) => (
                     <div key={k.l} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
                       <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{k.l}</div>
@@ -478,9 +478,9 @@ function LandingPage() {
                 </div>
                 <div className="mt-4 rounded-xl border border-slate-100">
                   {[
-                    { n: "Basmati Rice 5kg", q: "×2", p: formatPrice(21.9, cur) },
-                    { n: "Fresh Milk 1L", q: "×6", p: formatPrice(8.4, cur) },
-                    { n: "Chocolate Bar", q: "×3", p: formatPrice(4.5, cur) },
+                    { n: t('landing.hero.item1', "Basmati Rice 5kg"), q: "×2", p: formatPrice(21.9, cur) },
+                    { n: t('landing.hero.item2', "Fresh Milk 1L"), q: "×6", p: formatPrice(8.4, cur) },
+                    { n: t('landing.hero.item3', "Chocolate Bar"), q: "×3", p: formatPrice(4.5, cur) },
                   ].map((r) => (
                     <div key={r.n} className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
                       <span className="min-w-0 truncate text-slate-700">{r.n}</span>
@@ -490,7 +490,7 @@ function LandingPage() {
                   ))}
                 </div>
                 <div className="mt-4 flex items-center justify-between rounded-xl bg-tx-navy px-4 py-3 text-white">
-                  <span className="text-sm font-medium opacity-80">Total due</span>
+                  <span className="text-sm font-medium opacity-80">{t('landing.hero.total_due', 'Total due')}</span>
                   <span className="text-xl font-extrabold">{formatPrice(34.8, cur)}</span>
                 </div>
               </div>
@@ -729,7 +729,7 @@ function LandingPage() {
 
           <div className="mt-4 flex justify-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              <Sparkles className="h-3.5 w-3.5" /> 7-day free trial · No credit card required
+              <Sparkles className="h-3.5 w-3.5" /> {t('landing.pricing.trial_info', '7-day free trial · No credit card required')}
             </div>
           </div>
 
@@ -767,14 +767,14 @@ function LandingPage() {
               </div>
               <ul className="mt-6 space-y-2.5 text-sm text-slate-700">
                 {[
-                  "Unlimited products & barcodes",
-                  "Fast POS billing & receipts",
-                  "Inventory & low-stock alerts",
-                  "Customers, suppliers & ledger",
-                  "Purchases & purchase returns",
-                  "Offline mode & auto-sync",
-                  "Daily automatic backups",
-                  "Email support",
+                  t('landing.pricing.f1', "Unlimited products & barcodes"),
+                  t('landing.pricing.f2', "Fast POS billing & receipts"),
+                  t('landing.pricing.f3', "Inventory & low-stock alerts"),
+                  t('landing.pricing.f4', "Customers, suppliers & ledger"),
+                  t('landing.pricing.f5', "Purchases & purchase returns"),
+                  t('landing.pricing.f6', "Offline mode & auto-sync"),
+                  t('landing.pricing.f7', "Daily automatic backups"),
+                  t('landing.pricing.f8', "Email support"),
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-tx-green" /> {f}
@@ -806,14 +806,13 @@ function LandingPage() {
               </div>
               <ul className="mt-6 space-y-2.5 text-sm text-slate-100">
                 {[
-                  "Everything in Basic",
-                  "Multi-cashier with roles & permissions",
-                  "Shifts, cash drawer & audit logs",
-                  "Expiry, batch & wastage tracking",
-                  "Bulk import & global product library",
-                  "Advanced reports & P&L analytics",
-                  "Business operations & shift tasks",
-                  "Priority support",
+                  t('landing.pricing.f9', "Everything in Basic"),
+                  t('landing.pricing.f10', "Multi-cashier with roles & permissions"),
+                  t('landing.pricing.f11', "Shifts, cash drawer & audit logs"),
+                  t('landing.pricing.f12', "Expiry, batch & wastage tracking"),
+                  t('landing.pricing.f13', "Bulk import & global product library"),
+                  t('landing.pricing.f14', "Advanced reports & P&L analytics"),
+                  t('landing.pricing.f15', "Priority support"),
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-tx-green" /> {f}
@@ -824,7 +823,7 @@ function LandingPage() {
                 to="/auth"
                 className="mt-8 inline-flex items-center justify-center rounded-xl bg-tx-green px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-tx-green-dark"
               >
-                Start 7-day free trial
+                {t('landing.pricing.start_trial')}
               </Link>
             </div>
           </div>
@@ -1004,22 +1003,22 @@ function LandingPage() {
             </div>
           </div>
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-tx-navy">Product</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-tx-navy">{t('landing.footer.product', 'Product')}</div>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li><a href="#features" className="hover:text-tx-green-dark">Features</a></li>
-              <li><a href="#industries" className="hover:text-tx-green-dark">Industries</a></li>
-              <li><a href="#pricing" className="hover:text-tx-green-dark">Pricing</a></li>
-              <li><a href="#faq" className="hover:text-tx-green-dark">FAQ</a></li>
+              <li><a href="#features" className="hover:text-tx-green-dark">{t('landing.nav.features')}</a></li>
+              <li><a href="#industries" className="hover:text-tx-green-dark">{t('landing.nav.industries')}</a></li>
+              <li><a href="#pricing" className="hover:text-tx-green-dark">{t('landing.nav.pricing')}</a></li>
+              <li><a href="#faq" className="hover:text-tx-green-dark">{t('landing.nav.faq')}</a></li>
             </ul>
           </div>
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-tx-navy">Get started</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-tx-navy">{t('landing.footer.get_started', 'Get started')}</div>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li><Link to="/auth" className="hover:text-tx-green-dark">Sign in</Link></li>
-              <li><Link to="/auth" className="hover:text-tx-green-dark">Register free</Link></li>
+              <li><Link to="/auth" className="hover:text-tx-green-dark">{t('landing.nav.login')}</Link></li>
+              <li><Link to="/auth" className="hover:text-tx-green-dark">{t('landing.nav.signup')}</Link></li>
             </ul>
 
-            <div className="mt-6 text-xs font-bold uppercase tracking-wider text-tx-navy">Follow Tillix</div>
+            <div className="mt-6 text-xs font-bold uppercase tracking-wider text-tx-navy">{t('landing.footer.follow', 'Follow Tillix')}</div>
             <div className="mt-3 flex items-center gap-2">
               {[
                 { Icon: BrandFacebook, label: "Facebook", href: "https://facebook.com/tillix.co" },
