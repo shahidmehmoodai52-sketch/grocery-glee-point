@@ -1,0 +1,56 @@
+{
+  "landing": {
+    "hero": {
+      "eyebrow": "Moderne økosystem for detaljhandel",
+      "title": "Smart detaljhandel starter her",
+      "subtitle": "Tillix er et kraftig skybasert POS-system designet for moderne butikker, supermarkeder og kjeder. Administrer fakturering, lager og ansatte med letthet.",
+      "getStarted": "Start gratis",
+      "demo": "Se demo",
+      "trusted": "Betrodd av over 2000 bedrifter over hele verden"
+    },
+    "nav": {
+      "features": "Funksjoner",
+      "industries": "Bransjer",
+      "pricing": "Priser",
+      "faq": "FAQ",
+      "login": "Logg inn",
+      "signup": "Registrer deg"
+    },
+    "pricing": {
+      "title": "Enkle planer som vokser med butikken din",
+      "sub": "Lanseringstilbud – spar 50 % i en begrenset periode. Priser vises i din lokale valuta ({{code}}).",
+      "monthly": "Månedlig",
+      "yearly": "Årlig",
+      "save": "SPAR",
+      "basic_sub": "Perfekt for en enkelt butikk som nettopp har startet.",
+      "save_pct": "SPAR 50 %",
+      "start_trial": "Start 7-dagers gratis prøveperiode",
+      "recommended": "Anbefalt"
+    }
+  },
+  "common": {
+    "logout": "Logg ut",
+    "dashboard": "Dashboard",
+    "pos": "POS",
+    "products": "Produkter",
+    "customers": "Kunder",
+    "suppliers": "Leverandører",
+    "purchases": "Innkjøp",
+    "expenses": "Utgifter",
+    "reports": "Rapporter",
+    "settings": "Innstillinger"
+  },
+  "pos": {
+    "search_placeholder": "🔍 Skann strekkode eller søk produkt... (F3)",
+    "item_no": "Varenr.",
+    "item_name": "Navn",
+    "stock": "Lager",
+    "p_rate": "Innkjøpspris",
+    "unit_rate": "Enhetspris",
+    "qty": "Antall",
+    "discount": "Rabatt",
+    "amount": "Beløp",
+    "complete_sale": "Fullfør salg",
+    "save_changes": "Lagre endringer"
+  }
+}

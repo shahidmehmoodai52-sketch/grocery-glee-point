@@ -1,0 +1,56 @@
+{
+  "landing": {
+    "hero": {
+      "eyebrow": "Modernes Einzelhandels-Ökosystem",
+      "title": "Smart Retail beginnt hier",
+      "subtitle": "Tillix ist ein leistungsstarkes cloudbasiertes POS-System für moderne Geschäfte, Supermärkte und Filialbetriebe. Verwalten Sie Abrechnung, Inventar und Personal mit Leichtigkeit.",
+      "getStarted": "Kostenlos starten",
+      "demo": "Demo ansehen",
+      "trusted": "Vertrauen von über 2.000 Unternehmen weltweit"
+    },
+    "nav": {
+      "features": "Funktionen",
+      "industries": "Branchen",
+      "pricing": "Preise",
+      "faq": "FAQ",
+      "login": "Anmelden",
+      "signup": "Registrieren"
+    },
+    "pricing": {
+      "title": "Einfache Pläne, die mit Ihrem Geschäft wachsen",
+      "sub": "Einführungsangebot – sparen Sie 50% für begrenzte Zeit. Preise werden in Ihrer Landeswährung ({{code}}) angezeigt.",
+      "monthly": "Monatlich",
+      "yearly": "Jährlich",
+      "save": "SPAREN",
+      "basic_sub": "Perfekt für ein einzelnes Geschäft, das gerade erst anfängt.",
+      "save_pct": "50% SPAREN",
+      "start_trial": "Kostenlose 7-Tage-Testversion starten",
+      "recommended": "Empfohlen"
+    }
+  },
+  "common": {
+    "logout": "Abmelden",
+    "dashboard": "Dashboard",
+    "pos": "POS",
+    "products": "Produkte",
+    "customers": "Kunden",
+    "suppliers": "Lieferanten",
+    "purchases": "Einkäufe",
+    "expenses": "Ausgaben",
+    "reports": "Berichte",
+    "settings": "Einstellungen"
+  },
+  "pos": {
+    "search_placeholder": "🔍 Barcode scannen oder Produkt suchen... (F3)",
+    "item_no": "Art.-Nr.",
+    "item_name": "Name",
+    "stock": "Bestand",
+    "p_rate": "Einkaufspreis",
+    "unit_rate": "Einzelpreis",
+    "qty": "Menge",
+    "discount": "Rabatt",
+    "amount": "Betrag",
+    "complete_sale": "Verkauf abschließen",
+    "save_changes": "Änderungen speichern"
+  }
+}

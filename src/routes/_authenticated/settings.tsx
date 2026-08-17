@@ -17,6 +17,7 @@ import { Receipt, sampleInvoice } from "@/components/receipt";
 import { OfflineModeCard } from "@/components/offline-mode-card";
 import { setDefaultCurrencySymbol } from "@/lib/format";
 import { CurrencySelect } from "@/components/currency-select";
+import { LanguageSelect } from "@/components/language-select/language-select";
 
 
 
@@ -184,6 +185,16 @@ function Page() {
                 />
                 <div className="text-xs text-muted-foreground mt-1">Batches within this many days show a critical alert.</div>
               </div>
+            </div>
+          </Card>
+
+          <Card className="p-5 space-y-3">
+            <div>
+              <div className="font-medium">Application Language</div>
+              <div className="text-xs text-muted-foreground">Select the primary language for the software interface.</div>
+            </div>
+            <div className="max-w-[200px]">
+              <LanguageSelect className="w-full justify-start border" />
             </div>
           </Card>
 

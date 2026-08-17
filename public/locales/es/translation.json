@@ -1,0 +1,56 @@
+{
+  "landing": {
+    "hero": {
+      "eyebrow": "Ecosistema minorista moderno",
+      "title": "El comercio minorista inteligente comienza aquí",
+      "subtitle": "Tillix es un potente sistema POS basado en la nube diseñado para tiendas modernas, supermercados y comercio minorista de múltiples tiendas. Gestione facturación, inventario y personal con facilidad.",
+      "getStarted": "Empieza gratis",
+      "demo": "Ver Demo",
+      "trusted": "Con la confianza de más de 2.000 empresas en todo el mundo"
+    },
+    "nav": {
+      "features": "Características",
+      "industries": "Industrias",
+      "pricing": "Precios",
+      "faq": "Preguntas frecuentes",
+      "login": "Iniciar sesión",
+      "signup": "Registrarse"
+    },
+    "pricing": {
+      "title": "Planes sencillos que crecen con tu tienda",
+      "sub": "Oferta de lanzamiento: ahorra un 50% por tiempo limitado. Precios mostrados en tu moneda local ({{code}}).",
+      "monthly": "Mensual",
+      "yearly": "Anual",
+      "save": "AHORRA",
+      "basic_sub": "Perfecto para una sola tienda que está empezando.",
+      "save_pct": "AHORRA 50%",
+      "start_trial": "Comienza la prueba gratuita de 7 días",
+      "recommended": "Recomendado"
+    }
+  },
+  "common": {
+    "logout": "Cerrar sesión",
+    "dashboard": "Panel de control",
+    "pos": "POS",
+    "products": "Productos",
+    "customers": "Clientes",
+    "suppliers": "Proveedores",
+    "purchases": "Compras",
+    "expenses": "Gastos",
+    "reports": "Informes",
+    "settings": "Ajustes"
+  },
+  "pos": {
+    "search_placeholder": "🔍 Escanee el código de barras o busque el producto... (F3)",
+    "item_no": "Nº Artículo",
+    "item_name": "Nombre",
+    "stock": "Stock",
+    "p_rate": "P. Compra",
+    "unit_rate": "P. Unitario",
+    "qty": "Cant.",
+    "discount": "Descuento",
+    "amount": "Total",
+    "complete_sale": "Completar Venta",
+    "save_changes": "Guardar cambios"
+  }
+}
