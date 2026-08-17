@@ -3,8 +3,21 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpApi from 'i18next-http-backend';
 
-// @ts-ignore - for debugging
-if (typeof window !== 'undefined') { window.i18nDebug = i18n; }
+// Synchronize document direction whenever language changes
+const syncDir = (lng: string) => {
+  console.log('i18n syncDir:', lng);
+  const rtlLanguages = ['ur', 'ar'];
+  const dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
+  
+  if (typeof document !== 'undefined') {
+    document.documentElement.dir = dir;
+    document.documentElement.lang = lng;
+  }
+  
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('i18nextLng', lng);
+  }
+};
 
 i18n
   .use(HttpApi)
@@ -13,7 +26,7 @@ i18n
   .init({
     fallbackLng: 'en',
     supportedLngs: ['en', 'ur', 'ar', 'es', 'de', 'no'],
-    debug: true, // Enable debug to see what's happening in console
+    debug: true,
     interpolation: {
       escapeValue: false,
     },
@@ -25,24 +38,14 @@ i18n
       caches: ['localStorage'],
       lookupLocalStorage: 'i18nextLng',
     },
+  }, (err) => {
+    if (!err && typeof window !== 'undefined') {
+      syncDir(i18n.language);
+    }
   });
 
-
-// Synchronize document direction whenever language changes
 i18n.on('languageChanged', (lng) => {
-  console.log('i18n languageChanged event:', lng);
-  const rtlLanguages = ['ur', 'ar'];
-  const dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
-  
-  if (typeof document !== 'undefined') {
-    document.documentElement.dir = dir;
-    document.documentElement.lang = lng;
-  }
-  
-  // Persist language to local storage explicitly to ensure cross-route consistency
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('i18nextLng', lng);
-  }
+  syncDir(lng);
 });
 
 if (typeof window !== 'undefined') {
