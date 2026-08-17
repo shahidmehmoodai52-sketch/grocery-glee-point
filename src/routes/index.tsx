@@ -292,41 +292,41 @@ function LandingPage() {
   const perLabel = billing === "monthly" ? "/ month" : "/ year";
 
   const features = [
-    { icon: ReceiptText, title: "Fast Billing & Receipts", text: "Ring up sales in seconds with a keyboard-first POS, thermal receipt printing and instant hold/resume." },
-    { icon: Barcode, title: "Barcode Scanning", text: "Scan any barcode, generate your own labels, and print price tags for bulk items." },
-    { icon: Boxes, title: "Smart Inventory", text: "Real-time stock, low-stock alerts, batch and expiry tracking, damages and wastage — always accurate." },
-    { icon: Users, title: "Customers & Loyalty", text: "Customer accounts, khata/ledger, discounts and repeat-buyer rewards that grow your basket size." },
-    { icon: Truck, title: "Suppliers & Purchases", text: "Track suppliers, purchase orders, returns and outstanding payables in one clean workflow." },
-    { icon: TrendingUp, title: "Real-Time Analytics", text: "Live dashboards for sales, profit, best-sellers, cash flow and shift performance — from any device." },
-    { icon: Shield, title: "Roles & Permissions", text: "Owner, manager and cashier roles with granular permissions and full audit logs." },
-    { icon: Cloud, title: "Cloud + Offline", text: "Cloud-first with resilient offline mode — keep selling when the internet is down." },
-    { icon: Building2, title: "Multi-Store Ready", text: "Manage one shop or a hundred. Central catalog, pricing, stock transfers and per-branch reports." },
+    { icon: ReceiptText, title: t('landing.features_sec.f1_title'), text: t('landing.features_sec.f1_text') },
+    { icon: Barcode, title: t('landing.features_sec.f2_title'), text: t('landing.features_sec.f2_text') },
+    { icon: Boxes, title: t('landing.features_sec.f3_title'), text: t('landing.features_sec.f3_text') },
+    { icon: Users, title: t('landing.features_sec.f4_title'), text: t('landing.features_sec.f4_text') },
+    { icon: Truck, title: t('landing.features_sec.f5_title'), text: t('landing.features_sec.f5_text') },
+    { icon: TrendingUp, title: t('landing.features_sec.f6_title'), text: t('landing.features_sec.f6_text') },
+    { icon: Shield, title: t('landing.features_sec.f7_title'), text: t('landing.features_sec.f7_text') },
+    { icon: Cloud, title: t('landing.features_sec.f8_title'), text: t('landing.features_sec.f8_text') },
+    { icon: Building2, title: t('landing.features_sec.f9_title'), text: t('landing.features_sec.f9_text') },
   ];
 
   const industries = [
-    { icon: ShoppingBasket, name: "Grocery Stores" },
-    { icon: Store, name: "Supermarkets" },
-    { icon: Pill, name: "Pharmacies" },
-    { icon: UtensilsCrossed, name: "Restaurants & Cafes" },
-    { icon: PackageSearch, name: "Retail Shops" },
-    { icon: Landmark, name: "Wholesalers" },
-    { icon: Building2, name: "Multi-Store Chains" },
-    { icon: ShoppingCart, name: "Mini Marts" },
+    { icon: ShoppingBasket, name: t('landing.industries.grocery') },
+    { icon: Store, name: t('landing.industries.supermarket') },
+    { icon: Pill, name: t('landing.industries.pharmacy') },
+    { icon: UtensilsCrossed, name: t('landing.industries.restaurant') },
+    { icon: PackageSearch, name: t('landing.industries.retail') },
+    { icon: Landmark, name: t('landing.industries.wholesale') },
+    { icon: Building2, name: t('landing.industries.multi_store') },
+    { icon: ShoppingCart, name: t('landing.industries.mini_mart') },
   ];
 
   const benefits = [
-    "Automate day-to-day operations end to end",
-    "Cut errors with barcode-driven billing",
-    "Reduce stock loss with live inventory & alerts",
-    "Understand profit, not just sales",
-    "Onboard new cashiers in minutes",
-    "Grow from 1 till to 100 without switching tools",
+    t('landing.why.b1'),
+    t('landing.why.b2'),
+    t('landing.why.b3'),
+    t('landing.why.b4'),
+    t('landing.why.b5'),
+    t('landing.why.b6'),
   ];
 
   const steps = [
-    { n: "01", title: "Create your account", text: "Sign up in under a minute — no credit card required." },
-    { n: "02", title: "Add products & staff", text: "Import your catalog by CSV or scan barcodes, then invite cashiers with the right permissions." },
-    { n: "03", title: "Start selling smarter", text: "Ring up sales, track stock, reward customers and watch profits grow — from any device, anywhere." },
+    { n: "01", title: t('landing.how.s1_title'), text: t('landing.how.s1_text') },
+    { n: "02", title: t('landing.how.s2_title'), text: t('landing.how.s2_text') },
+    { n: "03", title: t('landing.how.s3_title'), text: t('landing.how.s3_text') },
   ];
 
   const testimonials = [
@@ -402,15 +402,15 @@ function LandingPage() {
         {menuOpen && (
           <div className="border-t border-slate-200 bg-white md:hidden">
             <div className="mx-auto flex max-w-7xl flex-col px-4 py-2 sm:px-6">
-              {[["Features","#features"],["Industries","#industries"],["How it works","#how"],["Pricing","#pricing"],["FAQ","#faq"]].map(([label, href]) => (
+              {[[t('landing.nav.features'),"#features"],[t('landing.nav.industries'),"#industries"],[t('landing.how.eyebrow'),"#how"],[t('landing.nav.pricing'),"#pricing"],[t('landing.nav.faq'),"#faq"]].map(([label, href]) => (
                 <a key={href} href={href} onClick={() => setMenuOpen(false)} className="py-2 text-sm font-medium text-slate-700">
                   {label}
                 </a>
               ))}
-              <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-navy">Sign in</Link>
-              <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-green-dark">Start 7-day free trial</Link>
+              <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-navy">{t('landing.nav.login')}</Link>
+              <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-green-dark">{t('landing.pricing.start_trial')}</Link>
               <div className="py-2">
-                <div className="mb-1 text-xs font-medium text-slate-500">Currency</div>
+                <div className="mb-1 text-xs font-medium text-slate-500">{t('pos.settings.currency', 'Currency')}</div>
                 <CurrencySelect value={cur.code} onChange={(code) => setCur(code)} />
               </div>
 
@@ -448,7 +448,7 @@ function LandingPage() {
               </div>
 
               <ul className="mt-6 grid grid-cols-2 gap-2 text-sm text-slate-600 sm:max-w-md">
-                {["Free to start","Works offline","Multi-store ready","Bank-grade security"].map(x => (
+                {[t('landing.why.b1'), t('landing.why.b2'), t('landing.why.b3'), t('landing.why.b4')].map(x => (
                   <li key={x} className="flex items-center gap-2"><Check className="h-4 w-4 text-tx-green" /> {x}</li>
                 ))}
               </ul>
@@ -503,9 +503,9 @@ function LandingPage() {
       <section id="industries" className="border-y border-slate-100 bg-slate-50/60">
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <SectionTitle
-            eyebrow="Built for every retailer"
-            title="One POS. Every kind of shop."
-            sub="From a corner store to a nationwide chain — Tillix adapts to your business, not the other way around."
+            eyebrow={t('landing.industries.eyebrow')}
+            title={t('landing.industries.title')}
+            sub={t('landing.industries.sub')}
           />
           <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {industries.map(({ icon: Icon, name }) => (
@@ -524,9 +524,9 @@ function LandingPage() {
       <section id="features" className="bg-white">
         <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <SectionTitle
-            eyebrow="Features"
-            title="Everything you need to run a modern shop"
-            sub="Tillix replaces a stack of tools with one clean platform — POS, inventory, purchasing, customers, staff and analytics."
+            eyebrow={t('landing.features_sec.eyebrow')}
+            title={t('landing.features_sec.title')}
+            sub={t('landing.features_sec.sub')}
           />
           <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {features.map(({ icon: Icon, title, text }) => (
@@ -547,15 +547,15 @@ function LandingPage() {
       <section id="multi-currency" className="bg-white">
         <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <SectionTitle
-            eyebrow="🌍 Global Ready"
-            title="Sell Anywhere with Multi-Currency Support"
-            sub="One POS Platform. Multiple Countries. Multiple Currencies."
+            eyebrow={t('landing.global.eyebrow')}
+            title={t('landing.global.title')}
+            sub={t('landing.global.sub')}
           />
           <div className="mx-auto mt-6 max-w-3xl text-center">
             <p className="text-sm leading-relaxed text-slate-600 sm:text-base">
-              Tillix is a cloud POS and retail management software built for businesses operating across different countries and regions. Whether you run a grocery store, supermarket, pharmacy, restaurant, wholesale business, or a multi-store retail chain, Tillix lets you manage your business in your local currency with a consistent, powerful international POS experience.
+              {t('landing.global.sub')}
             </p>
-            <p className="mt-4 text-sm font-medium text-tx-navy">Perfect for businesses operating in:</p>
+            <p className="mt-4 text-sm font-medium text-tx-navy">{t('landing.global.perfect')}</p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {[
                 ["🇵🇰", "Pakistan"],
@@ -598,10 +598,10 @@ function LandingPage() {
           <div className="mt-14 rounded-3xl border border-slate-200 bg-gradient-to-br from-tx-green-light/40 via-white to-white p-8 sm:p-10">
             <div className="text-center">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-tx-green-dark ring-1 ring-tx-green/20">
-                💱 Supported Currencies
+                {t('landing.global.supported_cur')}
               </div>
-              <h3 className="mt-3 text-xl font-bold text-tx-navy sm:text-2xl">Bill in the currency your customers use</h3>
-              <p className="mt-2 text-sm text-slate-600">From Pakistan POS to UAE POS software, Saudi Arabia POS and USA POS software — Tillix adapts to your market.</p>
+              <h3 className="mt-3 text-xl font-bold text-tx-navy sm:text-2xl">{t('landing.global.bill_in')}</h3>
+              <p className="mt-2 text-sm text-slate-600">{t('landing.global.adapt')}</p>
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-2.5">
               {[
@@ -638,14 +638,13 @@ function LandingPage() {
         <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-tx-green/30 bg-tx-green/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-tx-green-dark">
-              Why Tillix
+              {t('landing.why.eyebrow')}
             </div>
             <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-tx-navy sm:text-4xl">
-              Automate operations. Increase sales. Sleep better.
+              {t('landing.why.title')}
             </h2>
             <p className="mt-4 text-slate-600">
-              Retail runs on tiny decisions made a thousand times a day. Tillix removes the friction from
-              every one of them — so you spend time growing, not fixing.
+              {t('landing.why.sub')}
             </p>
             <ul className="mt-6 grid gap-3 sm:grid-cols-2">
               {benefits.map(b => (
@@ -662,13 +661,13 @@ function LandingPage() {
               <div className="rounded-[1.5rem] bg-white p-4">
                 <div className="flex items-center gap-2">
                   <Smartphone className="h-4 w-4 text-tx-green" />
-                  <span className="text-xs font-semibold text-tx-navy">Manager on the go</span>
+                  <span className="text-xs font-semibold text-tx-navy">{t('landing.why.manager')}</span>
                 </div>
                 <div className="mt-4 space-y-3">
                   {[
-                    { l: "Sales this week", v: formatPrice(18420, cur), d: "+12.4%" },
-                    { l: "Low stock items", v: "7", d: "review now" },
-                    { l: "New customers", v: "31", d: "+9 vs last week" },
+                    { l: t('landing.why.sales_week'), v: formatPrice(18420, cur), d: "+12.4%" },
+                    { l: t('landing.why.low_stock'), v: "7", d: t('landing.why.review') },
+                    { l: t('landing.why.new_cust'), v: "31", d: "+9 vs last week" },
                   ].map(k => (
                     <div key={k.l} className="rounded-xl border border-slate-100 p-3">
                       <div className="flex items-center justify-between">
@@ -688,7 +687,7 @@ function LandingPage() {
       {/* HOW IT WORKS */}
       <section id="how" className="bg-white">
         <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-          <SectionTitle eyebrow="How it works" title="Live in three simple steps" />
+          <SectionTitle eyebrow={t('landing.how.eyebrow')} title={t('landing.how.title')} />
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {steps.map(s => (
               <div key={s.n} className="relative rounded-2xl border border-slate-200 bg-white p-6">
@@ -796,7 +795,7 @@ function LandingPage() {
                 {t('landing.pricing.recommended', 'Recommended')}
               </div>
               <h3 className="text-lg font-bold">Pro</h3>
-              <p className="mt-1 text-sm text-slate-300">For growing shops & multi-cashier teams.</p>
+              <p className="mt-1 text-sm text-slate-300">{t('landing.pricing.pro_sub', 'For growing shops & multi-cashier teams.')}</p>
               <div className="mt-6 flex items-end gap-3">
                 <span className="text-4xl font-extrabold">{formatPrice(proPrice, cur)}</span>
                 <span className="pb-2 text-sm text-slate-300">{perLabel}</span>
@@ -831,7 +830,7 @@ function LandingPage() {
           </div>
 
           <p className="mt-6 text-center text-xs text-slate-500">
-            Prices auto-converted from USD based on your location. Taxes may apply. Cancel anytime.
+            {t('landing.pricing.auto_convert', 'Prices auto-converted from USD based on your location. Taxes may apply. Cancel anytime.')}
           </p>
         </div>
       </section>
@@ -920,13 +919,13 @@ function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-tx-green/30 bg-tx-green-light px-3 py-1 text-xs font-semibold text-tx-green-dark">
-              Meet the Team
+              {t('landing.team.eyebrow')}
             </div>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-              The people behind Tillix
+              {t('landing.team.title')}
             </h2>
             <p className="mt-3 text-base text-slate-600">
-              A dedicated crew building, supporting and scaling retail technology you can rely on.
+              {t('landing.team.sub')}
             </p>
           </div>
 
@@ -996,7 +995,7 @@ function LandingPage() {
           <div className="md:col-span-2">
             <BrandMark className="h-10 w-auto" />
             <p className="mt-3 max-w-sm text-sm text-slate-600">
-              Tillix — Smart Retail Starts Here. Cloud POS and retail management software for modern retailers, worldwide.
+              {t('landing.footer.desc')}
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-500">
               {["UAE","Saudi Arabia","Pakistan","USA","UK","EU","Australia","New Zealand"].map(c => (
