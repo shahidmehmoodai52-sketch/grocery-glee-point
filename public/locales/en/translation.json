@@ -15,6 +15,17 @@
       "faq": "FAQ",
       "login": "Log in",
       "signup": "Sign Up"
+    },
+    "pricing": {
+      "title": "Simple plans that grow with your shop",
+      "sub": "Launch offer — save 50% for a limited time. Prices shown in your local currency ({{code}}).",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "save": "SAVE",
+      "basic_sub": "Perfect for a single shop getting started.",
+      "save_pct": "SAVE 50%",
+      "start_trial": "Start 7-day free trial",
+      "recommended": "Recommended"
     }
   },
   "common": {
