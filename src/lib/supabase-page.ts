@@ -14,8 +14,8 @@ export async function fetchAll<T>(
   const all: T[] = [];
   let from = 0;
 
-  // Safety cap (200 pages) to prevent unbounded loops / UI blocking.
-  for (let i = 0; i < 200; i++) {
+  // Safety cap (500 pages) to prevent infinite loops, but fail loudly if reached.
+  for (let i = 0; i < 500; i++) {
     const to = from + pageSize - 1;
     const { data, error } = await build(from, to);
     if (error) throw error;
@@ -23,8 +23,9 @@ export async function fetchAll<T>(
     const rows = (data ?? []) as T[];
     all.push(...rows);
 
-    if (rows.length < pageSize) break;
+    if (rows.length < pageSize) return all;
     from += pageSize;
   }
-  return all;
+  
+  throw new Error(`Data truncation safety limit reached (500,000 rows). Please use paginated queries for large datasets.`);
 }
