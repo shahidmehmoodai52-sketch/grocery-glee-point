@@ -17,6 +17,7 @@ import { Receipt, sampleInvoice } from "@/components/receipt";
 import { OfflineModeCard } from "@/components/offline-mode-card";
 import { setDefaultCurrencySymbol } from "@/lib/format";
 import { CurrencySelect } from "@/components/currency-select";
+import { LanguageSelect } from "@/components/language-select/language-select";
 
 
 
