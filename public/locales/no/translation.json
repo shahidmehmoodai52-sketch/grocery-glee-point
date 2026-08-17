@@ -15,6 +15,17 @@
       "faq": "FAQ",
       "login": "Logg inn",
       "signup": "Registrer deg"
+    },
+    "pricing": {
+      "title": "Enkle planer som vokser med butikken din",
+      "sub": "Lanseringstilbud – spar 50 % i en begrenset periode. Priser vises i din lokale valuta ({{code}}).",
+      "monthly": "Månedlig",
+      "yearly": "Årlig",
+      "save": "SPAR",
+      "basic_sub": "Perfekt for en enkelt butikk som nettopp har startet.",
+      "save_pct": "SPAR 50 %",
+      "start_trial": "Start 7-dagers gratis prøveperiode",
+      "recommended": "Anbefalt"
     }
   },
   "common": {

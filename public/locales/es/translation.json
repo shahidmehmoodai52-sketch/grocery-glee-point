@@ -15,6 +15,17 @@
       "faq": "Preguntas frecuentes",
       "login": "Iniciar sesión",
       "signup": "Registrarse"
+    },
+    "pricing": {
+      "title": "Planes sencillos que crecen con tu tienda",
+      "sub": "Oferta de lanzamiento: ahorra un 50% por tiempo limitado. Precios mostrados en tu moneda local ({{code}}).",
+      "monthly": "Mensual",
+      "yearly": "Anual",
+      "save": "AHORRA",
+      "basic_sub": "Perfecto para una sola tienda que está empezando.",
+      "save_pct": "AHORRA 50%",
+      "start_trial": "Comienza la prueba gratuita de 7 días",
+      "recommended": "Recomendado"
     }
   },
   "common": {

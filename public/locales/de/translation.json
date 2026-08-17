@@ -15,6 +15,17 @@
       "faq": "FAQ",
       "login": "Anmelden",
       "signup": "Registrieren"
+    },
+    "pricing": {
+      "title": "Einfache Pläne, die mit Ihrem Geschäft wachsen",
+      "sub": "Einführungsangebot – sparen Sie 50% für begrenzte Zeit. Preise werden in Ihrer Landeswährung ({{code}}) angezeigt.",
+      "monthly": "Monatlich",
+      "yearly": "Jährlich",
+      "save": "SPAREN",
+      "basic_sub": "Perfekt für ein einzelnes Geschäft, das gerade erst anfängt.",
+      "save_pct": "50% SPAREN",
+      "start_trial": "Kostenlose 7-Tage-Testversion starten",
+      "recommended": "Empfohlen"
     }
   },
   "common": {
