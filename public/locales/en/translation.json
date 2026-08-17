@@ -28,5 +28,18 @@
     "expenses": "Expenses",
     "reports": "Reports",
     "settings": "Settings"
+  },
+  "pos": {
+    "search_placeholder": "🔍 Scan barcode or search product… (F3)",
+    "item_no": "Item No",
+    "item_name": "Item Name",
+    "stock": "Stock",
+    "p_rate": "P.Rate",
+    "unit_rate": "Unit Rate",
+    "qty": "QTY",
+    "discount": "Discount",
+    "amount": "Amount",
+    "complete_sale": "Complete Sale",
+    "save_changes": "Save changes"
   }
 }

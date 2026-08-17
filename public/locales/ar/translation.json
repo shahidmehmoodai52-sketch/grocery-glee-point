@@ -28,5 +28,18 @@
     "expenses": "المصاريف",
     "reports": "التقارير",
     "settings": "الإعدادات"
+  },
+  "pos": {
+    "search_placeholder": "🔍 امسح الباركود أو ابحث عن منتج... (F3)",
+    "item_no": "رقم الصنف",
+    "item_name": "اسم الصنف",
+    "stock": "المخزون",
+    "p_rate": "سعر الشراء",
+    "unit_rate": "سعر الوحدة",
+    "qty": "الكمية",
+    "discount": "الخصم",
+    "amount": "المبلغ",
+    "complete_sale": "إتمام البيع",
+    "save_changes": "حفظ التغييرات"
   }
 }

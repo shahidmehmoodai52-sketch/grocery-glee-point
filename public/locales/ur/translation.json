@@ -28,5 +28,18 @@
     "expenses": "اخراجات",
     "reports": "رپورٹس",
     "settings": "ترتیبات"
+  },
+  "pos": {
+    "search_placeholder": "🔍 بارکوڈ اسکین کریں یا پروڈکٹ تلاش کریں... (F3)",
+    "item_no": "آئٹم نمبر",
+    "item_name": "آئٹم کا نام",
+    "stock": "اسٹاک",
+    "p_rate": "خریداری کی شرح",
+    "unit_rate": "یونٹ کی شرح",
+    "qty": "مقدار",
+    "discount": "رعایت",
+    "amount": "رقم",
+    "complete_sale": "فروخت مکمل کریں",
+    "save_changes": "تبدیلیاں محفوظ کریں"
   }
 }
