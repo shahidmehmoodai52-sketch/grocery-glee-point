@@ -22,4 +22,12 @@ i18n
     },
   });
 
+// Synchronize document direction whenever language changes
+i18n.on('languageChanged', (lng) => {
+  const rtlLanguages = ['ur', 'ar'];
+  const dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
+  document.documentElement.dir = dir;
+  document.documentElement.lang = lng;
+});
+
 export default i18n;

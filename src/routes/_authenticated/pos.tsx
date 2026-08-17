@@ -82,6 +82,7 @@ import {
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
 import { enqueueWrite } from "@/lib/offline/sync";
+import { useTranslation } from "react-i18next";
 import { isOfflineNow } from "@/lib/offline/session";
 
 export const Route = createFileRoute("/_authenticated/pos")({
@@ -446,6 +447,7 @@ async function searchProductsOnline(q: string) {
 }
 
 function POSPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -2391,7 +2393,7 @@ function POSPage() {
               <Input
                 ref={searchRef}
                 autoFocus
-                placeholder="🔍  Scan barcode or search product…  (F3)"
+                placeholder={t('pos.search_placeholder', '🔍 Scan barcode or search product… (F3)')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -2553,21 +2555,21 @@ function POSPage() {
             <table className="w-full text-sm border-collapse [&_td]:border [&_th]:border [&_td]:border-border [&_th]:border-border">
               <thead className="sticky top-0 z-10 bg-primary text-primary-foreground text-[11px] uppercase tracking-wide">
                 <tr>
-                  <th className="px-2 py-2 text-left w-16">Item No</th>
-                  <th className="px-2 py-2 text-left">Item Name</th>
-                  <th className="px-2 py-2 text-right w-20">Stock</th>
+                  <th className="px-2 py-2 text-left w-16">{t('pos.item_no', 'Item No')}</th>
+                  <th className="px-2 py-2 text-left">{t('pos.item_name', 'Item Name')}</th>
+                  <th className="px-2 py-2 text-right w-20">{t('pos.stock', 'Stock')}</th>
                   {showCost && (
                     <th
                       className="px-2 py-2 text-right w-24 no-print"
                       title="Purchase rate (internal)"
                     >
-                      P.Rate
+                      {t('pos.p_rate', 'P.Rate')}
                     </th>
                   )}
-                  <th className="px-2 py-2 text-right w-32">Unit Rate</th>
-                  <th className="px-2 py-2 text-right w-28">QTY</th>
-                  <th className="px-2 py-2 text-right w-32">Discount</th>
-                  <th className="px-2 py-2 text-right w-36">Amount</th>
+                  <th className="px-2 py-2 text-right w-32">{t('pos.unit_rate', 'Unit Rate')}</th>
+                  <th className="px-2 py-2 text-right w-28">{t('pos.qty', 'QTY')}</th>
+                  <th className="px-2 py-2 text-right w-32">{t('pos.discount', 'Discount')}</th>
+                  <th className="px-2 py-2 text-right w-36">{t('pos.amount', 'Amount')}</th>
                   <th className="px-2 py-2 w-8 no-print"></th>
                 </tr>
               </thead>
@@ -3236,7 +3238,7 @@ function POSPage() {
               disabled={submitting}
             >
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {tab.editing_sale_id ? `Save changes · F4` : `Complete Sale · F4`}
+              {tab.editing_sale_id ? `${t('pos.save_changes', 'Save changes')} · F4` : `${t('pos.complete_sale', 'Complete Sale')} · F4`}
             </Button>
           </div>
         </aside>
