@@ -275,7 +275,7 @@ function ProductsPage() {
                 </div>
                 <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
                 <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
-                {showCost && <div><Label>Cost</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>}
+                {showCost && <div><Label>Purchase rate (Cost)</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>}
                 {showSell && (
                   <div>
                     <Label className="flex items-center justify-between">
