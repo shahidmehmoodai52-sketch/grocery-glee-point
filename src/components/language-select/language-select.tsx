@@ -13,6 +13,10 @@ import { cn } from '@/lib/utils';
 const languages = [
   { code: 'en', name: 'English', dir: 'ltr' },
   { code: 'ur', name: 'اردو (Urdu)', dir: 'rtl' },
+  { code: 'ar', name: 'العربية (Arabic)', dir: 'rtl' },
+  { code: 'es', name: 'Español (Spanish)', dir: 'ltr' },
+  { code: 'de', name: 'Deutsch (German)', dir: 'ltr' },
+  { code: 'no', name: 'Norsk (Norwegian)', dir: 'ltr' },
 ];
 
 export function LanguageSelect({ className }: { className?: string }) {

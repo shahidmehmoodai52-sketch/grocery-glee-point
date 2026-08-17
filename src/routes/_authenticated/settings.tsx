@@ -189,6 +189,16 @@ function Page() {
 
           <Card className="p-5 space-y-3">
             <div>
+              <div className="font-medium">Application Language</div>
+              <div className="text-xs text-muted-foreground">Select the primary language for the software interface.</div>
+            </div>
+            <div className="max-w-[200px]">
+              <LanguageSelect className="w-full justify-start border" />
+            </div>
+          </Card>
+
+          <Card className="p-5 space-y-3">
+            <div>
               <div className="font-medium">Business Operations</div>
               <div className="text-xs text-muted-foreground">
                 Optional shift management, cash drawer and daily operations. When Shift Management is off, POS behaves exactly like today with zero extra queries.
