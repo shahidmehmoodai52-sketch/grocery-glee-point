@@ -1,0 +1,32 @@
+{
+  "landing": {
+    "hero": {
+      "eyebrow": "Modernes Einzelhandels-Ökosystem",
+      "title": "Smart Retail beginnt hier",
+      "subtitle": "Tillix ist ein leistungsstarkes cloudbasiertes POS-System für moderne Geschäfte, Supermärkte und Filialbetriebe. Verwalten Sie Abrechnung, Inventar und Personal mit Leichtigkeit.",
+      "getStarted": "Kostenlos starten",
+      "demo": "Demo ansehen",
+      "trusted": "Vertrauen von über 2.000 Unternehmen weltweit"
+    },
+    "nav": {
+      "features": "Funktionen",
+      "industries": "Branchen",
+      "pricing": "Preise",
+      "faq": "FAQ",
+      "login": "Anmelden",
+      "signup": "Registrieren"
+    }
+  },
+  "common": {
+    "logout": "Abmelden",
+    "dashboard": "Dashboard",
+    "pos": "POS",
+    "products": "Produkte",
+    "customers": "Kunden",
+    "suppliers": "Lieferanten",
+    "purchases": "Einkäufe",
+    "expenses": "Ausgaben",
+    "reports": "Berichte",
+    "settings": "Einstellungen"
+  }
+}

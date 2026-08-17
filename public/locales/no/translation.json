@@ -1,0 +1,32 @@
+{
+  "landing": {
+    "hero": {
+      "eyebrow": "Moderne økosystem for detaljhandel",
+      "title": "Smart detaljhandel starter her",
+      "subtitle": "Tillix er et kraftig skybasert POS-system designet for moderne butikker, supermarkeder og kjeder. Administrer fakturering, lager og ansatte med letthet.",
+      "getStarted": "Start gratis",
+      "demo": "Se demo",
+      "trusted": "Betrodd av over 2000 bedrifter over hele verden"
+    },
+    "nav": {
+      "features": "Funksjoner",
+      "industries": "Bransjer",
+      "pricing": "Priser",
+      "faq": "FAQ",
+      "login": "Logg inn",
+      "signup": "Registrer deg"
+    }
+  },
+  "common": {
+    "logout": "Logg ut",
+    "dashboard": "Dashboard",
+    "pos": "POS",
+    "products": "Produkter",
+    "customers": "Kunder",
+    "suppliers": "Leverandører",
+    "purchases": "Innkjøp",
+    "expenses": "Utgifter",
+    "reports": "Rapporter",
+    "settings": "Innstillinger"
+  }
+}
