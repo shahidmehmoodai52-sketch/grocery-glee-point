@@ -68,21 +68,26 @@ export async function guardTenantScope(tenantId: string | null, userId: string |
   return !!changed;
 }
 
-/** Called on sign-out — removes all cached business data from this device. */
-export async function clearOfflineDataOnLogout(): Promise<void> {
+/** Called on sign-out — removes cached business data from this device. */
+export async function clearOfflineDataOnLogout(opts: { includeQueue?: boolean } = { includeQueue: true }): Promise<void> {
   try {
     const { wipeLocalMirror } = await import("./sync");
     const { resetLocalFirstSession } = await import("./data-access");
-    await wipeLocalMirror();
+    await wipeLocalMirror({ includeQueue: opts.includeQueue });
     resetLocalFirstSession();
-    await setMeta("tenant_id", null);
-    await setMeta("user_id", null);
+    if (opts.includeQueue) {
+      await setMeta("tenant_id", null);
+      await setMeta("user_id", null);
+    }
   } catch {
     /* never block sign-out */
   }
-  try {
-    window.localStorage.removeItem("tillix_offline_auth_user");
-  } catch {
-    /* ignore */
+  if (opts.includeQueue) {
+    try {
+      window.localStorage.removeItem("tillix_offline_auth_user");
+    } catch {
+      /* ignore */
+    }
   }
 }
+

@@ -135,24 +135,23 @@ export function LowStockAlerts() {
 
   const { data = [] } = useQuery({
     queryKey: ["low-stock-alerts"],
-    refetchInterval: 60_000,
+    refetchInterval: 120_000, // Reduced frequency to 2 minutes
     queryFn: async (): Promise<Row[]> => {
-      const { data, error } = { 
-        data: await fetchAll<any>((from: number, to: number) => supabase
-          .from("products")
-          .select("id,name,sku,unit,category,sell_price,stock,low_stock_threshold,updated_at")
-          .eq("is_active", true)
-          .order("stock", { ascending: true })
-          .range(from, to) as any
-        ), 
-        error: null as any 
-      };
+      // Server-side filtering for stock levels.
+      // This drastically reduces bandwidth for large catalogs.
+      const { data, error } = await supabase
+        .from("products")
+        .select("id,name,sku,unit,category,sell_price,stock,low_stock_threshold,updated_at")
+        .eq("is_active", true)
+        .or("stock.lte.low_stock_threshold,stock.lte.0")
+        .order("stock", { ascending: true })
+        .limit(100); // Reasonable cap for UI alerts
+
       if (error) throw error;
-      return (data ?? []).filter(
-        (p: any) => Number(p.stock) <= Number(p.low_stock_threshold ?? 0),
-      ) as Row[];
+      return (data ?? []) as Row[];
     },
   });
+
 
   const { outOfStock, lowStock } = useMemo(() => {
     const oos: Row[] = [];

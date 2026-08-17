@@ -92,9 +92,30 @@ export function AppSidebar() {
   const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
 
   const handleSignOut = async () => {
+    // Both logout buttons should behave identically and safely.
+    // The main logic is in the authenticated layout.
+    const { clearOfflineDataOnLogout } = await import("@/lib/offline/device");
+    const { getPendingQueueCount } = await import("@/lib/offline/sync");
+
+    try {
+      const count = await getPendingQueueCount();
+      if (count > 0) {
+        // If we're in the sidebar and there's pending data, we should probably
+        // just trigger the main layout's logout flow if possible, or show a toast.
+        // For simplicity and consistency, we'll just allow the logout if they
+        // click here, but the header button is the primary one.
+        // Actually, let's make it safe here too.
+        if (!confirm(`Warning: You have ${count} unsynced offline transactions. Logging out will PERMANENTLY delete them. Proceed?`)) {
+          return;
+        }
+      }
+    } catch {}
+
+    await clearOfflineDataOnLogout();
     await supabase.auth.signOut();
     navigate({ to: "/auth", search: { next: "/dashboard" }, replace: true });
   };
+
 
   return (
     <Sidebar collapsible="icon">
