@@ -30,10 +30,16 @@ i18n
 
 // Synchronize document direction whenever language changes
 i18n.on('languageChanged', (lng) => {
+  console.log('i18n languageChanged event:', lng);
   const rtlLanguages = ['ur', 'ar'];
   const dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
   document.documentElement.dir = dir;
   document.documentElement.lang = lng;
+  
+  // Persist language to local storage explicitly to ensure cross-route consistency
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('i18nextLng', lng);
+  }
 });
 
 if (typeof window !== 'undefined') {

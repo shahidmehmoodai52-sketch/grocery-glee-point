@@ -274,8 +274,17 @@ function SectionTitle({ eyebrow, title, sub }: { eyebrow?: string; title: string
 /* ---------- Page ---------- */
 
 function LandingPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
+  
+  // Ensure the page reflects the current language on mount
+  useEffect(() => {
+    const lng = i18n.language;
+    const rtlLanguages = ['ur', 'ar'];
+    document.documentElement.dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
+    document.documentElement.lang = lng;
+  }, [i18n.language]);
+
 
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
