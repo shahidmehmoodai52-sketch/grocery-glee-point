@@ -806,14 +806,13 @@ function LandingPage() {
               </div>
               <ul className="mt-6 space-y-2.5 text-sm text-slate-100">
                 {[
-                  "Everything in Basic",
-                  "Multi-cashier with roles & permissions",
-                  "Shifts, cash drawer & audit logs",
-                  "Expiry, batch & wastage tracking",
-                  "Bulk import & global product library",
-                  "Advanced reports & P&L analytics",
-                  "Business operations & shift tasks",
-                  "Priority support",
+                  t('landing.pricing.f9', "Everything in Basic"),
+                  t('landing.pricing.f10', "Multi-cashier with roles & permissions"),
+                  t('landing.pricing.f11', "Shifts, cash drawer & audit logs"),
+                  t('landing.pricing.f12', "Expiry, batch & wastage tracking"),
+                  t('landing.pricing.f13', "Bulk import & global product library"),
+                  t('landing.pricing.f14', "Advanced reports & P&L analytics"),
+                  t('landing.pricing.f15', "Priority support"),
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-tx-green" /> {f}
@@ -824,7 +823,7 @@ function LandingPage() {
                 to="/auth"
                 className="mt-8 inline-flex items-center justify-center rounded-xl bg-tx-green px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-tx-green-dark"
               >
-                Start 7-day free trial
+                {t('landing.pricing.start_trial')}
               </Link>
             </div>
           </div>
@@ -1004,22 +1003,22 @@ function LandingPage() {
             </div>
           </div>
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-tx-navy">Product</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-tx-navy">{t('landing.footer.product', 'Product')}</div>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li><a href="#features" className="hover:text-tx-green-dark">Features</a></li>
-              <li><a href="#industries" className="hover:text-tx-green-dark">Industries</a></li>
-              <li><a href="#pricing" className="hover:text-tx-green-dark">Pricing</a></li>
-              <li><a href="#faq" className="hover:text-tx-green-dark">FAQ</a></li>
+              <li><a href="#features" className="hover:text-tx-green-dark">{t('landing.nav.features')}</a></li>
+              <li><a href="#industries" className="hover:text-tx-green-dark">{t('landing.nav.industries')}</a></li>
+              <li><a href="#pricing" className="hover:text-tx-green-dark">{t('landing.nav.pricing')}</a></li>
+              <li><a href="#faq" className="hover:text-tx-green-dark">{t('landing.nav.faq')}</a></li>
             </ul>
           </div>
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-tx-navy">Get started</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-tx-navy">{t('landing.footer.get_started', 'Get started')}</div>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li><Link to="/auth" className="hover:text-tx-green-dark">Sign in</Link></li>
-              <li><Link to="/auth" className="hover:text-tx-green-dark">Register free</Link></li>
+              <li><Link to="/auth" className="hover:text-tx-green-dark">{t('landing.nav.login')}</Link></li>
+              <li><Link to="/auth" className="hover:text-tx-green-dark">{t('landing.nav.signup')}</Link></li>
             </ul>
 
-            <div className="mt-6 text-xs font-bold uppercase tracking-wider text-tx-navy">Follow Tillix</div>
+            <div className="mt-6 text-xs font-bold uppercase tracking-wider text-tx-navy">{t('landing.footer.follow', 'Follow Tillix')}</div>
             <div className="mt-3 flex items-center gap-2">
               {[
                 { Icon: BrandFacebook, label: "Facebook", href: "https://facebook.com/tillix.co" },
