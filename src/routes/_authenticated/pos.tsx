@@ -2929,7 +2929,8 @@ function POSPage() {
                       customer_id: null,
                       payment_method: isStaff ? "staff" : "cash",
                     });
-                    if (!isStaff) setShowStaff(false);
+                    // Logic fix: Don't hide the selector immediately when selecting a staff member
+                    // but DO ensure we focus the search.
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
