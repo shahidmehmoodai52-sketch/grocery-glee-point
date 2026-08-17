@@ -3,13 +3,17 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpApi from 'i18next-http-backend';
 
+// @ts-ignore - for debugging
+if (typeof window !== 'undefined') { window.i18nDebug = i18n; }
+
 i18n
   .use(HttpApi)
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     fallbackLng: 'en',
-    debug: false,
+    supportedLngs: ['en', 'ur', 'ar', 'es', 'de', 'no'],
+    debug: true, // Enable debug to see what's happening in console
     interpolation: {
       escapeValue: false,
     },
@@ -19,8 +23,10 @@ i18n
     detection: {
       order: ['localStorage', 'cookie', 'htmlTag', 'path', 'subdomain'],
       caches: ['localStorage'],
+      lookupLocalStorage: 'i18nextLng',
     },
   });
+
 
 // Synchronize document direction whenever language changes
 i18n.on('languageChanged', (lng) => {
