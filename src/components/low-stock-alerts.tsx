@@ -135,7 +135,7 @@ export function LowStockAlerts() {
 
   const { data = [] } = useQuery({
     queryKey: ["low-stock-alerts"],
-    refetchInterval: 120_000, // Reduced frequency to 2 minutes
+    refetchInterval: 5 * 60_000, // Reduced frequency to 5 minutes
     queryFn: async (): Promise<Row[]> => {
       // Server-side filtering for stock levels.
       // This drastically reduces bandwidth for large catalogs.
@@ -150,6 +150,8 @@ export function LowStockAlerts() {
       if (error) throw error;
       return (data ?? []) as Row[];
     },
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
   });
 
 

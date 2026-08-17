@@ -55,33 +55,26 @@ function Layout() {
   const [pendingCount, setPendingCount] = useState(0);
 
   const handleSignOut = async (force: boolean = false) => {
-    if (!force) {
-      try {
-        const { getPendingQueueCount } = await import("@/lib/offline/sync");
-        const count = await getPendingQueueCount();
-        if (count > 0) {
+    let hasPending = false;
+    try {
+      const { getPendingQueueCount } = await import("@/lib/offline/sync");
+      const count = await getPendingQueueCount();
+      if (count > 0) {
+        hasPending = true;
+        if (!force) {
           setPendingCount(count);
           setShowLogoutConfirm(true);
           return;
         }
-      } catch {
-        /* best effort check */
       }
+    } catch {
+      /* best effort check */
     }
 
-    // Multi-tenant safety: remove every cached row before releasing the device.
-    // If there are pending sales, clearOfflineDataOnLogout(includeQueue: false)
-    // would keep the queue, but that's risky for tenant leakage if the NEXT user
-    // is different. However, the user explicitly asked to "fix sign-out throws
-    // away pending offline sales".
-    //
-    // The safest fix:
-    // 1. Alert the user (above).
-    // 2. If they proceed, we wipe the mirror but NOT the queue if we want to
-    //    preserve it, but that's complex to re-link to the right user later.
-    //    Actually, we should probably just wipe everything if they confirm,
-    //    because the cashier is acknowledging the loss.
-    await clearOfflineDataOnLogout();
+    // If force is true, we wipe everything including the queue.
+    // If there is NO pending data, we wipe everything safely.
+    // If the user cancelled the dialog (force=false), we don't even reach here.
+    await clearOfflineDataOnLogout({ includeQueue: force || !hasPending });
     await supabase.auth.signOut();
     navigate({ to: "/auth", search: { next: "/dashboard" }, replace: true });
   };
