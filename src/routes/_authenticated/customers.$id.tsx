@@ -278,7 +278,7 @@ function Page() {
                   // Inline action buttons keep their own behaviour.
                   if ((e.target as HTMLElement).closest("button")) return;
                   if (x.type === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
-                  if (x.type === "cash_out" && x.id) return setEditPayment({ id: x.id, amount: x.debit, method: x.ref, note: x.note, created_at: x.date });
+                  if (x.type === "cash_out" && x.id) return setEditPayment({ id: x.id, amount: x.debit, method: "Cash Out", note: x.note, created_at: x.date });
                   if (x.type && !["payment", "cash_out"].includes(x.type) && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
 
                 }}
@@ -321,7 +321,7 @@ function Page() {
                       </Button>
                     )}
                     {(x.type === "payment" || x.type === "cash_out") && x.id && (
-                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.type === "payment" ? x.credit : x.debit, method: x.ref, note: x.note, created_at: x.date })}>
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.type === "payment" ? x.credit : x.debit, method: x.type === "cash_out" ? "Cash Out" : x.ref, note: x.note, created_at: x.date })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}

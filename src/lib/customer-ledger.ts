@@ -77,7 +77,7 @@ export function buildLedgerEntries({
         id: p.id,
         date: p.created_at,
         type: isCashOut ? "cash_out" : "payment",
-        ref: p.method || (isCashOut ? "Cash Out" : "Payment"),
+        ref: isCashOut ? "Cash Out" : (p.method || "Payment"),
         note,
         debit: isCashOut ? Number(p.amount || 0) : 0,
         credit: isCashOut ? 0 : Number(p.amount || 0),
