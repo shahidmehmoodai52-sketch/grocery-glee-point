@@ -1178,7 +1178,7 @@ function POSPage() {
       payment_method: nextMethod,
     };
 
-    if (nextMethod !== "credit") {
+    if (nextMethod !== "credit" && nextMethod !== "staff") {
       patch.customer_id = null;
     }
     // Digital and Digital + CB are separate methods; both use digital_account_id
@@ -1193,6 +1193,7 @@ function POSPage() {
     // Ensure we sync the payment method when selecting staff.
     if (nextMethod === "staff") {
       // If we don't have a staff member selected yet, the UI will trigger showStaff=true.
+      patch.customer_id = null;
     } else {
       patch.expense_person_id = null;
     }
