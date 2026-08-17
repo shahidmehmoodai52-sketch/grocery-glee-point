@@ -1,17 +1,20 @@
 
-import { supabase } from "./src/integrations/supabase/client.server";
+import { supabaseAdmin } from "./src/integrations/supabase/client.server";
 
 async function auditShop() {
   const shopCode = 'hafiz-super-mart-023';
   
   // 1. Find all tenants associated with this shop code (handles fragmentation)
-  const { data: tenants } = await supabase
+  const { data: tenants } = await supabaseAdmin
     .from('tenants')
     .select('id, name')
     .ilike('name', `%${shopCode}%`);
     
   if (!tenants || tenants.length === 0) {
     console.log("No tenants found for shop code:", shopCode);
+    // Let's broaden the search just in case
+    const { data: allTenants } = await supabaseAdmin.from('tenants').select('id, name').limit(10);
+    console.log("Broad search (first 10 tenants):", allTenants?.map(t => t.name));
     return;
   }
   
@@ -23,7 +26,7 @@ async function auditShop() {
   const targetDateStart = '2026-08-01T00:00:00Z';
   const targetDateEnd = '2026-08-01T23:59:59Z';
 
-  const { data: sales } = await supabase
+  const { data: sales } = await supabaseAdmin
     .from('sales')
     .select(`
       id, 
@@ -42,8 +45,9 @@ async function auditShop() {
 
   // 3. Identify "fake" invoices (no product_id or no items)
   const anomalies = sales?.filter(s => {
-    const hasItems = s.sale_items && s.sale_items.length > 0;
-    const allItemsHaveProduct = hasItems && s.sale_items.every(item => item.product_id !== null);
+    const items = s.sale_items as any[];
+    const hasItems = items && items.length > 0;
+    const allItemsHaveProduct = hasItems && items.every(item => item.product_id !== null);
     return !hasItems || !allItemsHaveProduct;
   });
 
@@ -53,9 +57,9 @@ async function auditShop() {
     console.log(`  ID: ${s.id}`);
     console.log(`  Total: ${s.total}`);
     console.log(`  Created At: ${s.created_at}`);
-    console.log(`  Items Count: ${s.sale_items?.length || 0}`);
+    console.log(`  Items Count: ${(s.sale_items as any[])?.length || 0}`);
     console.log(`  Note: ${s.note || 'None'}`);
-    const itemsWithoutProduct = s.sale_items?.filter(i => !i.product_id).map(i => i.name);
+    const itemsWithoutProduct = (s.sale_items as any[])?.filter(i => !i.product_id).map(i => i.name);
     if (itemsWithoutProduct?.length) {
       console.log(`  Items without Product ID: ${itemsWithoutProduct.join(', ')}`);
     }
@@ -63,7 +67,7 @@ async function auditShop() {
   });
 
   // 4. Also check party_payments for any manual ledger entries on that date
-  const { data: payments } = await supabase
+  const { data: payments } = await supabaseAdmin
     .from('party_payments')
     .select('id, amount, note, created_at, party_id')
     .in('tenant_id', tenantIds)
