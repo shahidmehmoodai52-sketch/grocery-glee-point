@@ -1,5 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { LanguageSelect } from "@/components/language-select/language-select";
+
 import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
@@ -271,7 +274,9 @@ function SectionTitle({ eyebrow, title, sub }: { eyebrow?: string; title: string
 /* ---------- Page ---------- */
 
 function LandingPage() {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
+
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const { cur, setCur } = useLocalCurrency();
@@ -354,13 +359,14 @@ function LandingPage() {
             <span className="sr-only">Tillix</span>
           </a>
           <nav className="hidden items-center gap-8 md:flex">
-            <a href="#features" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">Features</a>
-            <a href="#industries" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">Industries</a>
-            <a href="#how" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">How it works</a>
-            <a href="#pricing" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">Pricing</a>
-            <a href="#faq" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">FAQ</a>
+            <a href="#features" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">{t('landing.nav.features')}</a>
+            <a href="#industries" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">{t('landing.nav.industries')}</a>
+            <a href="#pricing" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">{t('landing.nav.pricing')}</a>
+            <a href="#faq" className="text-sm font-medium text-slate-700 hover:text-tx-green-dark">{t('landing.nav.faq')}</a>
           </nav>
+
           <div className="flex items-center gap-2">
+            <LanguageSelect className="mr-1" />
             <div className="hidden sm:block">
               <CurrencySelect
                 value={cur.code}
@@ -373,20 +379,15 @@ function LandingPage() {
               to="/auth"
               className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-tx-navy hover:bg-slate-100 sm:inline-flex"
             >
-              Sign in
-            </Link>
-            <Link
-              to="/auth"
-              className="hidden items-center gap-1 rounded-lg border border-tx-green/30 bg-tx-green/10 px-3.5 py-2 text-sm font-semibold text-tx-green-dark transition hover:bg-tx-green/20 sm:inline-flex"
-            >
-              <Sparkles className="h-3.5 w-3.5" /> Start free trial
+              {t('landing.nav.login')}
             </Link>
             <Link
               to="/auth"
               className="inline-flex items-center gap-1 rounded-lg bg-tx-green px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-emerald-600/20 transition hover:bg-tx-green-dark sm:px-4"
             >
-              Register free
+              {t('landing.nav.signup')}
             </Link>
+
 
             <button
               type="button"
@@ -427,29 +428,25 @@ function LandingPage() {
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-tx-green/30 bg-tx-green/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-tx-green-dark">
-                <Globe2 className="h-3.5 w-3.5" /> Trusted worldwide — UAE · SA · PK · US · EU · AU
+                <Globe2 className="h-3.5 w-3.5" /> {t('landing.hero.eyebrow')}
               </div>
               <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight text-tx-navy sm:text-5xl lg:text-6xl">
-                Tillix — Smart Retail <span className="text-tx-green">Starts Here.</span>
+                {t('landing.hero.title')}
               </h1>
-              <p className="mt-3 text-lg font-semibold text-tx-navy/80 sm:text-xl">
-                Cloud POS &amp; Retail Management Software
-              </p>
               <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-                Tillix is a modern cloud POS and retail management platform for grocery stores,
-                supermarkets, pharmacies, restaurants, wholesalers and multi-store chains.
-                Billing, inventory, barcodes, customers, suppliers and real-time analytics —
-                one secure, lightning-fast platform.
+                {t('landing.hero.subtitle')}
               </p>
+
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link to="/auth" className="inline-flex items-center gap-2 rounded-xl bg-tx-green px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-tx-green-dark">
-                  Register your shop free <Zap className="h-4 w-4" />
+                  {t('landing.hero.getStarted')} <Zap className="h-4 w-4" />
                 </Link>
                 <Link to="/auth" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-tx-navy transition hover:bg-slate-50">
-                  Sign in
+                  {t('landing.nav.login')}
                 </Link>
               </div>
+
               <ul className="mt-6 grid grid-cols-2 gap-2 text-sm text-slate-600 sm:max-w-md">
                 {["Free to start","Works offline","Multi-store ready","Bank-grade security"].map(x => (
                   <li key={x} className="flex items-center gap-2"><Check className="h-4 w-4 text-tx-green" /> {x}</li>

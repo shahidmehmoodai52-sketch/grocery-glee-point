@@ -1,5 +1,8 @@
 import { createFileRoute, Outlet, redirect, useRouter, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { LanguageSelect } from "@/components/language-select/language-select";
+
 import { LogOut } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -34,7 +37,9 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function Layout() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
+
   const handleSignOut = async () => {
     // Multi-tenant safety: remove every cached row before releasing the device.
     await clearOfflineDataOnLogout();
@@ -81,11 +86,13 @@ function Layout() {
             <div className="flex-1 min-w-0">
               <LowStockAlerts />
             </div>
+            <LanguageSelect className="mr-1" />
             <OfflineStatusBadge className="mr-1" />
             <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2">
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Sign out</span>
+              <span className="hidden sm:inline">{t('common.logout')}</span>
             </Button>
+
           </header>
           <main className="flex-1 min-w-0 overflow-auto">
             <RouteGuard><Outlet /></RouteGuard>
