@@ -67,20 +67,24 @@ export function buildLedgerEntries({
   }
 
   for (const p of payments) {
-    // Standalone payments (Credit) or Cash Out (Debit)
-    if (p.party_type === "customer") {
-      const isCashOut = p.note?.includes("Cash Out") || p.cash_transaction_id;
+    // Cash Out = money handed to the customer (DEBIT). Everything else is a
+    // received payment (CREDIT). Identify Cash Out ONLY by its note marker —
+    // every payment has a linked cash_transaction_id, so that flag cannot be used.
+    if (!p.party_type || p.party_type === "customer") {
+      const note = String(p.note ?? "");
+      const isCashOut = /^\s*cash\s*out\b/i.test(note);
       entries.push({
         id: p.id,
         date: p.created_at,
         type: isCashOut ? "cash_out" : "payment",
         ref: p.method || (isCashOut ? "Cash Out" : "Payment"),
-        note: p.note ?? "",
+        note,
         debit: isCashOut ? Number(p.amount || 0) : 0,
         credit: isCashOut ? 0 : Number(p.amount || 0),
       });
     }
   }
+
 
   return entries.sort((a, b) => a.date.localeCompare(b.date));
 }
