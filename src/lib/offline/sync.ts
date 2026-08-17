@@ -24,9 +24,10 @@ const PULL_TABLES: MirroredTable[] = [
 ];
 
 const PAGE = 1000;
-/** Safety ceiling per table per sync pass (products can be huge on first sync). */
-const MAX_PAGES = 150; // 150k rows
-const MAX_ATTEMPTS = 8;
+/** Maximum pages per table per sync pass to prevent memory exhaustion.
+ *  If a table exceeds this, the sync will error loudly rather than truncating. */
+const MAX_PAGES = 500; // 500k rows
+const MAX_ATTEMPTS = 50; // Increased retry budget; failures are never silently discarded now.
 /** Full-pull tables can be large (item history). Don't re-download too often. */
 const FULL_PULL_MIN_GAP_MS = 20 * 60_000;
 
@@ -80,9 +81,12 @@ async function pullTable(table: MirroredTable): Promise<number> {
     if (!full && since) q = q.gt(watermarkCol, since);
     const { data, error } = await q;
     if (error) throw new Error(`${table}: ${error.message}`);
+    
     if (!data || data.length === 0) break;
+    
     await (db() as any)[table].bulkPut(data);
     total += data.length;
+    
     if (!full) {
       const pageMax = data
         .map((r: any) => r.updated_at ?? r.created_at)
@@ -91,7 +95,15 @@ async function pullTable(table: MirroredTable): Promise<number> {
         .pop();
       if (pageMax && (!maxTs || pageMax > maxTs)) maxTs = pageMax;
     }
+    
+    // If we finished the dataset, we're done.
     if (data.length < PAGE) break;
+    
+    // If we hit the safety limit on the last iteration, it means there's more data.
+    if (page === MAX_PAGES - 1) {
+      throw new Error(`${table}: Sync safety limit reached (${MAX_PAGES * PAGE} rows). Please contact support for large dataset synchronization.`);
+    }
+
     // Give the main thread back between pages so scanning/checkout stay instant.
     await yieldToUI();
   }
@@ -109,7 +121,8 @@ const ACTIVE_STATUSES = ["pending", "failed", "retrying", "syncing", "uploading"
 
 /** Exponential backoff with jitter: 5s, 10s, 20s … capped at 5 minutes. */
 function backoffMs(attempts: number): number {
-  const base = Math.min(5_000 * 2 ** Math.max(0, attempts), 5 * 60_000);
+  // Max delay 1 hour for long-term retries.
+  const base = Math.min(5_000 * 2 ** Math.max(0, attempts), 60 * 60_000);
   return base + Math.floor(Math.random() * 1000);
 }
 
@@ -153,11 +166,8 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
   let cancelled = 0;
   const runnable: typeof all = [];
   for (const r of all) {
-    if ((r.attempts ?? 0) >= MAX_ATTEMPTS) {
-      await db()._queue.update(r.id!, { status: "cancelled" });
-      cancelled++;
-      continue;
-    }
+    // We no longer auto-cancel based on attempts. Exhausted attempts just wait longer.
+    // Permanent errors are still surfaced.
     if (r.next_attempt_at && r.next_attempt_at > nowIso) continue; // backoff not elapsed
     runnable.push(r);
   }
@@ -207,13 +217,16 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
       failed++;
       const attempts = (item.attempts ?? 0) + 1;
       const permanent = isPermanentSyncError(e);
-      const exhausted = permanent || attempts >= MAX_ATTEMPTS;
-      if (exhausted) cancelled++;
+      // Permanent errors (validation/schema/auth) stop retrying.
+      // Temporary network errors retry indefinitely with exponential backoff.
+      const shouldCancel = permanent;
+      if (shouldCancel) cancelled++;
+      
       await db()._queue.update(item.id!, {
-        status: exhausted ? "cancelled" : "retrying",
+        status: shouldCancel ? "cancelled" : "retrying",
         attempts,
-        last_error: `${permanent ? "PERMANENT: " : ""}${String(e?.message ?? e)}`,
-        next_attempt_at: exhausted ? null : new Date(Date.now() + backoffMs(attempts)).toISOString(),
+        last_error: `${permanent ? "PERMANENT ERROR: " : "SYNC ERROR: "}${String(e?.message ?? e)}`,
+        next_attempt_at: shouldCancel ? null : new Date(Date.now() + backoffMs(attempts)).toISOString(),
       });
       // Preserve chronological application for this entity only.
       blocked.add(item.table);
