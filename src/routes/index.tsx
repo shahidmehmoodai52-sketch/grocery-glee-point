@@ -402,7 +402,7 @@ function LandingPage() {
         {menuOpen && (
           <div className="border-t border-slate-200 bg-white md:hidden">
             <div className="mx-auto flex max-w-7xl flex-col px-4 py-2 sm:px-6">
-              [[t('landing.nav.features'),"#features"],[t('landing.nav.industries'),"#industries"],[t('landing.how.eyebrow'),"#how"],[t('landing.nav.pricing'),"#pricing"],[t('landing.nav.faq'),"#faq"]].map(([label, href]) => (
+              {[[t('landing.nav.features'),"#features"],[t('landing.nav.industries'),"#industries"],[t('landing.how.eyebrow'),"#how"],[t('landing.nav.pricing'),"#pricing"],[t('landing.nav.faq'),"#faq"]].map(([label, href]) => (
                 <a key={href} href={href} onClick={() => setMenuOpen(false)} className="py-2 text-sm font-medium text-slate-700">
                   {label}
                 </a>
