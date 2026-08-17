@@ -25,7 +25,9 @@
       "basic_sub": "Perfecto para una sola tienda que está empezando.",
       "save_pct": "AHORRA 50%",
       "start_trial": "Comienza la prueba gratuita de 7 días",
-      "recommended": "Recomendado"
+      "recommended": "Recomendado",
+      "pro_sub": "For growing shops & multi-cashier teams.",
+      "auto_convert": "Prices auto-converted from USD based on your location. Taxes may apply. Cancel anytime."
     },
     "industries": {
       "eyebrow": "Built for every retailer",

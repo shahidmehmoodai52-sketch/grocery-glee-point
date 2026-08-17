@@ -25,7 +25,9 @@
       "basic_sub": "Perfect for a single shop getting started.",
       "save_pct": "SAVE 50%",
       "start_trial": "Start 7-day free trial",
-      "recommended": "Recommended"
+      "recommended": "Recommended",
+      "pro_sub": "For growing shops & multi-cashier teams.",
+      "auto_convert": "Prices auto-converted from USD based on your location. Taxes may apply. Cancel anytime."
     },
     "industries": {
       "eyebrow": "Built for every retailer",

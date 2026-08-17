@@ -830,7 +830,7 @@ function LandingPage() {
           </div>
 
           <p className="mt-6 text-center text-xs text-slate-500">
-            Prices auto-converted from USD based on your location. Taxes may apply. Cancel anytime.
+            {t('landing.pricing.auto_convert', 'Prices auto-converted from USD based on your location. Taxes may apply. Cancel anytime.')}
           </p>
         </div>
       </section>
