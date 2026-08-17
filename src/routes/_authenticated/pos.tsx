@@ -2960,14 +2960,14 @@ function POSPage() {
                   type="button"
                   size="sm"
                   variant={tab.expense_person_id || showStaff ? "secondary" : "ghost"}
-                  className="h-6 text-[11px] px-2"
+                  className={`h-6 text-[11px] px-2 ${tab.expense_person_id ? "bg-warning/20 text-warning border-warning/30" : ""}`}
                   title="Charge this bill to a staff/owner expense ledger"
                   onClick={() => {
                     if (tab.expense_person_id || showStaff) {
                       setTab({ expense_person_id: null, payment_method: "cash" });
                       setShowStaff(false);
                     } else {
-                      setTab({ expense_person_id: null, payment_method: "staff" });
+                      setTab({ expense_person_id: null, payment_method: "staff", customer_id: null });
                       setShowStaff(true);
                     }
                     setTimeout(() => searchRef.current?.focus(), 0);
