@@ -102,8 +102,17 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     if (typed.trim().toLowerCase() !== expected.toLowerCase()) {
       return toast.error(`Confirmation did not match. Expected: "${expected}"`);
     }
-    const { error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: expected });
-    if (error) return toast.error(error.message);
+    let done = false;
+    while (!done) {
+      const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: expected });
+      if (error) return toast.error(error.message);
+      done = Boolean(
+        deletionResult
+        && typeof deletionResult === "object"
+        && "done" in deletionResult
+        && deletionResult.done,
+      );
+    }
     toast.success(`Deleted "${expected}"`);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
     navigate({ to: "/admin", replace: true });
