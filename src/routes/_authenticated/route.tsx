@@ -128,10 +128,11 @@ function Layout() {
             </div>
             <LanguageSelect className="mr-1" />
             <OfflineStatusBadge className="mr-1" />
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleSignOut(false)} className="gap-2">
               <LogOut className="h-4 w-4" />
               <span className="hidden sm:inline">{t('common.logout')}</span>
             </Button>
+
 
           </header>
           <main className="flex-1 min-w-0 overflow-auto">
