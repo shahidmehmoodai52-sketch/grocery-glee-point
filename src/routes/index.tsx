@@ -1,5 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { LanguageSelect } from "@/components/language-select/language-select";
+
 import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
@@ -271,7 +274,9 @@ function SectionTitle({ eyebrow, title, sub }: { eyebrow?: string; title: string
 /* ---------- Page ---------- */
 
 function LandingPage() {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
+
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const { cur, setCur } = useLocalCurrency();
