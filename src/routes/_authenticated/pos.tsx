@@ -1178,7 +1178,7 @@ function POSPage() {
       payment_method: nextMethod,
     };
 
-    if (nextMethod !== "credit") {
+    if (nextMethod !== "credit" && nextMethod !== "staff") {
       patch.customer_id = null;
     }
     // Digital and Digital + CB are separate methods; both use digital_account_id
@@ -1193,6 +1193,7 @@ function POSPage() {
     // Ensure we sync the payment method when selecting staff.
     if (nextMethod === "staff") {
       // If we don't have a staff member selected yet, the UI will trigger showStaff=true.
+      patch.customer_id = null;
     } else {
       patch.expense_person_id = null;
     }
@@ -2866,6 +2867,7 @@ function POSPage() {
                       payment_method: isWalkin ? "cash" : "credit",
                       expense_person_id: null,
                     });
+                    if (!isWalkin) setShowStaff(false);
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
@@ -2927,6 +2929,7 @@ function POSPage() {
                       customer_id: null,
                       payment_method: isStaff ? "staff" : "cash",
                     });
+                    // If we just selected "none", we can hide the staff section to clean up the UI
                     if (!isStaff) setShowStaff(false);
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
@@ -2957,14 +2960,14 @@ function POSPage() {
                   type="button"
                   size="sm"
                   variant={tab.expense_person_id || showStaff ? "secondary" : "ghost"}
-                  className="h-6 text-[11px] px-2"
+                  className={`h-6 text-[11px] px-2 ${tab.expense_person_id ? "bg-warning/20 text-warning border-warning/30" : ""}`}
                   title="Charge this bill to a staff/owner expense ledger"
                   onClick={() => {
                     if (tab.expense_person_id || showStaff) {
                       setTab({ expense_person_id: null, payment_method: "cash" });
                       setShowStaff(false);
                     } else {
-                      setTab({ expense_person_id: null, payment_method: "staff" });
+                      setTab({ expense_person_id: null, payment_method: "staff", customer_id: null });
                       setShowStaff(true);
                     }
                     setTimeout(() => searchRef.current?.focus(), 0);
