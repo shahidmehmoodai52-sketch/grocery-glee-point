@@ -1,0 +1,54 @@
+
+import { supabaseAdmin } from "./src/integrations/supabase/client.server";
+
+async function auditShop() {
+  console.log(`Auditing all sales and payments for ALL shops to find "fake" entries...`);
+  
+  const { data: tenants } = await supabaseAdmin.from('tenants').select('id, name');
+  
+  const { data: sales } = await supabaseAdmin
+    .from('sales')
+    .select(`
+      id, invoice_no, total, created_at, note, tenant_id,
+      sale_items (id, name, product_id)
+    `)
+    .order('created_at', { ascending: false });
+
+  console.log(`\n--- anomalous sales (missing products or empty) ---`);
+  
+  let found = 0;
+  sales?.forEach(s => {
+    const items = (s.sale_items as any[]) || [];
+    const isAnomalous = items.length === 0 || items.some(i => !i.product_id);
+    
+    if (isAnomalous) {
+      found++;
+      const tenantName = tenants?.find(t => t.id === s.tenant_id)?.name || 'Unknown';
+      console.log(`[!] Store: ${tenantName} | Date: ${s.created_at} | Invoice: ${s.invoice_no} | Total: ${s.total}`);
+      console.log(`    Note: ${s.note || 'None'}`);
+      console.log(`    Items Count: ${items.length}`);
+      items.filter(i => !i.product_id).forEach(i => console.log(`    - Missing Product ID: "${i.name}"`));
+      console.log('-------------------------------------------------');
+    }
+  });
+  console.log(`Total anomalous sales: ${found}`);
+
+  const { data: payments } = await supabaseAdmin
+    .from('party_payments')
+    .select(`
+      id, amount, note, created_at, party_id, tenant_id,
+      customers (name)
+    `)
+    .order('created_at', { ascending: false });
+
+  console.log(`\n--- all manual payments (ledger hits) ---`);
+  payments?.forEach(p => {
+    const customerName = (p.customers as any)?.name || 'Unknown';
+    const tenantName = tenants?.find(t => t.id === p.tenant_id)?.name || 'Unknown';
+    console.log(`[!] Store: ${tenantName} | Date: ${p.created_at} | Payment: ${p.amount} | Customer: ${customerName}`);
+    console.log(`    Note: ${p.note || 'None'}`);
+    console.log('-------------------------------------------------');
+  });
+}
+
+auditShop().catch(console.error);
