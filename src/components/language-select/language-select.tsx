@@ -22,14 +22,22 @@ const languages = [
 export function LanguageSelect({ className }: { className?: string }) {
   const { i18n } = useTranslation();
 
-  const changeLanguage = (code: string) => {
-    i18n.changeLanguage(code);
-    const lang = languages.find((l) => l.code === code);
-    if (lang) {
-      document.documentElement.dir = lang.dir;
-      document.documentElement.lang = lang.code;
+  const changeLanguage = async (code: string) => {
+    try {
+      console.log('Changing language to:', code);
+      await i18n.changeLanguage(code);
+      const lang = languages.find((l) => l.code === code);
+      if (lang) {
+        document.documentElement.dir = lang.dir;
+        document.documentElement.lang = lang.code;
+      }
+      // Force a reload of the current route to ensure all translations are updated
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to change language:', err);
     }
   };
+
 
   const currentLang = languages.find((l) => l.code === i18n.language) || languages[0];
 
