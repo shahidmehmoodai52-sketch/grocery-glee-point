@@ -2929,8 +2929,8 @@ function POSPage() {
                       customer_id: null,
                       payment_method: isStaff ? "staff" : "cash",
                     });
-                    // Logic fix: Don't hide the selector immediately when selecting a staff member
-                    // but DO ensure we focus the search.
+                    // If we just selected "none", we can hide the staff section to clean up the UI
+                    if (!isStaff) setShowStaff(false);
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
