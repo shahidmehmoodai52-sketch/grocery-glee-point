@@ -1,0 +1,32 @@
+{
+  "landing": {
+    "hero": {
+      "eyebrow": "Modern Retail Ecosystem",
+      "title": "Smart Retail Starts Here",
+      "subtitle": "Tillix is a powerful, cloud-based POS system designed for modern shops, supermarkets, and multi-store retail. Manage billing, inventory, and staff with ease.",
+      "getStarted": "Get Started Free",
+      "demo": "Watch Demo",
+      "trusted": "Trusted by 2,000+ businesses worldwide"
+    },
+    "nav": {
+      "features": "Features",
+      "industries": "Industries",
+      "pricing": "Pricing",
+      "faq": "FAQ",
+      "login": "Log in",
+      "signup": "Sign Up"
+    }
+  },
+  "common": {
+    "logout": "Sign out",
+    "dashboard": "Dashboard",
+    "pos": "POS",
+    "products": "Products",
+    "customers": "Customers",
+    "suppliers": "Suppliers",
+    "purchases": "Purchases",
+    "expenses": "Expenses",
+    "reports": "Reports",
+    "settings": "Settings"
+  }
+}
