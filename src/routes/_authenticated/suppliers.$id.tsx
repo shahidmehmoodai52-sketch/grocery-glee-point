@@ -18,23 +18,11 @@ import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger } from "@/lib/customer-ledger";
+import { buildSupplierLedgerEntries, type LedgerEntry as Entry } from "@/lib/supplier-ledger";
 
 
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
 
-type Entry = {
-  id?: string;
-  entity?: LedgerEntity;
-  date: string;
-  type: "purchase" | "payment" | "return";
-  ref: string;
-  note: string;
-  debit: number;   // In  (+) — we owe more
-  credit: number;  // Out (−) — we paid / refunded
-  purchase_id?: string;
-  paid?: number;
-  total?: number;
-};
 
 function Page() {
   const { id } = Route.useParams();
@@ -94,21 +82,11 @@ function Page() {
   });
 
   const entries: Entry[] = useMemo(() => {
-    const e: Entry[] = [];
-    for (const p of purchases as any[]) {
-      e.push({ id: p.id, entity: "purchase", date: p.created_at, type: "purchase", ref: p.invoice_no, note: p.note ?? "", debit: Number(p.total), credit: 0, purchase_id: p.id, paid: Number(p.paid), total: Number(p.total) });
-      if (Number(p.paid) > 0) {
-        e.push({ date: p.created_at, type: "payment", ref: `${p.invoice_no} · on-invoice`, note: "Paid at purchase time", debit: 0, credit: Number(p.paid) });
-      }
-    }
-    for (const r of returns as any[]) {
-      e.push({ id: r.id, entity: "purchase_return", date: r.created_at, type: "return", ref: r.return_no, note: r.note ?? "", debit: 0, credit: Number(r.total) });
-    }
-    for (const pay of payments as any[]) {
-      e.push({ id: pay.id, entity: "payment", date: pay.created_at, type: "payment", ref: pay.method, note: pay.note ?? "", debit: 0, credit: Number(pay.amount) });
-    }
-    e.sort((a, b) => a.date.localeCompare(b.date));
-    return e;
+    return buildSupplierLedgerEntries({
+      purchases: purchases as any[],
+      payments: payments as any[],
+      returns: returns as any[],
+    });
   }, [purchases, payments, returns]);
 
   const filteredEntries = entries.filter((x) => {
@@ -263,10 +241,10 @@ function Page() {
               <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
             )}
             {rows.map((x, i) => {
-              const isPurchase = x.type === "purchase" && x.purchase_id;
-              const open = isPurchase && expanded.has(x.purchase_id!);
-              const items = isPurchase ? itemsByPurchase.get(x.purchase_id!) ?? [] : [];
-              const due = isPurchase ? Number(x.total || 0) - Number(x.paid || 0) : 0;
+              const isPurchase = x.entity === "purchase" && x.id;
+              const open = isPurchase && expanded.has(x.id!);
+              const items = isPurchase ? itemsByPurchase.get(x.id!) ?? [] : [];
+              const due = isPurchase ? Number(x.data?.total || 0) - Number(x.data?.paid || 0) : 0;
               return (
                 <Fragment key={i}>
                   <TableRow
@@ -274,7 +252,7 @@ function Page() {
                     onClick={(e) => {
                       // Let the inline action buttons handle their own clicks.
                       if ((e.target as HTMLElement).closest("button")) return;
-                      if (isPurchase) return toggle(x.purchase_id!);
+                      if (isPurchase) return toggle(x.id!);
                       if (x.entity === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
                       if (x.entity && x.id) return setEditEntry({ entity: x.entity as Exclude<LedgerEntity, "payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
                     }}
@@ -289,7 +267,7 @@ function Page() {
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {isPurchase ? (
-                        <button onClick={() => toggle(x.purchase_id!)} className="inline-flex items-center gap-1 hover:underline no-print">
+                        <button onClick={() => toggle(x.id!)} className="inline-flex items-center gap-1 hover:underline no-print">
                           {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                           {x.ref}
                         </button>
@@ -297,7 +275,7 @@ function Page() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {x.note || "—"}
-                      {isPurchase && due <= 0 && Number(x.paid || 0) > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">Paid</Badge>}
+                      {isPurchase && due <= 0 && Number(x.data?.paid || 0) > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">Paid</Badge>}
 
                     </TableCell>
                     <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
@@ -329,7 +307,7 @@ function Page() {
                     <TableRow key={`${i}-d`} className="bg-muted/30">
                       <TableCell colSpan={8} className="p-0">
                         <div className="p-3">
-                          <div className="text-xs font-medium mb-2 text-muted-foreground">Items in {x.ref} · Total {fmtMoney(Number(x.total||0), sym)} · Paid {fmtMoney(Number(x.paid||0), sym)} · Due {fmtMoney(due, sym)}</div>
+                          <div className="text-xs font-medium mb-2 text-muted-foreground">Items in {x.ref} · Total {fmtMoney(Number(x.data?.total||0), sym)} · Paid {fmtMoney(Number(x.data?.paid||0), sym)} · Due {fmtMoney(due, sym)}</div>
                           {items.length === 0 ? (
                             <div className="text-xs text-muted-foreground">No item details</div>
                           ) : (
