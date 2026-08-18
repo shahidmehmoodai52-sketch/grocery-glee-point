@@ -385,10 +385,9 @@ async function searchProducts(term: string) {
 
 async function searchProductsOnline(q: string) {
   const prefix = `${q}%`;
-  // Optimized indexed search: Exact hits first, then prefix.
-  // Using ilike on name with leading % is slow, but we can't avoid it without full-text search.
-  // We'll prioritize exact/prefix SKU and Barcode matches which are indexed.
-  const [exactSkuRes, exactBarcodeRes, nameRes] = await Promise.all([
+  const like = `%${q}%`;
+  
+  const [exactSkuRes, exactBarcodeRes, nameRes, extraBarcodeRes] = await Promise.all([
     supabase
       .from("products")
       .select(PRODUCT_COLUMNS)
@@ -405,59 +404,36 @@ async function searchProductsOnline(q: string) {
       .from("products")
       .select(PRODUCT_COLUMNS)
       .eq("is_active", true)
-      .ilike("name", `%${q}%`)
-      .order("name")
-      .limit(50),
-  ]);
-
-  const merged = new Map<string, any>();
-  [...(exactSkuRes.data ?? []), ...(exactBarcodeRes.data ?? []), ...(nameRes.data ?? [])].forEach(p => merged.set(p.id, p));
-  return Array.from(merged.values());
-}
+      .ilike("name", like)
       .order("name")
       .limit(50),
     supabase
-      .from("products")
-      .select(PRODUCT_COLUMNS)
-      .eq("is_active", true)
-      .ilike("barcode", like)
-      .order("name")
+      .from("product_barcodes")
+      .select("product_id,barcode")
+      .ilike("barcode", prefix)
       .limit(50),
-    supabase.from("product_barcodes").select("product_id,barcode").ilike("barcode", like).limit(50),
   ]);
 
-  const firstError = nameRes.error ?? skuRes.error ?? barcodeRes.error ?? extraBarcodeRes.error;
+  const firstError = nameRes.error ?? exactSkuRes.error ?? exactBarcodeRes.error ?? extraBarcodeRes.error;
   if (firstError) throw firstError;
 
-  const matchedBarcodesByProduct: Record<string, string[]> = {};
-  for (const row of extraBarcodeRes.data ?? []) {
-    if (!matchedBarcodesByProduct[row.product_id]) matchedBarcodesByProduct[row.product_id] = [];
-    matchedBarcodesByProduct[row.product_id].push(row.barcode);
-  }
-
-  const extraIds = Object.keys(matchedBarcodesByProduct);
+  const extraIds = (extraBarcodeRes.data ?? []).map(r => r.product_id);
   const extraProductsRes = extraIds.length
     ? await supabase
         .from("products")
         .select(PRODUCT_COLUMNS)
         .eq("is_active", true)
         .in("id", extraIds)
-        .limit(24)
+        .limit(50)
     : { data: [], error: null };
-  if (extraProductsRes.error) throw extraProductsRes.error;
 
   const merged = new Map<string, any>();
-  for (const p of [
+  [
+    ...(exactSkuRes.data ?? []),
+    ...(exactBarcodeRes.data ?? []),
     ...(nameRes.data ?? []),
-    ...(skuRes.data ?? []),
-    ...(barcodeRes.data ?? []),
-    ...(extraProductsRes.data ?? []),
-  ]) {
-    merged.set(p.id, {
-      ...p,
-      _matched_barcodes: matchedBarcodesByProduct[p.id] ?? [],
-    });
-  }
+    ...(extraProductsRes.data ?? [])
+  ].forEach(p => merged.set(p.id, p));
 
   return Array.from(merged.values());
 }
