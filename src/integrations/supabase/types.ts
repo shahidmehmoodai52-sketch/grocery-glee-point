@@ -3398,6 +3398,7 @@ export type Database = {
           name: string
           owner_id: string | null
           plan: string
+          shop_code: string | null
           slug: string | null
           status: string
           updated_at: string
@@ -3412,6 +3413,7 @@ export type Database = {
           name: string
           owner_id?: string | null
           plan?: string
+          shop_code?: string | null
           slug?: string | null
           status?: string
           updated_at?: string
@@ -3426,6 +3428,7 @@ export type Database = {
           name?: string
           owner_id?: string | null
           plan?: string
+          shop_code?: string | null
           slug?: string | null
           status?: string
           updated_at?: string
@@ -4081,6 +4084,8 @@ export type Database = {
       }
       my_tenant_expires_at: { Args: never; Returns: string }
       my_tenant_status: { Args: never; Returns: string }
+      next_purchase_invoice_no: { Args: never; Returns: string }
+      next_sale_invoice_no: { Args: never; Returns: string }
       open_shift: {
         Args: { _notes?: string; _opening_cash: number }
         Returns: string
