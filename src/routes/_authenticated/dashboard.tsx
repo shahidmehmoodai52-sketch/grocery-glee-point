@@ -176,8 +176,6 @@ function Page() {
   const profit = salesProfit - returnsProfit;
   // Fallback for comparison if prevSalesProfit isn't available
   const prevProfit = prevRevenue * 0.2; // Simplified fallback for comparison UI
-  // Fallback for comparison if prevSalesProfit isn't available
-  const prevProfit = prevRevenue * 0.2; // Simplified fallback for comparison UI
 
   const pct = (curr: number, prev: number) => {
     if (!prev) return curr ? 100 : 0;
