@@ -1187,8 +1187,13 @@ function POSPage() {
       payment_method: nextMethod,
     };
 
-    if (nextMethod !== "credit" && nextMethod !== "staff") {
+    if (nextMethod === "staff") {
       patch.customer_id = null;
+    } else if (nextMethod !== "credit") {
+      patch.customer_id = null;
+      patch.expense_person_id = null;
+    } else {
+      patch.expense_person_id = null;
     }
     // Digital and Digital + CB are separate methods; both use digital_account_id
     // but only the cash-back flow uses digital_received_amount.
