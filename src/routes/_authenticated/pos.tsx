@@ -2973,10 +2973,18 @@ function POSPage() {
                   title="Charge this bill to a staff/owner expense ledger"
                   onClick={() => {
                     if (tab.expense_person_id || showStaff) {
-                      setTab({ expense_person_id: null, payment_method: "cash" });
+                      setTab({
+                        expense_person_id: null,
+                        customer_id: null,
+                        payment_method: "cash"
+                      });
                       setShowStaff(false);
                     } else {
-                      setTab({ expense_person_id: null, payment_method: "staff", customer_id: null });
+                      setTab({
+                        expense_person_id: null,
+                        payment_method: "staff",
+                        customer_id: null
+                      });
                       setShowStaff(true);
                     }
                     setTimeout(() => searchRef.current?.focus(), 0);
