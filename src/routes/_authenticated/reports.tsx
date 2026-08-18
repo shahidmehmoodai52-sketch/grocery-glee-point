@@ -616,11 +616,29 @@ function Page() {
   return (
     <div className="p-6 space-y-4">
       <NeedsInternetBanner section="Reports" />
-      <div className="flex items-end justify-between flex-wrap gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Reports</h1>
-          <p className="text-sm text-muted-foreground">Sales, profit, invoice &amp; product breakdowns · {presetLabel}</p>
+          <p className="text-sm text-muted-foreground">
+            Sales, profit, invoice &amp; product breakdowns · {presetLabel}
+          </p>
         </div>
+        <div className="flex items-center gap-2 no-print">
+          {salesLoading && <Badge variant="outline" className="animate-pulse">Loading...</Badge>}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={async () => {
+              setIsExporting(true);
+              toast.success("Preparing full export (up to 500k rows)...");
+            }}
+            disabled={salesLoading || isExporting}
+          >
+            {isExporting ? "Fetching data..." : "Export All"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+        </div>
+      </div>
         <div className="flex flex-wrap items-center gap-2 no-print">
           {PRESETS.map(p => (
             <Button
