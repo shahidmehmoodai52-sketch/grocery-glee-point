@@ -75,56 +75,39 @@ function Page() {
   };
 
   const { data: rows = [] } = useQuery({
-    queryKey: ["suppliers"],
-    // Local-first on cold start (instant paint), cloud on every later refetch.
-    queryFn: async () => readLocalFirst<any[]>({
-      table: "suppliers",
-      cloud: async () => (await supabase.from("suppliers").select("*").order("name")).data ?? [],
-      local: async () => (await db().suppliers.orderBy("name").toArray()) as any[],
-      cache: cacheSuppliers,
-      onRevalidated: (fresh: any[]) => qc.setQueryData(["suppliers"], fresh),
-    }),
+    queryKey: ["suppliers-with-balances"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_supplier_balances");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   const { data: cashAccounts = [] } = useQuery({
     queryKey: ["cash-accounts", "supplier-pay"],
     queryFn: async () => (await supabase.from("cash_accounts").select("id,name,type,is_active").eq("is_active", true).order("sort_order").order("name")).data ?? [],
   });
-  const { data: purchases = [] } = useQuery({
-    queryKey: ["supplier-list-purchases"],
-    queryFn: async () => (await supabase.from("purchases").select("id,supplier_id,total,paid,created_at").order("created_at", { ascending: true })).data ?? [],
-  });
-  const { data: payments = [] } = useQuery({
-    queryKey: ["supplier-list-payments"],
-    queryFn: async () => (await supabase.from("party_payments").select("id,party_type,party_id,amount,created_at").eq("party_type", "supplier").order("created_at", { ascending: true })).data ?? [],
-  });
-  const { data: returns = [] } = useQuery({
-    queryKey: ["supplier-list-returns"],
-    queryFn: async () => (await supabase.from("purchase_returns").select("id,supplier_id,total,refund_amount,created_at").order("created_at", { ascending: true })).data ?? [],
-  });
 
-  const supplierBalances = useMemo(() => {
-    const map = new Map<string, number>();
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((c: any) =>
+      (c.name ?? "").toLowerCase().includes(q) ||
+      (c.phone ?? "").toLowerCase().includes(q) ||
+      (c.email ?? "").toLowerCase().includes(q) ||
+      (c.address ?? "").toLowerCase().includes(q),
+    );
+  }, [rows, search]);
+
+  const totals = useMemo(() => {
+    let payable = 0, advance = 0;
     for (const s of rows as any[]) {
-      const entries: Array<{ debit: number; credit: number }> = [];
-      for (const p of purchases as any[]) {
-        if (p.supplier_id !== s.id) continue;
-        entries.push({ debit: Number(p.total || 0), credit: 0 });
-        if (Number(p.paid || 0) > 0) entries.push({ debit: 0, credit: Number(p.paid || 0) });
-      }
-      for (const r of returns as any[]) {
-        if (r.supplier_id !== s.id) continue;
-        entries.push({ debit: 0, credit: Number(r.total || 0) });
-      }
-      for (const pay of payments as any[]) {
-        if (pay.party_id !== s.id) continue;
-        entries.push({ debit: 0, credit: Number(pay.amount || 0) });
-      }
-      const summary = summarizeCustomerLedger({ openingBalance: Number(s.opening_balance ?? 0), entries });
-      map.set(s.id, summary.closing);
+      const b = Number(s.current_balance || 0);
+      if (b > 0) payable += b;
+      else if (b < 0) advance += -b;
     }
-    return map;
-  }, [rows, purchases, payments, returns]);
+    return { payable, advance, net: payable - advance };
+  }, [rows]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -249,7 +232,7 @@ function Page() {
                 </TableRow>
               )}
               {filtered.map((c: any) => {
-                const bal = supplierBalances.get(c.id) ?? Number(c.balance ?? 0);
+                const bal = Number(c.current_balance ?? 0);
                 return (
                   <TableRow
                     key={c.id}
