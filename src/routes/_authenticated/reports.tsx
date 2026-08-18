@@ -639,45 +639,45 @@ function Page() {
           <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </div>
       </div>
-        <div className="flex flex-wrap items-center gap-2 no-print">
-          {PRESETS.map(p => (
+      <div className="flex flex-wrap items-center gap-2 no-print">
+        {PRESETS.map(p => (
+          <Button
+            key={p.key}
+            variant={preset === p.key ? "default" : "outline"}
+            size="sm"
+            onClick={() => applyPreset(p.key)}
+          >
+            {p.label}
+          </Button>
+        ))}
+        <Popover>
+          <PopoverTrigger asChild>
             <Button
-              key={p.key}
-              variant={preset === p.key ? "default" : "outline"}
+              variant={preset === "custom" ? "default" : "outline"}
               size="sm"
-              onClick={() => applyPreset(p.key)}
+              className={cn("gap-2")}
             >
-              {p.label}
+              <CalendarIcon className="h-4 w-4" />
+              {fromDate && toDate
+                ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
+                : "Custom range"}
             </Button>
-          ))}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={preset === "custom" ? "default" : "outline"}
-                size="sm"
-                className={cn("gap-2")}
-              >
-                <CalendarIcon className="h-4 w-4" />
-                {fromDate && toDate
-                  ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
-                  : "Custom range"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="range"
-                selected={{ from: fromDate, to: toDate }}
-                onSelect={(r) => {
-                  setPreset("custom");
-                  setFromDate(r?.from);
-                  setToDate(r?.to);
-                }}
-                numberOfMonths={2}
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="range"
+              selected={{ from: fromDate, to: toDate }}
+              onSelect={(r) => {
+                setPreset("custom");
+                setFromDate(r?.from);
+                setToDate(r?.to);
+              }}
+              numberOfMonths={2}
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
       </div>
 
 
