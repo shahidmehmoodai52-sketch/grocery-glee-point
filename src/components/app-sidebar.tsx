@@ -100,7 +100,9 @@ export function AppSidebar() {
       const count = await getPendingQueueCount();
       if (count > 0) {
         hasPending = true;
-        if (!confirm(`Warning: You have ${count} unsynced offline transactions. Logging out will PERMANENTLY delete them. Proceed?`)) {
+        // Sidebar uses native confirm for simplicity as it's less reachable than the header button
+        // but we ensure it correctly preserves data unless confirmed.
+        if (!confirm(`Warning: You have ${count} unsynced offline transactions. Logging out now will PERMANENTLY delete them. \n\nClick OK to discard and log out, or Cancel to stay and sync.`)) {
           return;
         }
       }
