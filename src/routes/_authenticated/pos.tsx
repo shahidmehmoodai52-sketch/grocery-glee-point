@@ -1877,7 +1877,7 @@ function POSPage() {
       const payload = {
         customer_id: tab.expense_person_id ? null : tab.customer_id,
         expense_person_id: tab.expense_person_id,
-        payment_method: paymentMethodLabel,
+        payment_method: tab.expense_person_id ? "staff" : paymentMethodLabel,
         tax,
         digital_cash_back_mode: isDigitalCashBackMode,
         digital_received_amount: isDigitalCashBackMode
