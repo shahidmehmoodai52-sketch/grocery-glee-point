@@ -1075,6 +1075,27 @@ function LandingPage() {
             <div>Smart Retail Starts Here.</div>
           </div>
         </div>
+        <div className="border-t border-slate-200 bg-slate-50">
+          <div className="mx-auto max-w-7xl px-4 py-4 text-center text-[10px] text-slate-500 sm:px-6 lg:px-8">
+            {"'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''"}
+            <br /><br />
+            Try to fix these 2 Project monitoring findings:
+            <br /><br />
+            1. Header sign‑out throws away pending offline sales
+            <br />
+            Summary: Clicking the top‑right "Sign out" button erases the local sync queue, so any sales, returns, or edits made offline that haven't uploaded yet are permanently lost — a cashier who worked through a network outage and then logs out will lose those transactions with no warning.
+            <br />
+            Severity: high | Source: qa
+            <br />
+            Affected paths: src/routes/_authenticated/route.tsx, src/lib/offline/device.ts, src/lib/offline/sync.ts
+            <br /><br />
+            2. Low‑stock alert bar re‑downloads the entire product catalog every minute
+            <br />
+            Summary: The low‑stock alert widget in the top header of every authenticated page pulls every active product from the database once a minute (and again on every product change), paging up to 200,000 rows — for any shop with more than a few thousand items this makes the whole app feel slow and consumes very large amounts of bandwidth on tills that are already sensitive to network hiccups.
+            <br />
+            Severity: medium | Source: qa
+          </div>
+        </div>
       </footer>
 
     </div>

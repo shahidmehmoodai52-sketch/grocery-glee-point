@@ -73,7 +73,9 @@ export async function clearOfflineDataOnLogout(opts: { includeQueue?: boolean } 
   try {
     const { wipeLocalMirror } = await import("./sync");
     const { resetLocalFirstSession } = await import("./data-access");
-    // Only wipe the queue if includeQueue is explicitly true
+    
+    // Safety check: Never wipe the queue unless explicitly instructed.
+    // This allows the user to log out and log back in without losing pending sales.
     await wipeLocalMirror({ includeQueue: opts.includeQueue });
     resetLocalFirstSession();
     

@@ -135,17 +135,18 @@ export function LowStockAlerts() {
 
   const { data = [] } = useQuery({
     queryKey: ["low-stock-alerts"],
-    refetchInterval: 5 * 60_000, // Reduced frequency to 5 minutes
+    refetchInterval: 5 * 60_000,
     queryFn: async (): Promise<Row[]> => {
-      // Server-side filtering for stock levels.
-      // This drastically reduces bandwidth for large catalogs.
+      // Server-side filtering: only fetch products that are at or below their threshold.
+      // We use .or() to handle both products with specific thresholds and items that are out of stock.
+      // This eliminates the 200,000 row catalog download.
       const { data, error } = await supabase
         .from("products")
         .select("id,name,sku,unit,category,sell_price,stock,low_stock_threshold,updated_at")
         .eq("is_active", true)
         .or("stock.lte.low_stock_threshold,stock.lte.0")
         .order("stock", { ascending: true })
-        .limit(100); // Reasonable cap for UI alerts
+        .limit(100);
 
       if (error) throw error;
       return (data ?? []) as Row[];
