@@ -1075,29 +1075,6 @@ function LandingPage() {
             <div>Smart Retail Starts Here.</div>
           </div>
         </div>
-        <div className="border-t border-slate-200 bg-slate-50">
-          <div className="mx-auto max-w-7xl px-4 py-4 text-center text-xs text-slate-600 sm:px-6 lg:px-8">
-            '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''
-
-            Try to fix these 2 Project monitoring findings:
-
-            1. Header sign‑out throws away pending offline sales
-            Summary: Clicking the top‑right "Sign out" button erases the local sync queue, so any sales, returns, or edits made offline that haven't uploaded yet are permanently lost — a cashier who worked through a network outage and then logs out will lose those transactions with no warning.
-            Severity: high
-            Source: qa
-            Affected paths: src/routes/_authenticated/route.tsx, src/lib/offline/device.ts, src/lib/offline/sync.ts
-            Code range: 4b825dc642cb6eb9a060e54bf8d69288fbee4904..2963168afc7cf93b5ecd60c4d667c10679417038
-            Evidence: In src/routes/_authenticated/route.tsx the layout header binds its Sign‑out button to handleSignOut, which calls `clearOfflineDataOnLogout()` before `supabase.auth.signOut()`. clearOfflineDataOnLogout (src/lib/offline/device.ts) calls `wipeLocalMirror()` from src/lib/offline/sync.ts, which runs `await db()._queue.clear()` — deleting every queued write, including pending `complete_sale` / `complete_sale_return` RPCs created by completeSaleOfflineAware in src/lib/offline/pos.ts. There is no check for `_queue` length, no confirmation prompt, and no attempt to flush first. The alternative sign‑out in src/components/app-sidebar.tsx does not wipe the mirror, so the two logout paths behave differently, and the more visible header button is the destructive one.
-
-            2. Low‑stock alert bar re‑downloads the entire product catalog every minute
-            Summary: The low‑stock alert widget in the top header of every authenticated page pulls every active product from the database once a minute (and again on every product change), paging up to 200,000 rows — for any shop with more than a few thousand items this makes the whole app feel slow and consumes very large amounts of bandwidth on tills that are already sensitive to network hiccups.
-            Severity: medium
-            Source: qa
-            Affected paths: src/components/low-stock-alerts.tsx, src/lib/supabase-page.ts, src/routes/_authenticated/route.tsx, src/hooks/use-realtime-sync.ts
-            Code range: 4b825dc642cb6eb9a060e54bf8d69288fbee4904..2963168afc7cf93b5ecd60c4d667c10679417038
-            Evidence: src/components/low-stock-alerts.tsx registers a useQuery with `refetchInterval: 60_000` whose queryFn calls `fetchAll(...)` from src/lib/supabase-page.ts against `supabase.from("products").select("id,name,sku,unit,category,sell_price,stock,low_stock_threshold,updated_at").eq("is_active", true).order("stock", {ascending:true}).range(from,to)`. fetchAll loops up to 200 pages of 1000 rows with no server‑side filter for `stock <= low_stock_threshold` (the filter is applied client‑side after all rows are fetched). LowStockAlerts is rendered inside the persistent header in src/routes/_authenticated/route.tsx, and use-realtime-sync.ts also invalidates the `low-stock-alerts` key on every `products` change, so the full paginated download repeats whenever inventory moves. For a 20k‑product shop this is ~20 sequential Supabase requests per minute per open tab; for the "100k+ products" scale the project markets to, each refresh takes 100 requests / tens of MB.
-          </div>
-        </div>
       </footer>
 
     </div>
