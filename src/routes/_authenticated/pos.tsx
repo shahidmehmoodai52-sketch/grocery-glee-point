@@ -1875,7 +1875,7 @@ function POSPage() {
         : null;
 
       const payload = {
-        customer_id: tab.customer_id,
+        customer_id: tab.expense_person_id ? null : tab.customer_id,
         expense_person_id: tab.expense_person_id,
         payment_method: paymentMethodLabel,
         tax,
