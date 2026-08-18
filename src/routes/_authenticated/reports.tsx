@@ -639,7 +639,7 @@ function Page() {
           <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </div>
       </div>
-        
+        <div className="flex flex-wrap items-center gap-2 no-print">
           {PRESETS.map(p => (
             <Button
               key={p.key}
@@ -677,7 +677,6 @@ function Page() {
               />
             </PopoverContent>
           </Popover>
-          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
         </div>
       </div>
 
