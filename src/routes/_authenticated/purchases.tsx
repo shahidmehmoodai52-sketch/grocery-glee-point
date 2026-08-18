@@ -98,28 +98,26 @@ async function searchPurchaseProducts(term: string): Promise<{ products: PickerP
     return { products: hits as PickerProduct[], barcodes: [] };
   }
 
-  const [nameRes, namePrefixRes, skuRes, barcodeRes, extraBcRes] = await Promise.all([
-    supabase.from("products").select(PICKER_COLUMNS).ilike("name", like).order("name").limit(25),
-    supabase.from("products").select(PICKER_COLUMNS).ilike("name", prefix).order("name").limit(25),
-    supabase.from("products").select(PICKER_COLUMNS).ilike("sku", prefix).order("sku").limit(25),
-    supabase.from("products").select(PICKER_COLUMNS).ilike("barcode", prefix).order("name").limit(25),
+  const [exactSkuRes, exactBarcodeRes, nameRes, extraBcRes] = await Promise.all([
+    supabase.from("products").select(PICKER_COLUMNS).eq("is_active", true).ilike("sku", prefix).limit(25),
+    supabase.from("products").select(PICKER_COLUMNS).eq("is_active", true).ilike("barcode", prefix).limit(25),
+    supabase.from("products").select(PICKER_COLUMNS).eq("is_active", true).ilike("name", like).order("name").limit(25),
     supabase.from("product_barcodes").select("product_id,barcode").ilike("barcode", prefix).limit(25),
   ]);
 
   const barcodes = (extraBcRes.data ?? []) as { product_id: string; barcode: string }[];
   const extraIds = barcodes.map((b) => b.product_id);
   const extraRes = extraIds.length
-    ? await supabase.from("products").select(PICKER_COLUMNS).in("id", extraIds).limit(25)
+    ? await supabase.from("products").select(PICKER_COLUMNS).eq("is_active", true).in("id", extraIds).limit(25)
     : { data: [] as any[] };
 
   const merged = new Map<string, PickerProduct>();
-  for (const p of [
-    ...(namePrefixRes.data ?? []),
-    ...(skuRes.data ?? []),
-    ...(barcodeRes.data ?? []),
-    ...(extraRes.data ?? []),
+  [
+    ...(exactSkuRes.data ?? []),
+    ...(exactBarcodeRes.data ?? []),
     ...(nameRes.data ?? []),
-  ]) merged.set((p as any).id, p as PickerProduct);
+    ...(extraRes.data ?? []),
+  ].forEach(p => merged.set((p as any).id, p as PickerProduct));
 
   return { products: [...merged.values()], barcodes };
 }
