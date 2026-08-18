@@ -448,6 +448,12 @@ function Page() {
   });
 
 
+  useEffect(() => {
+    if (isExporting && !salesLoading) {
+      setIsExporting(false);
+      toast.success("Full data loaded for export.");
+    }
+  }, [salesLoading, isExporting]);
 
   // ---- aggregates (net of sale returns)
   const grossRevenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
