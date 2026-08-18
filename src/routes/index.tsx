@@ -1069,15 +1069,10 @@ function LandingPage() {
 
 
         </div>
-        <div className="border-t border-slate-100">
-          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:px-6 lg:px-8">
+        <div className="border-t border-slate-100 bg-slate-50">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-slate-500 sm:flex-row sm:px-6 lg:px-8">
             <div>© {new Date().getFullYear()} tillix.co All rights reserved.</div>
             <div>Smart Retail Starts Here.</div>
-          </div>
-        </div>
-        <div className="border-t border-slate-200 bg-slate-50">
-          <div className="mx-auto max-w-7xl px-4 py-4 text-center text-xs text-slate-600 sm:px-6 lg:px-8">
-            © {new Date().getFullYear()} tillix.co All rights reserved.
           </div>
         </div>
       </footer>
