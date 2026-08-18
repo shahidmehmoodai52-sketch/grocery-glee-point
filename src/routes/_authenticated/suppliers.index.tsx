@@ -251,7 +251,14 @@ function Page() {
               {filtered.map((c: any) => {
                 const bal = supplierBalances.get(c.id) ?? Number(c.balance ?? 0);
                 return (
-                  <TableRow key={c.id} className="group">
+                  <TableRow
+                    key={c.id}
+                    className="group cursor-pointer hover:bg-muted/50"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("a")) return;
+                      openEdit(c);
+                    }}
+                  >
                     <TableCell className="font-medium">
                       <Link to="/suppliers/$id" params={{ id: c.id }} className="hover:underline text-primary inline-flex items-center gap-2">
                         <span className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
