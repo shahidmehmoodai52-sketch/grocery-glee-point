@@ -164,20 +164,18 @@ function Page() {
   const prevPurchTotal = Number(prevStats?.total_purchases || 0);
   const returnsTotal = Number(stats?.total_returns || 0);
   const prevReturnsTotal = Number(prevStats?.total_returns || 0);
-  const refundsTotal = sum(saleReturns, "refund_amount");
+  const refundsTotal = saleReturns.reduce((a, x) => a + Number(x.refund_amount ?? 0), 0);
   const returnsProfit = saleReturns.reduce((s: number, r: any) => {
     const items = r.sale_return_items ?? [];
     const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
     return s + (Number(r.subtotal ?? r.total) - itemsCost);
   }, 0);
-  const prevReturnsProfit = prevReturns.reduce((s: number, r: any) => {
-    const items = r.sale_return_items ?? [];
-    const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
-    return s + (Number(r.subtotal ?? r.total) - itemsCost);
-  }, 0);
+  
   const netRevenue = revenue - returnsTotal;
   const prevNetRevenue = prevRevenue - prevReturnsTotal;
   const profit = salesProfit - returnsProfit;
+  // Fallback for comparison if prevSalesProfit isn't available
+  const prevProfit = prevRevenue * 0.2; // Simplified fallback for comparison UI
   // Fallback for comparison if prevSalesProfit isn't available
   const prevProfit = prevRevenue * 0.2; // Simplified fallback for comparison UI
 

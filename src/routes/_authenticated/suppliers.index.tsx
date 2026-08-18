@@ -109,27 +109,6 @@ function Page() {
     return { payable, advance, net: payable - advance };
   }, [rows]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((c: any) =>
-      (c.name ?? "").toLowerCase().includes(q) ||
-      (c.phone ?? "").toLowerCase().includes(q) ||
-      (c.email ?? "").toLowerCase().includes(q) ||
-      (c.address ?? "").toLowerCase().includes(q),
-    );
-  }, [rows, search]);
-
-  const totals = useMemo(() => {
-    let payable = 0, advance = 0;
-    for (const s of rows as any[]) {
-      const b = supplierBalances.get(s.id) ?? Number(s.balance ?? 0);
-      if (b > 0) payable += b;
-      else if (b < 0) advance += -b;
-    }
-    return { payable, advance, net: payable - advance };
-  }, [rows, supplierBalances]);
-
   const save = async () => {
     if (!form.name) return toast.error("Name required");
     try {
