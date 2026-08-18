@@ -3002,7 +3002,11 @@ function POSPage() {
                 onCashBackReceivedChange={(v) => setTab({ digital_received_amount: v })}
                 expensePersonId={tab.expense_person_id}
                 onSelectStaff={(id) => {
-                  setTab({ expense_person_id: id, payment_method: id ? "staff" : "cash" });
+                  setTab({
+                    expense_person_id: id,
+                    customer_id: id ? null : tab.customer_id,
+                    payment_method: id ? "staff" : (tab.customer_id ? "credit" : "cash")
+                  });
                   setShowStaff(!!id);
                 }}
               />
