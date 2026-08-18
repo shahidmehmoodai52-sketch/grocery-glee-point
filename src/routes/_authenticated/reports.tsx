@@ -378,60 +378,72 @@ function Page() {
 
 
 
-  const { data: sales = [] } = useQuery({
-    queryKey: ["report-sales-full", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("sales")
+  const [isExporting, setIsExporting] = useState(false);
+
+  const { data: sales = [], isLoading: salesLoading } = useQuery({
+    queryKey: ["report-sales-paged", from, to, isExporting],
+    queryFn: async () => {
+      const q = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
         .order("created_at", { ascending: false });
-      if (from) q = q.gte("created_at", range.from);
-      if (to) q = q.lte("created_at", range.to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+      
+      const filtered = q.gte("created_at", range.from).lte("created_at", range.to);
+      
+      if (isExporting) {
+        return await fetchAll<any>((fIdx: number, tIdx: number) => filtered.range(fIdx, tIdx), 1000);
+      }
+      return (await filtered.range(0, 999)).data ?? [];
+    },
   });
 
   const { data: purchases = [] } = useQuery({
-    queryKey: ["report-purchases", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("purchases").select("subtotal,tax,total,paid,created_at");
-      if (from) q = q.gte("created_at", range.from);
-      if (to) q = q.lte("created_at", range.to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+    queryKey: ["report-purchases-paged", from, to],
+    queryFn: async () => {
+      const { data } = await supabase.from("purchases")
+        .select("subtotal,tax,total,paid,created_at")
+        .gte("created_at", range.from)
+        .lte("created_at", range.to)
+        .range(0, 999);
+      return data ?? [];
+    },
   });
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ["report-expenses", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("expenses").select("amount,category,expense_date");
-      if (from) q = q.gte("expense_date", from);
-      if (to) q = q.lte("expense_date", to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+    queryKey: ["report-expenses-paged", from, to],
+    queryFn: async () => {
+      const { data } = await supabase.from("expenses")
+        .select("amount,category,expense_date")
+        .gte("expense_date", from)
+        .lte("expense_date", to)
+        .range(0, 999);
+      return data ?? [];
+    },
   });
 
   const { data: partyPayments = [] } = useQuery({
-    queryKey: ["report-party-payments", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("party_payments")
+    queryKey: ["report-party-payments-paged", from, to],
+    queryFn: async () => {
+      const { data } = await supabase.from("party_payments")
         .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
-        .order("created_at", { ascending: false });
-      if (from) q = q.gte("created_at", range.from);
-      if (to) q = q.lte("created_at", range.to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+        .gte("created_at", range.from)
+        .lte("created_at", range.to)
+        .order("created_at", { ascending: false })
+        .range(0, 999);
+      return data ?? [];
+    },
   });
 
   const { data: saleReturns = [] } = useQuery({
-    queryKey: ["report-sale-returns", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("sale_returns")
+    queryKey: ["report-sale-returns-paged", from, to],
+    queryFn: async () => {
+      const { data } = await supabase.from("sale_returns")
         .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
-        .order("created_at", { ascending: false });
-      if (from) q = q.gte("created_at", range.from);
-      if (to) q = q.lte("created_at", range.to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+        .gte("created_at", range.from)
+        .lte("created_at", range.to)
+        .order("created_at", { ascending: false })
+        .range(0, 999);
+      return data ?? [];
+    },
   });
 
 
