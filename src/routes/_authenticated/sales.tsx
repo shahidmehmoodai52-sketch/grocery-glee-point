@@ -83,12 +83,15 @@ function Page() {
   }, [prevFrom, fromDate, toDate]);
 
   const rangedQuery = (table: "sales" | "sale_returns", cols: string) => async () => {
-    return await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from(table).select(cols).order("created_at", { ascending: false });
-      if (window.startIso) q = q.gte("created_at", window.startIso);
-      if (window.endIso) q = q.lte("created_at", window.endIso);
-      return q.range(fIdx, tIdx) as any;
-    }, 1000);
+    // Optimization: Only fetch the first 1000 items. 
+    // If the user needs more, we should implement true server-side pagination with a 'Load more' button.
+    const { data, error } = await supabase.from(table).select(cols)
+      .order("created_at", { ascending: false })
+      .gte("created_at", window.startIso || "")
+      .lte("created_at", window.endIso || "")
+      .range(0, 999);
+    if (error) throw error;
+    return data ?? [];
   };
 
 

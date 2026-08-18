@@ -3929,7 +3929,29 @@ export type Database = {
         Returns: string
       }
       gen_tenant_slug: { Args: { _seed: string }; Returns: string }
+      get_dashboard_stats: {
+        Args: { p_from_date: string; p_to_date: string }
+        Returns: {
+          sale_count: number
+          total_purchases: number
+          total_returns: number
+          total_revenue: number
+        }[]
+      }
       get_my_shop_code: { Args: never; Returns: string }
+      get_supplier_balances: {
+        Args: never
+        Returns: {
+          address: string
+          current_balance: number
+          email: string
+          id: string
+          is_active: boolean
+          name: string
+          opening_balance: number
+          phone: string
+        }[]
+      }
       get_tenant_id_by_code: { Args: { _code: string }; Returns: string }
       has_active_subscription: {
         Args: { _tenant_id: string }

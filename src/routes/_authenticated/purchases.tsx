@@ -98,28 +98,26 @@ async function searchPurchaseProducts(term: string): Promise<{ products: PickerP
     return { products: hits as PickerProduct[], barcodes: [] };
   }
 
-  const [nameRes, namePrefixRes, skuRes, barcodeRes, extraBcRes] = await Promise.all([
-    supabase.from("products").select(PICKER_COLUMNS).ilike("name", like).order("name").limit(25),
-    supabase.from("products").select(PICKER_COLUMNS).ilike("name", prefix).order("name").limit(25),
-    supabase.from("products").select(PICKER_COLUMNS).ilike("sku", prefix).order("sku").limit(25),
-    supabase.from("products").select(PICKER_COLUMNS).ilike("barcode", prefix).order("name").limit(25),
+  const [exactSkuRes, exactBarcodeRes, nameRes, extraBcRes] = await Promise.all([
+    supabase.from("products").select(PICKER_COLUMNS).eq("is_active", true).ilike("sku", prefix).limit(25),
+    supabase.from("products").select(PICKER_COLUMNS).eq("is_active", true).ilike("barcode", prefix).limit(25),
+    supabase.from("products").select(PICKER_COLUMNS).eq("is_active", true).ilike("name", like).order("name").limit(25),
     supabase.from("product_barcodes").select("product_id,barcode").ilike("barcode", prefix).limit(25),
   ]);
 
   const barcodes = (extraBcRes.data ?? []) as { product_id: string; barcode: string }[];
   const extraIds = barcodes.map((b) => b.product_id);
   const extraRes = extraIds.length
-    ? await supabase.from("products").select(PICKER_COLUMNS).in("id", extraIds).limit(25)
+    ? await supabase.from("products").select(PICKER_COLUMNS).eq("is_active", true).in("id", extraIds).limit(25)
     : { data: [] as any[] };
 
   const merged = new Map<string, PickerProduct>();
-  for (const p of [
-    ...(namePrefixRes.data ?? []),
-    ...(skuRes.data ?? []),
-    ...(barcodeRes.data ?? []),
-    ...(extraRes.data ?? []),
+  [
+    ...(exactSkuRes.data ?? []),
+    ...(exactBarcodeRes.data ?? []),
     ...(nameRes.data ?? []),
-  ]) merged.set((p as any).id, p as PickerProduct);
+    ...(extraRes.data ?? []),
+  ].forEach(p => merged.set((p as any).id, p as PickerProduct));
 
   return { products: [...merged.values()], barcodes };
 }
@@ -462,17 +460,22 @@ function Page() {
       .slice(0, 25);
   }, [entrySearch, products, extraBarcodes]);
   const { data: purchases = [] } = useQuery({
-    queryKey: ["purchases"],
+    queryKey: ["purchases", dateFilter, filterFrom, filterTo],
     staleTime: 30_000,
-    queryFn: async () => offlineFirst<any[]>(
-      async () => await fetchAll<any>((from: number, to: number) => supabase.from("purchases").select("*, suppliers(name), purchase_items(*)").order("created_at", { ascending: false }).range(from, to)),
-      async () => {
-        const rows = await db().purchases.orderBy("created_at").reverse().toArray();
-        const supMap = new Map((await db().suppliers.toArray()).map((s: any) => [s.id, s.name]));
-        return rows.map((r: any) => ({ ...r, suppliers: r.supplier_id ? { name: supMap.get(r.supplier_id) ?? null } : null }));
-      },
-      cachePurchases,
-    ),
+    queryFn: async () => {
+      const { from, to } = dateFilter === "custom" ? { from: filterFrom, to: filterTo } : getPresetRange(dateFilter);
+      const start = from ? new Date(from) : new Date(); start.setHours(0,0,0,0);
+      const end = to ? new Date(to) : new Date(); end.setHours(23,59,59,999);
+      
+      const { data, error } = await supabase.from("purchases")
+        .select("*, suppliers(name), purchase_items(*)")
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString())
+        .order("created_at", { ascending: false })
+        .range(0, 499);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   const formatLocalDate = (value: Date) => {

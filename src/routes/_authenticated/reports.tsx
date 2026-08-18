@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon, Package, Search, ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
@@ -378,63 +379,81 @@ function Page() {
 
 
 
-  const { data: sales = [] } = useQuery({
-    queryKey: ["report-sales-full", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("sales")
+  const [isExporting, setIsExporting] = useState(false);
+
+  const { data: sales = [], isLoading: salesLoading } = useQuery({
+    queryKey: ["report-sales-paged", from, to, isExporting],
+    queryFn: async () => {
+      const q = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
         .order("created_at", { ascending: false });
-      if (from) q = q.gte("created_at", range.from);
-      if (to) q = q.lte("created_at", range.to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+      
+      const filtered = q.gte("created_at", range.from).lte("created_at", range.to);
+      
+      if (isExporting) {
+        return await fetchAll<any>((fIdx: number, tIdx: number) => filtered.range(fIdx, tIdx), 1000);
+      }
+      return (await filtered.range(0, 999)).data ?? [];
+    },
   });
 
   const { data: purchases = [] } = useQuery({
-    queryKey: ["report-purchases", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("purchases").select("subtotal,tax,total,paid,created_at");
-      if (from) q = q.gte("created_at", range.from);
-      if (to) q = q.lte("created_at", range.to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+    queryKey: ["report-purchases-paged", from, to],
+    queryFn: async () => {
+      const { data } = await supabase.from("purchases")
+        .select("subtotal,tax,total,paid,created_at")
+        .gte("created_at", range.from)
+        .lte("created_at", range.to)
+        .range(0, 999);
+      return data ?? [];
+    },
   });
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ["report-expenses", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("expenses").select("amount,category,expense_date");
-      if (from) q = q.gte("expense_date", from);
-      if (to) q = q.lte("expense_date", to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+    queryKey: ["report-expenses-paged", from, to],
+    queryFn: async () => {
+      const { data } = await supabase.from("expenses")
+        .select("amount,category,expense_date")
+        .gte("expense_date", from)
+        .lte("expense_date", to)
+        .range(0, 999);
+      return data ?? [];
+    },
   });
 
   const { data: partyPayments = [] } = useQuery({
-    queryKey: ["report-party-payments", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("party_payments")
+    queryKey: ["report-party-payments-paged", from, to],
+    queryFn: async () => {
+      const { data } = await supabase.from("party_payments")
         .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
-        .order("created_at", { ascending: false });
-      if (from) q = q.gte("created_at", range.from);
-      if (to) q = q.lte("created_at", range.to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+        .gte("created_at", range.from)
+        .lte("created_at", range.to)
+        .order("created_at", { ascending: false })
+        .range(0, 999);
+      return data ?? [];
+    },
   });
 
   const { data: saleReturns = [] } = useQuery({
-    queryKey: ["report-sale-returns", from, to],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => {
-      let q = supabase.from("sale_returns")
+    queryKey: ["report-sale-returns-paged", from, to],
+    queryFn: async () => {
+      const { data } = await supabase.from("sale_returns")
         .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
-        .order("created_at", { ascending: false });
-      if (from) q = q.gte("created_at", range.from);
-      if (to) q = q.lte("created_at", range.to);
-      return q.range(fIdx, tIdx);
-    }, 1000),
+        .gte("created_at", range.from)
+        .lte("created_at", range.to)
+        .order("created_at", { ascending: false })
+        .range(0, 999);
+      return data ?? [];
+    },
   });
 
 
+  useEffect(() => {
+    if (isExporting && !salesLoading) {
+      setIsExporting(false);
+      toast.success("Full data loaded for export.");
+    }
+  }, [salesLoading, isExporting]);
 
   // ---- aggregates (net of sale returns)
   const grossRevenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
@@ -604,51 +623,67 @@ function Page() {
   return (
     <div className="p-6 space-y-4">
       <NeedsInternetBanner section="Reports" />
-      <div className="flex items-end justify-between flex-wrap gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Reports</h1>
-          <p className="text-sm text-muted-foreground">Sales, profit, invoice &amp; product breakdowns · {presetLabel}</p>
+          <p className="text-sm text-muted-foreground">
+            Sales, profit, invoice &amp; product breakdowns · {presetLabel}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 no-print">
-          {PRESETS.map(p => (
+        <div className="flex items-center gap-2 no-print">
+          {salesLoading && <Badge variant="outline" className="animate-pulse">Loading...</Badge>}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={async () => {
+              setIsExporting(true);
+              toast.success("Preparing full export (up to 500k rows)...");
+            }}
+            disabled={salesLoading || isExporting}
+          >
+            {isExporting ? "Fetching data..." : "Export All"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 no-print">
+        {PRESETS.map(p => (
+          <Button
+            key={p.key}
+            variant={preset === p.key ? "default" : "outline"}
+            size="sm"
+            onClick={() => applyPreset(p.key)}
+          >
+            {p.label}
+          </Button>
+        ))}
+        <Popover>
+          <PopoverTrigger asChild>
             <Button
-              key={p.key}
-              variant={preset === p.key ? "default" : "outline"}
+              variant={preset === "custom" ? "default" : "outline"}
               size="sm"
-              onClick={() => applyPreset(p.key)}
+              className={cn("gap-2")}
             >
-              {p.label}
+              <CalendarIcon className="h-4 w-4" />
+              {fromDate && toDate
+                ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
+                : "Custom range"}
             </Button>
-          ))}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={preset === "custom" ? "default" : "outline"}
-                size="sm"
-                className={cn("gap-2")}
-              >
-                <CalendarIcon className="h-4 w-4" />
-                {fromDate && toDate
-                  ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
-                  : "Custom range"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="range"
-                selected={{ from: fromDate, to: toDate }}
-                onSelect={(r) => {
-                  setPreset("custom");
-                  setFromDate(r?.from);
-                  setToDate(r?.to);
-                }}
-                numberOfMonths={2}
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
-        </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="range"
+              selected={{ from: fromDate, to: toDate }}
+              onSelect={(r) => {
+                setPreset("custom");
+                setFromDate(r?.from);
+                setToDate(r?.to);
+              }}
+              numberOfMonths={2}
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
 
