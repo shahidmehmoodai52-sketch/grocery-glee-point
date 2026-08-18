@@ -267,7 +267,7 @@ function Page() {
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {isPurchase ? (
-                        <button onClick={() => toggle(x.purchase_id!)} className="inline-flex items-center gap-1 hover:underline no-print">
+                        <button onClick={() => toggle(x.id!)} className="inline-flex items-center gap-1 hover:underline no-print">
                           {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                           {x.ref}
                         </button>
@@ -275,7 +275,7 @@ function Page() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {x.note || "—"}
-                      {isPurchase && due <= 0 && Number(x.paid || 0) > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">Paid</Badge>}
+                      {isPurchase && due <= 0 && Number(x.data?.paid || 0) > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">Paid</Badge>}
 
                     </TableCell>
                     <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
@@ -307,7 +307,7 @@ function Page() {
                     <TableRow key={`${i}-d`} className="bg-muted/30">
                       <TableCell colSpan={8} className="p-0">
                         <div className="p-3">
-                          <div className="text-xs font-medium mb-2 text-muted-foreground">Items in {x.ref} · Total {fmtMoney(Number(x.total||0), sym)} · Paid {fmtMoney(Number(x.paid||0), sym)} · Due {fmtMoney(due, sym)}</div>
+                          <div className="text-xs font-medium mb-2 text-muted-foreground">Items in {x.ref} · Total {fmtMoney(Number(x.data?.total||0), sym)} · Paid {fmtMoney(Number(x.data?.paid||0), sym)} · Due {fmtMoney(due, sym)}</div>
                           {items.length === 0 ? (
                             <div className="text-xs text-muted-foreground">No item details</div>
                           ) : (
