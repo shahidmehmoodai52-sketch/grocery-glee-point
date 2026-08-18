@@ -408,7 +408,7 @@ function Page() {
 
     // Sales — cash inflow of paid amount (skip voided; skip credit-only with 0 paid)
     for (const s of (salesQ.data ?? []) as any[]) {
-      if (s.status === "voided") continue;
+      if (s.status === "voided" || s.expense_person_id) continue;
       const paid = Number(s.paid) || 0;
       if (paid <= 0) continue;
       const splits = parseSalePaymentSplits(s.payment_method, paid);
