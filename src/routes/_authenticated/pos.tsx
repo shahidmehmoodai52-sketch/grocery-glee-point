@@ -384,20 +384,36 @@ async function searchProducts(term: string) {
 }
 
 async function searchProductsOnline(q: string) {
-  const like = `%${q}%`;
-  const [nameRes, skuRes, barcodeRes, extraBarcodeRes] = await Promise.all([
+  const prefix = `${q}%`;
+  // Optimized indexed search: Exact hits first, then prefix.
+  // Using ilike on name with leading % is slow, but we can't avoid it without full-text search.
+  // We'll prioritize exact/prefix SKU and Barcode matches which are indexed.
+  const [exactSkuRes, exactBarcodeRes, nameRes] = await Promise.all([
     supabase
       .from("products")
       .select(PRODUCT_COLUMNS)
       .eq("is_active", true)
-      .ilike("name", like)
+      .ilike("sku", prefix)
+      .limit(50),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .eq("is_active", true)
+      .ilike("barcode", prefix)
+      .limit(50),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .eq("is_active", true)
+      .ilike("name", `%${q}%`)
       .order("name")
-      .limit(200),
-    supabase
-      .from("products")
-      .select(PRODUCT_COLUMNS)
-      .eq("is_active", true)
-      .ilike("sku", like)
+      .limit(50),
+  ]);
+
+  const merged = new Map<string, any>();
+  [...(exactSkuRes.data ?? []), ...(exactBarcodeRes.data ?? []), ...(nameRes.data ?? [])].forEach(p => merged.set(p.id, p));
+  return Array.from(merged.values());
+}
       .order("name")
       .limit(50),
     supabase
