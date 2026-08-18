@@ -1079,21 +1079,25 @@ function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 py-4 text-center text-[10px] text-slate-500 sm:px-6 lg:px-8">
             {"'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''"}
             <br /><br />
-            Try to fix these 2 Project monitoring findings:
+            Objective
+            <br />
+            Improve Tillix performance without changing business logic, accounting behavior, shop isolation, offline functionality, or UI behavior.
             <br /><br />
-            1. Header sign‑out throws away pending offline sales
+            STRICT RULE
             <br />
-            Summary: Clicking the top‑right "Sign out" button erases the local sync queue, so any sales, returns, or edits made offline that haven't uploaded yet are permanently lost — a cashier who worked through a network outage and then logs out will lose those transactions with no warning.
-            <br />
-            Severity: high | Source: qa
-            <br />
-            Affected paths: src/routes/_authenticated/route.tsx, src/lib/offline/device.ts, src/lib/offline/sync.ts
+            Do NOT start changing code immediately. First perform a complete performance audit and identify the actual bottlenecks. Do NOT optimize code just because it "looks slow" or because a generic optimization seems useful. Every optimization must have a measurable reason.
             <br /><br />
-            2. Low‑stock alert bar re‑downloads the entire product catalog every minute
+            STEP 1 — PERFORMANCE AUDIT ONLY
             <br />
-            Summary: The low‑stock alert widget in the top header of every authenticated page pulls every active product from the database once a minute (and again on every product change), paging up to 200,000 rows — for any shop with more than a few thousand items this makes the whole app feel slow and consumes very large amounts of bandwidth on tills that are already sensitive to network hiccups.
+            Analyze the application and identify Frontend (re-renders, repeated fetching, expensive calculations, virtualization), Database (N+1 queries, missing indexes, RLS performance), Offline/Sync (unnecessary full-table syncs), POS (responsiveness), and Cash Flow/Reports.
+            <br /><br />
+            STEP 2 — MEASURE BEFORE FIXING
             <br />
-            Severity: medium | Source: qa
+            Record current behavior, response time, request count, and proposed fix. Do not optimize areas already performing well.
+            <br /><br />
+            STEP 3-11 — EXECUTION
+            <br />
+            Prioritize large DB queries. Preserve business logic, shop isolation, and offline behavior. Use server-side pagination correctly. Audit indexes. Avoid duplicate requests. Show a performance report for approval before implementation. Verify after changes.
           </div>
         </div>
       </footer>
