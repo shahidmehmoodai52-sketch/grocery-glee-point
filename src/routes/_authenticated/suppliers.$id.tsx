@@ -71,7 +71,7 @@ function Page() {
   const { data: payments = [] } = useQuery({
     queryKey: ["supplier-payments", id],
     queryFn: async () =>
-      (await supabase.from("party_payments").select("id,amount,method,note,created_at,cash_transaction_id")
+      (await supabase.from("party_payments").select("id,amount,method,note,created_at,cash_transaction_id,party_type,party_id")
         .eq("party_type", "supplier").eq("party_id", id).order("created_at", { ascending: true })).data ?? [],
   });
   const { data: returns = [] } = useQuery({

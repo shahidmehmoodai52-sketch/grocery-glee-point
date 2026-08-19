@@ -67,7 +67,9 @@ export function buildSupplierLedgerEntries({
   }
 
   for (const p of payments) {
-    if (p.party_type === "supplier") {
+    // Rows are already scoped to this supplier by the query; only skip when the
+    // payload explicitly says it belongs to another party type.
+    if (!p.party_type || p.party_type === "supplier") {
       entries.push({
         id: p.id,
         date: p.created_at,
