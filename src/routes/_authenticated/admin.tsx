@@ -136,7 +136,7 @@ function AdminPanelPage() {
       <NeedsInternetBanner section="Admin panel" />
       <PageHeader
         title="Control Panel"
-        description="'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            Refund exceeds return total return krty time ye issue aa rhaa hy purchase return me"
+        description="'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            column \"updated_at\" of relation \"suppliers\" does not exist ab ye issue aa raha hy return krty time"
         icon={<ShieldCheck className="h-5 w-5" />}
       />
       <Tabs defaultValue="tenants">
