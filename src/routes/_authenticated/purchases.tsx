@@ -472,7 +472,7 @@ function Page() {
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString())
         .order("created_at", { ascending: false })
-        .range(0, 499);
+        .range(0, PURCHASE_LIST_LIMIT - 1);
       if (error) throw error;
       return data ?? [];
     },
@@ -1491,6 +1491,11 @@ function Page() {
             className="pl-8 h-9"
           />
         </div>
+        {(purchases as any[]).length >= PURCHASE_LIST_LIMIT && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Showing the latest {PURCHASE_LIST_LIMIT.toLocaleString()} purchases for this period. Narrow the date range to see older invoices.
+          </div>
+        )}
         <Table>
           <TableHeader><TableRow>
             <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
