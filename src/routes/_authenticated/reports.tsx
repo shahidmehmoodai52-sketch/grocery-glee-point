@@ -373,102 +373,70 @@ function Page() {
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
   const range = {
-    from: from ? new Date(from + "T00:00:00").toISOString() : "2000-01-01T00:00:00Z",
-    to: to ? new Date(to + "T23:59:59").toISOString() : new Date().toISOString(),
+    // Correct PKT range: Start of fromDate at 00:00:00, End of toDate at 23:59:59.999
+    from: fromDate ? new Date(new Date(fromDate).setHours(0, 0, 0, 0)).toISOString() : "2000-01-01T00:00:00Z",
+    to: toDate ? new Date(new Date(toDate).setHours(23, 59, 59, 999)).toISOString() : new Date().toISOString(),
   };
 
-
-
-  const [isExporting, setIsExporting] = useState(false);
-
   const { data: sales = [], isLoading: salesLoading } = useQuery({
-    queryKey: ["report-sales-paged", from, to, isExporting],
+    queryKey: ["report-sales-paged", from, to],
     queryFn: async () => {
       const q = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
         .order("created_at", { ascending: false });
       
       const filtered = q.gte("created_at", range.from).lte("created_at", range.to);
-      
-      if (isExporting) {
-        return await fetchAll<any>((fIdx: number, tIdx: number) => filtered.range(fIdx, tIdx), 1000);
-      }
-      return (await filtered.range(0, 999)).data ?? [];
+      return await fetchAll<any>((fIdx: number, tIdx: number) => filtered.range(fIdx, tIdx), 1000);
     },
   });
 
   const { data: purchases = [] } = useQuery({
-    queryKey: ["report-purchases-paged", from, to, isExporting],
+    queryKey: ["report-purchases-paged", from, to],
     queryFn: async () => {
       const base = supabase.from("purchases")
         .select("subtotal,tax,total,paid,created_at")
         .gte("created_at", range.from)
         .lte("created_at", range.to);
-      if (isExporting) {
-        return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
-      }
-      return (await base.range(0, 999)).data ?? [];
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
     },
   });
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ["report-expenses-paged", from, to, isExporting],
+    queryKey: ["report-expenses-paged", from, to],
     queryFn: async () => {
       const base = supabase.from("expenses")
         .select("amount,category,expense_date")
         .gte("expense_date", from)
         .lte("expense_date", to);
-      if (isExporting) {
-        return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
-      }
-      return (await base.range(0, 999)).data ?? [];
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
     },
   });
 
   const { data: partyPayments = [] } = useQuery({
-    queryKey: ["report-party-payments-paged", from, to, isExporting],
+    queryKey: ["report-party-payments-paged", from, to],
     queryFn: async () => {
       const base = supabase.from("party_payments")
         .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
         .gte("created_at", range.from)
         .lte("created_at", range.to)
         .order("created_at", { ascending: false });
-      if (isExporting) {
-        return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
-      }
-      return (await base.range(0, 999)).data ?? [];
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
     },
   });
 
   const { data: saleReturns = [] } = useQuery({
-    queryKey: ["report-sale-returns-paged", from, to, isExporting],
+    queryKey: ["report-sale-returns-paged", from, to],
     queryFn: async () => {
       const base = supabase.from("sale_returns")
         .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
         .gte("created_at", range.from)
         .lte("created_at", range.to)
         .order("created_at", { ascending: false });
-      if (isExporting) {
-        return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
-      }
-      return (await base.range(0, 999)).data ?? [];
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
     },
   });
 
-  const isTruncated = !isExporting && (
-    sales.length >= 1000 || purchases.length >= 1000 || expenses.length >= 1000 ||
-    partyPayments.length >= 1000 || saleReturns.length >= 1000
-  );
-
-
-  useEffect(() => {
-    if (isExporting && !salesLoading) {
-      setIsExporting(false);
-      toast.success("Full data loaded for export.");
-    }
-  }, [salesLoading, isExporting]);
-
-  // ---- aggregates (net of sale returns)
+  // Aggregates (net of sale returns)
   const grossRevenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
   const returnsSubtotal = saleReturns.reduce((s, x: any) => s + Number(x.subtotal ?? 0), 0);
   const returnsTax = saleReturns.reduce((s, x: any) => s + Number(x.tax ?? 0), 0);
@@ -645,25 +613,10 @@ function Page() {
         </div>
         <div className="flex items-center gap-2 no-print">
           {salesLoading && <Badge variant="outline" className="animate-pulse">Loading...</Badge>}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={async () => {
-              setIsExporting(true);
-              toast.success("Preparing full export (up to 500k rows)...");
-            }}
-            disabled={salesLoading || isExporting}
-          >
-            {isExporting ? "Fetching data..." : "Export All"}
-          </Button>
           <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </div>
       </div>
-      {isTruncated && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 no-print">
-          Showing only the latest 1,000 records per section for this period, so totals below may be understated. Click <strong>Export All</strong> to load the complete data, or pick a shorter date range.
-        </div>
-      )}
+
       <div className="flex flex-wrap items-center gap-2 no-print">
         {PRESETS.map(p => (
           <Button
