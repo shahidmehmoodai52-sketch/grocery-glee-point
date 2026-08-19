@@ -25,6 +25,8 @@ import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
+const PURCHASE_LIST_LIMIT = 2000;
+
 type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
 
 type Draft = {
@@ -472,7 +474,7 @@ function Page() {
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString())
         .order("created_at", { ascending: false })
-        .range(0, 499);
+        .range(0, PURCHASE_LIST_LIMIT - 1);
       if (error) throw error;
       return data ?? [];
     },
@@ -706,17 +708,28 @@ function Page() {
           await supabase.from("products").update({ stock: currentStock - Number(it.qty) }).eq("id", it.product_id);
         }
 
-        // 4. Replace items
-        await supabase.from("purchase_items").delete().eq("purchase_id", editingId);
+        // 4. Replace items (carry tenant_id from the parent purchase so RLS accepts the insert)
+        const { data: parentPurchase, error: tErr } = await supabase
+          .from("purchases")
+          .select("tenant_id")
+          .eq("id", editingId)
+          .single();
+        if (tErr) throw tErr;
+
+        const { error: delErr } = await supabase.from("purchase_items").delete().eq("purchase_id", editingId);
+        if (delErr) throw delErr;
+
         const newItems = payload.items.map(it => ({
           purchase_id: editingId,
+          tenant_id: parentPurchase?.tenant_id,
           product_id: it.product_id,
           name: it.name,
           qty: it.qty,
           cost: it.cost,
           line_total: it.line_total
         }));
-        await supabase.from("purchase_items").insert(newItems);
+        const { error: insErr } = await supabase.from("purchase_items").insert(newItems);
+        if (insErr) throw insErr;
 
         // Apply new stock
         for (const it of payload.items) {
@@ -1480,6 +1493,11 @@ function Page() {
             className="pl-8 h-9"
           />
         </div>
+        {(purchases as any[]).length >= PURCHASE_LIST_LIMIT && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Showing the latest {PURCHASE_LIST_LIMIT.toLocaleString()} purchases for this period. Narrow the date range to see older invoices.
+          </div>
+        )}
         <Table>
           <TableHeader><TableRow>
             <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
