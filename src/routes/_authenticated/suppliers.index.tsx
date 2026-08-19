@@ -117,7 +117,7 @@ function Page() {
     } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
     setOpen(false);
     setForm({ name: "", phone: "", email: "", address: "", balance: 0 });
-    qc.invalidateQueries({ queryKey: ["suppliers"] });
+    qc.invalidateQueries({ queryKey: ["suppliers-with-balances"] });
   };
 
   const recordPayment = async () => {
