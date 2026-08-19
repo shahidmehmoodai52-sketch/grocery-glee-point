@@ -136,7 +136,7 @@ function AdminPanelPage() {
       <NeedsInternetBanner section="Admin panel" />
       <PageHeader
         title="Control Panel"
-        description="'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            supplier ledger show nahe ho rahy pos me kisi bi shop ko"
+        description="'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            purchase retrun me issue aa raha hy chekc kro and fix it or koi code touch nahe krna"
         icon={<ShieldCheck className="h-5 w-5" />}
       />
       <Tabs defaultValue="tenants">
