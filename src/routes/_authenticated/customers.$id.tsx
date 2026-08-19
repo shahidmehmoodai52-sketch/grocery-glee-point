@@ -274,13 +274,10 @@ function Page() {
               <TableRow
                 key={i}
                 className={`cursor-pointer ${x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : "hover:bg-muted/50"}`}
-                onClick={(e) => {
-                  // Inline action buttons keep their own behaviour.
-                  if ((e.target as HTMLElement).closest("button")) return;
+                onClick={() => {
                   if (x.type === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
                   if (x.type === "cash_out" && x.id) return setEditPayment({ id: x.id, amount: x.debit, method: "Cash Out", note: x.note, created_at: x.date });
                   if (x.type && !["payment", "cash_out"].includes(x.type) && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
-
                 }}
               >
 
