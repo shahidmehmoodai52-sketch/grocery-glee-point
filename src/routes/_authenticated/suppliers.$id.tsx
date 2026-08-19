@@ -18,7 +18,7 @@ import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger } from "@/lib/customer-ledger";
-import { buildSupplierLedgerEntries, type LedgerEntry as Entry } from "@/lib/supplier-ledger";
+import type { LedgerEntry as Entry } from "@/lib/supplier-ledger";
 
 
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
