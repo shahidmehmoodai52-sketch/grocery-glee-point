@@ -613,25 +613,10 @@ function Page() {
         </div>
         <div className="flex items-center gap-2 no-print">
           {salesLoading && <Badge variant="outline" className="animate-pulse">Loading...</Badge>}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={async () => {
-              setIsExporting(true);
-              toast.success("Preparing full export (up to 500k rows)...");
-            }}
-            disabled={salesLoading || isExporting}
-          >
-            {isExporting ? "Fetching data..." : "Export All"}
-          </Button>
           <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </div>
       </div>
-      {isTruncated && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 no-print">
-          Showing only the latest 1,000 records per section for this period, so totals below may be understated. Click <strong>Export All</strong> to load the complete data, or pick a shorter date range.
-        </div>
-      )}
+
       <div className="flex flex-wrap items-center gap-2 no-print">
         {PRESETS.map(p => (
           <Button
