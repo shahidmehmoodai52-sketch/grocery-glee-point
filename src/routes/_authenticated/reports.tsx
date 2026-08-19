@@ -659,6 +659,11 @@ function Page() {
           <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </div>
       </div>
+      {isTruncated && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 no-print">
+          Showing only the latest 1,000 records per section for this period, so totals below may be understated. Click <strong>Export All</strong> to load the complete data, or pick a shorter date range.
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2 no-print">
         {PRESETS.map(p => (
           <Button
