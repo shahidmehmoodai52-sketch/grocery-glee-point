@@ -18,7 +18,7 @@ import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger } from "@/lib/customer-ledger";
-import { buildSupplierLedgerEntries, type LedgerEntry as Entry } from "@/lib/supplier-ledger";
+import type { LedgerEntry as Entry } from "@/lib/supplier-ledger";
 
 
 export const Route = createFileRoute("/_authenticated/suppliers/$id")({ component: Page });
@@ -62,32 +62,24 @@ function Page() {
     queryKey: ["supplier", id],
     queryFn: async () => (await supabase.from("suppliers").select("*").eq("id", id).maybeSingle()).data,
   });
-  const { data: purchases = [] } = useQuery({
-    queryKey: ["supplier-purchases", id],
-    queryFn: async () =>
-      (await supabase.from("purchases").select("id,invoice_no,total,paid,created_at,note")
-        .eq("supplier_id", id).order("created_at", { ascending: true })).data ?? [],
+  const { data: entries = [], isLoading: ledgerLoading, error: ledgerError } = useQuery<Entry[]>({
+    queryKey: ["supplier-ledger", id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_supplier_ledger", { p_supplier_id: id });
+      if (error) throw error;
+      return (data ?? []).map((row: any) => ({
+        id: row.id ?? undefined,
+        date: row.occurred_at,
+        type: row.entry_type === "return" ? "return" : row.entry_type === "purchase" ? "purchase" : "payment",
+        entity: row.entry_type === "purchase" ? "purchase" : row.entry_type === "return" ? "purchase_return" : row.entry_type === "payment" ? "payment" : undefined,
+        ref: row.reference,
+        note: row.note ?? "",
+        debit: Number(row.debit || 0),
+        credit: Number(row.credit || 0),
+        data: row.source_data,
+      }));
+    },
   });
-  const { data: payments = [] } = useQuery({
-    queryKey: ["supplier-payments", id],
-    queryFn: async () =>
-      (await supabase.from("party_payments").select("id,amount,method,note,created_at,cash_transaction_id,party_type,party_id")
-        .eq("party_type", "supplier").eq("party_id", id).order("created_at", { ascending: true })).data ?? [],
-  });
-  const { data: returns = [] } = useQuery({
-    queryKey: ["supplier-returns", id],
-    queryFn: async () =>
-      (await supabase.from("purchase_returns").select("id,return_no,total,refund_amount,created_at,note")
-        .eq("supplier_id", id).order("created_at", { ascending: true })).data ?? [],
-  });
-
-  const entries: Entry[] = useMemo(() => {
-    return buildSupplierLedgerEntries({
-      purchases: purchases as any[],
-      payments: payments as any[],
-      returns: returns as any[],
-    });
-  }, [purchases, payments, returns]);
 
   const filteredEntries = entries.filter((x) => {
     if (from && x.date < from) return false;
@@ -237,7 +229,13 @@ function Page() {
               <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
               <TableCell className="no-print"></TableCell>
             </TableRow>
-            {rows.length === 0 && (
+            {ledgerError && (
+              <TableRow><TableCell colSpan={8} className="text-center text-destructive py-6">Could not load ledger. Please refresh and try again.</TableCell></TableRow>
+            )}
+            {!ledgerError && ledgerLoading && (
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Loading ledger…</TableCell></TableRow>
+            )}
+            {!ledgerError && !ledgerLoading && rows.length === 0 && (
               <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
             )}
             {rows.map((x, i) => {
