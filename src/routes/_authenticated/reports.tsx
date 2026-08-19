@@ -398,54 +398,67 @@ function Page() {
   });
 
   const { data: purchases = [] } = useQuery({
-    queryKey: ["report-purchases-paged", from, to],
+    queryKey: ["report-purchases-paged", from, to, isExporting],
     queryFn: async () => {
-      const { data } = await supabase.from("purchases")
+      const base = supabase.from("purchases")
         .select("subtotal,tax,total,paid,created_at")
         .gte("created_at", range.from)
-        .lte("created_at", range.to)
-        .range(0, 999);
-      return data ?? [];
+        .lte("created_at", range.to);
+      if (isExporting) {
+        return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      }
+      return (await base.range(0, 999)).data ?? [];
     },
   });
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ["report-expenses-paged", from, to],
+    queryKey: ["report-expenses-paged", from, to, isExporting],
     queryFn: async () => {
-      const { data } = await supabase.from("expenses")
+      const base = supabase.from("expenses")
         .select("amount,category,expense_date")
         .gte("expense_date", from)
-        .lte("expense_date", to)
-        .range(0, 999);
-      return data ?? [];
+        .lte("expense_date", to);
+      if (isExporting) {
+        return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      }
+      return (await base.range(0, 999)).data ?? [];
     },
   });
 
   const { data: partyPayments = [] } = useQuery({
-    queryKey: ["report-party-payments-paged", from, to],
+    queryKey: ["report-party-payments-paged", from, to, isExporting],
     queryFn: async () => {
-      const { data } = await supabase.from("party_payments")
+      const base = supabase.from("party_payments")
         .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
         .gte("created_at", range.from)
         .lte("created_at", range.to)
-        .order("created_at", { ascending: false })
-        .range(0, 999);
-      return data ?? [];
+        .order("created_at", { ascending: false });
+      if (isExporting) {
+        return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      }
+      return (await base.range(0, 999)).data ?? [];
     },
   });
 
   const { data: saleReturns = [] } = useQuery({
-    queryKey: ["report-sale-returns-paged", from, to],
+    queryKey: ["report-sale-returns-paged", from, to, isExporting],
     queryFn: async () => {
-      const { data } = await supabase.from("sale_returns")
+      const base = supabase.from("sale_returns")
         .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
         .gte("created_at", range.from)
         .lte("created_at", range.to)
-        .order("created_at", { ascending: false })
-        .range(0, 999);
-      return data ?? [];
+        .order("created_at", { ascending: false });
+      if (isExporting) {
+        return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      }
+      return (await base.range(0, 999)).data ?? [];
     },
   });
+
+  const isTruncated = !isExporting && (
+    sales.length >= 1000 || purchases.length >= 1000 || expenses.length >= 1000 ||
+    partyPayments.length >= 1000 || saleReturns.length >= 1000
+  );
 
 
   useEffect(() => {
