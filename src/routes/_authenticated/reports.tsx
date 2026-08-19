@@ -81,6 +81,7 @@ function SupplierWiseReport({
 
     for (const s of sales) {
       for (const it of s.sale_items ?? []) {
+        const prod = pMap.get(it.product_id);
         const sid = prod?.preferred_supplier_id || "unassigned";
         const sName = suppliers.find((x) => x.id === sid)?.name || (sid === "unassigned" ? "Unassigned" : "Unknown");
 
