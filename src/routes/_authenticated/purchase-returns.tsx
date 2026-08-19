@@ -40,6 +40,7 @@ type Draft = {
   refund: number;
   method: string;
   note: string;
+  paySource?: string;
 };
 
 const emptyDraft: Draft = {
@@ -128,6 +129,13 @@ function Page() {
     queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
   });
 
+  const { data: cashAccounts = [] } = useQuery({
+    queryKey: ["cash-accounts", "purchase-return-pay"],
+    queryFn: async () =>
+      (await supabase.from("cash_accounts").select("id,name,type,is_active")
+        .eq("is_active", true).order("sort_order").order("name")).data ?? [],
+  });
+
   const [debouncedEntrySearch, setDebouncedEntrySearch] = useState(entrySearch);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedEntrySearch(entrySearch), 300);
@@ -211,7 +219,10 @@ function Page() {
         payload: {
           purchase_id: purchaseId === "none" ? null : purchaseId,
           supplier_id: supplier === "none" ? null : supplier,
-          tax, refund_amount: refund, refund_method: method, note,
+          tax, 
+          refund_amount: refund, 
+          refund_method: method === "account" ? draft.paySource : method, 
+          note,
           items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
         },
       });
@@ -453,10 +464,28 @@ function Page() {
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
                         <SelectItem value="transfer">Transfer</SelectItem>
+                        <SelectItem value="account">Cash Account</SelectItem>
                         <SelectItem value="credit">Supplier Credit</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {method === "account" && (
+                    <div className="space-y-2">
+                      <Label>Account</Label>
+                      <Select 
+                        value={draft.paySource} 
+                        onValueChange={(v) => setDraft(d => ({ ...d, paySource: v }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                        <SelectContent>
+                          {cashAccounts.map((a: any) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Note</Label>
