@@ -25,6 +25,8 @@ import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
+const PURCHASE_LIST_LIMIT = 2000;
+
 type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
 
 type Draft = {
