@@ -3946,7 +3946,6 @@ export type Database = {
           current_balance: number
           email: string
           id: string
-          is_active: boolean
           name: string
           opening_balance: number
           phone: string
