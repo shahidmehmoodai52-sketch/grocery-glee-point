@@ -221,7 +221,7 @@ function Page() {
           supplier_id: supplier === "none" ? null : supplier,
           tax, 
           refund_amount: refund, 
-          refund_method: method === "account" ? draft.paySource : method, 
+          refund_method: method === "account" ? draft.paySource : (method === "credit" ? "credit" : method), 
           note,
           items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
         },
