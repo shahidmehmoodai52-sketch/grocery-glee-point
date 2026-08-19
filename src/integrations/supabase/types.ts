@@ -3952,6 +3952,19 @@ export type Database = {
           phone: string
         }[]
       }
+      get_supplier_ledger: {
+        Args: { p_supplier_id: string }
+        Returns: {
+          credit: number
+          debit: number
+          entry_type: string
+          id: string
+          note: string
+          occurred_at: string
+          reference: string
+          source_data: Json
+        }[]
+      }
       get_tenant_id_by_code: { Args: { _code: string }; Returns: string }
       has_active_subscription: {
         Args: { _tenant_id: string }
