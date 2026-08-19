@@ -436,20 +436,7 @@ function Page() {
     },
   });
 
-  const isTruncated = !isExporting && (
-    sales.length >= 1000 || purchases.length >= 1000 || expenses.length >= 1000 ||
-    partyPayments.length >= 1000 || saleReturns.length >= 1000
-  );
-
-
-  useEffect(() => {
-    if (isExporting && !salesLoading) {
-      setIsExporting(false);
-      toast.success("Full data loaded for export.");
-    }
-  }, [salesLoading, isExporting]);
-
-  // ---- aggregates (net of sale returns)
+  // Aggregates (net of sale returns)
   const grossRevenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
   const returnsSubtotal = saleReturns.reduce((s, x: any) => s + Number(x.subtotal ?? 0), 0);
   const returnsTax = saleReturns.reduce((s, x: any) => s + Number(x.tax ?? 0), 0);
