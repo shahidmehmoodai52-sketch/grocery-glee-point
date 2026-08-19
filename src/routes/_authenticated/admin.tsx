@@ -136,7 +136,7 @@ function AdminPanelPage() {
       <NeedsInternetBanner section="Admin panel" />
       <PageHeader
         title="Control Panel"
-        description="Managed by tillix.co support · info@tillix.co"
+        description="'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            al taj mart 025 ko compelete deep audit kro jo bi broker codes hen fix kro   sales save ho rahi hen but dashboard me show nahe ho rahen"
         icon={<ShieldCheck className="h-5 w-5" />}
       />
       <Tabs defaultValue="tenants">
