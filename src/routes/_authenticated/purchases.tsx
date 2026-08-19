@@ -706,17 +706,28 @@ function Page() {
           await supabase.from("products").update({ stock: currentStock - Number(it.qty) }).eq("id", it.product_id);
         }
 
-        // 4. Replace items
-        await supabase.from("purchase_items").delete().eq("purchase_id", editingId);
+        // 4. Replace items (carry tenant_id from the parent purchase so RLS accepts the insert)
+        const { data: parentPurchase, error: tErr } = await supabase
+          .from("purchases")
+          .select("tenant_id")
+          .eq("id", editingId)
+          .single();
+        if (tErr) throw tErr;
+
+        const { error: delErr } = await supabase.from("purchase_items").delete().eq("purchase_id", editingId);
+        if (delErr) throw delErr;
+
         const newItems = payload.items.map(it => ({
           purchase_id: editingId,
+          tenant_id: parentPurchase?.tenant_id,
           product_id: it.product_id,
           name: it.name,
           qty: it.qty,
           cost: it.cost,
           line_total: it.line_total
         }));
-        await supabase.from("purchase_items").insert(newItems);
+        const { error: insErr } = await supabase.from("purchase_items").insert(newItems);
+        if (insErr) throw insErr;
 
         // Apply new stock
         for (const it of payload.items) {
