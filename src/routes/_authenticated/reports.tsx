@@ -470,6 +470,7 @@ function Page() {
       return { data: data || [], count: count || 0 };
     },
   });
+  const saleReturns = saleReturnsPaged.data;
   const revenue = Number(summaryStats?.total_revenue || 0);
   const totalSales = Number(summaryStats?.total_revenue || 0) + Number(summaryStats?.total_tax || 0);
   const returnsTotal = Number(summaryStats?.total_returns || 0);
