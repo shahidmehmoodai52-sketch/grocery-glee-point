@@ -84,6 +84,7 @@ import { db as offlineDb } from "@/lib/offline/db";
 import { enqueueWrite } from "@/lib/offline/sync";
 import { useTranslation } from "react-i18next";
 import { isOfflineNow } from "@/lib/offline/session";
+import { getLocalPrinterSettings } from "@/lib/offline/printer-settings";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
