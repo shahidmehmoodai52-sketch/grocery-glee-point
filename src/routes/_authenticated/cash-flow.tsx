@@ -196,8 +196,10 @@ function Page() {
   const [spForm, setSpForm] = useState<any>({ ...emptySupplierPay });
 
   const [search, setSearch] = useState("");
+  const [mainPreset, setMainPreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
   const [filterAcc, setFilterAcc] = useState<string>("all");
   const [filterMethod, setFilterMethod] = useState<string>("all");
 
