@@ -19,6 +19,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { useEarliestDataDate } from "@/lib/earliest-date";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { fetchAll } from "@/lib/supabase-page";
 
