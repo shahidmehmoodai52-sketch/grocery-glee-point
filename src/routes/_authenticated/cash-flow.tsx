@@ -347,20 +347,20 @@ function Page() {
     return "cash";
   };
 
+  const allAccounts = accounts; // Compatibility alias
+  const autoTxs: Tx[] = []; // Compatibility alias
+
   const filteredTx = useMemo(() => {
     const term = search.trim().toLowerCase();
     return txs.filter((t) => {
-      if (filterAcc !== "all" && t.account_id !== filterAcc) return false;
-      if (filterMethod !== "all" && methodOf(t) !== filterMethod) return false;
-      if (dateFrom && t.occurred_on < dateFrom) return false;
-      if (dateTo && t.occurred_on > dateTo) return false;
+      // Filtering is primarily done server-side via RPC now.
       if (term) {
         const hay = `${t.category} ${t.reference ?? ""} ${t.notes ?? ""} ${payLabel(methodOf(t))}`.toLowerCase();
         if (!hay.includes(term)) return false;
       }
       return true;
     }).sort((a, b) => (b.occurred_on > a.occurred_on ? 1 : b.occurred_on < a.occurred_on ? -1 : (b.created_at > a.created_at ? 1 : -1)));
-  }, [txs, search, dateFrom, dateTo, filterAcc, filterMethod, allAccounts]);
+  }, [txs, search, allAccounts]);
 
   /** CSV export of exactly what is on screen (method + account included). */
   const exportCsv = () => {
