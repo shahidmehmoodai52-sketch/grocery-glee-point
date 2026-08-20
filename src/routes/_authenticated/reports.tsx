@@ -114,7 +114,7 @@ function SupplierWiseReport({
 
     // Adjust for returns
     for (const r of saleReturns) {
-      for (const it of r.sale_return_items ?? []) {
+      for (const it of (r.sale_return_items as any[]) ?? []) {
         const prod = pMap.get(it.product_id);
         const sid = prod?.preferred_supplier_id || "unassigned";
         if (!sMap.has(sid)) continue;
