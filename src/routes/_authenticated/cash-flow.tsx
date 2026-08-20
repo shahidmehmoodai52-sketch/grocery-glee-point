@@ -1160,7 +1160,7 @@ function Page() {
               const title = details.kind === "opening" ? "Opening balance — per account" : "Cash on hand — per account";
               const perAcc = new Map<string, { prior: number; inSum: number; outSum: number }>();
               for (const a of allAccounts) perAcc.set(a.id, { prior: 0, inSum: 0, outSum: 0 });
-              for (const t of txs) {
+              for (const t of detailTxs) {
                 const r = perAcc.get(t.account_id);
                 if (!r) continue;
                 const amt = Number(t.amount);
@@ -1209,7 +1209,7 @@ function Page() {
 
             const dir = details.kind === "in" ? "in" : details.kind === "out" ? "out" : null;
             const accId = details.kind === "account" ? details.accountId : null;
-            const scope = txs.filter((t) => {
+            const scope = detailTxs.filter((t) => {
               if (dir && t.direction !== dir) return false;
               if (accId && t.account_id !== accId) return false;
               if (dFilterAcc !== "all" && t.account_id !== dFilterAcc) return false;
