@@ -302,37 +302,39 @@ function Page() {
     };
   }, [summary]);
 
-  const accBalances = useMemo(() => {
-    return accounts.map(a => ({
-      ...a,
-      balance: a.id === filterAcc ? stats.balance : a.opening_balance // fallback if not filtered
-    }));
-  }, [accounts, filterAcc, stats.balance]);
-
   const isAutoTx = (id: string) => id.startsWith("auto:");
   const isAutoAcc = (id: string) => id.startsWith("auto:");
+
+  /** Per-account in/out for the WHOLE selected period (server-side aggregate).
+   *  The transactions table is paged (50 rows), so account cards and the report
+   *  must never be summed from `txs` — that showed only page 1 of the history. */
+  const { data: accountTotalsRaw } = useQuery({
+    queryKey: ["cf-account-totals", dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_cash_flow_account_totals", {
+        p_from_date: dateFrom || "2000-01-01",
+        p_to_date: dateTo || "2099-12-31",
+      });
+      if (error) throw error;
+      return (data ?? []) as { account_id: string | null; total_in: number; total_out: number; entry_count: number }[];
+    },
+  });
 
   const balances = useMemo(() => {
     const map = new Map<string, { inSum: number; outSum: number }>();
     for (const a of accounts) map.set(a.id, { inSum: 0, outSum: 0 });
-    for (const t of txs) {
-      const b = map.get(t.account_id);
-      if (!b) continue;
-      if (t.direction === "in") b.inSum += Number(t.amount);
-      else b.outSum += Number(t.amount);
+    for (const row of accountTotalsRaw ?? []) {
+      if (!row.account_id) continue;
+      map.set(row.account_id, { inSum: Number(row.total_in || 0), outSum: Number(row.total_out || 0) });
     }
     return map;
-  }, [accounts, txs]);
+  }, [accounts, accountTotalsRaw]);
 
-  const totals = useMemo(() => {
-    let opening = 0, inSum = 0, outSum = 0;
-    for (const a of accounts) {
-      opening += Number(a.opening_balance);
-      const b = balances.get(a.id);
-      if (b) { inSum += b.inSum; outSum += b.outSum; }
-    }
-    return { opening, inSum, outSum, balance: opening + inSum - outSum };
-  }, [accounts, balances]);
+  /** Headline figures always come from the server summary (full period). */
+  const totals = useMemo(
+    () => ({ opening: stats.opening, inSum: stats.in, outSum: stats.out, balance: stats.balance }),
+    [stats],
+  );
 
   // Receivables (credit sales unpaid) / Payables (purchases unpaid)
   const receivables = Number(summary.receivables || 0);
