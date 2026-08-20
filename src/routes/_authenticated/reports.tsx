@@ -492,6 +492,7 @@ function Page() {
   const openInvoices = (title: string, list: any[], note?: string) =>
     setDrill({ title, note: note ?? `${salesPaged.count} invoice${salesPaged.count === 1 ? "" : "s"} total`, invoices: list });
 
+
   const openReturns = (title: string) =>
     setDrill({
       title,
