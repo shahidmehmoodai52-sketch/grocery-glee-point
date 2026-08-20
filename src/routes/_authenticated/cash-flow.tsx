@@ -651,7 +651,7 @@ function Page() {
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Auto-synced from POS</div>
-          <div className="text-2xl font-bold mt-1">{autoTxs.length}</div>
+          <div className="text-2xl font-bold mt-1">{ledgerPaged.count}</div>
           <div className="text-[11px] text-muted-foreground mt-1">Sales, returns, purchases, expenses & party payments</div>
         </Card>
       </div>
