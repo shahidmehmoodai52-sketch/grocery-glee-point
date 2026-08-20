@@ -823,14 +823,15 @@ function Page() {
         {/* Report */}
         <TabsContent value="report" className="mt-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-end">
-            <div>
-              <Label className="text-xs">From</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">To</Label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </div>
+            <DateRangeBar
+              preset={mainPreset}
+              from={dateFrom}
+              to={dateTo}
+              onPreset={setMainPreset}
+              onFrom={setDateFrom}
+              onTo={setDateTo}
+            />
+
             <div className="text-xs text-muted-foreground ml-auto">
               {dateFrom || dateTo ? `Filtered ${dateFrom || "…"} → ${dateTo || "…"}` : "Showing all history"}
             </div>
