@@ -342,6 +342,7 @@ function Page() {
                 if (r?.from) setFrom(startOfDay(r.from));
                 if (r?.to) setTo(startOfDay(r.to));
                 else if (r?.from) setTo(startOfDay(r.from));
+                setUserPicked(true);
                 setPreset("custom");
               }}
               numberOfMonths={2}
