@@ -320,6 +320,29 @@ function Page() {
     },
   });
 
+  /** Drill-down dialogs need the FULL history (day 1 → today) so opening/prior
+   *  balances and running balances are correct. Only fetched while a dialog is open. */
+  const { data: detailTxs = [] } = useQuery({
+    queryKey: ["cf-ledger-full"],
+    enabled: !!details,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
+        p_from_date: "2000-01-01",
+        p_to_date: "2099-12-31",
+        p_limit: 100000,
+        p_offset: 0,
+      });
+      if (error) throw error;
+      return (data ?? []).map((row: any) => ({
+        ...row,
+        transfer_group_id: row.transfer_group_id || null,
+        payment_method: row.payment_method || null,
+      })) as Tx[];
+    },
+  });
+
+
   const balances = useMemo(() => {
     const map = new Map<string, { inSum: number; outSum: number }>();
     for (const a of accounts) map.set(a.id, { inSum: 0, outSum: 0 });
