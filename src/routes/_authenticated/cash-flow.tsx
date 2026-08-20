@@ -262,14 +262,20 @@ function Page() {
       const { data, count, error } = await supabase.rpc("get_cash_flow_ledger", {
         p_from_date: dateFrom || "2000-01-01",
         p_to_date: dateTo || "2099-12-31",
-        p_account_id: filterAcc === "all" ? null : filterAcc,
-        p_payment_method: filterMethod === "all" ? null : filterMethod,
-        p_search: search || null,
+        p_account_id: filterAcc === "all" ? undefined : filterAcc,
+        p_payment_method: filterMethod === "all" ? undefined : filterMethod,
+        p_search: search || undefined,
         p_limit: PAGE_SIZE_PAGED,
         p_offset: page * PAGE_SIZE_PAGED
       }, { count: "exact" });
       if (error) throw error;
-      return { data: data || [], count: count || 0 };
+      // map RPC response to Tx type, adding required fields if missing
+      const mapped = (data || []).map((row: any) => ({
+        ...row,
+        transfer_group_id: row.transfer_group_id || null,
+        payment_method: row.payment_method || null
+      })) as Tx[];
+      return { data: mapped, count: count || 0 };
     },
   });
 
@@ -312,42 +318,27 @@ function Page() {
       else b.outSum += Number(t.amount);
     }
     return map;
-  }, [allAccounts, txs]);
+  }, [accounts, txs]);
 
   const totals = useMemo(() => {
     let opening = 0, inSum = 0, outSum = 0;
-    for (const a of allAccounts) {
+    for (const a of accounts) {
       opening += Number(a.opening_balance);
       const b = balances.get(a.id);
       if (b) { inSum += b.inSum; outSum += b.outSum; }
     }
     return { opening, inSum, outSum, balance: opening + inSum - outSum };
-  }, [allAccounts, balances]);
+  }, [accounts, balances]);
 
   // Receivables (credit sales unpaid) / Payables (purchases unpaid)
-  const receivables = useMemo(() => {
-    let sum = 0;
-    for (const s of (salesQ.data ?? []) as any[]) {
-      if (s.status === "voided") continue;
-      const due = Number(s.total) - Number(s.paid);
-      if (due > 0.001) sum += due;
-    }
-    return sum;
-  }, [salesQ.data]);
-  const payables = useMemo(() => {
-    let sum = 0;
-    for (const p of (purchasesQ.data ?? []) as any[]) {
-      const due = Number(p.total) - Number(p.paid);
-      if (due > 0.001) sum += due;
-    }
-    return sum;
-  }, [purchasesQ.data]);
+  const receivables = Number(summary.total_receivables || 0);
+  const payables = Number(summary.total_payables || 0);
 
   /** Payment method of an entry. Stored value wins; legacy/auto rows are
    *  inferred from their account type and default to Cash. */
   const methodOf = (t: Tx): string => {
     if (t.payment_method) return t.payment_method;
-    const acc = allAccounts.find((a) => a.id === t.account_id);
+    const acc = accounts.find((a) => a.id === t.account_id);
     const type = acc?.type ?? "cash";
     const name = (acc?.name ?? "").toLowerCase();
     if (type === "card") return "card";
