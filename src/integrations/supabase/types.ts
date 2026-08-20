@@ -3929,64 +3929,39 @@ export type Database = {
         Returns: string
       }
       gen_tenant_slug: { Args: { _seed: string }; Returns: string }
-      get_cash_flow_ledger:
-        | {
-            Args: {
-              p_account_id?: string
-              p_from_date?: string
-              p_limit?: number
-              p_offset?: number
-              p_search?: string
-              p_to_date?: string
-            }
-            Returns: {
-              account_id: string
-              account_name: string
-              amount: number
-              category: string
-              created_at: string
-              direction: string
-              id: string
-              notes: string
-              occurred_on: string
-              payment_method: string
-              reference: string
-            }[]
-          }
-        | {
-            Args: {
-              p_account_id?: string
-              p_from_date?: string
-              p_limit?: number
-              p_offset?: number
-              p_payment_method?: string
-              p_search?: string
-              p_to_date?: string
-            }
-            Returns: {
-              account_id: string
-              account_name: string
-              amount: number
-              category: string
-              created_at: string
-              direction: string
-              id: string
-              notes: string
-              occurred_on: string
-              payment_method: string
-              reference: string
-            }[]
-          }
-      get_cash_flow_summary:
-        | { Args: { p_from_date?: string; p_to_date?: string }; Returns: Json }
-        | {
-            Args: {
-              p_account_id?: string
-              p_from_date?: string
-              p_to_date?: string
-            }
-            Returns: Json
-          }
+      get_cash_flow_ledger: {
+        Args: {
+          p_account_id?: string
+          p_from_date?: string
+          p_limit?: number
+          p_offset?: number
+          p_payment_method?: string
+          p_search?: string
+          p_to_date?: string
+        }
+        Returns: {
+          account_id: string
+          account_name: string
+          amount: number
+          category: string
+          created_at: string
+          direction: string
+          id: string
+          notes: string
+          occurred_on: string
+          payment_method: string
+          reference: string
+          total_count: number
+        }[]
+      }
+      get_cash_flow_summary: {
+        Args: {
+          p_account_id?: string
+          p_from_date?: string
+          p_to_date?: string
+        }
+        Returns: Json
+      }
       get_dashboard_stats: {
         Args: { p_from_date: string; p_to_date: string }
         Returns: {
