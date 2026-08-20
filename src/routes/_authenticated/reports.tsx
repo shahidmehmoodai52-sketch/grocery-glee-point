@@ -454,47 +454,44 @@ function Page() {
     },
   });
 
-  const { data: saleReturns = [] } = useQuery({
-    queryKey: ["report-sale-returns-paged", from, to],
+  const [saleReturnsPage, setSaleReturnsPage] = useState(0);
+
+  const { data: saleReturnsPaged = { data: [], count: 0 } } = useQuery({
+    queryKey: ["report-sale-returns-paged", range.from, range.to, saleReturnsPage],
     queryFn: async () => {
-      const base = supabase.from("sale_returns")
-        .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
+      const { data, count, error } = await supabase.from("sale_returns")
+        .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)", { count: "exact" })
         .gte("created_at", range.from)
         .lte("created_at", range.to)
-        .order("created_at", { ascending: false });
-      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+        .order("created_at", { ascending: false })
+        .range(saleReturnsPage * PAGE_SIZE, (saleReturnsPage + 1) * PAGE_SIZE - 1);
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
     },
   });
+  const saleReturns = saleReturnsPaged.data;
 
-  // Aggregates (net of sale returns)
-  const grossRevenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
-  const returnsSubtotal = saleReturns.reduce((s, x: any) => s + Number(x.subtotal ?? 0), 0);
-  const returnsTax = saleReturns.reduce((s, x: any) => s + Number(x.tax ?? 0), 0);
-  const returnsTotal = saleReturns.reduce((s, x: any) => s + Number(x.total ?? 0), 0);
-  const returnsRefund = saleReturns.reduce((s, x: any) => s + Number(x.refund_amount ?? 0), 0);
-  const returnsCogs = saleReturns.reduce(
-    (s, x: any) => s + (x.sale_return_items ?? []).reduce((a: number, i: any) => a + Number(i.qty) * Number(i.cost ?? 0), 0),
-    0,
-  );
-  const revenue = grossRevenue - returnsSubtotal;
-  const cogs = sales.reduce((s, x: any) => s + Number(x.cost_total), 0) - returnsCogs;
-  const grossProfit = revenue - cogs;
-  const taxCollected = sales.reduce((s, x: any) => s + Number(x.tax), 0) - returnsTax;
-  const totalSales = sales.reduce((s, x: any) => s + Number(x.total), 0) - returnsTotal;
-  const totalPurchases = purchases.reduce((s, x: any) => s + Number(x.total), 0);
-  const cashIn = sales.reduce((s, x: any) => s + Number(x.paid), 0) - returnsRefund;
-  const creditOut = sales.filter((x: any) => x.status === "credit").reduce((s, x: any) => s + (Number(x.total) - Number(x.paid)), 0);
-  const expensesPeriod = expenses.reduce((s, x: any) => s + Number(x.amount), 0);
-  const netProfit = grossProfit - expensesPeriod;
+  // Aggregates (use server-side summary if available, else fallback)
+  const revenue = Number(summaryStats?.total_revenue || 0);
+  const totalSales = Number(summaryStats?.total_revenue || 0) + Number(summaryStats?.total_tax || 0);
+  const returnsTotal = Number(summaryStats?.total_returns || 0);
+  const totalPurchases = Number(summaryStats?.total_purchases || 0);
+  const expensesPeriod = Number(summaryStats?.total_expenses || 0);
+  const taxCollected = Number(summaryStats?.total_tax || 0);
+  const netProfit = Number(summaryStats?.total_revenue || 0) - Number(summaryStats?.total_cost || 0) - Number(summaryStats?.total_expenses || 0);
+
+  // Fallback for drill-down notes when using server-side stats
+  const cashIn = Number(summaryStats?.total_paid || 0);
+  const returnsRefund = Number(summaryStats?.total_returns || 0); // approx
 
   // ---- drill-down helpers (every report row is clickable)
   const openInvoices = (title: string, list: any[], note?: string) =>
-    setDrill({ title, note: note ?? `${list.length} invoice${list.length === 1 ? "" : "s"}`, invoices: list });
+    setDrill({ title, note: note ?? `${salesPaged.count} invoice${salesPaged.count === 1 ? "" : "s"} total`, invoices: list });
 
   const openReturns = (title: string) =>
     setDrill({
       title,
-      note: `${saleReturns.length} return${saleReturns.length === 1 ? "" : "s"}`,
+      note: `${saleReturnsPaged.count} return${saleReturnsPaged.count === 1 ? "" : "s"}`,
       cols: ["Return #", "Date", "Customer", "Subtotal", "Refund", "Total"],
       rows: (saleReturns as any[]).map((r) => [
         r.return_no ?? "—",
@@ -509,7 +506,7 @@ function Page() {
   const openExpenses = () =>
     setDrill({
       title: "Operating expenses",
-      note: `${expenses.length} entr${expenses.length === 1 ? "y" : "ies"} · ${fmtMoney(expensesPeriod, sym)}`,
+      note: `${expensesPaged.count} entr${expensesPaged.count === 1 ? "y" : "ies"} · ${fmtMoney(expensesPeriod, sym)}`,
       cols: ["Date", "Category", "Amount"],
       rows: (expenses as any[]).map((e) => [e.expense_date, e.category ?? "—", fmtMoney(Number(e.amount), sym)]),
     });
@@ -517,7 +514,7 @@ function Page() {
   const openPurchases = () =>
     setDrill({
       title: "Purchases (period)",
-      note: `${purchases.length} purchase${purchases.length === 1 ? "" : "s"} · ${fmtMoney(totalPurchases, sym)}`,
+      note: `${purchasesPaged.count} purchase${purchasesPaged.count === 1 ? "" : "s"} · ${fmtMoney(totalPurchases, sym)}`,
       cols: ["Date", "Subtotal", "Tax", "Total", "Paid"],
       rows: (purchases as any[]).map((p) => [
         new Date(p.created_at).toLocaleString(),
