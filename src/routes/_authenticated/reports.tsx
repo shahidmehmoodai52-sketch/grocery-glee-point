@@ -379,6 +379,10 @@ function Page() {
     from: fromDate ? new Date(new Date(fromDate).setHours(0, 0, 0, 0)).toISOString() : "2000-01-01T00:00:00Z",
     to: toDate ? new Date(new Date(toDate).setHours(23, 59, 59, 999)).toISOString() : new Date().toISOString(),
   };
+  
+  const fromTime = range.from;
+  const toTime = range.to;
+
 
   const [salesPage, setSalesPage] = useState(0);
   const [purchasesPage, setPurchasesPage] = useState(0);
