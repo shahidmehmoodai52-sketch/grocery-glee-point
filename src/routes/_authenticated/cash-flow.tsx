@@ -302,37 +302,62 @@ function Page() {
     };
   }, [summary]);
 
-  const accBalances = useMemo(() => {
-    return accounts.map(a => ({
-      ...a,
-      balance: a.id === filterAcc ? stats.balance : a.opening_balance // fallback if not filtered
-    }));
-  }, [accounts, filterAcc, stats.balance]);
-
   const isAutoTx = (id: string) => id.startsWith("auto:");
   const isAutoAcc = (id: string) => id.startsWith("auto:");
+
+  /** Per-account in/out for the WHOLE selected period (server-side aggregate).
+   *  The transactions table is paged (50 rows), so account cards and the report
+   *  must never be summed from `txs` — that showed only page 1 of the history. */
+  const { data: accountTotalsRaw } = useQuery({
+    queryKey: ["cf-account-totals", dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_cash_flow_account_totals", {
+        p_from_date: dateFrom || "2000-01-01",
+        p_to_date: dateTo || "2099-12-31",
+      });
+      if (error) throw error;
+      return (data ?? []) as { account_id: string | null; total_in: number; total_out: number; entry_count: number }[];
+    },
+  });
+
+  /** Drill-down dialogs need the FULL history (day 1 → today) so opening/prior
+   *  balances and running balances are correct. Only fetched while a dialog is open. */
+  const { data: detailTxs = [] } = useQuery({
+    queryKey: ["cf-ledger-full"],
+    enabled: !!details,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
+        p_from_date: "2000-01-01",
+        p_to_date: "2099-12-31",
+        p_limit: 100000,
+        p_offset: 0,
+      });
+      if (error) throw error;
+      return (data ?? []).map((row: any) => ({
+        ...row,
+        transfer_group_id: row.transfer_group_id || null,
+        payment_method: row.payment_method || null,
+      })) as Tx[];
+    },
+  });
+
 
   const balances = useMemo(() => {
     const map = new Map<string, { inSum: number; outSum: number }>();
     for (const a of accounts) map.set(a.id, { inSum: 0, outSum: 0 });
-    for (const t of txs) {
-      const b = map.get(t.account_id);
-      if (!b) continue;
-      if (t.direction === "in") b.inSum += Number(t.amount);
-      else b.outSum += Number(t.amount);
+    for (const row of accountTotalsRaw ?? []) {
+      if (!row.account_id) continue;
+      map.set(row.account_id, { inSum: Number(row.total_in || 0), outSum: Number(row.total_out || 0) });
     }
     return map;
-  }, [accounts, txs]);
+  }, [accounts, accountTotalsRaw]);
 
-  const totals = useMemo(() => {
-    let opening = 0, inSum = 0, outSum = 0;
-    for (const a of accounts) {
-      opening += Number(a.opening_balance);
-      const b = balances.get(a.id);
-      if (b) { inSum += b.inSum; outSum += b.outSum; }
-    }
-    return { opening, inSum, outSum, balance: opening + inSum - outSum };
-  }, [accounts, balances]);
+  /** Headline figures always come from the server summary (full period). */
+  const totals = useMemo(
+    () => ({ opening: stats.opening, inSum: stats.in, outSum: stats.out, balance: stats.balance }),
+    [stats],
+  );
 
   // Receivables (credit sales unpaid) / Payables (purchases unpaid)
   const receivables = Number(summary.receivables || 0);
@@ -553,20 +578,14 @@ function Page() {
   const fmt = (n: number) => fmtMoney(n, sym);
 
   const reportRows = useMemo(() => {
-    // In current filter window, per-account totals
+    // Per-account totals for the WHOLE selected period (server aggregate, not the current page)
     return allAccounts.map((a) => {
-      let inSum = 0, outSum = 0;
-      for (const t of filteredTx) {
-        if (t.account_id !== a.id) continue;
-        if (t.direction === "in") inSum += Number(t.amount);
-        else outSum += Number(t.amount);
-      }
-      const opening = Number(a.opening_balance);
       const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
+      const opening = Number(a.opening_balance);
       const currentBalance = opening + b.inSum - b.outSum;
-      return { acc: a, inSum, outSum, net: inSum - outSum, currentBalance };
+      return { acc: a, inSum: b.inSum, outSum: b.outSum, net: b.inSum - b.outSum, currentBalance };
     });
-  }, [accounts, filteredTx, balances]);
+  }, [allAccounts, balances]);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -655,7 +674,7 @@ function Page() {
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Auto-synced from POS</div>
-          <div className="text-2xl font-bold mt-1">{autoTxs.length}</div>
+          <div className="text-2xl font-bold mt-1">{ledgerPaged.count}</div>
           <div className="text-[11px] text-muted-foreground mt-1">Sales, returns, purchases, expenses & party payments</div>
         </Card>
       </div>
@@ -1141,7 +1160,7 @@ function Page() {
               const title = details.kind === "opening" ? "Opening balance — per account" : "Cash on hand — per account";
               const perAcc = new Map<string, { prior: number; inSum: number; outSum: number }>();
               for (const a of allAccounts) perAcc.set(a.id, { prior: 0, inSum: 0, outSum: 0 });
-              for (const t of txs) {
+              for (const t of detailTxs) {
                 const r = perAcc.get(t.account_id);
                 if (!r) continue;
                 const amt = Number(t.amount);
@@ -1190,7 +1209,7 @@ function Page() {
 
             const dir = details.kind === "in" ? "in" : details.kind === "out" ? "out" : null;
             const accId = details.kind === "account" ? details.accountId : null;
-            const scope = txs.filter((t) => {
+            const scope = detailTxs.filter((t) => {
               if (dir && t.direction !== dir) return false;
               if (accId && t.account_id !== accId) return false;
               if (dFilterAcc !== "all" && t.account_id !== dFilterAcc) return false;
