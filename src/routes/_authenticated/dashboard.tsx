@@ -62,22 +62,34 @@ function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
 
-  const [preset, setPreset] = useState<DatePreset | "custom">("today");
-  const [from, setFrom] = useState<Date>(startOfDay(new Date()));
+  // Default range = shop's first ever transaction → today, so historical data is
+  // never hidden behind a narrow default. Explicit user selection always wins.
+  const { data: earliest } = useEarliestDataDate();
+  const [preset, setPreset] = useState<DatePreset | "custom">("all");
+  const [from, setFrom] = useState<Date>(new Date(2000, 0, 1));
   const [to, setTo] = useState<Date>(startOfDay(new Date()));
+  const [userPicked, setUserPicked] = useState(false);
+
+  useEffect(() => {
+    if (userPicked || !earliest) return;
+    setFrom(startOfDay(earliest));
+    setTo(startOfDay(new Date()));
+  }, [earliest, userPicked]);
 
   const applyPreset = (p: DatePreset) => {
+    setUserPicked(true);
     setPreset(p);
     const r = rangeFor(p);
     if (p === "all") {
       const now = new Date();
-      setFrom(new Date(2000, 0, 1));
+      setFrom(earliest ? startOfDay(earliest) : new Date(2000, 0, 1));
       setTo(startOfDay(now));
     } else {
       setFrom(startOfDay(new Date(r.from)));
       setTo(startOfDay(new Date(r.to)));
     }
   };
+
 
   const fromISO = startOfDay(from).toISOString();
   const toISO = endOfDay(to).toISOString();
