@@ -802,10 +802,19 @@ function Page() {
                       )}
                     </TableRow>
                   );
-                })}
-              </TableBody>
-            </Table>
-          </Card>
+                 })}
+               </TableBody>
+             </Table>
+             {ledgerPaged.count > PAGE_SIZE_PAGED && (
+               <div className="p-4 flex items-center justify-between border-t text-sm">
+                 <div className="text-muted-foreground">Showing {page * PAGE_SIZE_PAGED + 1} to {Math.min((page + 1) * PAGE_SIZE_PAGED, ledgerPaged.count)} of {ledgerPaged.count} entries</div>
+                 <div className="flex gap-2">
+                   <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
+                   <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={(page + 1) * PAGE_SIZE_PAGED >= ledgerPaged.count}>Next</Button>
+                 </div>
+               </div>
+             )}
+           </Card>
         </TabsContent>
 
         {/* Report */}
