@@ -403,12 +403,12 @@ function Page() {
   const summaryStats = (summaryStatsRaw as any)?.[0] || {};
 
   const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
-    queryKey: ["report-sales-paged", range.from, range.to, salesPage],
+    queryKey: ["report-sales-paged", fromTime, toTime, salesPage],
     queryFn: async () => {
       const q = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)", { count: "exact" })
-        .gte("created_at", range.from)
-        .lte("created_at", range.to)
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
         .order("created_at", { ascending: false })
         .range(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE - 1);
       
