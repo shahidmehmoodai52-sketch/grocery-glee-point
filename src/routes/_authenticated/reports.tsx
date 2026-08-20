@@ -383,7 +383,7 @@ function Page() {
   const [expensesPage, setExpensesPage] = useState(0);
   const PAGE_SIZE = 50;
 
-  const { data: summaryStats } = useQuery({
+  const { data: summaryStatsRaw } = useQuery({
     queryKey: ["reports-summary", range.from, range.to],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_reports_summary", {
@@ -394,6 +394,7 @@ function Page() {
       return data;
     },
   });
+  const summaryStats = (summaryStatsRaw as any)?.[0] || {};
 
   const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
     queryKey: ["report-sales-paged", range.from, range.to, salesPage],
