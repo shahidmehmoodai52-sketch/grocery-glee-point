@@ -555,20 +555,14 @@ function Page() {
   const fmt = (n: number) => fmtMoney(n, sym);
 
   const reportRows = useMemo(() => {
-    // In current filter window, per-account totals
+    // Per-account totals for the WHOLE selected period (server aggregate, not the current page)
     return allAccounts.map((a) => {
-      let inSum = 0, outSum = 0;
-      for (const t of filteredTx) {
-        if (t.account_id !== a.id) continue;
-        if (t.direction === "in") inSum += Number(t.amount);
-        else outSum += Number(t.amount);
-      }
-      const opening = Number(a.opening_balance);
       const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
+      const opening = Number(a.opening_balance);
       const currentBalance = opening + b.inSum - b.outSum;
-      return { acc: a, inSum, outSum, net: inSum - outSum, currentBalance };
+      return { acc: a, inSum: b.inSum, outSum: b.outSum, net: b.inSum - b.outSum, currentBalance };
     });
-  }, [accounts, filteredTx, balances]);
+  }, [allAccounts, balances]);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
