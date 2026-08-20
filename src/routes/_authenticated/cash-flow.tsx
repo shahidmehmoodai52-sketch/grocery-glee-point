@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Wallet, Banknote, CreditCard, Smartphone,
@@ -199,6 +199,26 @@ function Page() {
   const [mainPreset, setMainPreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [userPicked, setUserPicked] = useState(false);
+
+  const { data: earliest } = useQuery({
+    queryKey: ["earliest-cf-date"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cash_transactions")
+        .select("created_at")
+        .order("created_at", { ascending: true })
+        .limit(1);
+      const v = (data?.[0] as any)?.created_at;
+      return v ? v.slice(0, 10) : null;
+    },
+  });
+
+  useEffect(() => {
+    if (userPicked || !earliest) return;
+    setDateFrom(earliest);
+    setDateTo(new Date().toISOString().slice(0, 10));
+  }, [earliest, userPicked]);
 
   const [filterAcc, setFilterAcc] = useState<string>("all");
   const [filterMethod, setFilterMethod] = useState<string>("all");
@@ -248,8 +268,8 @@ function Page() {
     queryKey: ["cf-summary", dateFrom, dateTo, filterAcc],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_summary", {
-        p_from_date: dateFrom || "2000-01-01",
-        p_to_date: dateTo || "2099-12-31",
+        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
+        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
         p_account_id: filterAcc === "all" ? undefined : filterAcc
       });
       if (error) throw error;
@@ -262,8 +282,8 @@ function Page() {
     queryKey: ["cf-ledger-paged", dateFrom, dateTo, filterAcc, filterMethod, search, page],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
-        p_from_date: dateFrom || "2000-01-01",
-        p_to_date: dateTo || "2099-12-31",
+        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
+        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
         p_account_id: filterAcc === "all" ? undefined : filterAcc,
         p_payment_method: filterMethod === "all" ? undefined : filterMethod,
         p_search: search || undefined,
@@ -312,8 +332,8 @@ function Page() {
     queryKey: ["cf-account-totals", dateFrom, dateTo],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_account_totals", {
-        p_from_date: dateFrom || "2000-01-01",
-        p_to_date: dateTo || "2099-12-31",
+        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
+        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
       });
       if (error) throw error;
       return (data ?? []) as { account_id: string | null; total_in: number; total_out: number; entry_count: number }[];
@@ -328,8 +348,8 @@ function Page() {
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
-        p_from_date: "2000-01-01",
-        p_to_date: "2099-12-31",
+        p_from_date: "2000-01-01T00:00:00",
+        p_to_date: "2099-12-31T23:59:59",
         p_limit: 100000,
         p_offset: 0,
       });
@@ -610,9 +630,16 @@ function Page() {
         preset={mainPreset}
         from={dateFrom}
         to={dateTo}
-        onPreset={setMainPreset}
-        onFrom={(v) => { setDateFrom(v); setPage(0); }}
-        onTo={(v) => { setDateTo(v); setPage(0); }}
+        onPreset={(p) => {
+          setUserPicked(true);
+          setMainPreset(p);
+          if (p === "all") {
+            setDateFrom(earliest || "");
+            setDateTo(new Date().toISOString().slice(0, 10));
+          }
+        }}
+        onFrom={(v) => { setUserPicked(true); setDateFrom(v); setPage(0); }}
+        onTo={(v) => { setUserPicked(true); setDateTo(v); setPage(0); }}
       />
 
       {/* Summary cards */}
