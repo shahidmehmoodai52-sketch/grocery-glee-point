@@ -420,12 +420,12 @@ function Page() {
   const sales = salesPaged.data;
 
   const { data: purchasesPaged = { data: [], count: 0 } } = useQuery({
-    queryKey: ["report-purchases-paged", range.from, range.to, purchasesPage],
+    queryKey: ["report-purchases-paged", fromTime, toTime, purchasesPage],
     queryFn: async () => {
       const { data, count, error } = await supabase.from("purchases")
         .select("subtotal,tax,total,paid,created_at", { count: "exact" })
-        .gte("created_at", range.from)
-        .lte("created_at", range.to)
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
         .order("created_at", { ascending: false })
         .range(purchasesPage * PAGE_SIZE, (purchasesPage + 1) * PAGE_SIZE - 1);
       if (error) throw error;
