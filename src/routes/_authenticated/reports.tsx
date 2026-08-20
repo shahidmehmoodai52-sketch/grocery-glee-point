@@ -401,7 +401,7 @@ function Page() {
       return data;
     },
   });
-  const summaryStats = (summaryStatsRaw as any)?.[0] || {};
+  const summaryStats = (summaryStatsRaw as any) || {};
 
   const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
     queryKey: ["report-sales-paged", fromTime, toTime, salesPage],
@@ -478,20 +478,20 @@ function Page() {
     },
   });
   const saleReturns = saleReturnsPaged.data;
-  const revenue = Number(summaryStats?.total_revenue || 0);
-  const totalSales = Number(summaryStats?.total_revenue || 0) + Number(summaryStats?.total_tax || 0);
-  const returnsTotal = Number(summaryStats?.total_returns || 0);
-  const totalPurchases = Number(summaryStats?.total_purchases || 0);
-  const expensesPeriod = Number(summaryStats?.total_expenses || 0);
-  const taxCollected = Number(summaryStats?.total_tax || 0);
-  const cogs = Number(summaryStats?.total_cost || 0);
+  const revenue = Number(summaryStats.sales_total || 0);
+  const totalSales = Number(summaryStats.sales_total || 0);
+  const returnsTotal = Number(summaryStats.returns_total || 0);
+  const totalPurchases = Number(summaryStats.purchases_total || 0);
+  const expensesPeriod = Number(summaryStats.expenses_total || 0);
+  const taxCollected = Number(summaryStats.sales_tax || 0);
+  const cogs = Number(summaryStats.sales_cost || 0);
   const grossProfit = revenue - cogs;
   const netProfit = grossProfit - expensesPeriod;
-  const grossRevenue = revenue + Number(summaryStats?.total_returns || 0); // Simplified for P&L breakdown
-  const creditOut = Number(summaryStats?.total_credit || 0);
-  const cashIn = Number(summaryStats?.total_paid || 0);
-  const returnsLoss = Number(summaryStats?.total_returns || 0);
-  const returnsSubtotal = returnsLoss; // consistent naming for P&L row
+  const grossRevenue = revenue + Number(summaryStats.returns_total || 0);
+  const creditOut = 0; // Not in RPC yet
+  const cashIn = 0; // Not in RPC yet
+  const returnsLoss = Number(summaryStats.returns_total || 0);
+  const returnsSubtotal = returnsLoss;
 
   // ---- drill-down helpers (every report row is clickable)
   const openInvoices = (title: string, list: any[], note?: string) =>
