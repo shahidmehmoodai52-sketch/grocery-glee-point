@@ -41,6 +41,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminAccess, ADMIN_PERMS } from "@/hooks/use-admin-access";
+import { getLocalPrinterSettings, saveLocalPrinterSettings } from "@/lib/offline/printer-settings";
 import { fmtMoney } from "@/lib/format";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { useServerFn } from "@tanstack/react-start";
@@ -87,6 +88,7 @@ type SecuritySummary = {
 function AdminPanelPage() {
   const navigate = useNavigate();
   const { isSuperAdmin, isAdminStaff, canEnter, loading } = useAdminAccess();
+  const [activeTab, setActiveTab] = useState("shops");
 
   useEffect(() => {
     if (!loading && !canEnter) {
