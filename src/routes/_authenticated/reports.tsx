@@ -19,6 +19,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { useEarliestDataDate } from "@/lib/earliest-date";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { fetchAll } from "@/lib/supabase-page";
 
@@ -349,9 +350,17 @@ const toISO = (d: Date) => {
 function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
-  const [preset, setPreset] = useState<DatePreset | "custom">("today");
-  const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
+  // Default range = shop's first ever transaction → today (never hide history).
+  const { data: earliestData } = useEarliestDataDate();
+  const [preset, setPreset] = useState<DatePreset | "custom">("all");
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(new Date());
+  const [userPicked, setUserPicked] = useState(false);
+  useEffect(() => {
+    if (userPicked || !earliestData) return;
+    setFromDate(earliestData);
+    setToDate(new Date());
+  }, [earliestData, userPicked]);
   const from = fromDate ? toISO(fromDate) : "1970-01-01";
   const to = toDate ? toISO(toDate) : today();
   
@@ -367,11 +376,18 @@ function Page() {
   }>(null);
 
   const applyPreset = (p: DatePreset) => {
+    setUserPicked(true);
     setPreset(p);
     const { from: f, to: t } = rangeFor(p);
+    if (p === "all") {
+      setFromDate(earliestData ?? undefined);
+      setToDate(new Date());
+      return;
+    }
     setFromDate(f ? new Date(f) : undefined);
     setToDate(t ? new Date(t) : undefined);
   };
+
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
   const range = {
@@ -453,14 +469,31 @@ function Page() {
   const { data: partyPayments = [] } = useQuery({
     queryKey: ["report-party-payments-paged", fromTime, toTime],
     queryFn: async () => {
+      // No FK-based embed here: party_payments has no FK to customers/suppliers,
+      // so PostgREST embedding fails (PGRST200). Resolve names client-side.
       const base = supabase.from("party_payments")
-        .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
+        .select("id,party_type,party_id,amount,method,note,created_at")
         .gte("created_at", fromTime)
         .lte("created_at", toTime)
         .order("created_at", { ascending: false });
-      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      const rows = await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      if (!rows.length) return rows;
+      const custIds = [...new Set(rows.filter(r => r.party_type === "customer").map(r => r.party_id).filter(Boolean))];
+      const supIds = [...new Set(rows.filter(r => r.party_type !== "customer").map(r => r.party_id).filter(Boolean))];
+      const [custRes, supRes] = await Promise.all([
+        custIds.length ? supabase.from("customers").select("id,name").in("id", custIds) : Promise.resolve({ data: [] as any[] }),
+        supIds.length ? supabase.from("suppliers").select("id,name").in("id", supIds) : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const cMap = new Map((custRes.data ?? []).map((c: any) => [c.id, c.name]));
+      const sMap = new Map((supRes.data ?? []).map((s: any) => [s.id, s.name]));
+      return rows.map((r) => ({
+        ...r,
+        customers: r.party_type === "customer" ? { name: cMap.get(r.party_id) ?? null } : null,
+        suppliers: r.party_type !== "customer" ? { name: sMap.get(r.party_id) ?? null } : null,
+      }));
     },
   });
+
 
   const [saleReturnsPage, setSaleReturnsPage] = useState(0);
 
@@ -683,6 +716,7 @@ function Page() {
               mode="range"
               selected={{ from: fromDate, to: toDate }}
               onSelect={(r) => {
+                setUserPicked(true);
                 setPreset("custom");
                 setFromDate(r?.from);
                 setToDate(r?.to);

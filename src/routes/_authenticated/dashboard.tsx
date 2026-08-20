@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,6 +24,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtDate } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { useEarliestDataDate } from "@/lib/earliest-date";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
@@ -61,22 +62,34 @@ function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
 
-  const [preset, setPreset] = useState<DatePreset | "custom">("today");
-  const [from, setFrom] = useState<Date>(startOfDay(new Date()));
+  // Default range = shop's first ever transaction → today, so historical data is
+  // never hidden behind a narrow default. Explicit user selection always wins.
+  const { data: earliest } = useEarliestDataDate();
+  const [preset, setPreset] = useState<DatePreset | "custom">("all");
+  const [from, setFrom] = useState<Date>(new Date(2000, 0, 1));
   const [to, setTo] = useState<Date>(startOfDay(new Date()));
+  const [userPicked, setUserPicked] = useState(false);
+
+  useEffect(() => {
+    if (userPicked || !earliest) return;
+    setFrom(startOfDay(earliest));
+    setTo(startOfDay(new Date()));
+  }, [earliest, userPicked]);
 
   const applyPreset = (p: DatePreset) => {
+    setUserPicked(true);
     setPreset(p);
     const r = rangeFor(p);
     if (p === "all") {
       const now = new Date();
-      setFrom(new Date(2000, 0, 1));
+      setFrom(earliest ? startOfDay(earliest) : new Date(2000, 0, 1));
       setTo(startOfDay(now));
     } else {
       setFrom(startOfDay(new Date(r.from)));
       setTo(startOfDay(new Date(r.to)));
     }
   };
+
 
   const fromISO = startOfDay(from).toISOString();
   const toISO = endOfDay(to).toISOString();
@@ -329,6 +342,7 @@ function Page() {
                 if (r?.from) setFrom(startOfDay(r.from));
                 if (r?.to) setTo(startOfDay(r.to));
                 else if (r?.from) setTo(startOfDay(r.from));
+                setUserPicked(true);
                 setPreset("custom");
               }}
               numberOfMonths={2}

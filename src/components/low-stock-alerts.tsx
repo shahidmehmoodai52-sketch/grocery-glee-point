@@ -137,20 +137,23 @@ export function LowStockAlerts() {
     queryKey: ["low-stock-alerts"],
     refetchInterval: 5 * 60_000,
     queryFn: async (): Promise<Row[]> => {
-      // Server-side filtering: only fetch products that are at or below their threshold.
-      // We use .or() to handle both products with specific thresholds and items that are out of stock.
-      // This eliminates the 200,000 row catalog download.
+      // PostgREST cannot compare two columns, so `stock.lte.low_stock_threshold`
+      // was a 400 (invalid numeric). Fetch a bounded low-stock window, then
+      // apply the per-product threshold client-side.
       const { data, error } = await supabase
         .from("products")
         .select("id,name,sku,unit,category,sell_price,stock,low_stock_threshold,updated_at")
         .eq("is_active", true)
-        .or("stock.lte.low_stock_threshold,stock.lte.0")
+        .lte("stock", 100)
         .order("stock", { ascending: true })
-        .limit(100);
+        .limit(300);
 
       if (error) throw error;
-      return (data ?? []) as Row[];
+      return ((data ?? []) as Row[]).filter(
+        (p) => Number(p.stock) <= 0 || Number(p.stock) <= Number(p.low_stock_threshold ?? 5),
+      ).slice(0, 100);
     },
+
     staleTime: 30_000,
     gcTime: 10 * 60_000,
   });
