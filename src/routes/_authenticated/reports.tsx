@@ -80,7 +80,7 @@ function SupplierWiseReport({
     }>();
 
     for (const s of sales) {
-      for (const it of s.sale_items ?? []) {
+      for (const it of (s.sale_items as any[]) ?? []) {
         const prod = pMap.get(it.product_id);
         const sid = prod?.preferred_supplier_id || "unassigned";
         const sName = suppliers.find((x) => x.id === sid)?.name || (sid === "unassigned" ? "Unassigned" : "Unknown");
@@ -114,7 +114,7 @@ function SupplierWiseReport({
 
     // Adjust for returns
     for (const r of saleReturns) {
-      for (const it of r.sale_return_items ?? []) {
+      for (const it of (r.sale_return_items as any[]) ?? []) {
         const prod = pMap.get(it.product_id);
         const sid = prod?.preferred_supplier_id || "unassigned";
         if (!sMap.has(sid)) continue;
@@ -354,6 +354,8 @@ function Page() {
   const [toDate, setToDate] = useState<Date | undefined>(new Date());
   const from = fromDate ? toISO(fromDate) : "1970-01-01";
   const to = toDate ? toISO(toDate) : today();
+  
+
   const [tab, setTab] = useState("pnl");
   const [search, setSearch] = useState("");
   const [drill, setDrill] = useState<null | {
@@ -377,94 +379,129 @@ function Page() {
     from: fromDate ? new Date(new Date(fromDate).setHours(0, 0, 0, 0)).toISOString() : "2000-01-01T00:00:00Z",
     to: toDate ? new Date(new Date(toDate).setHours(23, 59, 59, 999)).toISOString() : new Date().toISOString(),
   };
+  
+  const fromTime = range.from;
+  const toTime = range.to;
 
-  const { data: sales = [], isLoading: salesLoading } = useQuery({
-    queryKey: ["report-sales-paged", from, to],
+
+
+  const [salesPage, setSalesPage] = useState(0);
+  const [purchasesPage, setPurchasesPage] = useState(0);
+  const [expensesPage, setExpensesPage] = useState(0);
+  const PAGE_SIZE = 50;
+
+  const { data: summaryStatsRaw } = useQuery({
+    queryKey: ["reports-summary", fromTime, toTime],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_reports_summary", {
+        p_from_date: fromTime,
+        p_to_date: toTime
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+  const summaryStats = (summaryStatsRaw as any)?.[0] || {};
+
+  const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
+    queryKey: ["report-sales-paged", fromTime, toTime, salesPage],
     queryFn: async () => {
       const q = supabase.from("sales")
-        .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
-        .order("created_at", { ascending: false });
+        .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)", { count: "exact" })
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false })
+        .range(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE - 1);
       
-      const filtered = q.gte("created_at", range.from).lte("created_at", range.to);
-      return await fetchAll<any>((fIdx: number, tIdx: number) => filtered.range(fIdx, tIdx), 1000);
+      const { data, count, error } = await q;
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
     },
   });
+  const sales = salesPaged.data;
 
-  const { data: purchases = [] } = useQuery({
-    queryKey: ["report-purchases-paged", from, to],
+  const { data: purchasesPaged = { data: [], count: 0 } } = useQuery({
+    queryKey: ["report-purchases-paged", fromTime, toTime, purchasesPage],
     queryFn: async () => {
-      const base = supabase.from("purchases")
-        .select("subtotal,tax,total,paid,created_at")
-        .gte("created_at", range.from)
-        .lte("created_at", range.to);
-      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      const { data, count, error } = await supabase.from("purchases")
+        .select("subtotal,tax,total,paid,created_at", { count: "exact" })
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false })
+        .range(purchasesPage * PAGE_SIZE, (purchasesPage + 1) * PAGE_SIZE - 1);
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
     },
   });
+  const purchases = purchasesPaged.data;
 
-  const { data: expenses = [] } = useQuery({
-    queryKey: ["report-expenses-paged", from, to],
+  const { data: expensesPaged = { data: [], count: 0 } } = useQuery({
+    queryKey: ["report-expenses-paged", range.from, range.to, expensesPage],
     queryFn: async () => {
-      const base = supabase.from("expenses")
-        .select("amount,category,expense_date")
+      const { data, count, error } = await supabase.from("expenses")
+        .select("amount,category,expense_date", { count: "exact" })
         .gte("expense_date", from)
-        .lte("expense_date", to);
-      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+        .lte("expense_date", to)
+        .order("expense_date", { ascending: false })
+        .range(expensesPage * PAGE_SIZE, (expensesPage + 1) * PAGE_SIZE - 1);
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
     },
   });
+  const expenses = expensesPaged.data;
 
   const { data: partyPayments = [] } = useQuery({
-    queryKey: ["report-party-payments-paged", from, to],
+    queryKey: ["report-party-payments-paged", fromTime, toTime],
     queryFn: async () => {
       const base = supabase.from("party_payments")
         .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
-        .gte("created_at", range.from)
-        .lte("created_at", range.to)
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
         .order("created_at", { ascending: false });
       return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
     },
   });
 
-  const { data: saleReturns = [] } = useQuery({
-    queryKey: ["report-sale-returns-paged", from, to],
+  const [saleReturnsPage, setSaleReturnsPage] = useState(0);
+
+  const { data: saleReturnsPaged = { data: [], count: 0 } } = useQuery({
+    queryKey: ["report-sale-returns-paged", fromTime, toTime, saleReturnsPage],
     queryFn: async () => {
-      const base = supabase.from("sale_returns")
-        .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
-        .gte("created_at", range.from)
-        .lte("created_at", range.to)
-        .order("created_at", { ascending: false });
-      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      const { data, count, error } = await supabase.from("sale_returns")
+        .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)", { count: "exact" })
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false })
+        .range(saleReturnsPage * PAGE_SIZE, (saleReturnsPage + 1) * PAGE_SIZE - 1);
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
     },
   });
-
-  // Aggregates (net of sale returns)
-  const grossRevenue = sales.reduce((s, x: any) => s + Number(x.subtotal) - Number(x.discount), 0);
-  const returnsSubtotal = saleReturns.reduce((s, x: any) => s + Number(x.subtotal ?? 0), 0);
-  const returnsTax = saleReturns.reduce((s, x: any) => s + Number(x.tax ?? 0), 0);
-  const returnsTotal = saleReturns.reduce((s, x: any) => s + Number(x.total ?? 0), 0);
-  const returnsRefund = saleReturns.reduce((s, x: any) => s + Number(x.refund_amount ?? 0), 0);
-  const returnsCogs = saleReturns.reduce(
-    (s, x: any) => s + (x.sale_return_items ?? []).reduce((a: number, i: any) => a + Number(i.qty) * Number(i.cost ?? 0), 0),
-    0,
-  );
-  const revenue = grossRevenue - returnsSubtotal;
-  const cogs = sales.reduce((s, x: any) => s + Number(x.cost_total), 0) - returnsCogs;
+  const saleReturns = saleReturnsPaged.data;
+  const revenue = Number(summaryStats?.total_revenue || 0);
+  const totalSales = Number(summaryStats?.total_revenue || 0) + Number(summaryStats?.total_tax || 0);
+  const returnsTotal = Number(summaryStats?.total_returns || 0);
+  const totalPurchases = Number(summaryStats?.total_purchases || 0);
+  const expensesPeriod = Number(summaryStats?.total_expenses || 0);
+  const taxCollected = Number(summaryStats?.total_tax || 0);
+  const cogs = Number(summaryStats?.total_cost || 0);
   const grossProfit = revenue - cogs;
-  const taxCollected = sales.reduce((s, x: any) => s + Number(x.tax), 0) - returnsTax;
-  const totalSales = sales.reduce((s, x: any) => s + Number(x.total), 0) - returnsTotal;
-  const totalPurchases = purchases.reduce((s, x: any) => s + Number(x.total), 0);
-  const cashIn = sales.reduce((s, x: any) => s + Number(x.paid), 0) - returnsRefund;
-  const creditOut = sales.filter((x: any) => x.status === "credit").reduce((s, x: any) => s + (Number(x.total) - Number(x.paid)), 0);
-  const expensesPeriod = expenses.reduce((s, x: any) => s + Number(x.amount), 0);
   const netProfit = grossProfit - expensesPeriod;
+  const grossRevenue = revenue + Number(summaryStats?.total_returns || 0); // Simplified for P&L breakdown
+  const creditOut = Number(summaryStats?.total_credit || 0);
+  const cashIn = Number(summaryStats?.total_paid || 0);
+  const returnsLoss = Number(summaryStats?.total_returns || 0);
+  const returnsSubtotal = returnsLoss; // consistent naming for P&L row
 
   // ---- drill-down helpers (every report row is clickable)
   const openInvoices = (title: string, list: any[], note?: string) =>
-    setDrill({ title, note: note ?? `${list.length} invoice${list.length === 1 ? "" : "s"}`, invoices: list });
+    setDrill({ title, note: note ?? `${salesPaged.count} invoice${salesPaged.count === 1 ? "" : "s"} total`, invoices: list });
+
 
   const openReturns = (title: string) =>
     setDrill({
       title,
-      note: `${saleReturns.length} return${saleReturns.length === 1 ? "" : "s"}`,
+      note: `${saleReturnsPaged.count} return${saleReturnsPaged.count === 1 ? "" : "s"}`,
       cols: ["Return #", "Date", "Customer", "Subtotal", "Refund", "Total"],
       rows: (saleReturns as any[]).map((r) => [
         r.return_no ?? "—",
@@ -479,7 +516,7 @@ function Page() {
   const openExpenses = () =>
     setDrill({
       title: "Operating expenses",
-      note: `${expenses.length} entr${expenses.length === 1 ? "y" : "ies"} · ${fmtMoney(expensesPeriod, sym)}`,
+      note: `${expensesPaged.count} entr${expensesPaged.count === 1 ? "y" : "ies"} · ${fmtMoney(expensesPeriod, sym)}`,
       cols: ["Date", "Category", "Amount"],
       rows: (expenses as any[]).map((e) => [e.expense_date, e.category ?? "—", fmtMoney(Number(e.amount), sym)]),
     });
@@ -487,7 +524,7 @@ function Page() {
   const openPurchases = () =>
     setDrill({
       title: "Purchases (period)",
-      note: `${purchases.length} purchase${purchases.length === 1 ? "" : "s"} · ${fmtMoney(totalPurchases, sym)}`,
+      note: `${purchasesPaged.count} purchase${purchasesPaged.count === 1 ? "" : "s"} · ${fmtMoney(totalPurchases, sym)}`,
       cols: ["Date", "Subtotal", "Tax", "Total", "Paid"],
       rows: (purchases as any[]).map((p) => [
         new Date(p.created_at).toLocaleString(),
@@ -704,7 +741,7 @@ function Page() {
 
               </TableBody>
             </Table>
-            <div className="text-xs text-muted-foreground mt-3">{from} → {to} · {sales.length} sales, {purchases.length} purchases, {expenses.length} expenses</div>
+            <div className="text-xs text-muted-foreground mt-3">{from} → {to} · {salesPaged.count} sales, {purchasesPaged.count} purchases, {expensesPaged.count} expenses</div>
           </Card>
         </TabsContent>
 
@@ -786,8 +823,17 @@ function Page() {
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
-          </Card>
+             </Table>
+             {purchasesPaged.count > PAGE_SIZE && (
+               <div className="p-4 flex items-center justify-between border-t text-sm">
+                 <div className="text-muted-foreground">Showing {purchasesPage * PAGE_SIZE + 1} to {Math.min((purchasesPage + 1) * PAGE_SIZE, purchasesPaged.count)} of {purchasesPaged.count} purchases</div>
+                 <div className="flex gap-2">
+                   <Button variant="outline" size="sm" onClick={() => setPurchasesPage(p => Math.max(0, p - 1))} disabled={purchasesPage === 0}>Previous</Button>
+                   <Button variant="outline" size="sm" onClick={() => setPurchasesPage(p => p + 1)} disabled={(purchasesPage + 1) * PAGE_SIZE >= purchasesPaged.count}>Next</Button>
+                 </div>
+               </div>
+             )}
+           </Card>
         </TabsContent>
 
         <TabsContent value="invoice">
@@ -802,21 +848,22 @@ function Page() {
               <TableBody>
                 {filteredInvoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
                 {filteredInvoices.map((s: any) => {
-                  const profit = (Number(s.subtotal) - Number(s.discount)) - Number(s.cost_total);
-                  const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
+                  const profit = (Number(s.subtotal || 0) - Number(s.discount || 0)) - Number(s.cost_total || 0);
+                  const qty = (s.sale_items as any[] ?? []).reduce((a: number, i: any) => a + Number(i.qty || 0), 0);
                   return (
                     <TableRow
                       key={s.id}
                       className="cursor-pointer hover:bg-muted/50"
+
                       onClick={() => setDrill({
                         title: `Invoice ${s.invoice_no}`,
                         note: `${new Date(s.created_at).toLocaleString()} · ${s.customers?.name ?? "Walk-in"} · ${displayPaymentMethod(s.payment_method)} · Total ${fmtMoney(Number(s.total), sym)} · Paid ${fmtMoney(Number(s.paid), sym)}`,
                         cols: ["Item", "Qty", "Price", "Line total"],
-                        rows: (s.sale_items ?? []).map((i: any) => [
+                        rows: (s.sale_items as any[] ?? []).map((i: any) => [
                           i.name,
-                          Number(i.qty),
-                          fmtMoney(Number(i.price), sym),
-                          fmtMoney(Number(i.line_total), sym),
+                          Number(i.qty || 0),
+                          fmtMoney(Number(i.price || 0), sym),
+                          fmtMoney(Number(i.line_total || 0), sym),
                         ]),
                       })}
                     >
@@ -841,9 +888,18 @@ function Page() {
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
+             </Table>
+             {salesPaged.count > PAGE_SIZE && (
+               <div className="p-4 flex items-center justify-between border-t text-sm">
+                 <div className="text-muted-foreground">Showing {salesPage * PAGE_SIZE + 1} to {Math.min((salesPage + 1) * PAGE_SIZE, salesPaged.count)} of {salesPaged.count} invoices</div>
+                 <div className="flex gap-2">
+                   <Button variant="outline" size="sm" onClick={() => setSalesPage(p => Math.max(0, p - 1))} disabled={salesPage === 0}>Previous</Button>
+                   <Button variant="outline" size="sm" onClick={() => setSalesPage(p => p + 1)} disabled={(salesPage + 1) * PAGE_SIZE >= salesPaged.count}>Next</Button>
+                 </div>
+               </div>
+             )}
+           </Card>
+         </TabsContent>
 
         <TabsContent value="product">
           <Card className="p-3">
@@ -867,7 +923,7 @@ function Page() {
                       onClick={() => {
                         const rows: (string | number)[][] = [];
                         for (const s of sales as any[]) {
-                          for (const it of s.sale_items ?? []) {
+                          for (const it of (s.sale_items as any[]) ?? []) {
                             if (it.name !== p.name) continue;
                             rows.push([
                               s.invoice_no,

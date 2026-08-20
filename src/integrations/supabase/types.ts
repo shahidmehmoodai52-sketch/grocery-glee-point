@@ -3929,6 +3929,33 @@ export type Database = {
         Returns: string
       }
       gen_tenant_slug: { Args: { _seed: string }; Returns: string }
+      get_cash_flow_ledger: {
+        Args: {
+          p_account_id?: string
+          p_from_date?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_to_date?: string
+        }
+        Returns: {
+          account_id: string
+          account_name: string
+          amount: number
+          category: string
+          created_at: string
+          direction: string
+          id: string
+          notes: string
+          occurred_on: string
+          payment_method: string
+          reference: string
+        }[]
+      }
+      get_cash_flow_summary: {
+        Args: { p_from_date?: string; p_to_date?: string }
+        Returns: Json
+      }
       get_dashboard_stats: {
         Args: { p_from_date: string; p_to_date: string }
         Returns: {
@@ -3938,7 +3965,31 @@ export type Database = {
           total_revenue: number
         }[]
       }
+      get_dashboard_timeseries: {
+        Args: { p_from_date: string; p_to_date: string }
+        Returns: {
+          bucket_date: string
+          profit: number
+          returns: number
+          revenue: number
+        }[]
+      }
+      get_inventory_value: { Args: never; Returns: number }
+      get_low_stock_products: {
+        Args: { p_limit?: number; p_threshold?: number }
+        Returns: {
+          cost_price: number
+          id: string
+          name: string
+          sell_price: number
+          stock: number
+        }[]
+      }
       get_my_shop_code: { Args: never; Returns: string }
+      get_reports_summary: {
+        Args: { p_from_date: string; p_to_date: string }
+        Returns: Json
+      }
       get_supplier_balances: {
         Args: never
         Returns: {
@@ -3965,6 +4016,14 @@ export type Database = {
         }[]
       }
       get_tenant_id_by_code: { Args: { _code: string }; Returns: string }
+      get_top_selling_items: {
+        Args: { p_from_date: string; p_limit?: number; p_to_date: string }
+        Returns: {
+          name: string
+          qty: number
+          total: number
+        }[]
+      }
       has_active_subscription: {
         Args: { _tenant_id: string }
         Returns: boolean
@@ -4196,6 +4255,7 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_payment_bucket: { Args: { p_method: string }; Returns: string }
       resume_bill: { Args: { _id: string }; Returns: Json }
       set_checklist_item: {
         Args: {
