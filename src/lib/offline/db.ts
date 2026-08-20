@@ -7,6 +7,7 @@ import Dexie, { type Table } from "dexie";
 export interface SyncState {
   table: string;              // primary key
   last_pulled_at: string | null; // ISO
+  last_pulled_id: string | null; // UUID
   last_error: string | null;
 }
 
