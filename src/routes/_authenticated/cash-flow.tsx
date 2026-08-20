@@ -346,26 +346,39 @@ function Page() {
   });
 
   /** Drill-down dialogs need the FULL history (day 1 → today) so opening/prior
-   *  balances and running balances are correct. Only fetched while a dialog is open. */
+   *  balances and running balances are correct. Only fetched while a dialog is open.
+   *  PostgREST caps a single response (~1000 rows), so page through the ledger and
+   *  scope the fetch to the selected account when the dialog is account-specific. */
+  const detailAccountId = details?.kind === "account" ? details.accountId : null;
   const { data: detailTxs = [] } = useQuery({
-    queryKey: ["cf-ledger-full"],
+    queryKey: ["cf-ledger-full", detailAccountId ?? "all"],
     enabled: !!details,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
-        p_from_date: "2000-01-01T00:00:00",
-        p_to_date: "2099-12-31T23:59:59",
-        p_limit: 100000,
-        p_offset: 0,
-      });
-      if (error) throw error;
-      return (data ?? []).map((row: any) => ({
+      const CHUNK = 1000;
+      const rows: any[] = [];
+      for (let offset = 0; ; offset += CHUNK) {
+        const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
+          p_from_date: "2000-01-01T00:00:00",
+          p_to_date: "2099-12-31T23:59:59",
+          p_limit: CHUNK,
+          p_offset: offset,
+          ...(detailAccountId ? { p_account_id: detailAccountId } : {}),
+        });
+        if (error) throw error;
+        const batch = data ?? [];
+        rows.push(...batch);
+        const total = Number((batch[0] as any)?.total_count ?? 0);
+        if (batch.length < CHUNK || (total && rows.length >= total) || offset > 200000) break;
+      }
+      return rows.map((row: any) => ({
         ...row,
         transfer_group_id: row.transfer_group_id || null,
         payment_method: row.payment_method || null,
       })) as Tx[];
     },
   });
+
 
 
   const balances = useMemo(() => {
