@@ -739,14 +739,15 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">From</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">To</Label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </div>
+            <DateRangeBar
+              preset={mainPreset}
+              from={dateFrom}
+              to={dateTo}
+              onPreset={setMainPreset}
+              onFrom={(v) => { setDateFrom(v); setPage(0); }}
+              onTo={(v) => { setDateTo(v); setPage(0); }}
+            />
+
             <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
           </div>
           <Card className="overflow-x-auto">
