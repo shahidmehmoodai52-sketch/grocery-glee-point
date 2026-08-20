@@ -475,7 +475,16 @@ function Page() {
       return a ? { id: a.id, name: a.name } : null;
     }
     const method = id.slice(5);
-    const type = methodBuckets.typeGuess(method);
+    const norm = (s: string) => (s || "").toLowerCase().trim();
+    const typeGuess = (m: string): string => {
+      const s = norm(m);
+      if (!s || s === "cash") return "cash";
+      if (s.includes("card")) return "card";
+      if (s.includes("bank") || s.includes("online") || s.includes("transfer") || s.includes("cheque") || s.includes("check")) return "bank";
+      if (s.includes("easy") || s.includes("jazz") || s.includes("wallet") || s.includes("upi") || s.includes("mobile")) return "mobile_wallet";
+      return "other";
+    };
+    const type = typeGuess(method);
     const name = method.charAt(0).toUpperCase() + method.slice(1);
     const existing = accounts.find(a => a.name.toLowerCase() === name.toLowerCase());
     if (existing) return { id: existing.id, name: existing.name };
