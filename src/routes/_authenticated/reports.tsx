@@ -716,6 +716,7 @@ function Page() {
               mode="range"
               selected={{ from: fromDate, to: toDate }}
               onSelect={(r) => {
+                setUserPicked(true);
                 setPreset("custom");
                 setFromDate(r?.from);
                 setToDate(r?.to);
