@@ -24,6 +24,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtDate } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { useEarliestDataDate } from "@/lib/earliest-date";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
