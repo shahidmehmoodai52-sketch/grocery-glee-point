@@ -248,8 +248,8 @@ function Page() {
     queryKey: ["cf-summary", dateFrom, dateTo, filterAcc],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_summary", {
-        p_from_date: dateFrom || "2000-01-01",
-        p_to_date: dateTo || "2099-12-31",
+        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
+        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
         p_account_id: filterAcc === "all" ? undefined : filterAcc
       });
       if (error) throw error;
@@ -262,8 +262,8 @@ function Page() {
     queryKey: ["cf-ledger-paged", dateFrom, dateTo, filterAcc, filterMethod, search, page],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
-        p_from_date: dateFrom || "2000-01-01",
-        p_to_date: dateTo || "2099-12-31",
+        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
+        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
         p_account_id: filterAcc === "all" ? undefined : filterAcc,
         p_payment_method: filterMethod === "all" ? undefined : filterMethod,
         p_search: search || undefined,
@@ -312,8 +312,8 @@ function Page() {
     queryKey: ["cf-account-totals", dateFrom, dateTo],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_account_totals", {
-        p_from_date: dateFrom || "2000-01-01",
-        p_to_date: dateTo || "2099-12-31",
+        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
+        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
       });
       if (error) throw error;
       return (data ?? []) as { account_id: string | null; total_in: number; total_out: number; entry_count: number }[];
@@ -328,8 +328,8 @@ function Page() {
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
-        p_from_date: "2000-01-01",
-        p_to_date: "2099-12-31",
+        p_from_date: "2000-01-01T00:00:00",
+        p_to_date: "2099-12-31T23:59:59",
         p_limit: 100000,
         p_offset: 0,
       });
