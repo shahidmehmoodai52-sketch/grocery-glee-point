@@ -638,7 +638,9 @@ function Page() {
           setMainPreset(p);
           if (p === "all") {
             setDateFrom(earliest || "");
-            setDateTo(new Date().toISOString().slice(0, 10));
+            const now = new Date();
+            const pkt = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+            setDateTo(pkt.toISOString().slice(0, 10));
           }
         }}
         onFrom={(v) => { setUserPicked(true); setDateFrom(v); setPage(0); }}
