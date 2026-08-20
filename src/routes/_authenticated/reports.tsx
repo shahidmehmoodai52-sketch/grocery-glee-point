@@ -355,10 +355,6 @@ function Page() {
   const from = fromDate ? toISO(fromDate) : "1970-01-01";
   const to = toDate ? toISO(toDate) : today();
   
-  const range = useMemo(() => ({
-    from: `${from}T00:00:00`,
-    to: `${to}T23:59:59`
-  }), [from, to]);
 
   const [tab, setTab] = useState("pnl");
   const [search, setSearch] = useState("");
