@@ -450,12 +450,12 @@ function Page() {
   const expenses = expensesPaged.data;
 
   const { data: partyPayments = [] } = useQuery({
-    queryKey: ["report-party-payments-paged", from, to],
+    queryKey: ["report-party-payments-paged", fromTime, toTime],
     queryFn: async () => {
       const base = supabase.from("party_payments")
         .select("id,party_type,amount,method,note,created_at,customers(name),suppliers(name)")
-        .gte("created_at", range.from)
-        .lte("created_at", range.to)
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
         .order("created_at", { ascending: false });
       return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
     },
