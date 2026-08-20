@@ -3929,6 +3929,15 @@ export type Database = {
         Returns: string
       }
       gen_tenant_slug: { Args: { _seed: string }; Returns: string }
+      get_cash_flow_account_totals: {
+        Args: { p_from_date?: string; p_to_date?: string }
+        Returns: {
+          account_id: string
+          entry_count: number
+          total_in: number
+          total_out: number
+        }[]
+      }
       get_cash_flow_ledger: {
         Args: {
           p_account_id?: string
