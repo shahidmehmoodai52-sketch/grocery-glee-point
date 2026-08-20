@@ -260,7 +260,7 @@ function Page() {
           total: fmtMoney(revenue, sym) };
       case "profit":
         return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
-          rows: [["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)], ["Returns profit reversed", `- ${fmtMoney(returnsProfit, sym)}`], ["Net profit", fmtMoney(profit, sym)]],
+          rows: [["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)], ["Returns loss reversed", `- ${fmtMoney(returnsLoss, sym)}`], ["Net profit", fmtMoney(profit, sym)]],
           total: fmtMoney(profit, sym) };
       case "purch":
         return { title: `Purchases · ${rangeLabel}`, cols: ["Date", "Total", "Paid"],
@@ -269,7 +269,7 @@ function Page() {
       case "inventory":
         return { title: "Inventory value", cols: ["Product", "Stock", "Cost", "Value"],
           rows: [...products].sort((a:any,b:any)=>Number(b.stock)*Number(b.cost_price)-Number(a.stock)*Number(a.cost_price)).map((p:any)=>[p.name, String(p.stock), fmtMoney(Number(p.cost_price), sym), fmtMoney(Number(p.stock)*Number(p.cost_price), sym)]),
-          total: fmtMoney(inventoryValue, sym) };
+          total: fmtMoney(inventoryValueAgg, sym) };
       case "returns":
         return { title: `Returns · ${rangeLabel}`, cols: ["Date", "Total", "Refunded"],
           rows: saleReturns.map((r:any)=>[fmtDateStr(r.created_at), fmtMoney(Number(r.total), sym), fmtMoney(Number(r.refund_amount), sym)]),
@@ -284,7 +284,7 @@ function Page() {
           total: fmtMoney(netRevenue, sym) };
     }
     return null;
-  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, refundsTotal, netRevenue, inventoryValue, sym, rangeLabel]);
+  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, netRevenue, inventoryValueAgg, sym, rangeLabel, salesProfit, returnsLoss]);
 
   return (
     <div className="p-6 space-y-6">
