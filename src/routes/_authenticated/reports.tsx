@@ -464,12 +464,12 @@ function Page() {
   const [saleReturnsPage, setSaleReturnsPage] = useState(0);
 
   const { data: saleReturnsPaged = { data: [], count: 0 } } = useQuery({
-    queryKey: ["report-sale-returns-paged", range.from, range.to, saleReturnsPage],
+    queryKey: ["report-sale-returns-paged", fromTime, toTime, saleReturnsPage],
     queryFn: async () => {
       const { data, count, error } = await supabase.from("sale_returns")
         .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)", { count: "exact" })
-        .gte("created_at", range.from)
-        .lte("created_at", range.to)
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
         .order("created_at", { ascending: false })
         .range(saleReturnsPage * PAGE_SIZE, (saleReturnsPage + 1) * PAGE_SIZE - 1);
       if (error) throw error;
