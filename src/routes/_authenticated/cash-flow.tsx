@@ -92,6 +92,7 @@ type Account = {
 type Tx = {
   id: string;
   account_id: string;
+  account_name?: string;
   direction: "in" | "out";
   amount: number;
   occurred_on: string;
