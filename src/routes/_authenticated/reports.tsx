@@ -384,6 +384,7 @@ function Page() {
   const toTime = range.to;
 
 
+
   const [salesPage, setSalesPage] = useState(0);
   const [purchasesPage, setPurchasesPage] = useState(0);
   const [expensesPage, setExpensesPage] = useState(0);
