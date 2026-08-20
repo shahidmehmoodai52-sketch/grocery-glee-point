@@ -1973,14 +1973,19 @@ function POSPage() {
       qc.invalidateQueries({ queryKey: ["expense_persons"] });
 
       // Post-sale print behaviour, configurable in Settings.
-      const printPromptEnabled = (settings as any)?.pos_print_prompt_enabled === true;
-      const printDefault = "no";
+      const localPrinter = await getLocalPrinterSettings();
+      const printPromptEnabled = localPrinter.pos_print_prompt_enabled;
+      const printDefault = localPrinter.pos_print_prompt_default;
+      
       if (printPromptEnabled) {
         setPrintAsk(patchedSale);
-      } else if (patchedSale) {
-        // If prompt is disabled, follow the explicit default.
-        // Since we now hardcode default to "no", it only prints if explicitly enabled.
-        // But for clarity, we keep the logic structure.
+      } else if (patchedSale && printDefault === "yes") {
+        printInvoiceDirect(patchedSale, {
+          ...settings,
+          printer_name: localPrinter.printer_name,
+          paper_width: localPrinter.paper_width,
+          direct_print_enabled: localPrinter.direct_print_enabled
+        }, "sale");
         setTimeout(() => searchRef.current?.focus(), 50);
       } else {
         setTimeout(() => searchRef.current?.focus(), 50);
@@ -4326,8 +4331,14 @@ function PrintPromptDialog({
     (which === "yes" ? yesRef.current : noRef.current)?.focus();
   };
 
-  const doPrint = () => {
-    printInvoiceDirect(sale, settings.data, "sale");
+  const doPrint = async () => {
+    const localPrinter = await getLocalPrinterSettings();
+    printInvoiceDirect(sale, {
+      ...settings.data,
+      printer_name: localPrinter.printer_name,
+      paper_width: localPrinter.paper_width,
+      direct_print_enabled: localPrinter.direct_print_enabled
+    }, "sale");
     onYes();
   };
 
