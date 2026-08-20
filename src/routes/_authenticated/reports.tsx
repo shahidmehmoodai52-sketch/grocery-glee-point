@@ -905,7 +905,7 @@ function Page() {
                       onClick={() => {
                         const rows: (string | number)[][] = [];
                         for (const s of sales as any[]) {
-                          for (const it of s.sale_items ?? []) {
+                          for (const it of (s.sale_items as any[]) ?? []) {
                             if (it.name !== p.name) continue;
                             rows.push([
                               s.invoice_no,
