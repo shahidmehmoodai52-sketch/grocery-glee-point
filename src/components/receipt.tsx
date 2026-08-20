@@ -119,8 +119,9 @@ function setReceiptPrintPageSize(
   `;
 }
 
-async function tryDirectPrint(): Promise<boolean> {
+async function tryDirectPrint(options: { printerName?: string | null; silent?: boolean } = {}): Promise<boolean> {
   if (typeof window === "undefined") return false;
+  
   const getPrintApi = () => {
     const win = window as Window & typeof globalThis & {
       pos?: { print?: (options?: Record<string, unknown>) => Promise<boolean> | boolean };
@@ -129,25 +130,33 @@ async function tryDirectPrint(): Promise<boolean> {
     return win.pos?.print ?? win.electron?.print;
   };
 
-  const hasBridge = typeof getPrintApi() === "function";
-  const attempts = hasBridge ? 3 : 1;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const printApi = getPrintApi();
-    if (typeof printApi === "function") {
+  const printApi = getPrintApi();
+  const hasBridge = typeof printApi === "function";
+
+  if (hasBridge) {
+    const attempts = 3;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const result = await printApi({ silent: true, printBackground: true });
+        const result = await (getPrintApi()!)({
+          silent: options.silent !== false,
+          printBackground: true,
+          deviceName: options.printerName || undefined,
+        });
         if (result !== false) return true;
-      } catch {
-        // Keep retrying a few times for the desktop bridge to become ready.
+      } catch (err) {
+        console.warn("Direct print attempt failed:", err);
       }
-    }
-    if (attempt < attempts - 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 200));
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 200));
+      }
     }
   }
 
+  // If we reach here and direct printing was explicitly requested but failed/missing bridge,
+  // we return false to let the caller decide whether to fallback to browser print.
+  if (options.silent === true && hasBridge) return false;
 
-  // Browser fallback — no desktop bridge available, use the native print dialog.
+  // Browser fallback — either no bridge or explicit fallback requested
   try {
     window.print();
     return true;
@@ -156,12 +165,15 @@ async function tryDirectPrint(): Promise<boolean> {
   }
 }
 
-export function printReceipt(sourceElement?: HTMLElement | null) {
+export function printReceipt(sourceElement?: HTMLElement | null, settings?: ReceiptSettings | null) {
   if (typeof document === "undefined" || typeof window === "undefined") return;
   document.querySelector(".receipt-print-root")?.remove();
   const source = sourceElement ?? document.querySelector<HTMLElement>(".print-area");
   if (!source) {
-    void tryDirectPrint();
+    void tryDirectPrint({ 
+      printerName: settings?.printer_name,
+      silent: settings?.direct_print_enabled === true
+    });
     return;
   }
   const printRoot = document.createElement("div");
@@ -193,9 +205,15 @@ export function printReceipt(sourceElement?: HTMLElement | null) {
     window.removeEventListener("afterprint", cleanup);
   };
   window.addEventListener("afterprint", cleanup);
-  setReceiptPrintPageSize(styleEl, "80mm", printRoot);
+  
+  const width = settings?.paper_width || "80mm";
+  setReceiptPrintPageSize(styleEl, width, printRoot);
+  
   requestAnimationFrame(() => {
-    void tryDirectPrint().then(() => {
+    void tryDirectPrint({ 
+      printerName: settings?.printer_name,
+      silent: settings?.direct_print_enabled === true
+    }).then(() => {
       // Small delay to ensure browser print dialog has handed off or desktop bridge finished
       setTimeout(cleanup, 1000);
     });
