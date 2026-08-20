@@ -217,7 +217,10 @@ function Page() {
   useEffect(() => {
     if (userPicked || !earliest) return;
     setDateFrom(earliest);
-    setDateTo(new Date().toISOString().slice(0, 10));
+    // Use Pakistan Time for "today" to avoid 1-day cutoffs in summary cards
+    const now = new Date();
+    const pkt = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+    setDateTo(pkt.toISOString().slice(0, 10));
   }, [earliest, userPicked]);
 
   const [filterAcc, setFilterAcc] = useState<string>("all");
