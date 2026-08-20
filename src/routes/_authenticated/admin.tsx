@@ -23,6 +23,7 @@ import {
   Wand2,
   Trash2,
   CalendarClock,
+  Printer,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { 
+  Select, 
+  SelectTrigger, 
+  SelectValue, 
+  SelectContent, 
+  SelectItem 
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -41,6 +50,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminAccess, ADMIN_PERMS } from "@/hooks/use-admin-access";
+import { getLocalPrinterSettings, saveLocalPrinterSettings } from "@/lib/offline/printer-settings";
 import { fmtMoney } from "@/lib/format";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { useServerFn } from "@tanstack/react-start";
@@ -87,6 +97,7 @@ type SecuritySummary = {
 function AdminPanelPage() {
   const navigate = useNavigate();
   const { isSuperAdmin, isAdminStaff, canEnter, loading } = useAdminAccess();
+  const [activeTab, setActiveTab] = useState("shops");
 
   useEffect(() => {
     if (!loading && !canEnter) {
@@ -139,10 +150,11 @@ function AdminPanelPage() {
         description="Managed by tillix.co support · info@tillix.co"
         icon={<ShieldCheck className="h-5 w-5" />}
       />
-      <Tabs defaultValue="tenants">
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-muted/50 p-1 flex-wrap h-auto justify-start">
           <TabsTrigger value="tenants"><Store className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
           <TabsTrigger value="library"><BookOpen className="h-4 w-4 mr-1" />Library</TabsTrigger>
+          <TabsTrigger value="printers"><Printer className="h-4 w-4 mr-1" />Printers</TabsTrigger>
           {isSuperAdmin && (
             <TabsTrigger value="staff"><UserCog className="h-4 w-4 mr-1" />Admin staff</TabsTrigger>
           )}
@@ -167,12 +179,119 @@ function AdminPanelPage() {
         </TabsList>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
         <TabsContent value="library" className="mt-3"><LibraryTab /></TabsContent>
+        <TabsContent value="printers" className="mt-3"><PrinterSettingsTab /></TabsContent>
         {isSuperAdmin && (
           <TabsContent value="staff" className="mt-3"><AdminStaffTab /></TabsContent>
         )}
         <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function PrinterSettingsTab() {
+  const [settings, setSettings] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
+
+  useEffect(() => {
+    getLocalPrinterSettings().then(setSettings);
+  }, []);
+
+  const save = async (patch: any) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    await saveLocalPrinterSettings(next);
+    toast.success("Printer settings updated locally");
+  };
+
+  const runTestPrint = async () => {
+    if (!settings) return;
+    setTestBusy(true);
+    try {
+      const { printInvoiceDirect, sampleInvoice } = await import("@/components/receipt");
+      // Force direct print for test
+      const testSettings = {
+        ...settings,
+        direct_print_enabled: true,
+      };
+      printInvoiceDirect(sampleInvoice, testSettings, "sale");
+      toast.success("Test print sent", { description: "Check your printer for the sample receipt." });
+    } catch (e: any) {
+      toast.error("Test print failed", { description: e?.message });
+    } finally {
+      setTestBusy(false);
+    }
+  };
+
+  if (!settings) return <TableSkeleton rows={4} columns={2} />;
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 space-y-4 max-w-2xl">
+        <div>
+          <h3 className="text-lg font-medium">Local Printer Settings</h3>
+          <p className="text-sm text-muted-foreground">These settings are specific to THIS computer and browser.</p>
+        </div>
+
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <Label>Selected Printer Name</Label>
+            <Input 
+              value={settings.printer_name || ""} 
+              onChange={(e) => save({ printer_name: e.target.value })} 
+              placeholder="e.g. POS-80, Epson TM-T20II"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Enter the exact name of the printer as it appears in Windows/OS.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Paper Size</Label>
+              <Select value={settings.paper_width} onValueChange={(v) => save({ paper_width: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="58mm">58mm Thermal</SelectItem>
+                  <SelectItem value="80mm">80mm Thermal</SelectItem>
+                  <SelectItem value="A4">A4 Standard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex flex-col justify-end space-y-2">
+               <Label className="flex items-center justify-between gap-3 rounded border p-2 text-sm">
+                <span>One-Click Direct Print</span>
+                <Switch 
+                  checked={!!settings.direct_print_enabled} 
+                  onCheckedChange={(v) => save({ direct_print_enabled: v })} 
+                />
+              </Label>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <Button onClick={runTestPrint} disabled={testBusy} variant="outline" className="w-full">
+              <Printer className="h-4 w-4 mr-2" />
+              {testBusy ? "Printing..." : "Run Test Print"}
+            </Button>
+          </div>
+        </div>
+      </Card>
+      
+      <Card className="p-4 bg-muted/30 max-w-2xl">
+        <div className="flex gap-2">
+          <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
+          <div className="text-xs space-y-1">
+            <div className="font-semibold text-amber-900 uppercase tracking-wider">Direct Print Requirements</div>
+            <p>1. You must have the <b>Tillix Local Print Agent</b> installed and running on this computer.</p>
+            <p>2. The browser must have permission to communicate with the agent.</p>
+            <p>3. If direct printing fails, the system will fallback to the standard browser print preview.</p>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

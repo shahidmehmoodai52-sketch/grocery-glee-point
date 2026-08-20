@@ -17,6 +17,7 @@ import { fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
+import { getLocalPrinterSettings } from "@/lib/offline/printer-settings";
 import { printInvoiceDirect } from "@/components/receipt";
 
 import { db } from "@/lib/offline/db";
@@ -1521,7 +1522,8 @@ function Page() {
                     variant="ghost" 
                     size="icon" 
                     data-print-id={p.id}
-                    onClick={() => {
+                    onClick={async () => {
+                      const localPrinter = await getLocalPrinterSettings();
                       printInvoiceDirect({
                         invoice_no: p.invoice_no,
                         created_at: p.created_at,
@@ -1540,7 +1542,12 @@ function Page() {
                           price: it.cost,
                           line_total: it.line_total
                         }))
-                      }, settings, "purchase" as any);
+                      }, {
+                        ...settings,
+                        printer_name: localPrinter.printer_name,
+                        paper_width: localPrinter.paper_width,
+                        direct_print_enabled: localPrinter.direct_print_enabled
+                      }, "purchase" as any);
                     }} 
                     title="Print receipt"
                   >
