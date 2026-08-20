@@ -858,11 +858,11 @@ function Page() {
                         title: `Invoice ${s.invoice_no}`,
                         note: `${new Date(s.created_at).toLocaleString()} · ${s.customers?.name ?? "Walk-in"} · ${displayPaymentMethod(s.payment_method)} · Total ${fmtMoney(Number(s.total), sym)} · Paid ${fmtMoney(Number(s.paid), sym)}`,
                         cols: ["Item", "Qty", "Price", "Line total"],
-                        rows: (s.sale_items ?? []).map((i: any) => [
+                        rows: (s.sale_items as any[] ?? []).map((i: any) => [
                           i.name,
-                          Number(i.qty),
-                          fmtMoney(Number(i.price), sym),
-                          fmtMoney(Number(i.line_total), sym),
+                          Number(i.qty || 0),
+                          fmtMoney(Number(i.price || 0), sym),
+                          fmtMoney(Number(i.line_total || 0), sym),
                         ]),
                       })}
                     >
