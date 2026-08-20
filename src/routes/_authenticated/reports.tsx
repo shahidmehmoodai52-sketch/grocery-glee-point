@@ -390,11 +390,11 @@ function Page() {
   const PAGE_SIZE = 50;
 
   const { data: summaryStatsRaw } = useQuery({
-    queryKey: ["reports-summary", range.from, range.to],
+    queryKey: ["reports-summary", fromTime, toTime],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_reports_summary", {
-        p_from_date: range.from,
-        p_to_date: range.to
+        p_from_date: fromTime,
+        p_to_date: toTime
       });
       if (error) throw error;
       return data;
