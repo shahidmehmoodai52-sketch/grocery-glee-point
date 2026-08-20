@@ -470,20 +470,20 @@ function Page() {
       return { data: data || [], count: count || 0 };
     },
   });
-  const saleReturns = saleReturnsPaged.data;
-
-  // Aggregates (use server-side summary if available, else fallback)
   const revenue = Number(summaryStats?.total_revenue || 0);
   const totalSales = Number(summaryStats?.total_revenue || 0) + Number(summaryStats?.total_tax || 0);
   const returnsTotal = Number(summaryStats?.total_returns || 0);
   const totalPurchases = Number(summaryStats?.total_purchases || 0);
   const expensesPeriod = Number(summaryStats?.total_expenses || 0);
   const taxCollected = Number(summaryStats?.total_tax || 0);
-  const netProfit = Number(summaryStats?.total_revenue || 0) - Number(summaryStats?.total_cost || 0) - Number(summaryStats?.total_expenses || 0);
-
-  // Fallback for drill-down notes when using server-side stats
+  const cogs = Number(summaryStats?.total_cost || 0);
+  const grossProfit = revenue - cogs;
+  const netProfit = grossProfit - expensesPeriod;
+  const grossRevenue = revenue + Number(summaryStats?.total_returns || 0); // Simplified for P&L breakdown
+  const creditOut = Number(summaryStats?.total_credit || 0);
   const cashIn = Number(summaryStats?.total_paid || 0);
-  const returnsRefund = Number(summaryStats?.total_returns || 0); // approx
+  const returnsLoss = Number(summaryStats?.total_returns || 0);
+  const returnsSubtotal = returnsLoss; // consistent naming for P&L row
 
   // ---- drill-down helpers (every report row is clickable)
   const openInvoices = (title: string, list: any[], note?: string) =>
