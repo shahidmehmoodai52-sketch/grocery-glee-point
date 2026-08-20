@@ -822,8 +822,17 @@ function Page() {
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
-          </Card>
+             </Table>
+             {purchasesPaged.count > PAGE_SIZE && (
+               <div className="p-4 flex items-center justify-between border-t text-sm">
+                 <div className="text-muted-foreground">Showing {purchasesPage * PAGE_SIZE + 1} to {Math.min((purchasesPage + 1) * PAGE_SIZE, purchasesPaged.count)} of {purchasesPaged.count} purchases</div>
+                 <div className="flex gap-2">
+                   <Button variant="outline" size="sm" onClick={() => setPurchasesPage(p => Math.max(0, p - 1))} disabled={purchasesPage === 0}>Previous</Button>
+                   <Button variant="outline" size="sm" onClick={() => setPurchasesPage(p => p + 1)} disabled={(purchasesPage + 1) * PAGE_SIZE >= purchasesPaged.count}>Next</Button>
+                 </div>
+               </div>
+             )}
+           </Card>
         </TabsContent>
 
         <TabsContent value="invoice">
