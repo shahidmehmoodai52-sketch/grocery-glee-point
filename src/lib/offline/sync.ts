@@ -31,12 +31,12 @@ const MAX_ATTEMPTS = 50; // Increased retry budget; failures are never silently 
 /** Full-pull tables can be large (item history). Don't re-download too often. */
 const FULL_PULL_MIN_GAP_MS = 20 * 60_000;
 
-async function getWatermark(table: string): Promise<string | null> {
+async function getWatermark(table: string): Promise<{ ts: string | null; id: string | null }> {
   const row = await db()._sync_state.get(table);
-  return row?.last_pulled_at ?? null;
+  return { ts: row?.last_pulled_at ?? null, id: row?.last_pulled_id ?? null };
 }
-async function setWatermark(table: string, ts: string) {
-  await db()._sync_state.put({ table, last_pulled_at: ts, last_error: null });
+async function setWatermark(table: string, ts: string, id: string | null = null) {
+  await db()._sync_state.put({ table, last_pulled_at: ts, last_pulled_id: id, last_error: null });
 }
 
 // Only these tables actually have an `updated_at` column in the cloud schema.
@@ -58,7 +58,7 @@ export function subscribeSyncedTables(l: ChangedListener) {
 }
 
 async function pullTable(table: MirroredTable): Promise<number> {
-  const since = await getWatermark(table);
+  const { ts: since, id: sinceId } = await getWatermark(table);
   const full = FULL_PULL.has(table);
   if (full && since) {
     const age = Date.now() - new Date(since).getTime();
@@ -67,18 +67,35 @@ async function pullTable(table: MirroredTable): Promise<number> {
     }
   }
   const watermarkCol = HAS_UPDATED_AT.has(table) ? "updated_at" : "created_at";
-  const orderCol = full ? "id" : watermarkCol;
 
   let total = 0;
   let maxTs: string | null = null;
+  let maxId: string | null = null;
 
   for (let page = 0; page < MAX_PAGES; page++) {
     let q = supabase
       .from(table as any)
-      .select("*")
-      .order(orderCol, { ascending: true })
-      .range(page * PAGE, page * PAGE + PAGE - 1);
-    if (!full && since) q = q.gt(watermarkCol, since);
+      .select("*");
+
+    if (full) {
+      q = q.order("id", { ascending: true })
+           .range(page * PAGE, page * PAGE + PAGE - 1);
+    } else {
+      // Composite ordering to prevent skipping rows with identical timestamps at page boundaries
+      q = q.order(watermarkCol, { ascending: true })
+           .order("id", { ascending: true });
+      
+      if (since) {
+        if (sinceId) {
+          q = q.or(`${watermarkCol}.gt."${since}",and(${watermarkCol}.eq."${since}",id.gt."${sinceId}")`);
+        } else {
+          q = q.gt(watermarkCol, since);
+        }
+      }
+      // Since we filter by cursor, we always fetch the first PAGE
+      q = q.limit(PAGE);
+    }
+
     const { data, error } = await q;
     if (error) throw new Error(`${table}: ${error.message}`);
     
@@ -88,12 +105,12 @@ async function pullTable(table: MirroredTable): Promise<number> {
     total += data.length;
     
     if (!full) {
-      const pageMax = data
-        .map((r: any) => r.updated_at ?? r.created_at)
-        .filter(Boolean)
-        .sort()
-        .pop();
-      if (pageMax && (!maxTs || pageMax > maxTs)) maxTs = pageMax;
+      const lastRow = data[data.length - 1];
+      const ts = lastRow.updated_at ?? lastRow.created_at;
+      if (ts) {
+        maxTs = ts;
+        maxId = lastRow.id;
+      }
     }
     
     // If we finished the dataset, we're done.
@@ -108,7 +125,7 @@ async function pullTable(table: MirroredTable): Promise<number> {
     await yieldToUI();
   }
 
-  if (maxTs) await setWatermark(table, maxTs);
+  if (maxTs) await setWatermark(table, maxTs, maxId);
   if (full) await setWatermark(table, new Date().toISOString());
   return total;
 }
@@ -295,8 +312,11 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
               await stampFresh(t);
             } catch {/* freshness stamping is best effort */}
           } catch (e: any) {
+            const { ts, id } = await getWatermark(t);
             await db()._sync_state.put({
-              table: t, last_pulled_at: (await getWatermark(t)),
+              table: t,
+              last_pulled_at: ts,
+              last_pulled_id: id,
               last_error: String(e?.message ?? e),
             });
           }
