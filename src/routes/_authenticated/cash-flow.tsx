@@ -199,6 +199,26 @@ function Page() {
   const [mainPreset, setMainPreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [userPicked, setUserPicked] = useState(false);
+
+  const { data: earliest } = useQuery({
+    queryKey: ["earliest-cf-date"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cash_transactions")
+        .select("created_at")
+        .order("created_at", { ascending: true })
+        .limit(1);
+      const v = (data?.[0] as any)?.created_at;
+      return v ? v.slice(0, 10) : null;
+    },
+  });
+
+  useEffect(() => {
+    if (userPicked || !earliest) return;
+    setDateFrom(earliest);
+    setDateTo(new Date().toISOString().slice(0, 10));
+  }, [earliest, userPicked]);
 
   const [filterAcc, setFilterAcc] = useState<string>("all");
   const [filterMethod, setFilterMethod] = useState<string>("all");
@@ -610,9 +630,16 @@ function Page() {
         preset={mainPreset}
         from={dateFrom}
         to={dateTo}
-        onPreset={setMainPreset}
-        onFrom={(v) => { setDateFrom(v); setPage(0); }}
-        onTo={(v) => { setDateTo(v); setPage(0); }}
+        onPreset={(p) => {
+          setUserPicked(true);
+          setMainPreset(p);
+          if (p === "all") {
+            setDateFrom(earliest || "");
+            setDateTo(new Date().toISOString().slice(0, 10));
+          }
+        }}
+        onFrom={(v) => { setUserPicked(true); setDateFrom(v); setPage(0); }}
+        onTo={(v) => { setUserPicked(true); setDateTo(v); setPage(0); }}
       />
 
       {/* Summary cards */}
