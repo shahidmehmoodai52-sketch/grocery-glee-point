@@ -847,12 +847,13 @@ function Page() {
               <TableBody>
                 {filteredInvoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
                 {filteredInvoices.map((s: any) => {
-                  const profit = (Number(s.subtotal) - Number(s.discount)) - Number(s.cost_total);
-                  const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
+                  const profit = (Number(s.subtotal || 0) - Number(s.discount || 0)) - Number(s.cost_total || 0);
+                  const qty = (s.sale_items as any[] ?? []).reduce((a: number, i: any) => a + Number(i.qty || 0), 0);
                   return (
                     <TableRow
                       key={s.id}
                       className="cursor-pointer hover:bg-muted/50"
+
                       onClick={() => setDrill({
                         title: `Invoice ${s.invoice_no}`,
                         note: `${new Date(s.created_at).toLocaleString()} · ${s.customers?.name ?? "Walk-in"} · ${displayPaymentMethod(s.payment_method)} · Total ${fmtMoney(Number(s.total), sym)} · Paid ${fmtMoney(Number(s.paid), sym)}`,
