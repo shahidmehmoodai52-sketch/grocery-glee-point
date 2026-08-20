@@ -82,58 +82,106 @@ function Page() {
   const toISO = endOfDay(to).toISOString();
   const spanDays = diffDays(from, to);
 
-  // Previous period for comparison
-  const prevTo = new Date(startOfDay(from).getTime() - 1);
-  const prevFrom = new Date(startOfDay(prevTo).getTime() - (spanDays - 1) * 86400000);
+  const prevFrom = new Date(from.getTime() - spanDays * 86400000);
+  const prevTo = new Date(to.getTime() - spanDays * 86400000);
   const prevFromISO = startOfDay(prevFrom).toISOString();
   const prevToISO = endOfDay(prevTo).toISOString();
 
-  const { data: stats } = useQuery({
-    queryKey: ["dash-stats", fromISO, toISO],
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+
+  const { data: dashboardTimeseries = [] } = useQuery({
+    queryKey: ["dash-timeseries", fromISO, toISO],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_dashboard_stats", {
+      const { data, error } = await supabase.rpc("get_dashboard_timeseries", {
         p_from_date: fromISO,
         p_to_date: toISO
       });
       if (error) throw error;
-      return data?.[0] || { total_revenue: 0, total_purchases: 0, total_returns: 0, sale_count: 0 };
+      return data || [];
     },
   });
 
-  const { data: sales = [] } = useQuery({
-    queryKey: ["dash-sales-timeseries", fromISO, toISO],
-    queryFn: async () =>
-      (await supabase.from("sales").select("total,cost_total,tax,created_at,paid,payment_method")
-        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+  const { data: topItems = [] } = useQuery({
+    queryKey: ["dash-top-items-rpc", fromISO, toISO],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_top_selling_items", {
+        p_from_date: fromISO,
+        p_to_date: toISO,
+        p_limit: 6
+      });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: lowStock = [] } = useQuery({
+    queryKey: ["dash-low-stock-rpc"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_low_stock_products", {
+        p_threshold: 5,
+        p_limit: 6
+      });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: inventoryValue = 0 } = useQuery({
+    queryKey: ["dash-inventory-value-rpc"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_inventory_value");
+      if (error) throw error;
+      return Number(data || 0);
+    },
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ["dash-stats-v2", fromISO, toISO],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_reports_summary", {
+        p_from_date: fromISO,
+        p_to_date: toISO
+      });
+      if (error) throw error;
+      return data as any;
+    },
   });
 
   const { data: prevStats } = useQuery({
-    queryKey: ["dash-stats-prev", prevFromISO, prevToISO],
+    queryKey: ["dash-stats-prev-v2", prevFromISO, prevToISO],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_dashboard_stats", {
+      const { data, error } = await supabase.rpc("get_reports_summary", {
         p_from_date: prevFromISO,
         p_to_date: prevToISO
       });
       if (error) throw error;
-      return data?.[0] || { total_revenue: 0, total_purchases: 0, total_returns: 0, sale_count: 0 };
+      return data as any;
     },
   });
 
+  const { data: sales = [] } = useQuery({
+    queryKey: ["dash-sales-detail", fromISO, toISO],
+    queryFn: async () =>
+      (await supabase.from("sales").select("total,cost_total,tax,created_at,paid,payment_method,status")
+        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+    enabled: !!detailKey && ["revenue", "invoices", "net", "profit"].includes(detailKey),
+  });
   const { data: purchases = [] } = useQuery({
     queryKey: ["dash-purchases-detail", fromISO, toISO],
     queryFn: async () =>
       (await supabase.from("purchases").select("total,paid,created_at")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+    enabled: detailKey === "purch",
   });
-
   const { data: saleReturns = [] } = useQuery({
     queryKey: ["dash-sale-returns-detail", fromISO, toISO],
     queryFn: async () =>
       (await supabase.from("sale_returns").select("total,subtotal,refund_amount,created_at,sale_return_items(qty,cost)")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+    enabled: !!detailKey && ["returns", "profit", "net"].includes(detailKey),
   });
   const { data: products = [] } = useQuery({
-    queryKey: ["dash-products"],
+    queryKey: ["dash-products-detail"],
     queryFn: async () =>
       fetchAll<any>((from: number, to: number) =>
         supabase
@@ -142,40 +190,29 @@ function Page() {
           .eq("is_active", true)
           .range(from, to),
       ),
-  });
-  const { data: topItemsRaw = [] } = useQuery({
-    queryKey: ["dash-top-items", fromISO, toISO],
-    queryFn: async () =>
-      await fetchAll<any>((from: number, to: number) =>
-        supabase.from("sale_items").select("name,qty,line_total,sales!inner(created_at)")
-          .gte("sales.created_at", fromISO).lte("sales.created_at", toISO).range(from, to),
-      ),
+    enabled: detailKey === "inventory",
   });
 
   const revenue = Number(stats?.total_revenue || 0);
   const prevRevenue = Number(prevStats?.total_revenue || 0);
-  const salesProfit = sales.reduce(
-    (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
-    0,
-  );
-  // We'll calculate prev profit by a simple ratio or keep a minimal fetch for it if needed, 
-  // but for now let's use the stats for totals.
+  
+  // profit = revenue - returns - cost_total
+  // We'll calculate it from summary stats
+  const salesProfit = Number(stats?.total_revenue || 0) - Number(stats?.total_cost || 0) - Number(stats?.total_tax || 0);
+  const returnsLoss = Number(stats?.total_returns || 0); // Simplified loss from returns
+  const profit = salesProfit - returnsLoss;
+  
+  const prevSalesProfit = Number(prevStats?.total_revenue || 0) - Number(prevStats?.total_cost || 0) - Number(prevStats?.total_tax || 0);
+  const prevReturnsLoss = Number(prevStats?.total_returns || 0);
+  const prevProfit = prevSalesProfit - prevReturnsLoss;
+
   const purchTotal = Number(stats?.total_purchases || 0);
   const prevPurchTotal = Number(prevStats?.total_purchases || 0);
   const returnsTotal = Number(stats?.total_returns || 0);
   const prevReturnsTotal = Number(prevStats?.total_returns || 0);
-  const refundsTotal = saleReturns.reduce((a, x) => a + Number(x.refund_amount ?? 0), 0);
-  const returnsProfit = saleReturns.reduce((s: number, r: any) => {
-    const items = r.sale_return_items ?? [];
-    const itemsCost = items.reduce((c: number, it: any) => c + Number(it.cost ?? 0) * Number(it.qty ?? 0), 0);
-    return s + (Number(r.subtotal ?? r.total) - itemsCost);
-  }, 0);
   
   const netRevenue = revenue - returnsTotal;
   const prevNetRevenue = prevRevenue - prevReturnsTotal;
-  const profit = salesProfit - returnsProfit;
-  // Fallback for comparison if prevSalesProfit isn't available
-  const prevProfit = prevRevenue * 0.2; // Simplified fallback for comparison UI
 
   const pct = (curr: number, prev: number) => {
     if (!prev) return curr ? 100 : 0;
@@ -187,51 +224,7 @@ function Page() {
   const dProfit = pct(profit, prevProfit);
   const dPurch = pct(purchTotal, prevPurchTotal);
 
-  // Time series over selected range. For a single day, bucket by hour so the chart has multiple points.
-  const series = useMemo(() => {
-    const map = new Map<string, { day: string; sales: number; profit: number; returns: number }>();
-    const hourly = spanDays <= 1;
-    if (hourly) {
-      const base = startOfDay(from).getTime();
-      for (let h = 0; h < 24; h++) {
-        const k = `H${h}`;
-        map.set(k, { day: `${String(h).padStart(2, "0")}:00`, sales: 0, profit: 0, returns: 0 });
-      }
-      const bucketOf = (iso: string) => {
-        const t = new Date(iso).getTime();
-        const h = Math.floor((t - base) / 3600000);
-        return h >= 0 && h < 24 ? `H${h}` : null;
-      };
-      sales.forEach((s: any) => {
-        const k = bucketOf(s.created_at); if (!k) return;
-        const row = map.get(k)!;
-        row.sales += Number(s.total);
-        row.profit += Number(s.total) - Number(s.tax) - Number(s.cost_total);
-      });
-      saleReturns.forEach((r: any) => {
-        const k = bucketOf(r.created_at); if (!k) return;
-        map.get(k)!.returns += Number(r.total);
-      });
-    } else {
-      for (let i = 0; i < Math.min(spanDays, 180); i++) {
-        const d = new Date(startOfDay(from).getTime() + i * 86400000);
-        const k = d.toISOString().slice(0, 10);
-        map.set(k, { day: k.slice(5), sales: 0, profit: 0, returns: 0 });
-      }
-      sales.forEach((s: any) => {
-        const k = new Date(s.created_at).toISOString().slice(0, 10);
-        const row = map.get(k); if (!row) return;
-        row.sales += Number(s.total);
-        row.profit += Number(s.total) - Number(s.tax) - Number(s.cost_total);
-      });
-      saleReturns.forEach((r: any) => {
-        const k = new Date(r.created_at).toISOString().slice(0, 10);
-        const row = map.get(k); if (!row) return;
-        row.returns += Number(r.total);
-      });
-    }
-    return Array.from(map.values());
-  }, [sales, saleReturns, from, spanDays]);
+  const series = dashboardTimeseries;
 
   const methodMix = useMemo(() => {
     const m = new Map<string, number>();
@@ -248,22 +241,9 @@ function Page() {
   }, [sales]);
   const pieColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)", "var(--chart-5)", "var(--chart-3)"];
 
-  const topItems = useMemo(() => {
-    const m = new Map<string, { name: string; qty: number; total: number }>();
-    topItemsRaw.forEach((it: any) => {
-      const cur = m.get(it.name) ?? { name: it.name, qty: 0, total: 0 };
-      cur.qty += Number(it.qty);
-      cur.total += Number(it.line_total);
-      m.set(it.name, cur);
-    });
-    return Array.from(m.values()).sort((a, b) => b.total - a.total).slice(0, 6);
-  }, [topItemsRaw]);
-
-  const lowStock = products.filter((p: any) => Number(p.stock) <= 5)
-    .sort((a: any, b: any) => Number(a.stock) - Number(b.stock)).slice(0, 6);
-  const inventoryValue = products.reduce((s: number, p: any) => s + Number(p.stock) * Number(p.cost_price), 0);
-
-  const [detailKey, setDetailKey] = useState<string | null>(null);
+  const inventoryValueAgg = inventoryValue; // rename to avoid conflict with detail logic if needed, but we replaced the old ones
+  const lowStockAgg = lowStock;
+  const topItemsAgg = topItems;
 
   const rangeLabel = preset === "custom"
     ? `${format(from, "MMM d")} – ${format(to, "MMM d, yyyy")}`
