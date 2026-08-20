@@ -18,7 +18,8 @@
     "electron:dev": "cross-env POS_DEV=1 electron electron/main.cjs",
     "electron:build": "cross-env NITRO_PRESET=node-server vite build",
     "electron:pack": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish never",
-    "electron:release": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish always"
+    "electron:release": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish always",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
