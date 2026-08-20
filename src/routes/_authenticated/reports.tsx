@@ -349,9 +349,17 @@ const toISO = (d: Date) => {
 function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
-  const [preset, setPreset] = useState<DatePreset | "custom">("today");
-  const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
+  // Default range = shop's first ever transaction → today (never hide history).
+  const { data: earliestData } = useEarliestDataDate();
+  const [preset, setPreset] = useState<DatePreset | "custom">("all");
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(new Date());
+  const [userPicked, setUserPicked] = useState(false);
+  useEffect(() => {
+    if (userPicked || !earliestData) return;
+    setFromDate(earliestData);
+    setToDate(new Date());
+  }, [earliestData, userPicked]);
   const from = fromDate ? toISO(fromDate) : "1970-01-01";
   const to = toDate ? toISO(toDate) : today();
   
@@ -367,11 +375,18 @@ function Page() {
   }>(null);
 
   const applyPreset = (p: DatePreset) => {
+    setUserPicked(true);
     setPreset(p);
     const { from: f, to: t } = rangeFor(p);
+    if (p === "all") {
+      setFromDate(earliestData ?? undefined);
+      setToDate(new Date());
+      return;
+    }
     setFromDate(f ? new Date(f) : undefined);
     setToDate(t ? new Date(t) : undefined);
   };
+
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
   const range = {
