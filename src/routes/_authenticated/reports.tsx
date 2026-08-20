@@ -378,39 +378,69 @@ function Page() {
     to: toDate ? new Date(new Date(toDate).setHours(23, 59, 59, 999)).toISOString() : new Date().toISOString(),
   };
 
-  const { data: sales = [], isLoading: salesLoading } = useQuery({
-    queryKey: ["report-sales-paged", from, to],
+  const [salesPage, setSalesPage] = useState(0);
+  const [purchasesPage, setPurchasesPage] = useState(0);
+  const [expensesPage, setExpensesPage] = useState(0);
+  const PAGE_SIZE = 50;
+
+  const { data: summaryStats } = useQuery({
+    queryKey: ["reports-summary", range.from, range.to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_reports_summary", {
+        p_from_date: range.from,
+        p_to_date: range.to
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
+    queryKey: ["report-sales-paged", range.from, range.to, salesPage],
     queryFn: async () => {
       const q = supabase.from("sales")
-        .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
-        .order("created_at", { ascending: false });
-      
-      const filtered = q.gte("created_at", range.from).lte("created_at", range.to);
-      return await fetchAll<any>((fIdx: number, tIdx: number) => filtered.range(fIdx, tIdx), 1000);
-    },
-  });
-
-  const { data: purchases = [] } = useQuery({
-    queryKey: ["report-purchases-paged", from, to],
-    queryFn: async () => {
-      const base = supabase.from("purchases")
-        .select("subtotal,tax,total,paid,created_at")
+        .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)", { count: "exact" })
         .gte("created_at", range.from)
-        .lte("created_at", range.to);
-      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+        .lte("created_at", range.to)
+        .order("created_at", { ascending: false })
+        .range(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE - 1);
+      
+      const { data, count, error } = await q;
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
     },
   });
+  const sales = salesPaged.data;
 
-  const { data: expenses = [] } = useQuery({
-    queryKey: ["report-expenses-paged", from, to],
+  const { data: purchasesPaged = { data: [], count: 0 } } = useQuery({
+    queryKey: ["report-purchases-paged", range.from, range.to, purchasesPage],
     queryFn: async () => {
-      const base = supabase.from("expenses")
-        .select("amount,category,expense_date")
-        .gte("expense_date", from)
-        .lte("expense_date", to);
-      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+      const { data, count, error } = await supabase.from("purchases")
+        .select("subtotal,tax,total,paid,created_at", { count: "exact" })
+        .gte("created_at", range.from)
+        .lte("created_at", range.to)
+        .order("created_at", { ascending: false })
+        .range(purchasesPage * PAGE_SIZE, (purchasesPage + 1) * PAGE_SIZE - 1);
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
     },
   });
+  const purchases = purchasesPaged.data;
+
+  const { data: expensesPaged = { data: [], count: 0 } } = useQuery({
+    queryKey: ["report-expenses-paged", range.from, range.to, expensesPage],
+    queryFn: async () => {
+      const { data, count, error } = await supabase.from("expenses")
+        .select("amount,category,expense_date", { count: "exact" })
+        .gte("expense_date", from)
+        .lte("expense_date", to)
+        .order("expense_date", { ascending: false })
+        .range(expensesPage * PAGE_SIZE, (expensesPage + 1) * PAGE_SIZE - 1);
+      if (error) throw error;
+      return { data: data || [], count: count || 0 };
+    },
+  });
+  const expenses = expensesPaged.data;
 
   const { data: partyPayments = [] } = useQuery({
     queryKey: ["report-party-payments-paged", from, to],
