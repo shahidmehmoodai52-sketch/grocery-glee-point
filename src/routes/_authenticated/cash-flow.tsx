@@ -250,7 +250,7 @@ function Page() {
       const { data, error } = await supabase.rpc("get_cash_flow_summary", {
         p_from_date: dateFrom || "2000-01-01",
         p_to_date: dateTo || "2099-12-31",
-        p_account_id: filterAcc === "all" ? null : filterAcc
+        p_account_id: filterAcc === "all" ? undefined : filterAcc
       });
       if (error) throw error;
       return data;
