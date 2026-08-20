@@ -740,7 +740,7 @@ function Page() {
 
               </TableBody>
             </Table>
-            <div className="text-xs text-muted-foreground mt-3">{from} → {to} · {sales.length} sales, {purchases.length} purchases, {expenses.length} expenses</div>
+            <div className="text-xs text-muted-foreground mt-3">{from} → {to} · {salesPaged.count} sales, {purchasesPaged.count} purchases, {expensesPaged.count} expenses</div>
           </Card>
         </TabsContent>
 
