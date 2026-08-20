@@ -12,7 +12,7 @@ export type ReceiptSettings = {
   tax_id?: string | null;
   receipt_header?: string | null;
   receipt_footer?: string | null;
-  paper_width?: string | null; // '58mm' | '80mm'
+  paper_width?: string | null; // '58mm' | '80mm' | 'A4'
   show_logo?: boolean | null;
   show_tax_id?: boolean | null;
   show_address?: boolean | null;
@@ -22,6 +22,9 @@ export type ReceiptSettings = {
   payment_qr_url?: string | null;
   payment_qr_label?: string | null;
   show_payment_qr?: boolean | null;
+  // Local direct print settings
+  printer_name?: string | null;
+  direct_print_enabled?: boolean | null;
 };
 
 export type ReceiptInvoice = {
@@ -225,7 +228,7 @@ export function printInvoiceDirect(invoice: ReceiptInvoice, settings: ReceiptSet
   window.addEventListener("afterprint", done);
   // Give React a frame to commit before printing.
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    printReceipt(wrapper);
+    printReceipt(wrapper, settings);
     // Safety cleanup in case afterprint doesn't fire (some browsers).
     setTimeout(done, 5000);
   }));
