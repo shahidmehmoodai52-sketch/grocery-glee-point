@@ -105,7 +105,7 @@ async function pullTable(table: MirroredTable): Promise<number> {
     total += data.length;
     
     if (!full) {
-      const lastRow = data[data.length - 1];
+      const lastRow = data[data.length - 1] as any;
       const ts = lastRow.updated_at ?? lastRow.created_at;
       if (ts) {
         maxTs = ts;
