@@ -250,7 +250,7 @@ function Page() {
       const { data, error } = await supabase.rpc("get_cash_flow_summary", {
         p_from_date: dateFrom || "2000-01-01",
         p_to_date: dateTo || "2099-12-31",
-        p_account_id: filterAcc === "all" ? null : filterAcc
+        p_account_id: filterAcc === "all" ? undefined : filterAcc
       });
       if (error) throw error;
       return data;
@@ -261,7 +261,7 @@ function Page() {
   const { data: ledgerPaged = { data: [], count: 0 }, isLoading: ledgerLoading } = useQuery({
     queryKey: ["cf-ledger-paged", dateFrom, dateTo, filterAcc, filterMethod, search, page],
     queryFn: async () => {
-      const { data, count, error } = await supabase.rpc("get_cash_flow_ledger", {
+      const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
         p_from_date: dateFrom || "2000-01-01",
         p_to_date: dateTo || "2099-12-31",
         p_account_id: filterAcc === "all" ? undefined : filterAcc,
@@ -269,15 +269,17 @@ function Page() {
         p_search: search || undefined,
         p_limit: PAGE_SIZE_PAGED,
         p_offset: page * PAGE_SIZE_PAGED
-      }, { count: "exact" });
+      });
       if (error) throw error;
+      const rows = data || [];
+      const totalCount = rows.length > 0 ? Number(rows[0].total_count) : 0;
       // map RPC response to Tx type, adding required fields if missing
-      const mapped = (data || []).map((row: any) => ({
+      const mapped = rows.map((row: any) => ({
         ...row,
         transfer_group_id: row.transfer_group_id || null,
         payment_method: row.payment_method || null
       })) as Tx[];
-      return { data: mapped, count: count || 0 };
+      return { data: mapped, count: totalCount };
     },
   });
 
@@ -584,6 +586,16 @@ function Page() {
         )}
       </div>
 
+      {/* Global date filter */}
+      <DateRangeBar
+        preset={mainPreset}
+        from={dateFrom}
+        to={dateTo}
+        onPreset={setMainPreset}
+        onFrom={(v) => { setDateFrom(v); setPage(0); }}
+        onTo={(v) => { setDateTo(v); setPage(0); }}
+      />
+
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Card
@@ -741,15 +753,6 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
-            <DateRangeBar
-              preset={mainPreset}
-              from={dateFrom}
-              to={dateTo}
-              onPreset={setMainPreset}
-              onFrom={(v) => { setDateFrom(v); setPage(0); }}
-              onTo={(v) => { setDateTo(v); setPage(0); }}
-            />
-
             <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
           </div>
           <Card className="overflow-x-auto">
@@ -823,15 +826,6 @@ function Page() {
         {/* Report */}
         <TabsContent value="report" className="mt-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-end">
-            <DateRangeBar
-              preset={mainPreset}
-              from={dateFrom}
-              to={dateTo}
-              onPreset={setMainPreset}
-              onFrom={setDateFrom}
-              onTo={setDateTo}
-            />
-
             <div className="text-xs text-muted-foreground ml-auto">
               {dateFrom || dateTo ? `Filtered ${dateFrom || "…"} → ${dateTo || "…"}` : "Showing all history"}
             </div>
