@@ -196,8 +196,10 @@ function Page() {
   const [spForm, setSpForm] = useState<any>({ ...emptySupplierPay });
 
   const [search, setSearch] = useState("");
+  const [mainPreset, setMainPreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
   const [filterAcc, setFilterAcc] = useState<string>("all");
   const [filterMethod, setFilterMethod] = useState<string>("all");
 
@@ -739,14 +741,15 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">From</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">To</Label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </div>
+            <DateRangeBar
+              preset={mainPreset}
+              from={dateFrom}
+              to={dateTo}
+              onPreset={setMainPreset}
+              onFrom={(v) => { setDateFrom(v); setPage(0); }}
+              onTo={(v) => { setDateTo(v); setPage(0); }}
+            />
+
             <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
           </div>
           <Card className="overflow-x-auto">
@@ -820,14 +823,15 @@ function Page() {
         {/* Report */}
         <TabsContent value="report" className="mt-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-end">
-            <div>
-              <Label className="text-xs">From</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">To</Label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </div>
+            <DateRangeBar
+              preset={mainPreset}
+              from={dateFrom}
+              to={dateTo}
+              onPreset={setMainPreset}
+              onFrom={setDateFrom}
+              onTo={setDateTo}
+            />
+
             <div className="text-xs text-muted-foreground ml-auto">
               {dateFrom || dateTo ? `Filtered ${dateFrom || "…"} → ${dateTo || "…"}` : "Showing all history"}
             </div>
