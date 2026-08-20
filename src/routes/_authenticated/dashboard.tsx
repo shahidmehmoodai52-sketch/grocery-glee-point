@@ -193,23 +193,23 @@ function Page() {
     enabled: detailKey === "inventory",
   });
 
-  const revenue = Number(stats?.total_revenue || 0);
-  const prevRevenue = Number(prevStats?.total_revenue || 0);
+  const revenue = Number(stats?.sales_total || 0);
+  const prevRevenue = Number(prevStats?.sales_total || 0);
   
   // profit = revenue - returns - cost_total
   // We'll calculate it from summary stats
-  const salesProfit = Number(stats?.total_revenue || 0) - Number(stats?.total_cost || 0) - Number(stats?.total_tax || 0);
-  const returnsLoss = Number(stats?.total_returns || 0); // Simplified loss from returns
+  const salesProfit = Number(stats?.sales_total || 0) - Number(stats?.sales_cost || 0) - Number(stats?.sales_tax || 0);
+  const returnsLoss = Number(stats?.returns_total || 0); // Simplified loss from returns
   const profit = salesProfit - returnsLoss;
   
-  const prevSalesProfit = Number(prevStats?.total_revenue || 0) - Number(prevStats?.total_cost || 0) - Number(prevStats?.total_tax || 0);
-  const prevReturnsLoss = Number(prevStats?.total_returns || 0);
+  const prevSalesProfit = Number(prevStats?.sales_total || 0) - Number(prevStats?.sales_cost || 0) - Number(prevStats?.sales_tax || 0);
+  const prevReturnsLoss = Number(prevStats?.returns_total || 0);
   const prevProfit = prevSalesProfit - prevReturnsLoss;
 
-  const purchTotal = Number(stats?.total_purchases || 0);
-  const prevPurchTotal = Number(prevStats?.total_purchases || 0);
-  const returnsTotal = Number(stats?.total_returns || 0);
-  const prevReturnsTotal = Number(prevStats?.total_returns || 0);
+  const purchTotal = Number(stats?.purchases_total || 0);
+  const prevPurchTotal = Number(prevStats?.purchases_total || 0);
+  const returnsTotal = Number(stats?.returns_total || 0);
+  const prevReturnsTotal = Number(prevStats?.returns_total || 0);
   
   const netRevenue = revenue - returnsTotal;
   const prevNetRevenue = prevRevenue - prevReturnsTotal;
@@ -345,7 +345,7 @@ function Page() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <Kpi onClick={() => setDetailKey("net")}
           icon={TrendingUp} label="Revenue" value={fmtMoney(netRevenue, sym)}
-          delta={dNet} sub={`${stats?.sale_count || 0} invoices · after returns`} tone="primary"
+          delta={dNet} sub={`${stats?.sales_count || 0} invoices · after returns`} tone="primary"
         />
         <Kpi onClick={() => setDetailKey("revenue")}
           icon={Receipt} label="Gross sales" value={fmtMoney(revenue, sym)}

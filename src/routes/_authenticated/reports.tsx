@@ -401,7 +401,7 @@ function Page() {
       return data;
     },
   });
-  const summaryStats = (summaryStatsRaw as any)?.[0] || {};
+  const summaryStats = (summaryStatsRaw as any) || {};
 
   const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
     queryKey: ["report-sales-paged", fromTime, toTime, salesPage],

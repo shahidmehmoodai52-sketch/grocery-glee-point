@@ -256,7 +256,7 @@ function Page() {
       return data;
     },
   });
-  const summary = (summaryStatsRaw as any)?.[0] || { total_in: 0, total_out: 0, opening_balance: 0, current_balance: 0 };
+  const summary = (summaryStatsRaw as any) || { total_in: 0, total_out: 0, opening: 0, balance: 0, receivables: 0, payables: 0 };
 
   const { data: ledgerPaged = { data: [], count: 0 }, isLoading: ledgerLoading } = useQuery({
     queryKey: ["cf-ledger-paged", dateFrom, dateTo, filterAcc, filterMethod, search, page],
@@ -293,10 +293,10 @@ function Page() {
 
   const stats = useMemo(() => {
     return {
-      opening: Number(summary.opening_balance || 0),
+      opening: Number(summary.opening || 0),
       in: Number(summary.total_in || 0),
       out: Number(summary.total_out || 0),
-      balance: Number(summary.current_balance || 0),
+      balance: Number(summary.balance || 0),
     };
   }, [summary]);
 
@@ -333,8 +333,8 @@ function Page() {
   }, [accounts, balances]);
 
   // Receivables (credit sales unpaid) / Payables (purchases unpaid)
-  const receivables = Number(summary.total_receivables || 0);
-  const payables = Number(summary.total_payables || 0);
+  const receivables = Number(summary.receivables || 0);
+  const payables = Number(summary.payables || 0);
 
   /** Payment method of an entry. Stored value wins; legacy/auto rows are
    *  inferred from their account type and default to Cash. */
