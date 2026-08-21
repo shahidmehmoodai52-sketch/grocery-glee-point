@@ -1048,11 +1048,15 @@ function SecurityTab() {
       _severity: severity ?? undefined,
       _older_than_days: olderDays ?? undefined,
     });
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success(`Cleared ${data ?? 0} events`);
     qc.invalidateQueries({ queryKey: ["admin-security-events"] });
     qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
   };
+
 
 
   const blockFromEvent = async (e: SecurityEvent) => {
