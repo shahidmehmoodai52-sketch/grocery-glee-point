@@ -64,7 +64,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { UserCog, BookOpen } from "lucide-react";
 import { fetchAll } from "@/lib/supabase-page";
 
-export const Route = createFileRoute("/_authenticated/admin")({
+export const Route = createFileRoute("/admin")({
   component: AdminPanelPage,
 });
 
