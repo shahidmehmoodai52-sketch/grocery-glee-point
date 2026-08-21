@@ -362,8 +362,10 @@ function TenantsTab() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "suspended" | "archived">("all");
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
+  const [archiveDialog, setArchiveDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [isDeleting, setIsDeleting] = useState(false);
+
 
 
   const { data: tenants = [], isLoading } = useQuery({
