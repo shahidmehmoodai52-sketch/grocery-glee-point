@@ -419,6 +419,8 @@ function Page() {
       if (error) throw error;
       return data;
     },
+    staleTime: 0,
+    gcTime: 0,
   });
   const summaryStats = (summaryStatsRaw as any) || {};
 
@@ -436,6 +438,8 @@ function Page() {
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
+    staleTime: 0,
+    gcTime: 0,
   });
   const sales = salesPaged.data;
 
@@ -769,11 +773,17 @@ function Page() {
                 <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted onClick={() => openReturns("Sale returns")} />
                 <Row label="Sales (net of returns & discount)" value={fmtMoney(revenue, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", sales as any[])} />
                 
-                <TableRow className="bg-muted/30 border-t">
+                <TableRow 
+                  className="bg-muted/30 border-t cursor-pointer hover:bg-muted/50"
+                  onClick={() => openInvoices("Cash Sales", (sales as any[]).filter(s => Number(s.paid) > 0))}
+                >
                   <TableCell className="py-2 pl-8 text-xs text-muted-foreground italic">↳ Of which Cash Sales</TableCell>
                   <TableCell className="py-2 text-right text-xs font-medium">{fmtMoney(cashIn, sym)}</TableCell>
                 </TableRow>
-                <TableRow className="bg-muted/30">
+                <TableRow 
+                  className="bg-muted/30 cursor-pointer hover:bg-muted/50"
+                  onClick={() => openInvoices("Credit Sales (Unpaid)", (sales as any[]).filter(s => Number(s.total) > Number(s.paid)))}
+                >
                   <TableCell className="py-2 pl-8 text-xs text-muted-foreground italic">↳ Of which Credit Sales (Unpaid)</TableCell>
                   <TableCell className="py-2 text-right text-xs font-medium text-destructive">{fmtMoney(creditOut, sym)}</TableCell>
                 </TableRow>
