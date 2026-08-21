@@ -1,10 +1,10 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
-  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2,
+  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2, LogOut
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -28,10 +28,49 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { fmtMoney } from "@/lib/format";
 import { resetTenantOwnerPassword } from "@/lib/admin.functions";
+import { Toaster } from "@/components/ui/sonner";
 
-export const Route = createFileRoute("/_authenticated/admin_/shops/$id")({
-  component: ShopDetailPage,
+export const Route = createFileRoute("/admin_/shops/$id")({
+  beforeLoad: async ({ location }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw redirect({ to: "/admin-login", search: { next: location.pathname } });
+    }
+    const { data: isAdmin } = await supabase.rpc("am_i_admin_staff");
+    if (!isAdmin) {
+      await supabase.auth.signOut();
+      throw redirect({ to: "/admin-login" });
+    }
+  },
+  component: AdminShopDetailLayout,
 });
+
+function AdminShopDetailLayout() {
+  const navigate = useNavigate();
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/admin-login", replace: true });
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="h-14 border-b bg-card px-4 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          <h1 className="font-semibold text-lg">Tillix Admin</h1>
+        </div>
+        <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2 text-muted-foreground hover:text-foreground">
+          <LogOut className="h-4 w-4" />
+          <span>Sign out</span>
+        </Button>
+      </header>
+      <main className="flex-1">
+        <ShopDetailPage />
+      </main>
+      <Toaster richColors position="top-right" duration={4000} closeButton />
+    </div>
+  );
+}
 
 function ShopDetailPage() {
   const navigate = useNavigate();
@@ -39,7 +78,7 @@ function ShopDetailPage() {
   const { isSuperAdmin, loading } = useSuperAdmin();
 
   useEffect(() => {
-    if (!loading && !isSuperAdmin) navigate({ to: "/dashboard", replace: true });
+    if (!loading && !isSuperAdmin) navigate({ to: "/admin", replace: true });
   }, [loading, isSuperAdmin, navigate]);
 
   if (loading) return <div className="p-6"><TableSkeleton rows={6} columns={4} /></div>;

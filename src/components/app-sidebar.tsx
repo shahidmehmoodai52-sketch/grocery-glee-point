@@ -75,19 +75,8 @@ export function AppSidebar() {
   const { data: settings } = useSettings();
   const { isAdmin, can } = usePermissions();
   const { isSuperAdmin } = useSuperAdmin();
-  const withPlatform = isSuperAdmin
-    ? [
-        ...groups,
-        {
-          label: "Platform",
-          items: [
-            { title: "Admin panel", url: "/admin", icon: ShieldCheck, perm: "admin", adminOnly: false } as Item,
-          ],
-        },
-      ]
-    : groups;
-  const visibleGroups = withPlatform
-    .map((g) => ({ ...g, items: g.items.filter((it) => (it.url === "/admin" ? isSuperAdmin : it.adminOnly ? isAdmin : can(it.perm))) }))
+  const visibleGroups = groups
+    .map((g) => ({ ...g, items: g.items.filter((it) => (it.adminOnly ? isAdmin : can(it.perm))) }))
     .filter((g) => g.items.length > 0);
   const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
 

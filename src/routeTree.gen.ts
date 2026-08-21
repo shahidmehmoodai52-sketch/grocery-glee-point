@@ -13,6 +13,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminLoginRouteImport } from './routes/admin-login'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
@@ -36,12 +37,12 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCashFlowRouteImport } from './routes/_authenticated/cash-flow'
 import { Route as AuthenticatedBackupRouteImport } from './routes/_authenticated/backup'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as AuthenticatedSuppliersIndexRouteImport } from './routes/_authenticated/suppliers.index'
 import { Route as AuthenticatedStockCountIndexRouteImport } from './routes/_authenticated/stock-count.index'
 import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authenticated/customers.index'
+import { Route as AdminShopsIdRouteImport } from './routes/admin_.shops.$id'
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers.$id'
 import { Route as AuthenticatedStockCountIdRouteImport } from './routes/_authenticated/stock-count.$id'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
@@ -49,7 +50,6 @@ import { Route as AuthenticatedExpensePersonsIdRouteImport } from './routes/_aut
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
-import { Route as AuthenticatedAdminShopsIdRouteImport } from './routes/_authenticated/admin_.shops.$id'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -69,6 +69,11 @@ const AuthRoute = AuthRouteImport.update({
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin-login',
   path: '/admin-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -188,11 +193,6 @@ const AuthenticatedAssetsRoute = AuthenticatedAssetsRouteImport.update({
   path: '/assets',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const Char91DotwellKnownChar93OauthProtectedResourceRoute =
   Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
     id: '/.well-known/oauth-protected-resource',
@@ -223,6 +223,11 @@ const AuthenticatedCustomersIndexRoute =
     path: '/customers/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AdminShopsIdRoute = AdminShopsIdRouteImport.update({
+  id: '/admin_/shops/$id',
+  path: '/admin/shops/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedSuppliersIdRoute =
   AuthenticatedSuppliersIdRouteImport.update({
     id: '/suppliers/$id',
@@ -263,22 +268,16 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAdminShopsIdRoute =
-  AuthenticatedAdminShopsIdRouteImport.update({
-    id: '/admin_/shops/$id',
-    path: '/admin/shops/$id',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/admin': typeof AuthenticatedAdminRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/backup': typeof AuthenticatedBackupRoute
   '/cash-flow': typeof AuthenticatedCashFlowRoute
@@ -307,20 +306,20 @@ export interface FileRoutesByFullPath {
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
+  '/admin/shops/$id': typeof AdminShopsIdRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/suppliers/': typeof AuthenticatedSuppliersIndexRoute
-  '/admin/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/admin': typeof AuthenticatedAdminRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/backup': typeof AuthenticatedBackupRoute
   '/cash-flow': typeof AuthenticatedCashFlowRoute
@@ -349,22 +348,22 @@ export interface FileRoutesByTo {
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
+  '/admin/shops/$id': typeof AdminShopsIdRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/stock-count': typeof AuthenticatedStockCountIndexRoute
   '/suppliers': typeof AuthenticatedSuppliersIndexRoute
-  '/admin/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/admin': typeof AdminRoute
   '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/backup': typeof AuthenticatedBackupRoute
   '/_authenticated/cash-flow': typeof AuthenticatedCashFlowRoute
@@ -393,22 +392,22 @@ export interface FileRoutesById {
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
   '/_authenticated/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/_authenticated/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
+  '/admin_/shops/$id': typeof AdminShopsIdRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/_authenticated/suppliers/': typeof AuthenticatedSuppliersIndexRoute
-  '/_authenticated/admin_/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/admin-login'
     | '/auth'
     | '/mcp'
     | '/reset-password'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
-    | '/admin'
     | '/assets'
     | '/backup'
     | '/cash-flow'
@@ -437,20 +436,20 @@ export interface FileRouteTypes {
     | '/products/$id'
     | '/stock-count/$id'
     | '/suppliers/$id'
+    | '/admin/shops/$id'
     | '/customers/'
     | '/stock-count/'
     | '/suppliers/'
-    | '/admin/shops/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/admin-login'
     | '/auth'
     | '/mcp'
     | '/reset-password'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
-    | '/admin'
     | '/assets'
     | '/backup'
     | '/cash-flow'
@@ -479,21 +478,21 @@ export interface FileRouteTypes {
     | '/products/$id'
     | '/stock-count/$id'
     | '/suppliers/$id'
+    | '/admin/shops/$id'
     | '/customers'
     | '/stock-count'
     | '/suppliers'
-    | '/admin/shops/$id'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/admin'
     | '/admin-login'
     | '/auth'
     | '/mcp'
     | '/reset-password'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
-    | '/_authenticated/admin'
     | '/_authenticated/assets'
     | '/_authenticated/backup'
     | '/_authenticated/cash-flow'
@@ -522,15 +521,16 @@ export interface FileRouteTypes {
     | '/_authenticated/products/$id'
     | '/_authenticated/stock-count/$id'
     | '/_authenticated/suppliers/$id'
+    | '/admin_/shops/$id'
     | '/_authenticated/customers/'
     | '/_authenticated/stock-count/'
     | '/_authenticated/suppliers/'
-    | '/_authenticated/admin_/shops/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AdminRoute: typeof AdminRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AuthRoute: typeof AuthRoute
   McpRoute: typeof McpRoute
@@ -539,6 +539,7 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  AdminShopsIdRoute: typeof AdminShopsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -569,6 +570,13 @@ declare module '@tanstack/react-router' {
       path: '/admin-login'
       fullPath: '/admin-login'
       preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -732,13 +740,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAssetsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/.well-known/oauth-protected-resource': {
       id: '/.well-known/oauth-protected-resource'
       path: '/.well-known/oauth-protected-resource'
@@ -773,6 +774,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/customers/'
       preLoaderRoute: typeof AuthenticatedCustomersIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/admin_/shops/$id': {
+      id: '/admin_/shops/$id'
+      path: '/admin/shops/$id'
+      fullPath: '/admin/shops/$id'
+      preLoaderRoute: typeof AdminShopsIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/suppliers/$id': {
       id: '/_authenticated/suppliers/$id'
@@ -823,13 +831,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/admin_/shops/$id': {
-      id: '/_authenticated/admin_/shops/$id'
-      path: '/admin/shops/$id'
-      fullPath: '/admin/shops/$id'
-      preLoaderRoute: typeof AuthenticatedAdminShopsIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
@@ -847,7 +848,6 @@ const AuthenticatedProductsRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedBackupRoute: typeof AuthenticatedBackupRoute
   AuthenticatedCashFlowRoute: typeof AuthenticatedCashFlowRoute
@@ -876,11 +876,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCustomersIndexRoute: typeof AuthenticatedCustomersIndexRoute
   AuthenticatedStockCountIndexRoute: typeof AuthenticatedStockCountIndexRoute
   AuthenticatedSuppliersIndexRoute: typeof AuthenticatedSuppliersIndexRoute
-  AuthenticatedAdminShopsIdRoute: typeof AuthenticatedAdminShopsIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedBackupRoute: AuthenticatedBackupRoute,
   AuthenticatedCashFlowRoute: AuthenticatedCashFlowRoute,
@@ -909,7 +907,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCustomersIndexRoute: AuthenticatedCustomersIndexRoute,
   AuthenticatedStockCountIndexRoute: AuthenticatedStockCountIndexRoute,
   AuthenticatedSuppliersIndexRoute: AuthenticatedSuppliersIndexRoute,
-  AuthenticatedAdminShopsIdRoute: AuthenticatedAdminShopsIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -918,6 +915,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AdminRoute: AdminRoute,
   AdminLoginRoute: AdminLoginRoute,
   AuthRoute: AuthRoute,
   McpRoute: McpRoute,
@@ -927,6 +925,7 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  AdminShopsIdRoute: AdminShopsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

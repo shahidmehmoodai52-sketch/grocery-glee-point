@@ -40,6 +40,13 @@ export const Route = createFileRoute("/_authenticated")({
     if (!user) {
       throw redirect({ to: "/auth", search: { next: location.pathname + location.searchStr } });
     }
+
+    // Block admin staff from shop routes and force them to the admin panel
+    const { data: isAdmin } = await supabase.rpc("am_i_admin_staff");
+    if (isAdmin) {
+      throw redirect({ to: "/admin" });
+    }
+
     return { user };
   },
   component: Layout,
