@@ -391,10 +391,11 @@ function Page() {
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
   const range = {
-    // Correct PKT range: Start of fromDate at 00:00:00, End of toDate at 23:59:59.999
-    from: fromDate ? new Date(new Date(fromDate).setHours(0, 0, 0, 0)).toISOString() : "2000-01-01T00:00:00Z",
-    to: toDate ? new Date(new Date(toDate).setHours(23, 59, 59, 999)).toISOString() : new Date().toISOString(),
+    // PKT business-day boundaries (UTC+5), independent of the browser timezone.
+    from: fromDate ? pktStartISO(fromDate) : "2000-01-01T00:00:00.000Z",
+    to: toDate ? pktEndISO(toDate) : pktEndISO(pktToday()),
   };
+
   
   const fromTime = range.from;
   const toTime = range.to;
