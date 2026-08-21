@@ -606,8 +606,15 @@ function Page() {
   const returnsSubtotal = returnsLoss;
 
   // ---- drill-down helpers (every report row is clickable)
-  const openInvoices = (title: string, list: any[], note?: string) =>
-    setDrill({ title, note: note ?? `${salesPaged.count} invoice${salesPaged.count === 1 ? "" : "s"} total`, invoices: list });
+  const openInvoices = (title: string, list: any[], countOverride?: number) => {
+    const count = countOverride ?? list.length;
+    setDrill({ 
+      title, 
+      note: `${count} invoice${count === 1 ? "" : "s"} total`, 
+      invoices: list 
+    });
+  };
+
 
 
   const openReturns = (title: string) =>
@@ -847,18 +854,25 @@ function Page() {
                 
                 <TableRow 
                   className="bg-muted/30 border-t cursor-pointer hover:bg-muted/50"
-                  onClick={() => openInvoices("Cash Sales", (sales as any[]).filter(s => Number(s.paid) > 0))}
+                  onClick={() => {
+                    const filtered = (sales as any[]).filter(s => Number(s.paid) > 0);
+                    openInvoices("Cash Sales", filtered);
+                  }}
                 >
                   <TableCell className="py-2 pl-8 text-xs text-muted-foreground italic">↳ Of which Cash Sales</TableCell>
                   <TableCell className="py-2 text-right text-xs font-medium">{fmtMoney(cashIn, sym)}</TableCell>
                 </TableRow>
                 <TableRow 
                   className="bg-muted/30 cursor-pointer hover:bg-muted/50"
-                  onClick={() => openInvoices("Credit Sales (Unpaid)", (sales as any[]).filter(s => Number(s.total) > Number(s.paid)))}
+                  onClick={() => {
+                    const filtered = (sales as any[]).filter(s => Number(s.total) > Number(s.paid));
+                    openInvoices("Credit Sales (Unpaid)", filtered);
+                  }}
                 >
                   <TableCell className="py-2 pl-8 text-xs text-muted-foreground italic">↳ Of which Credit Sales (Unpaid)</TableCell>
                   <TableCell className="py-2 text-right text-xs font-medium text-destructive">{fmtMoney(creditOut, sym)}</TableCell>
                 </TableRow>
+
 
                 <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices("Cost of goods sold", sales as any[])} />
                 <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", sales as any[])} />
@@ -886,7 +900,11 @@ function Page() {
                   <TableRow
                     key={d.date}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openInvoices(`Sales on ${d.date}`, (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                    onClick={() => {
+                      const filtered = (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date);
+                      openInvoices(`Sales on ${d.date}`, filtered);
+                    }}
+
                   >
                     <TableCell>{d.date}</TableCell>
                     <TableCell className="text-right">{d.invoices}</TableCell>
@@ -928,7 +946,11 @@ function Page() {
                     <TableRow
                       key={d.date}
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => openInvoices(`Sales & profit on ${d.date}`, (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                      onClick={() => {
+                        const filtered = (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date);
+                        openInvoices(`Sales & profit on ${d.date}`, filtered);
+                      }}
+
                     >
                       <TableCell>{d.date}</TableCell>
                       <TableCell className="text-right">{d.invoices}</TableCell>
