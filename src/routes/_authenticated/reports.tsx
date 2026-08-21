@@ -965,8 +965,8 @@ function Page() {
                 <TableHead>Status</TableHead><TableHead></TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {filteredInvoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
-                {filteredInvoices.map((s: any) => {
+                {salesPaged.data.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {salesPaged.data.map((s: any) => {
                   const profit = (Number(s.subtotal || 0) - Number(s.discount || 0)) - Number(s.cost_total || 0);
                   const qty = (s.sale_items as any[] ?? []).reduce((a: number, i: any) => a + Number(i.qty || 0), 0);
                   return (
