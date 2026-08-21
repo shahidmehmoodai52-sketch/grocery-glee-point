@@ -455,6 +455,8 @@ function Page() {
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
+    staleTime: 0,
+    gcTime: 0,
   });
   const purchases = purchasesPaged.data;
 
@@ -470,6 +472,8 @@ function Page() {
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
+    staleTime: 0,
+    gcTime: 0,
   });
   const expenses = expensesPaged.data;
 
@@ -499,6 +503,8 @@ function Page() {
         suppliers: r.party_type !== "customer" ? { name: sMap.get(r.party_id) ?? null } : null,
       }));
     },
+    staleTime: 0,
+    gcTime: 0,
   });
 
 
@@ -516,6 +522,8 @@ function Page() {
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
+    staleTime: 0,
+    gcTime: 0,
   });
   const saleReturns = saleReturnsPaged.data;
   const revenue = Number(summaryStats.sales_total || 0);
