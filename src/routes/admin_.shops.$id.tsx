@@ -29,6 +29,8 @@ import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { fmtMoney } from "@/lib/format";
 import { resetTenantOwnerPassword } from "@/lib/admin.functions";
 import { Toaster } from "@/components/ui/sonner";
+import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
+
 
 export const Route = createFileRoute("/admin_/shops/$id")({
   beforeLoad: async ({ location }) => {
@@ -105,6 +107,11 @@ type TenantDetail = {
 function ShopDetail({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [suspendDialog, setSuspendDialog] = useState(false);
+  const [archiveDialog, setArchiveDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
@@ -125,37 +132,39 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
   };
 
-  const suspend = async () => {
-    const reason = window.prompt(`Suspend "${data?.tenant.name}"? Reason:`) ?? "";
-    if (!reason) return;
-    await setStatus("suspended", reason);
-  };
+  const suspend = () => setSuspendDialog(true);
+  const archive = () => setArchiveDialog(true);
+  const removeShop = () => setDeleteDialog(true);
 
-  const removeShop = async () => {
+  const handleConfirmDelete = async () => {
     if (!data) return;
     const expected = data.tenant.name.trim();
-    const typed = window.prompt(
-      `PERMANENTLY delete this shop and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone.\n\nType exactly:  ${expected}`,
-    );
-    if (typed === null) return;
-    if (typed.trim().toLowerCase() !== expected.toLowerCase()) {
-      return toast.error(`Confirmation did not match. Expected: "${expected}"`);
+    setIsDeleting(true);
+    try {
+      let done = false;
+      while (!done) {
+        const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", { 
+          _tenant_id: tenantId, 
+          _confirm: expected 
+        });
+        if (error) throw error;
+        done = Boolean(
+          deletionResult
+          && typeof deletionResult === "object"
+          && "done" in deletionResult
+          && deletionResult.done,
+        );
+      }
+      toast.success(`Deleted "${expected}"`);
+      qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+      navigate({ to: "/admin", replace: true });
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsDeleting(false);
     }
-    let done = false;
-    while (!done) {
-      const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: expected });
-      if (error) return toast.error(error.message);
-      done = Boolean(
-        deletionResult
-        && typeof deletionResult === "object"
-        && "done" in deletionResult
-        && deletionResult.done,
-      );
-    }
-    toast.success(`Deleted "${expected}"`);
-    qc.invalidateQueries({ queryKey: ["admin-tenants"] });
-    navigate({ to: "/admin", replace: true });
   };
+
 
   if (isLoading || !data) return <div className="p-6"><TableSkeleton rows={6} columns={4} /></div>;
   const t = data.tenant;
@@ -203,12 +212,11 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
               {t.library_approved ? "Revoke library access" : "Grant library access"}
             </Button>
             {t.status !== "archived" && (
-              <Button size="sm" variant="ghost" onClick={() => {
-                if (confirm(`Archive "${t.name}"? Owner loses access.`)) setStatus("archived");
-              }}>
+              <Button size="sm" variant="ghost" onClick={archive}>
                 <Archive className="h-4 w-4 mr-1" /> Archive
               </Button>
             )}
+
             <Button size="sm" variant="destructive" onClick={removeShop}>
               <Trash2 className="h-4 w-4 mr-1" /> Delete shop
             </Button>
@@ -241,9 +249,44 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
           <ActivityTab tenantId={tenantId} />
         </TabsContent>
       </Tabs>
+
+      <TypedConfirmDialog
+        open={suspendDialog}
+        onOpenChange={setSuspendDialog}
+        title="Suspend Shop"
+        description={`Are you sure you want to suspend "${t.name}"? This will block access for all staff members.`}
+        confirmLabel="Suspend"
+        requireReason
+        destructive
+        onConfirm={async (reason) => { await setStatus("suspended", reason); }}
+      />
+
+      <TypedConfirmDialog
+        open={archiveDialog}
+        onOpenChange={setArchiveDialog}
+        title="Archive Shop"
+        description={`Are you sure you want to archive "${t.name}"? The owner and staff will lose access, but data will be preserved.`}
+        confirmLabel="Archive"
+        requireReason
+        destructive
+        onConfirm={async (reason) => { await setStatus("archived", reason); }}
+      />
+
+      <TypedConfirmDialog
+        open={deleteDialog}
+        onOpenChange={setDeleteDialog}
+        title="Permanently Delete Shop"
+        description={`This will permanently delete "${t.name}" and ALL its data. This action is irreversible.`}
+        confirmText={t.name}
+        confirmLabel="Delete Everything"
+        destructive
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
+
 
 function StatusIndicator({ status }: { status: string }) {
   if (status === "active") return <StatusBadge tone="success">Active</StatusBadge>;

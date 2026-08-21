@@ -65,6 +65,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { UserCog, BookOpen } from "lucide-react";
 import { fetchAll } from "@/lib/supabase-page";
 import { Toaster } from "@/components/ui/sonner";
+import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
+
 
 export const Route = createFileRoute("/admin")({
   beforeLoad: async ({ location }) => {
@@ -134,6 +136,21 @@ type SecuritySummary = {
   active_blocks: number;
   unique_ips_24h: number;
 };
+
+type AdminActionLog = {
+  id: string;
+  created_at: string;
+  actor_id: string | null;
+  action: string;
+  tenant_id: string | null;
+  tenant_name: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  reason: string | null;
+  metadata: any;
+};
+
+
 
 function AdminPanelPage() {
   const navigate = useNavigate();
@@ -337,11 +354,21 @@ function PrinterSettingsTab() {
   );
 }
 
+
+
 function TenantsTab() {
+  const navigate = useNavigate();
   const qc = useQueryClient();
+
   const { has } = useAdminAccess();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "suspended" | "archived">("all");
+  const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
+  const [archiveDialog, setArchiveDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
+  const [isDeleting, setIsDeleting] = useState(false);
+
+
 
   const { data: tenants = [], isLoading } = useQuery({
     queryKey: ["admin-tenants"],
@@ -386,27 +413,41 @@ function TenantsTab() {
     qc.invalidateQueries({ queryKey: ["admin-tenant-detail", id] });
   };
 
-  const suspend = async (id: string, name: string) => {
-    const reason = window.prompt(`Suspend "${name}"? Enter reason (visible in audit log):`) ?? "";
-    if (!reason) return;
-    await setStatus(id, "suspended", reason);
+  const suspend = (id: string, name: string) => {
+    setSuspendDialog({ open: true, id, name });
   };
 
-  const removeShop = async (id: string, name: string) => {
-    const typed = window.prompt(
-      `PERMANENTLY delete "${name}" and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone. Type the shop name exactly to confirm:`,
-    );
-    if (typed === null) return;
-    if (typed !== name) return toast.error("Confirmation did not match — nothing deleted");
-    let done = false;
-    while (!done) {
-      const { data, error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: id, _confirm: typed });
-      if (error) return toast.error(error.message);
-      done = Boolean(data && typeof data === "object" && "done" in data && data.done);
-    }
-    toast.success(`Deleted "${name}"`);
-    qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+  const archive = (id: string, name: string) => {
+    setArchiveDialog({ open: true, id, name });
   };
+
+  const removeShop = (id: string, name: string) => {
+    setDeleteDialog({ open: true, id, name });
+  };
+
+
+  const handleConfirmDelete = async (reason: string) => {
+    const { id, name } = deleteDialog;
+    setIsDeleting(true);
+    try {
+      let done = false;
+      while (!done) {
+        const { data, error } = await supabase.rpc("admin_delete_tenant", { 
+          _tenant_id: id, 
+          _confirm: name 
+        });
+        if (error) throw error;
+        done = Boolean(data && typeof data === "object" && "done" in data && data.done);
+      }
+      toast.success(`Deleted "${name}"`);
+      qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
 
 
   return (
@@ -463,78 +504,64 @@ function TenantsTab() {
             )}
             {!isLoading && filtered.length === 0 && (
               <TableRow><TableCell colSpan={9} className="py-8">
-                <EmptyState icon={Store} title="No shops match" description="Try clearing filters or search." />
+                <EmptyState title="No shops found" description="Try a different search or filter" icon={Store} />
               </TableCell></TableRow>
             )}
             {filtered.map((t) => (
-              <TableRow key={t.id}>
+              <TableRow key={t.id} className="group cursor-pointer" onClick={() => navigate({ to: "/admin/shops/$id", params: { id: t.id } })}>
                 <TableCell>
-                  <Link to="/admin/shops/$id" params={{ id: t.id }} className="font-medium hover:underline">
-                    {t.name}
-                  </Link>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(t.created_at).toLocaleDateString()} · {t.slug ?? "—"}
-                  </div>
+                  <div className="font-medium">{t.name}</div>
+                  <div className="text-[10px] text-muted-foreground font-mono">{t.id.slice(0, 8)}</div>
                 </TableCell>
                 <TableCell>
-                  <div>{t.owner_name ?? "—"}</div>
-                  <div className="text-xs text-muted-foreground">{t.owner_email ?? "—"}</div>
+                  <div className="text-sm">{t.owner_name || "—"}</div>
+                  <div className="text-[11px] text-muted-foreground">{t.owner_email || "—"}</div>
                 </TableCell>
-                <TableCell>
-                  {t.status === "active" && <StatusBadge tone="success">Active</StatusBadge>}
-                  {t.status === "pending" && <StatusBadge tone="warning">Pending</StatusBadge>}
-                  {t.status === "suspended" && <StatusBadge tone="danger">Suspended</StatusBadge>}
-                  {t.status === "archived" && <StatusBadge tone="neutral">Archived</StatusBadge>}
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">{t.plan ?? "—"}</div>
-                  {t.subscription_status && (
-                    <div className="text-xs text-muted-foreground">{t.subscription_status}</div>
-                  )}
-                </TableCell>
+                <TableCell><StatusBadge status={t.status} /></TableCell>
+                <TableCell><span className="capitalize text-sm">{t.plan || "—"}</span></TableCell>
                 <TableCell>
                   <ExpiryCell tenantId={t.id} expiresAt={t.subscription_expires_at} />
                 </TableCell>
-                <TableCell className="text-right">{t.member_count}</TableCell>
-                <TableCell className="text-right">{t.product_count}</TableCell>
-                <TableCell className="text-right">
-                  <div className="text-sm">{fmtMoney(t.sales_total, "")}</div>
-                  <div className="text-xs text-muted-foreground">{t.sales_count} orders</div>
+
+                <TableCell className="text-right text-sm">{t.member_count}</TableCell>
+                <TableCell className="text-right text-sm">{t.product_count}</TableCell>
+                <TableCell className="text-right text-sm">
+                  <div className="font-medium">{t.sales_count}</div>
+                  <div className="text-[11px] text-muted-foreground">{fmtMoney(t.sales_total)}</div>
                 </TableCell>
-                <TableCell className="text-right">
-                  <div className="inline-flex gap-1">
-                    <Button size="icon" variant="ghost" title="Open shop folder" asChild>
-                      <Link to="/admin/shops/$id" params={{ id: t.id }}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
+                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex justify-end gap-1">
+                    <Button variant="ghost" size="icon" asChild>
+                      <Link to="/admin/shops/$id" params={{ id: t.id }}><Eye className="h-4 w-4" /></Link>
                     </Button>
-                    {t.status !== "active" && has("shops.approve") && (
-                      <Button size="sm" variant="outline" onClick={() => setStatus(t.id, "active")}>
-                        <CheckCircle2 className="h-4 w-4 mr-1" /> {t.status === "pending" ? "Approve" : "Activate"}
-                      </Button>
-                    )}
-                    {t.status === "active" && has("shops.suspend") && (
-                      <Button size="sm" variant="ghost" onClick={() => suspend(t.id, t.name)}>
-                        <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
-                      </Button>
-                    )}
-                    {t.status !== "archived" && has("shops.suspend") && (
-                      <Button size="icon" variant="ghost" title="Archive" onClick={() => {
-                        if (confirm(`Archive "${t.name}"? Owner loses access.`)) setStatus(t.id, "archived");
-                      }}>
-                        <Archive className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {has("shops.delete") && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Delete shop permanently"
-                        onClick={() => removeShop(t.id, t.name)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon"><Plus className="h-4 w-4" /></Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-1" align="end">
+                        {t.status !== "active" && has("shops.approve") && (
+                          <Button variant="ghost" className="w-full justify-start text-emerald-600 h-8" onClick={() => setStatus(t.id, "active")}>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Approve
+                          </Button>
+                        )}
+                        {t.status !== "suspended" && has("shops.suspend") && (
+                          <Button variant="ghost" className="w-full justify-start text-amber-600 h-8" onClick={() => suspend(t.id, t.name)}>
+                            <Ban className="h-3.5 w-3.5 mr-2" /> Suspend
+                          </Button>
+                        )}
+                        {t.status !== "archived" && has("shops.archive") && (
+                          <Button variant="ghost" className="w-full justify-start text-muted-foreground h-8" onClick={() => archive(t.id, t.name)}>
+                            <Archive className="h-3.5 w-3.5 mr-2" /> Archive
+                          </Button>
+                        )}
+
+                        {has("shops.delete") && (
+                          <Button variant="ghost" className="w-full justify-start text-destructive h-8" onClick={() => removeShop(t.id, t.name)}>
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          </Button>
+                        )}
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </TableCell>
               </TableRow>
@@ -543,7 +570,39 @@ function TenantsTab() {
         </Table>
       </Card>
 
-      
+      <TypedConfirmDialog
+        open={suspendDialog.open}
+        onOpenChange={(open) => setSuspendDialog(prev => ({ ...prev, open }))}
+        title="Suspend Shop"
+        description={`Are you sure you want to suspend "${suspendDialog.name}"? This will block access for all staff members.`}
+        confirmLabel="Suspend"
+        requireReason
+        destructive
+        onConfirm={async (reason) => { await setStatus(suspendDialog.id, "suspended", reason); }}
+      />
+
+      <TypedConfirmDialog
+        open={archiveDialog.open}
+        onOpenChange={(o) => setArchiveDialog(prev => ({ ...prev, open: o }))}
+        title="Archive Shop"
+        description={`Are you sure you want to archive "${archiveDialog.name}"?`}
+        confirmLabel="Archive"
+        requireReason
+        destructive
+        onConfirm={async (reason) => { await setStatus(archiveDialog.id, "archived", reason); }}
+      />
+
+      <TypedConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}
+        title="Permanently Delete Shop"
+        description={`This will permanently delete "${deleteDialog.name}" and ALL its data (products, sales, customers, expenses, staff). This action is irreversible.`}
+        confirmText={deleteDialog.name}
+        confirmLabel="Delete Everything"
+        destructive
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
@@ -939,6 +998,8 @@ function SecurityTab() {
   const qc = useQueryClient();
   const [severity, setSeverity] = useState<"all" | "info" | "warning" | "critical">("all");
   const [blockOpen, setBlockOpen] = useState(false);
+  const [clearDialog, setClearDialog] = useState<{ open: boolean; severity?: "info" | "warning" | "critical"; olderDays?: number }>({ open: false });
+
 
   const { data: summary } = useQuery({
     queryKey: ["admin-security-summary"],
@@ -975,6 +1036,21 @@ function SecurityTab() {
     },
   });
 
+  const { data: auditLogs = [], isLoading: auditLoading } = useQuery({
+    queryKey: ["admin-audit-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("admin_action_log_view")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data as unknown as AdminActionLog[]) ?? [];
+    },
+  });
+
+
+
   const unblock = async (id: string) => {
     const { error } = await supabase.rpc("admin_unblock_identifier", { _id: id });
     if (error) return toast.error(error.message);
@@ -983,18 +1059,26 @@ function SecurityTab() {
     qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
   };
 
-  const clearEvents = async (severity?: "info" | "warning" | "critical", olderDays?: number) => {
-    const label = severity ? `${severity} events` : olderDays ? `events older than ${olderDays} days` : "ALL events";
-    if (!confirm(`Clear ${label} from the log? Blocklist entries are NOT affected.`)) return;
+  const clearEvents = (severity?: "info" | "warning" | "critical", olderDays?: number) => {
+    setClearDialog({ open: true, severity, olderDays });
+  };
+
+  const handleConfirmClear = async (reason: string) => {
+    const { severity, olderDays } = clearDialog;
     const { data, error } = await supabase.rpc("admin_clear_security_events", {
       _severity: severity ?? undefined,
       _older_than_days: olderDays ?? undefined,
     });
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success(`Cleared ${data ?? 0} events`);
     qc.invalidateQueries({ queryKey: ["admin-security-events"] });
     qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
   };
+
+
 
   const blockFromEvent = async (e: SecurityEvent) => {
     const kind = e.ip_address ? "ip" : e.email ? "email" : null;
@@ -1181,13 +1265,78 @@ function SecurityTab() {
         </Table>
       </Card>
 
+      <Card className="p-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            <div className="font-medium">Admin audit trail</div>
+            <span className="text-xs text-muted-foreground">Recent admin actions</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => qc.invalidateQueries({ queryKey: ["admin-audit-logs"] })}>
+            Refresh
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Admin</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>Target</TableHead>
+              <TableHead>Reason</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {auditLoading && (
+              <TableRow><TableCell colSpan={5} className="py-4"><TableSkeleton rows={5} columns={5} /></TableCell></TableRow>
+            )}
+            {!auditLoading && auditLogs.length === 0 && (
+              <TableRow><TableCell colSpan={5} className="py-8">
+                <EmptyState icon={ShieldCheck} title="No logs" description="No admin actions logged yet." />
+              </TableCell></TableRow>
+            )}
+            {auditLogs.map((l) => (
+              <TableRow key={l.id}>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-xs font-mono">{l.actor_id?.slice(0, 8) ?? "System"}</TableCell>
+                <TableCell><StatusBadge tone="neutral" className="uppercase text-[10px]">{l.action}</StatusBadge></TableCell>
+                <TableCell className="text-xs">
+                  {l.tenant_name ? (
+                    <div className="font-medium text-primary">{l.tenant_name}</div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                  {l.entity_type && <div className="text-[10px] text-muted-foreground">{l.entity_type} {l.entity_id?.slice(0, 8)}</div>}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{l.reason ?? "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
       <BlockDialog open={blockOpen} onClose={() => setBlockOpen(false)} onDone={() => {
         qc.invalidateQueries({ queryKey: ["admin-security-blocks"] });
         qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
       }} />
+
+      <TypedConfirmDialog
+        open={clearDialog.open}
+        onOpenChange={(open) => setClearDialog(prev => ({ ...prev, open }))}
+        title="Clear Security Events"
+        description={`Are you sure you want to clear ${
+          clearDialog.severity ? clearDialog.severity + " " : ""
+        }events${
+          clearDialog.olderDays ? " older than " + clearDialog.olderDays + " days" : ""
+        }? This will remove them from the log permanently.`}
+        confirmLabel="Clear Log"
+        destructive
+        onConfirm={handleConfirmClear}
+      />
     </div>
   );
 }
+
 
 function BlockDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const [kind, setKind] = useState<"ip" | "email">("ip");

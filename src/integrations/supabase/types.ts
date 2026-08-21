@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_action_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+          reason: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_action_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_staff: {
         Row: {
           added_by: string | null
@@ -3509,6 +3559,31 @@ export type Database = {
       }
     }
     Views: {
+      admin_action_log_view: {
+        Row: {
+          action: string | null
+          actor_id: string | null
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          metadata: Json | null
+          reason: string | null
+          tenant_id: string | null
+          tenant_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_action_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_batch_status: {
         Row: {
           batch_no: string | null
@@ -3788,15 +3863,17 @@ export type Database = {
         Args: { _expires_at: string; _tenant_id: string }
         Returns: undefined
       }
-      admin_set_tenant_plan: {
-        Args: {
-          _expires_at?: string
-          _plan_id: string
-          _status?: string
-          _tenant_id: string
-        }
-        Returns: undefined
-      }
+      admin_set_tenant_plan:
+        | { Args: { _plan: string; _tenant_id: string }; Returns: undefined }
+        | {
+            Args: {
+              _expires_at?: string
+              _plan_id: string
+              _status?: string
+              _tenant_id: string
+            }
+            Returns: undefined
+          }
       admin_set_tenant_status: {
         Args: { _reason?: string; _status: string; _tenant_id: string }
         Returns: undefined
@@ -4104,6 +4181,19 @@ export type Database = {
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
+      }
+      log_admin_action: {
+        Args: {
+          _action: string
+          _after_state?: Json
+          _before_state?: Json
+          _entity_id?: string
+          _entity_type?: string
+          _metadata?: Json
+          _reason?: string
+          _tenant_id?: string
+        }
+        Returns: undefined
       }
       log_application_error: {
         Args: {
