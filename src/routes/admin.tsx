@@ -140,8 +140,7 @@ type SecuritySummary = {
 type AdminActionLog = {
   id: string;
   created_at: string;
-  admin_id: string;
-  admin_email: string;
+  actor_id: string | null;
   action: string;
   tenant_id: string | null;
   tenant_name: string | null;
@@ -150,6 +149,7 @@ type AdminActionLog = {
   reason: string | null;
   metadata: any;
 };
+
 
 
 function AdminPanelPage() {
