@@ -42,6 +42,7 @@ import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]
 import { Route as AuthenticatedSuppliersIndexRouteImport } from './routes/_authenticated/suppliers.index'
 import { Route as AuthenticatedStockCountIndexRouteImport } from './routes/_authenticated/stock-count.index'
 import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authenticated/customers.index'
+import { Route as AdminShopsIdRouteImport } from './routes/admin_.shops.$id'
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers.$id'
 import { Route as AuthenticatedStockCountIdRouteImport } from './routes/_authenticated/stock-count.$id'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
@@ -49,7 +50,6 @@ import { Route as AuthenticatedExpensePersonsIdRouteImport } from './routes/_aut
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
-import { Route as AuthenticatedAdminShopsIdRouteImport } from './routes/_authenticated/admin_.shops.$id'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -223,6 +223,11 @@ const AuthenticatedCustomersIndexRoute =
     path: '/customers/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AdminShopsIdRoute = AdminShopsIdRouteImport.update({
+  id: '/admin_/shops/$id',
+  path: '/admin/shops/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedSuppliersIdRoute =
   AuthenticatedSuppliersIdRouteImport.update({
     id: '/suppliers/$id',
@@ -263,12 +268,6 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAdminShopsIdRoute =
-  AuthenticatedAdminShopsIdRouteImport.update({
-    id: '/admin_/shops/$id',
-    path: '/admin/shops/$id',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -307,10 +306,10 @@ export interface FileRoutesByFullPath {
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
+  '/admin/shops/$id': typeof AdminShopsIdRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/suppliers/': typeof AuthenticatedSuppliersIndexRoute
-  '/admin/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -349,10 +348,10 @@ export interface FileRoutesByTo {
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
+  '/admin/shops/$id': typeof AdminShopsIdRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/stock-count': typeof AuthenticatedStockCountIndexRoute
   '/suppliers': typeof AuthenticatedSuppliersIndexRoute
-  '/admin/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -393,10 +392,10 @@ export interface FileRoutesById {
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
   '/_authenticated/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/_authenticated/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
+  '/admin_/shops/$id': typeof AdminShopsIdRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/_authenticated/suppliers/': typeof AuthenticatedSuppliersIndexRoute
-  '/_authenticated/admin_/shops/$id': typeof AuthenticatedAdminShopsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -437,10 +436,10 @@ export interface FileRouteTypes {
     | '/products/$id'
     | '/stock-count/$id'
     | '/suppliers/$id'
+    | '/admin/shops/$id'
     | '/customers/'
     | '/stock-count/'
     | '/suppliers/'
-    | '/admin/shops/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -479,10 +478,10 @@ export interface FileRouteTypes {
     | '/products/$id'
     | '/stock-count/$id'
     | '/suppliers/$id'
+    | '/admin/shops/$id'
     | '/customers'
     | '/stock-count'
     | '/suppliers'
-    | '/admin/shops/$id'
   id:
     | '__root__'
     | '/'
@@ -522,10 +521,10 @@ export interface FileRouteTypes {
     | '/_authenticated/products/$id'
     | '/_authenticated/stock-count/$id'
     | '/_authenticated/suppliers/$id'
+    | '/admin_/shops/$id'
     | '/_authenticated/customers/'
     | '/_authenticated/stock-count/'
     | '/_authenticated/suppliers/'
-    | '/_authenticated/admin_/shops/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -540,6 +539,7 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  AdminShopsIdRoute: typeof AdminShopsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -775,6 +775,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/admin_/shops/$id': {
+      id: '/admin_/shops/$id'
+      path: '/admin/shops/$id'
+      fullPath: '/admin/shops/$id'
+      preLoaderRoute: typeof AdminShopsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/suppliers/$id': {
       id: '/_authenticated/suppliers/$id'
       path: '/suppliers/$id'
@@ -824,13 +831,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/admin_/shops/$id': {
-      id: '/_authenticated/admin_/shops/$id'
-      path: '/admin/shops/$id'
-      fullPath: '/admin/shops/$id'
-      preLoaderRoute: typeof AuthenticatedAdminShopsIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
@@ -876,7 +876,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCustomersIndexRoute: typeof AuthenticatedCustomersIndexRoute
   AuthenticatedStockCountIndexRoute: typeof AuthenticatedStockCountIndexRoute
   AuthenticatedSuppliersIndexRoute: typeof AuthenticatedSuppliersIndexRoute
-  AuthenticatedAdminShopsIdRoute: typeof AuthenticatedAdminShopsIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -908,7 +907,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCustomersIndexRoute: AuthenticatedCustomersIndexRoute,
   AuthenticatedStockCountIndexRoute: AuthenticatedStockCountIndexRoute,
   AuthenticatedSuppliersIndexRoute: AuthenticatedSuppliersIndexRoute,
-  AuthenticatedAdminShopsIdRoute: AuthenticatedAdminShopsIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -927,6 +925,7 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  AdminShopsIdRoute: AdminShopsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
