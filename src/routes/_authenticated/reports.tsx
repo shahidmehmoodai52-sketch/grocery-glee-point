@@ -423,8 +423,22 @@ function Page() {
     gcTime: 0,
   });
   const summaryStats = (summaryStatsRaw as any) || {};
+  
+  const { data: salesFull = [], isLoading: salesLoading } = useQuery({
+    queryKey: ["report-sales-full", fromTime, toTime],
+    queryFn: async () => {
+      const base = supabase.from("sales")
+        .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false });
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
 
-  const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
+  const { data: salesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-sales-paged", fromTime, toTime, salesPage],
     queryFn: async () => {
       const q = supabase.from("sales")
@@ -441,7 +455,21 @@ function Page() {
     staleTime: 0,
     gcTime: 0,
   });
-  const sales = salesPaged.data;
+  const sales = salesFull; // Use full data for calculations and drill-downs
+
+  const { data: purchasesFull = [] } = useQuery({
+    queryKey: ["report-purchases-full", fromTime, toTime],
+    queryFn: async () => {
+      const base = supabase.from("purchases")
+        .select("subtotal,tax,total,paid,created_at")
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false });
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
 
   const { data: purchasesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-purchases-paged", fromTime, toTime, purchasesPage],
@@ -458,7 +486,21 @@ function Page() {
     staleTime: 0,
     gcTime: 0,
   });
-  const purchases = purchasesPaged.data;
+  const purchases = purchasesFull;
+
+  const { data: expensesFull = [] } = useQuery({
+    queryKey: ["report-expenses-full", range.from, range.to],
+    queryFn: async () => {
+      const base = supabase.from("expenses")
+        .select("amount,category,expense_date")
+        .gte("expense_date", from)
+        .lte("expense_date", to)
+        .order("expense_date", { ascending: false });
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
 
   const { data: expensesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-expenses-paged", range.from, range.to, expensesPage],
@@ -475,7 +517,7 @@ function Page() {
     staleTime: 0,
     gcTime: 0,
   });
-  const expenses = expensesPaged.data;
+  const expenses = expensesFull;
 
   const { data: partyPayments = [] } = useQuery({
     queryKey: ["report-party-payments-paged", fromTime, toTime],
@@ -510,6 +552,20 @@ function Page() {
 
   const [saleReturnsPage, setSaleReturnsPage] = useState(0);
 
+  const { data: saleReturnsFull = [] } = useQuery({
+    queryKey: ["report-sale-returns-full", fromTime, toTime],
+    queryFn: async () => {
+      const base = supabase.from("sale_returns")
+        .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false });
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
+
   const { data: saleReturnsPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-sale-returns-paged", fromTime, toTime, saleReturnsPage],
     queryFn: async () => {
@@ -525,7 +581,7 @@ function Page() {
     staleTime: 0,
     gcTime: 0,
   });
-  const saleReturns = saleReturnsPaged.data;
+  const saleReturns = saleReturnsFull;
   const revenue = Number(summaryStats.sales_total || 0);
   const totalSales = Number(summaryStats.sales_total || 0);
   const returnsTotal = Number(summaryStats.returns_total || 0);
