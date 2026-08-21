@@ -350,9 +350,44 @@ function PrinterSettingsTab() {
           </div>
         </div>
       </Card>
+
+      <TypedConfirmDialog
+        open={suspendDialog.open}
+        onOpenChange={(o) => setSuspendDialog(prev => ({ ...prev, open: o }))}
+        title="Suspend Shop"
+        description={`Are you sure you want to suspend "${suspendDialog.name}"?`}
+        confirmLabel="Suspend"
+        requireReason
+        destructive
+        onConfirm={async (reason) => { await setStatus(suspendDialog.id, "suspended", reason); }}
+      />
+
+      <TypedConfirmDialog
+        open={archiveDialog.open}
+        onOpenChange={(o) => setArchiveDialog(prev => ({ ...prev, open: o }))}
+        title="Archive Shop"
+        description={`Are you sure you want to archive "${archiveDialog.name}"?`}
+        confirmLabel="Archive"
+        requireReason
+        destructive
+        onConfirm={async (reason) => { await setStatus(archiveDialog.id, "archived", reason); }}
+      />
+
+      <TypedConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(o) => setDeleteDialog(prev => ({ ...prev, open: o }))}
+        title="Permanently Delete Shop"
+        description={`This will permanently delete "${deleteDialog.name}" and ALL its data.`}
+        confirmText={deleteDialog.name}
+        confirmLabel="Delete Everything"
+        destructive
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
+
 
 function TenantsTab() {
   const navigate = useNavigate();
