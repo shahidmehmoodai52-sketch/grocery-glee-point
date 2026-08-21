@@ -419,10 +419,26 @@ function Page() {
       if (error) throw error;
       return data;
     },
+    staleTime: 0,
+    gcTime: 0,
   });
   const summaryStats = (summaryStatsRaw as any) || {};
+  
+  const { data: salesFull = [], isLoading: salesLoading } = useQuery({
+    queryKey: ["report-sales-full", fromTime, toTime],
+    queryFn: async () => {
+      const base = supabase.from("sales")
+        .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false });
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
 
-  const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
+  const { data: salesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-sales-paged", fromTime, toTime, salesPage],
     queryFn: async () => {
       const q = supabase.from("sales")
@@ -436,8 +452,24 @@ function Page() {
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
+    staleTime: 0,
+    gcTime: 0,
   });
-  const sales = salesPaged.data;
+  const sales = salesFull; // Use full data for calculations and drill-downs
+
+  const { data: purchasesFull = [] } = useQuery({
+    queryKey: ["report-purchases-full", fromTime, toTime],
+    queryFn: async () => {
+      const base = supabase.from("purchases")
+        .select("subtotal,tax,total,paid,created_at")
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false });
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
 
   const { data: purchasesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-purchases-paged", fromTime, toTime, purchasesPage],
@@ -451,8 +483,24 @@ function Page() {
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
+    staleTime: 0,
+    gcTime: 0,
   });
-  const purchases = purchasesPaged.data;
+  const purchases = purchasesFull;
+
+  const { data: expensesFull = [] } = useQuery({
+    queryKey: ["report-expenses-full", range.from, range.to],
+    queryFn: async () => {
+      const base = supabase.from("expenses")
+        .select("amount,category,expense_date")
+        .gte("expense_date", from)
+        .lte("expense_date", to)
+        .order("expense_date", { ascending: false });
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
 
   const { data: expensesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-expenses-paged", range.from, range.to, expensesPage],
@@ -466,8 +514,10 @@ function Page() {
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
+    staleTime: 0,
+    gcTime: 0,
   });
-  const expenses = expensesPaged.data;
+  const expenses = expensesFull;
 
   const { data: partyPayments = [] } = useQuery({
     queryKey: ["report-party-payments-paged", fromTime, toTime],
@@ -495,10 +545,26 @@ function Page() {
         suppliers: r.party_type !== "customer" ? { name: sMap.get(r.party_id) ?? null } : null,
       }));
     },
+    staleTime: 0,
+    gcTime: 0,
   });
 
 
   const [saleReturnsPage, setSaleReturnsPage] = useState(0);
+
+  const { data: saleReturnsFull = [] } = useQuery({
+    queryKey: ["report-sale-returns-full", fromTime, toTime],
+    queryFn: async () => {
+      const base = supabase.from("sale_returns")
+        .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
+        .gte("created_at", fromTime)
+        .lte("created_at", toTime)
+        .order("created_at", { ascending: false });
+      return await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
 
   const { data: saleReturnsPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-sale-returns-paged", fromTime, toTime, saleReturnsPage],
@@ -512,8 +578,10 @@ function Page() {
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
+    staleTime: 0,
+    gcTime: 0,
   });
-  const saleReturns = saleReturnsPaged.data;
+  const saleReturns = saleReturnsFull;
   const revenue = Number(summaryStats.sales_total || 0);
   const totalSales = Number(summaryStats.sales_total || 0);
   const returnsTotal = Number(summaryStats.returns_total || 0);
@@ -769,11 +837,17 @@ function Page() {
                 <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted onClick={() => openReturns("Sale returns")} />
                 <Row label="Sales (net of returns & discount)" value={fmtMoney(revenue, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", sales as any[])} />
                 
-                <TableRow className="bg-muted/30 border-t">
+                <TableRow 
+                  className="bg-muted/30 border-t cursor-pointer hover:bg-muted/50"
+                  onClick={() => openInvoices("Cash Sales", (sales as any[]).filter(s => Number(s.paid) > 0))}
+                >
                   <TableCell className="py-2 pl-8 text-xs text-muted-foreground italic">↳ Of which Cash Sales</TableCell>
                   <TableCell className="py-2 text-right text-xs font-medium">{fmtMoney(cashIn, sym)}</TableCell>
                 </TableRow>
-                <TableRow className="bg-muted/30">
+                <TableRow 
+                  className="bg-muted/30 cursor-pointer hover:bg-muted/50"
+                  onClick={() => openInvoices("Credit Sales (Unpaid)", (sales as any[]).filter(s => Number(s.total) > Number(s.paid)))}
+                >
                   <TableCell className="py-2 pl-8 text-xs text-muted-foreground italic">↳ Of which Credit Sales (Unpaid)</TableCell>
                   <TableCell className="py-2 text-right text-xs font-medium text-destructive">{fmtMoney(creditOut, sym)}</TableCell>
                 </TableRow>
@@ -891,8 +965,8 @@ function Page() {
                 <TableHead>Status</TableHead><TableHead></TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {filteredInvoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
-                {filteredInvoices.map((s: any) => {
+                {salesPaged.data.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {salesPaged.data.map((s: any) => {
                   const profit = (Number(s.subtotal || 0) - Number(s.discount || 0)) - Number(s.cost_total || 0);
                   const qty = (s.sale_items as any[] ?? []).reduce((a: number, i: any) => a + Number(i.qty || 0), 0);
                   return (
@@ -924,11 +998,11 @@ function Page() {
                     </TableRow>
                   );
                 })}
-                {filteredInvoices.length > 0 && (
+                {salesPaged.data.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={5}>Total ({filteredInvoices.length} invoices{q && ` of ${sales.length}`})</TableCell>
-                    <TableCell className="text-right">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + Number(b.total), 0), sym)}</TableCell>
-                    <TableCell className="text-right text-success">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + ((Number(b.subtotal) - Number(b.discount)) - Number(b.cost_total)), 0), sym)}</TableCell>
+                    <TableCell colSpan={5}>Total ({salesPaged.count} invoices)</TableCell>
+                    <TableCell className="text-right">{fmtMoney(revenue, sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(grossProfit, sym)}</TableCell>
                     <TableCell colSpan={2} />
                   </TableRow>
                 )}
@@ -967,7 +1041,7 @@ function Page() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => {
                         const rows: (string | number)[][] = [];
-                        for (const s of sales as any[]) {
+                        for (const s of salesFull as any[]) {
                           for (const it of (s.sale_items as any[]) ?? []) {
                             if (it.name !== p.name) continue;
                             rows.push([
@@ -1081,7 +1155,7 @@ function Page() {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => {
                       const rows: (string | number)[][] = [];
-                      for (const s of sales as any[]) {
+                      for (const s of salesFull as any[]) {
                         for (const split of parsePaymentSplit(s.payment_method, Number(s.paid))) {
                           if ((split.method || "unknown").toLowerCase() !== m.method) continue;
                           rows.push([new Date(s.created_at).toLocaleString(), "In · Sale", s.invoice_no, s.customers?.name ?? "Walk-in", fmtMoney(Number(split.amount), sym)]);
