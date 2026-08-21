@@ -3277,17 +3277,23 @@ export type Database = {
       }
       tenant_sequences: {
         Row: {
+          last_purchase_return_value: number
           last_purchase_value: number
+          last_sale_return_value: number
           last_sale_value: number
           tenant_id: string
         }
         Insert: {
+          last_purchase_return_value?: number
           last_purchase_value?: number
+          last_sale_return_value?: number
           last_sale_value?: number
           tenant_id: string
         }
         Update: {
+          last_purchase_return_value?: number
           last_purchase_value?: number
+          last_sale_return_value?: number
           last_sale_value?: number
           tenant_id?: string
         }
@@ -4193,7 +4199,9 @@ export type Database = {
       my_tenant_expires_at: { Args: never; Returns: string }
       my_tenant_status: { Args: never; Returns: string }
       next_purchase_invoice_no: { Args: never; Returns: string }
+      next_purchase_return_no: { Args: never; Returns: string }
       next_sale_invoice_no: { Args: never; Returns: string }
+      next_sale_return_no: { Args: never; Returns: string }
       open_shift: {
         Args: { _notes?: string; _opening_cash: number }
         Returns: string
@@ -4201,6 +4209,10 @@ export type Database = {
       owner_alerts: { Args: never; Returns: Json }
       owner_recommendations: { Args: never; Returns: Json }
       prune_audit_logs: { Args: { _days?: number }; Returns: number }
+      recalc_supplier_balances: {
+        Args: { p_tenant_id?: string }
+        Returns: number
+      }
       record_cash_event: {
         Args: {
           _amount: number
@@ -4270,6 +4282,10 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_cash_account: {
+        Args: { p_method: string; p_tenant_id: string }
+        Returns: string
+      }
       resolve_payment_bucket: { Args: { p_method: string }; Returns: string }
       resume_bill: { Args: { _id: string }; Returns: Json }
       set_checklist_item: {
@@ -4306,6 +4322,17 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      split_payment_parts: {
+        Args: { p_method: string }
+        Returns: {
+          part_amount: number
+          part_name: string
+        }[]
+      }
+      supplier_balance_calc: {
+        Args: { p_supplier_id: string }
+        Returns: number
+      }
       tenant_category_allowed: {
         Args: { _category: string; _tenant: string }
         Returns: boolean
@@ -4322,6 +4349,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      url_decode: { Args: { p_text: string }; Returns: string }
       void_sale: { Args: { _reason: string; _sale_id: string }; Returns: Json }
     }
     Enums: {
