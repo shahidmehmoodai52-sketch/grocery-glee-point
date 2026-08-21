@@ -1240,13 +1240,78 @@ function SecurityTab() {
         </Table>
       </Card>
 
+      <Card className="p-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            <div className="font-medium">Admin audit trail</div>
+            <span className="text-xs text-muted-foreground">Recent admin actions</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => qc.invalidateQueries({ queryKey: ["admin-audit-logs"] })}>
+            Refresh
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Admin</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>Target</TableHead>
+              <TableHead>Reason</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {auditLoading && (
+              <TableRow><TableCell colSpan={5} className="py-4"><TableSkeleton rows={5} columns={5} /></TableCell></TableRow>
+            )}
+            {!auditLoading && auditLogs.length === 0 && (
+              <TableRow><TableCell colSpan={5} className="py-8">
+                <EmptyState icon={ShieldCheck} title="No logs" description="No admin actions logged yet." />
+              </TableCell></TableRow>
+            )}
+            {auditLogs.map((l) => (
+              <TableRow key={l.id}>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-xs font-mono">{l.actor_id?.slice(0, 8) ?? "System"}</TableCell>
+                <TableCell><StatusBadge tone="neutral" className="uppercase text-[10px]">{l.action}</StatusBadge></TableCell>
+                <TableCell className="text-xs">
+                  {l.tenant_name ? (
+                    <div className="font-medium text-primary">{l.tenant_name}</div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                  {l.entity_type && <div className="text-[10px] text-muted-foreground">{l.entity_type} {l.entity_id?.slice(0, 8)}</div>}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{l.reason ?? "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+
       <BlockDialog open={blockOpen} onClose={() => setBlockOpen(false)} onDone={() => {
         qc.invalidateQueries({ queryKey: ["admin-security-blocks"] });
         qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
       }} />
+
+      <TypedConfirmDialog
+        open={clearDialog.open}
+        onOpenChange={(open) => setClearDialog(prev => ({ ...prev, open }))}
+        title="Clear Security Events"
+        description={`Are you sure you want to clear ${
+          clearDialog.severity ? clearDialog.severity + " " : ""
+        }events${
+          clearDialog.olderDays ? " older than " + clearDialog.olderDays + " days" : ""
+        }? This will remove them from the log permanently.`}
+        confirmLabel="Clear Log"
+        destructive
+        onConfirm={handleConfirmClear}
+      />
     </div>
   );
 }
+
 
 function BlockDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const [kind, setKind] = useState<"ip" | "email">("ip");
