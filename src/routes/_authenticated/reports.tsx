@@ -1041,7 +1041,7 @@ function Page() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => {
                         const rows: (string | number)[][] = [];
-                        for (const s of sales as any[]) {
+                        for (const s of salesFull as any[]) {
                           for (const it of (s.sale_items as any[]) ?? []) {
                             if (it.name !== p.name) continue;
                             rows.push([
@@ -1155,7 +1155,7 @@ function Page() {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => {
                       const rows: (string | number)[][] = [];
-                      for (const s of sales as any[]) {
+                      for (const s of salesFull as any[]) {
                         for (const split of parsePaymentSplit(s.payment_method, Number(s.paid))) {
                           if ((split.method || "unknown").toLowerCase() !== m.method) continue;
                           rows.push([new Date(s.created_at).toLocaleString(), "In · Sale", s.invoice_no, s.customers?.name ?? "Walk-in", fmtMoney(Number(split.amount), sym)]);
