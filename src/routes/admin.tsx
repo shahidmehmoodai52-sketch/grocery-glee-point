@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,6 +24,7 @@ import {
   Trash2,
   CalendarClock,
   Printer,
+  LogOut,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -63,10 +64,50 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserCog, BookOpen } from "lucide-react";
 import { fetchAll } from "@/lib/supabase-page";
+import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/admin")({
-  component: AdminPanelPage,
+  beforeLoad: async ({ location }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw redirect({ to: "/admin-login", search: { next: location.pathname } });
+    }
+    const { data: isAdmin } = await supabase.rpc("am_i_admin_staff");
+    if (!isAdmin) {
+      await supabase.auth.signOut();
+      throw redirect({ to: "/admin-login" });
+    }
+  },
+  component: AdminLayout,
 });
+
+function AdminLayout() {
+  const navigate = useNavigate();
+  
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/admin-login", replace: true });
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="h-14 border-b bg-card px-4 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          <h1 className="font-semibold text-lg">Tillix Admin</h1>
+        </div>
+        <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2 text-muted-foreground hover:text-foreground">
+          <LogOut className="h-4 w-4" />
+          <span>Sign out</span>
+        </Button>
+      </header>
+      <main className="flex-1">
+        <AdminPanelPage />
+      </main>
+      <Toaster richColors position="top-right" duration={4000} closeButton />
+    </div>
+  );
+}
 
 type TenantRow = {
   id: string;
@@ -101,7 +142,7 @@ function AdminPanelPage() {
 
   useEffect(() => {
     if (!loading && !canEnter) {
-      navigate({ to: "/dashboard", replace: true });
+      navigate({ to: "/admin-login", replace: true });
     }
   }, [loading, canEnter, navigate]);
 
