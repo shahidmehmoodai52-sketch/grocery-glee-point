@@ -548,10 +548,11 @@ function TenantsTab() {
                           </Button>
                         )}
                         {t.status !== "archived" && has("shops.archive") && (
-                          <Button variant="ghost" className="w-full justify-start text-muted-foreground h-8" onClick={() => setStatus(t.id, "archived")}>
+                          <Button variant="ghost" className="w-full justify-start text-muted-foreground h-8" onClick={() => archive(t.id, t.name)}>
                             <Archive className="h-3.5 w-3.5 mr-2" /> Archive
                           </Button>
                         )}
+
                         {has("shops.delete") && (
                           <Button variant="ghost" className="w-full justify-start text-destructive h-8" onClick={() => removeShop(t.id, t.name)}>
                             <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
