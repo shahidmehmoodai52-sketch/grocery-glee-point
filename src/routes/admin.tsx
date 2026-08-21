@@ -1042,7 +1042,7 @@ function SecurityTab() {
     setClearDialog({ open: true, severity, olderDays });
   };
 
-  const handleConfirmClear = async () => {
+  const handleConfirmClear = async (reason: string) => {
     const { severity, olderDays } = clearDialog;
     const { data, error } = await supabase.rpc("admin_clear_security_events", {
       _severity: severity ?? undefined,
