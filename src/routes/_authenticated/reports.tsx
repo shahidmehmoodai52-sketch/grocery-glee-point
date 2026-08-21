@@ -521,8 +521,8 @@ function Page() {
   const grossProfit = revenue - cogs;
   const netProfit = grossProfit - expensesPeriod;
   const grossRevenue = revenue + Number(summaryStats.returns_total || 0);
-  const creditOut = 0; // Not in RPC yet
-  const cashIn = 0; // Not in RPC yet
+  const creditOut = Number(summaryStats.credit_sales_total || 0);
+  const cashIn = Number(summaryStats.cash_sales_total || 0);
   const returnsLoss = Number(summaryStats.returns_total || 0);
   const returnsSubtotal = returnsLoss;
 
