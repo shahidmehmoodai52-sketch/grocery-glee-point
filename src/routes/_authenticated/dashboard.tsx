@@ -91,14 +91,16 @@ function Page() {
   };
 
 
-  const fromISO = startOfDay(from).toISOString();
-  const toISO = endOfDay(to).toISOString();
+  // PKT business-day boundaries (UTC+5), independent of the browser timezone.
+  const fromISO = pktStartISO(from);
+  const toISO = pktEndISO(to);
   const spanDays = diffDays(from, to);
 
   const prevFrom = new Date(from.getTime() - spanDays * 86400000);
   const prevTo = new Date(to.getTime() - spanDays * 86400000);
-  const prevFromISO = startOfDay(prevFrom).toISOString();
-  const prevToISO = endOfDay(prevTo).toISOString();
+  const prevFromISO = pktStartISO(prevFrom);
+  const prevToISO = pktEndISO(prevTo);
+
 
   const [detailKey, setDetailKey] = useState<string | null>(null);
 
