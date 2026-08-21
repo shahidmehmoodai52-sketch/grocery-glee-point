@@ -41,5 +41,17 @@ export const resetTenantOwnerPassword = createServerFn({ method: "POST" })
       }
       throw new Error(error.message);
     }
+
+    // Log the password reset action
+    await context.supabase.rpc("log_admin_action", {
+      _action: "ADMIN_RESET_PASSWORD",
+      _tenant_id: data.tenant_id,
+      _entity_type: "auth.users",
+      _entity_id: tenant.owner_id,
+      _reason: "Manual admin password reset",
+      _metadata: { shop_name: tenant.name }
+    });
+
     return { ok: true, shop: tenant.name };
   });
+
