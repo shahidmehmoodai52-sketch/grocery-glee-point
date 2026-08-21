@@ -1039,14 +1039,54 @@ function Page() {
               </TableBody>
              </Table>
              {salesPaged.count > PAGE_SIZE && (
-               <div className="p-4 flex items-center justify-between border-t text-sm">
-                 <div className="text-muted-foreground">Showing {salesPage * PAGE_SIZE + 1} to {Math.min((salesPage + 1) * PAGE_SIZE, salesPaged.count)} of {salesPaged.count} invoices</div>
-                 <div className="flex gap-2">
-                   <Button variant="outline" size="sm" onClick={() => setSalesPage(p => Math.max(0, p - 1))} disabled={salesPage === 0}>Previous</Button>
-                   <Button variant="outline" size="sm" onClick={() => setSalesPage(p => p + 1)} disabled={(salesPage + 1) * PAGE_SIZE >= salesPaged.count}>Next</Button>
+               <div className="p-4 flex flex-col sm:flex-row items-center justify-between border-t gap-4">
+                 <div className="text-sm text-muted-foreground order-2 sm:order-1">
+                   Showing <strong>{salesPage * PAGE_SIZE + 1}</strong> to <strong>{Math.min((salesPage + 1) * PAGE_SIZE, salesPaged.count)}</strong> of <strong>{salesPaged.count}</strong> invoices
+                 </div>
+                 <div className="flex items-center gap-1 order-1 sm:order-2">
+                   <Button 
+                     variant="outline" 
+                     size="sm" 
+                     className="h-8 w-8 p-0"
+                     onClick={() => setSalesPage(p => Math.max(0, p - 1))} 
+                     disabled={salesPage === 0 || salesPagedLoading}
+                   >
+                     <ChevronLeft className="h-4 w-4" />
+                   </Button>
+                   
+                   {Array.from({ length: Math.min(5, Math.ceil(salesPaged.count / PAGE_SIZE)) }).map((_, i) => {
+                     const pageNum = i;
+                     return (
+                       <Button
+                         key={pageNum}
+                         variant={salesPage === pageNum ? "default" : "outline"}
+                         size="sm"
+                         className="h-8 w-8 p-0 text-xs"
+                         onClick={() => setSalesPage(pageNum)}
+                         disabled={salesPagedLoading}
+                       >
+                         {pageNum + 1}
+                       </Button>
+                     );
+                   })}
+
+                   {Math.ceil(salesPaged.count / PAGE_SIZE) > 5 && (
+                     <span className="text-muted-foreground px-1">...</span>
+                   )}
+
+                   <Button 
+                     variant="outline" 
+                     size="sm" 
+                     className="h-8 w-8 p-0"
+                     onClick={() => setSalesPage(p => p + 1)} 
+                     disabled={(salesPage + 1) * PAGE_SIZE >= salesPaged.count || salesPagedLoading}
+                   >
+                     <ChevronRight className="h-4 w-4" />
+                   </Button>
                  </div>
                </div>
              )}
+
            </Card>
          </TabsContent>
 
