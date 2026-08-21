@@ -521,8 +521,8 @@ function Page() {
   const grossProfit = revenue - cogs;
   const netProfit = grossProfit - expensesPeriod;
   const grossRevenue = revenue + Number(summaryStats.returns_total || 0);
-  const creditOut = 0; // Not in RPC yet
-  const cashIn = 0; // Not in RPC yet
+  const creditOut = Number(summaryStats.credit_sales_total || 0);
+  const cashIn = Number(summaryStats.cash_sales_total || 0);
   const returnsLoss = Number(summaryStats.returns_total || 0);
   const returnsSubtotal = returnsLoss;
 
@@ -765,14 +765,22 @@ function Page() {
                 <Row label="Gross sales (before returns)" value={fmtMoney(grossRevenue, sym)} muted onClick={() => openInvoices("Gross sales (before returns)", sales as any[])} />
                 <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted onClick={() => openReturns("Sale returns")} />
                 <Row label="Sales (net of returns & discount)" value={fmtMoney(revenue, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", sales as any[])} />
+                
+                <TableRow className="bg-muted/30 border-t">
+                  <TableCell className="py-2 pl-8 text-xs text-muted-foreground italic">↳ Of which Cash Sales</TableCell>
+                  <TableCell className="py-2 text-right text-xs font-medium">{fmtMoney(cashIn, sym)}</TableCell>
+                </TableRow>
+                <TableRow className="bg-muted/30">
+                  <TableCell className="py-2 pl-8 text-xs text-muted-foreground italic">↳ Of which Credit Sales (Unpaid)</TableCell>
+                  <TableCell className="py-2 text-right text-xs font-medium text-destructive">{fmtMoney(creditOut, sym)}</TableCell>
+                </TableRow>
+
                 <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices("Cost of goods sold", sales as any[])} />
                 <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", sales as any[])} />
                 <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
                 <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted onClick={() => openInvoices("Tax collected", (sales as any[]).filter((s) => Number(s.tax) > 0))} />
-                <Row label="Credit outstanding" value={fmtMoney(creditOut, sym)} muted onClick={() => openInvoices("Credit outstanding", (sales as any[]).filter((s) => s.status === "credit" && Number(s.total) - Number(s.paid) > 0))} />
                 <Row label="Total purchases (period)" value={fmtMoney(totalPurchases, sym)} muted onClick={openPurchases} />
                 <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices("Net profit basis · all invoices", sales as any[])} />
-
               </TableBody>
             </Table>
             <div className="text-xs text-muted-foreground mt-3">{from} → {to} · {salesPaged.count} sales, {purchasesPaged.count} purchases, {expensesPaged.count} expenses</div>
