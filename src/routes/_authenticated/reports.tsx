@@ -1135,11 +1135,15 @@ function Page() {
                     <TableRow
                       key={p.method}
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => openInvoices(
-                        `Payments · ${p.method}`,
-                        (sales as any[]).filter((s) => parsePaymentSplit(s.payment_method, Number(s.paid)).some((x) => (x.method || "unknown") === p.method)),
-                        `${p.invoices} invoice${p.invoices === 1 ? "" : "s"} · Received ${fmtMoney(p.paid, sym)}`,
-                      )}
+                      onClick={() => {
+                        const filtered = (sales as any[]).filter((s) => parsePaymentSplit(s.payment_method, Number(s.paid)).some((x) => (x.method || "unknown") === p.method));
+                        openInvoices(
+                          `Payments · ${p.method}`,
+                          filtered,
+                          p.invoices
+                        );
+                      }}
+
                     >
                       <TableCell className="capitalize font-medium">{p.method}</TableCell>
                       <TableCell className="text-right">{p.invoices}</TableCell>
