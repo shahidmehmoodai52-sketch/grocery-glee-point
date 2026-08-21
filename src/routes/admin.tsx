@@ -1024,9 +1024,10 @@ function SecurityTab() {
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
-      return (data as AdminActionLog[]) ?? [];
+      return (data as unknown as AdminActionLog[]) ?? [];
     },
   });
+
 
 
   const unblock = async (id: string) => {
