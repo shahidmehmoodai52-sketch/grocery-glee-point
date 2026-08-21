@@ -342,7 +342,7 @@ const displayPaymentMethod = (methodValue: string | null | undefined) => {
   return rows.map((r) => r.method).join(" + ");
 };
 
-function today() { return new Date().toISOString().slice(0, 10); }
+function today() { return pktToday(); }
 const toISO = (d: Date) => {
   const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
   const da = String(d.getDate()).padStart(2, "0");
