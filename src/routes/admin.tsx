@@ -582,6 +582,17 @@ function TenantsTab() {
       />
 
       <TypedConfirmDialog
+        open={archiveDialog.open}
+        onOpenChange={(o) => setArchiveDialog(prev => ({ ...prev, open: o }))}
+        title="Archive Shop"
+        description={`Are you sure you want to archive "${archiveDialog.name}"?`}
+        confirmLabel="Archive"
+        requireReason
+        destructive
+        onConfirm={async (reason) => { await setStatus(archiveDialog.id, "archived", reason); }}
+      />
+
+      <TypedConfirmDialog
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}
         title="Permanently Delete Shop"
