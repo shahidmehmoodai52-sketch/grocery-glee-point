@@ -438,24 +438,32 @@ function Page() {
     gcTime: 0,
   });
 
-  const { data: salesPaged = { data: [], count: 0 } } = useQuery({
-    queryKey: ["report-sales-paged", fromTime, toTime, salesPage],
+  const { data: salesPaged = { data: [], count: 0 }, isLoading: salesPagedLoading } = useQuery({
+    queryKey: ["report-sales-paged", fromTime, toTime, salesPage, search],
     queryFn: async () => {
-      const q = supabase.from("sales")
+      const q = search.trim();
+      let query = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)", { count: "exact" })
         .gte("created_at", fromTime)
-        .lte("created_at", toTime)
+        .lte("created_at", toTime);
+      
+      if (q) {
+        // Simple text search filter
+        query = query.or(`invoice_no.ilike.%${q}%,payment_method.ilike.%${q}%`);
+      }
+
+      const { data, count, error } = await query
         .order("created_at", { ascending: false })
         .range(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE - 1);
       
-      const { data, count, error } = await q;
       if (error) throw error;
       return { data: data || [], count: count || 0 };
     },
     staleTime: 0,
     gcTime: 0,
   });
-  const sales = salesFull; // Use full data for calculations and drill-downs
+  const sales = salesFull; 
+
 
   const { data: purchasesFull = [] } = useQuery({
     queryKey: ["report-purchases-full", fromTime, toTime],
@@ -1258,59 +1266,70 @@ function Page() {
       </Tabs>
 
       <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{drill?.title}</DialogTitle>
-            {drill?.note && <DialogDescription>{drill.note}</DialogDescription>}
-          </DialogHeader>
-          {drill?.invoices && (
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
-                <TableHead>Method</TableHead><TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {drill.invoices.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
-                {drill.invoices.map((s: any) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
-                    <TableCell className="text-sm whitespace-nowrap">{new Date(s.created_at).toLocaleString()}</TableCell>
-                    <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
-                    <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
-                    <TableCell className="text-right font-medium">{fmtMoney(Number(s.total), sym)}</TableCell>
-                    <TableCell className="text-right">{fmtMoney(Number(s.paid), sym)}</TableCell>
-                    <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
-                  </TableRow>
-                ))}
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+          <div className="p-6 pb-2">
+            <DialogHeader>
+              <DialogTitle>{drill?.title}</DialogTitle>
+              {drill?.note && <DialogDescription>{drill.note}</DialogDescription>}
+            </DialogHeader>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
+            {drill?.invoices && (
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
+                    <TableHead>Method</TableHead><TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {drill.invoices.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                    {drill.invoices.map((s: any) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">{new Date(s.created_at).toLocaleString()}</TableCell>
+                        <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
+                        <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
+                        <TableCell className="text-right font-medium">{fmtMoney(Number(s.total), sym)}</TableCell>
+                        <TableCell className="text-right">{fmtMoney(Number(s.paid), sym)}</TableCell>
+                        <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                
                 {drill.invoices.length > 0 && (
-                  <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={4}>Total ({drill.invoices.length})</TableCell>
-                    <TableCell className="text-right">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.total), 0), sym)}</TableCell>
-                    <TableCell className="text-right">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.paid), 0), sym)}</TableCell>
-                    <TableCell />
-                  </TableRow>
+                  <div className="flex justify-end p-4 bg-muted/20 rounded-lg">
+                    <div className="text-right space-y-1">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wider">Overall Total ({drill.invoices.length})</div>
+                      <div className="text-lg font-bold text-primary">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.total), 0), sym)}</div>
+                      <div className="text-xs text-muted-foreground">Total Paid: {fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.paid), 0), sym)}</div>
+                    </div>
+                  </div>
                 )}
-              </TableBody>
-            </Table>
-          )}
-          {drill?.cols && drill?.rows && (
-            <Table>
-              <TableHeader><TableRow>
-                {drill.cols.map((c, i) => <TableHead key={c} className={i === 0 ? "" : "text-right"}>{c}</TableHead>)}
-              </TableRow></TableHeader>
-              <TableBody>
-                {drill.rows.length === 0 && <TableRow><TableCell colSpan={drill.cols.length} className="text-center text-muted-foreground py-6">No records</TableCell></TableRow>}
-                {drill.rows.map((r, ri) => (
-                  <TableRow key={ri}>
-                    {r.map((c, ci) => <TableCell key={ci} className={ci === 0 ? "" : "text-right"}>{c}</TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              </div>
+            )}
+            
+            {drill?.cols && drill?.rows && (
+              <Table>
+                <TableHeader><TableRow>
+                  {drill.cols.map((c, i) => <TableHead key={c} className={i === 0 ? "" : "text-right"}>{c}</TableHead>)}
+                </TableRow></TableHeader>
+                <TableBody>
+                  {drill.rows.length === 0 && <TableRow><TableCell colSpan={drill.cols.length} className="text-center text-muted-foreground py-6">No records</TableCell></TableRow>}
+                  {drill.rows.map((r, ri) => (
+                    <TableRow key={ri}>
+                      {r.map((c, ci) => <TableCell key={ci} className={ci === 0 ? "" : "text-right"}>{c}</TableCell>)}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
