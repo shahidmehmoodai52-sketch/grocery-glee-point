@@ -415,9 +415,14 @@ function TenantsTab() {
     setSuspendDialog({ open: true, id, name });
   };
 
+  const archive = (id: string, name: string) => {
+    setArchiveDialog({ open: true, id, name });
+  };
+
   const removeShop = (id: string, name: string) => {
     setDeleteDialog({ open: true, id, name });
   };
+
 
   const handleConfirmDelete = async (reason: string) => {
     const { id, name } = deleteDialog;
