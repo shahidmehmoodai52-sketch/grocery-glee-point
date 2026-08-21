@@ -998,11 +998,11 @@ function Page() {
                     </TableRow>
                   );
                 })}
-                {filteredInvoices.length > 0 && (
+                {salesPaged.data.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={5}>Total ({filteredInvoices.length} invoices{q && ` of ${sales.length}`})</TableCell>
-                    <TableCell className="text-right">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + Number(b.total), 0), sym)}</TableCell>
-                    <TableCell className="text-right text-success">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + ((Number(b.subtotal) - Number(b.discount)) - Number(b.cost_total)), 0), sym)}</TableCell>
+                    <TableCell colSpan={5}>Total ({salesPaged.count} invoices)</TableCell>
+                    <TableCell className="text-right">{fmtMoney(revenue, sym)}</TableCell>
+                    <TableCell className="text-right text-success">{fmtMoney(grossProfit, sym)}</TableCell>
                     <TableCell colSpan={2} />
                   </TableRow>
                 )}
