@@ -1430,6 +1430,7 @@ function SecurityTab() {
               <TableHead>Admin</TableHead>
               <TableHead>Action</TableHead>
               <TableHead>Target</TableHead>
+              <TableHead>Changes</TableHead>
               <TableHead>Reason</TableHead>
             </TableRow>
           </TableHeader>
@@ -1454,6 +1455,18 @@ function SecurityTab() {
                     <span className="text-muted-foreground">—</span>
                   )}
                   {l.entity_type && <div className="text-[10px] text-muted-foreground">{l.entity_type} {l.entity_id?.slice(0, 8)}</div>}
+                </TableCell>
+                <TableCell className="text-xs">
+                  {l.metadata && Object.keys(l.metadata).length > 0 && (
+                    <div className="max-w-xs overflow-hidden">
+                       {Object.entries(l.metadata).map(([k, v]) => (
+                         <div key={k} className="truncate" title={`${k}: ${JSON.stringify(v)}`}>
+                           <span className="font-medium text-[10px] text-muted-foreground mr-1">{k}:</span>
+                           <span className="text-[10px]">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+                         </div>
+                       ))}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{l.reason ?? "—"}</TableCell>
               </TableRow>
