@@ -22,14 +22,22 @@ interface StatCardProps {
   delta?: number;
   sub?: string;
   className?: string;
+  onClick?: () => void;
 }
 
 export function StatCard({
-  label, value, icon: Icon, tone = "default", delta, sub, className,
+  label, value, icon: Icon, tone = "default", delta, sub, className, onClick,
 }: StatCardProps) {
   const t = toneStyles[tone];
   return (
-    <Card className={cn("p-5 transition-shadow hover:shadow-md", className)}>
+    <Card 
+      className={cn(
+        "p-5 transition-shadow hover:shadow-md", 
+        onClick && "cursor-pointer hover:border-primary/50",
+        className
+      )}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {label}

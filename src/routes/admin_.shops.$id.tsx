@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
   KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2,
+  Calendar, Search, Filter,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -123,59 +124,65 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
   const owner = data.members.find((m) => m.user_id === t.owner_id) ?? null;
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center gap-2">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/admin"><ArrowLeft className="h-4 w-4 mr-1" /> Admin panel</Link>
+          <Link to="/admin"><ArrowLeft className="h-4 w-4 mr-1" /> Back to Panel</Link>
         </Button>
+        <div className="flex items-center gap-2">
+           <StatusIndicator status={t.status} />
+        </div>
       </div>
-      <PageHeader
-        title={t.name}
-        description={`${owner?.email ?? "No owner"} · ${t.slug ?? "—"} · Registered ${new Date(t.created_at).toLocaleDateString()}`}
-        icon={<Store className="h-5 w-5" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <StatusIndicator status={t.status} />
-            {t.status !== "active" && (
-              <Button size="sm" onClick={() => setStatus("active")}>
-                <CheckCircle2 className="h-4 w-4 mr-1" /> {t.status === "pending" ? "Approve" : "Activate"}
-              </Button>
-            )}
-            {t.status === "active" && (
-              <Button size="sm" variant="outline" onClick={suspend}>
-                <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant={t.library_approved ? "outline" : "default"}
-              onClick={async () => {
-                const next = !t.library_approved;
-                const { error } = await supabase
-                  .from("tenants")
-                  .update({ library_approved: next })
-                  .eq("id", t.id);
-                if (error) return toast.error(error.message);
-                toast.success(next ? "Global library access granted" : "Global library access revoked");
-                qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
-              }}
-            >
-              <Library className="h-4 w-4 mr-1" />
-              {t.library_approved ? "Revoke library access" : "Grant library access"}
-            </Button>
-            {t.status !== "archived" && (
-              <Button size="sm" variant="ghost" onClick={() => {
-                if (confirm(`Archive "${t.name}"? Owner loses access.`)) setStatus("archived");
-              }}>
-                <Archive className="h-4 w-4 mr-1" /> Archive
-              </Button>
-            )}
-            <Button size="sm" variant="destructive" onClick={removeShop}>
-              <Trash2 className="h-4 w-4 mr-1" /> Delete shop
-            </Button>
+
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-6">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+            <Store className="h-8 w-8" />
           </div>
-        }
-      />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{t.name}</h1>
+            <p className="text-muted-foreground mt-1 flex items-center gap-2">
+              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{t.slug ?? "no-slug"}</span>
+              <span>•</span>
+              <span>{owner?.email ?? "No owner email"}</span>
+              <span>•</span>
+              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(t.created_at).toLocaleDateString()}</span>
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2">
+          {t.status !== "active" && (
+            <Button onClick={() => setStatus("active")}>
+              <CheckCircle2 className="h-4 w-4 mr-1" /> {t.status === "pending" ? "Approve" : "Activate"}
+            </Button>
+          )}
+          {t.status === "active" && (
+            <Button variant="outline" onClick={suspend}>
+              <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
+            </Button>
+          )}
+          <Button
+            variant={t.library_approved ? "outline" : "secondary"}
+            onClick={async () => {
+              const next = !t.library_approved;
+              const { error } = await supabase
+                .from("tenants")
+                .update({ library_approved: next })
+                .eq("id", t.id);
+              if (error) return toast.error(error.message);
+              toast.success(next ? "Library access granted" : "Library access revoked");
+              qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
+            }}
+          >
+            <Library className="h-4 w-4 mr-1" />
+            {t.library_approved ? "Revoke Library" : "Grant Library"}
+          </Button>
+          <Button variant="destructive" size="icon" onClick={removeShop} title="Delete shop">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       <Tabs defaultValue="overview">
         <TabsList>
@@ -520,10 +527,10 @@ function SalesTab({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} />
+        <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} tone="primary" />
         <StatCard label="Orders (30d)" value={totalOrders} icon={ShoppingCart} />
         <StatCard label="Est. profit" value={fmtMoney(totalRevenue - totalCost, "")} icon={Wallet} tone="success" />
-        <StatCard label="Low stock" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock > 0 ? "warning" : "default"} />
+        <StatCard label="Expenses (30d)" value={fmtMoney(data.expenses_total || 0, "")} icon={ArrowLeft} tone="danger" />
       </div>
 
       <Card className="p-4">
@@ -575,7 +582,7 @@ function SalesTab({ tenantId }: { tenantId: string }) {
             <div className="text-sm text-muted-foreground">No payments recorded.</div>
           ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead>Method</TableHead>
                   <TableHead className="text-right">Orders</TableHead>
@@ -827,17 +834,28 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
             <TableRow>
               <TableHead>When</TableHead>
               <TableHead>Action</TableHead>
-              <TableHead>Table</TableHead>
-              <TableHead>Record</TableHead>
+              <TableHead>Target Table</TableHead>
+              <TableHead>Changes / Record</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {audit.map((a) => (
               <TableRow key={a.id}>
-                <TableCell className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</TableCell>
                 <TableCell><StatusBadge tone={a.action === "DELETE" ? "danger" : a.action === "INSERT" ? "success" : "neutral"}>{a.action}</StatusBadge></TableCell>
-                <TableCell className="text-xs">{a.table_name}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{a.record_id?.slice(0, 8) ?? "—"}</TableCell>
+                <TableCell className="text-[10px] font-mono">{a.table_name}</TableCell>
+                <TableCell className="text-[10px] text-muted-foreground">
+                  <div className="font-mono mb-1">{a.record_id?.slice(0, 8) ?? "—"}</div>
+                  {a.changed_fields && (
+                    <div className="max-w-xs overflow-hidden text-[9px] border rounded p-1 bg-muted/20">
+                      {Object.entries(a.changed_fields).map(([k, v]) => (
+                        <div key={k} className="truncate">
+                          <span className="font-semibold text-primary/70">{k}:</span> {JSON.stringify(v)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
