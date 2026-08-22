@@ -887,11 +887,12 @@ function CreditSalesDrilldown({
         <DialogHeader className="p-6 pb-2">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <CreditCard className="h-5 w-5 text-primary" />
-            Credit Sales (Unpaid Invoices)
+            Credit Sales
           </DialogTitle>
           <div className="text-sm text-muted-foreground mt-1">
-            Showing all credit transactions for this shop.
+            All invoices recorded with the credit payment method for this shop.
           </div>
+
         </DialogHeader>
 
         <div className="flex-1 overflow-auto px-6 py-2">
@@ -942,7 +943,14 @@ function CreditSalesDrilldown({
                   Showing <span className="text-foreground">{page * pageSize + 1}</span> to{" "}
                   <span className="text-foreground">{Math.min((page + 1) * pageSize, data.total)}</span> of{" "}
                   <span className="text-foreground">{data.total}</span> entries
+                  <span className="block mt-1">
+                    Page total:{" "}
+                    <span className="text-foreground font-semibold">
+                      {fmtMoney(data.items.reduce((s, r) => s + Number(r.total || 0), 0), "")}
+                    </span>
+                  </span>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
