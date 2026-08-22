@@ -361,7 +361,7 @@ function Page() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
         <Kpi onClick={() => setDetailKey("net")}
           icon={TrendingUp} label="Revenue" value={fmtMoney(netRevenue, sym)}
           delta={dNet} sub={`${stats?.sales_count || 0} invoices · after returns`} tone="primary"
@@ -369,6 +369,10 @@ function Page() {
         <Kpi onClick={() => setDetailKey("revenue")}
           icon={Receipt} label="Gross sales" value={fmtMoney(revenue, sym)}
           delta={dRevenue} sub="Before returns" tone="info"
+        />
+        <Kpi onClick={() => setDetailKey("credit")}
+          icon={CreditCard} label="Credit sales" value={fmtMoney(creditSales, sym)}
+          sub="Unpaid portion" tone="warning"
         />
         <Kpi onClick={() => setDetailKey("returns")}
           icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
