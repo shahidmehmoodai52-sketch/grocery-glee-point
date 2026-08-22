@@ -175,9 +175,9 @@ function Page() {
   const { data: sales = [] } = useQuery({
     queryKey: ["dash-sales-detail", fromISO, toISO],
     queryFn: async () =>
-      (await supabase.from("sales").select("total,cost_total,tax,created_at,paid,payment_method,status")
+      (await supabase.from("sales").select("total,cost_total,tax,created_at,paid,payment_method,status,invoice_no")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
-    enabled: !!detailKey && ["revenue", "invoices", "net", "profit"].includes(detailKey),
+    enabled: !!detailKey && ["revenue", "invoices", "net", "profit", "credit"].includes(detailKey),
   });
   const { data: purchases = [] } = useQuery({
     queryKey: ["dash-purchases-detail", fromISO, toISO],
@@ -273,8 +273,8 @@ function Page() {
           rows: sales.map((s:any)=>[fmtDateStr(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
           total: fmtMoney(revenue, sym) };
       case "credit":
-        return { title: `Credit sales · ${rangeLabel}`, cols: ["Date", "Invoice", "Status", "Total"],
-          rows: sales.filter((s:any) => s.status === "credit").map((s:any)=>[fmtDateStr(s.created_at), s.invoice_no||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
+        return { title: `Credit sales · ${rangeLabel}`, cols: ["Date", "Invoice", "Status", "Total", "Paid"],
+          rows: sales.filter((s:any) => s.status === "credit").map((s:any)=>[fmtDateStr(s.created_at), s.invoice_no||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
           total: fmtMoney(creditSales, sym) };
       case "profit":
         return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],

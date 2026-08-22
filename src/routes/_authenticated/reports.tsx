@@ -420,13 +420,18 @@ function Page() {
   const summaryStats = (summaryStatsRaw as any) || {};
 
   const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
-    queryKey: ["report-sales-paged", fromTime, toTime, salesPage],
+    queryKey: ["report-sales-paged", fromTime, toTime, salesPage, tab],
     queryFn: async () => {
       const q = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)", { count: "exact" })
         .gte("created_at", fromTime)
-        .lte("created_at", toTime)
-        .order("created_at", { ascending: false })
+        .lte("created_at", toTime);
+
+      if (tab === "sales") {
+        q.eq("status", "completed");
+      }
+
+      q.order("created_at", { ascending: false })
         .range(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE - 1);
       
       const { data, count, error } = await q;
@@ -456,8 +461,8 @@ function Page() {
     queryFn: async () => {
       const { data, count, error } = await supabase.from("expenses")
         .select("amount,category,expense_date", { count: "exact" })
-        .gte("expense_date", from)
-        .lte("expense_date", to)
+        .gte("expense_date", fromTime.split("T")[0])
+        .lte("expense_date", toTime.split("T")[0])
         .order("expense_date", { ascending: false })
         .range(expensesPage * PAGE_SIZE, (expensesPage + 1) * PAGE_SIZE - 1);
       if (error) throw error;
@@ -528,7 +533,7 @@ function Page() {
 
   // ---- drill-down helpers (every report row is clickable)
   const openInvoices = (title: string, list: any[], note?: string) =>
-    setDrill({ title, note: note ?? `${salesPaged.count} invoice${salesPaged.count === 1 ? "" : "s"} total`, invoices: list });
+    setDrill({ title, note: note ?? `${list.length} invoice(s) shown`, invoices: list });
 
 
   const openReturns = (title: string) =>
@@ -657,6 +662,7 @@ function Page() {
   const q = search.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
     if (!q) return sales as any[];
+    if (q === "status:credit") return (sales as any[]).filter(s => s.status === "credit");
     return (sales as any[]).filter((s) =>
       String(s.invoice_no ?? "").toLowerCase().includes(q) ||
       String(s.customers?.name ?? "walk-in").toLowerCase().includes(q) ||
@@ -733,7 +739,10 @@ function Page() {
         <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Cost of goods" value={fmtMoney(cogs, sym)} tone="destructive" />
         <Stat icon={Wallet} label="Gross profit" value={fmtMoney(grossProfit, sym)} tone="success" />
-        <Stat icon={CreditCard} label="Credit sales" value={fmtMoney(creditOut, sym)} tone="warning" />
+        <Stat icon={CreditCard} label="Credit sales" value={fmtMoney(creditOut, sym)} tone="warning" onClick={() => {
+          setTab("invoice");
+          setSearch("status:credit");
+        }} />
         <Stat icon={TrendingDown} label="Expenses (period)" value={fmtMoney(expensesPeriod, sym)} tone="warning" />
       </div>
 
@@ -770,7 +779,10 @@ function Page() {
                 <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", sales as any[])} />
                 <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
                 <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted onClick={() => openInvoices("Tax collected", (sales as any[]).filter((s) => Number(s.tax) > 0))} />
-                <Row label="Credit sales (period)" value={fmtMoney(creditOut, sym)} muted onClick={() => openInvoices("Credit sales (period)", (sales as any[]).filter((s) => s.status === "credit"))} />
+                <Row label="Credit sales (period)" value={fmtMoney(creditOut, sym)} muted onClick={() => {
+                  setTab("invoice");
+                  setSearch("status:credit");
+                }} />
                 <Row label="Total purchases (period)" value={fmtMoney(totalPurchases, sym)} muted onClick={openPurchases} />
                 <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices("Net profit basis · all invoices", sales as any[])} />
 
@@ -1232,10 +1244,10 @@ function Page() {
 }
 
 
-function Stat({ icon: Icon, label, value, tone }: any) {
+function Stat({ icon: Icon, label, value, tone, onClick }: any) {
   const colors: Record<string, string> = { primary: "text-primary", success: "text-success", destructive: "text-destructive", warning: "text-warning" };
   return (
-    <Card className="p-4">
+    <Card className={`p-4 ${onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`} onClick={onClick}>
       <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5" />{label}</div>
       <div className={`text-2xl font-semibold mt-1 ${colors[tone]}`}>{value}</div>
     </Card>
