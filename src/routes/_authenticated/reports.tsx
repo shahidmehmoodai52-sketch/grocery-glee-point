@@ -22,6 +22,8 @@ import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { useEarliestDataDate } from "@/lib/earliest-date";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { fetchAll } from "@/lib/supabase-page";
+import { pktStartISO, pktEndISO, pktToday } from "@/lib/pkt-range";
+
 
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: Page });
@@ -340,7 +342,7 @@ const displayPaymentMethod = (methodValue: string | null | undefined) => {
   return rows.map((r) => r.method).join(" + ");
 };
 
-function today() { return new Date().toISOString().slice(0, 10); }
+function today() { return pktToday(); }
 const toISO = (d: Date) => {
   const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
   const da = String(d.getDate()).padStart(2, "0");
@@ -391,10 +393,11 @@ function Page() {
   const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
 
   const range = {
-    // Correct PKT range: Start of fromDate at 00:00:00, End of toDate at 23:59:59.999
-    from: fromDate ? new Date(new Date(fromDate).setHours(0, 0, 0, 0)).toISOString() : "2000-01-01T00:00:00Z",
-    to: toDate ? new Date(new Date(toDate).setHours(23, 59, 59, 999)).toISOString() : new Date().toISOString(),
+    // PKT business-day boundaries (UTC+5), independent of the browser timezone.
+    from: fromDate ? pktStartISO(fromDate) : "2000-01-01T00:00:00.000Z",
+    to: toDate ? pktEndISO(toDate) : pktEndISO(pktToday()),
   };
+
   
   const fromTime = range.from;
   const toTime = range.to;
