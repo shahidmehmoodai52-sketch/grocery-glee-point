@@ -528,7 +528,7 @@ function Page() {
 
   // ---- drill-down helpers (every report row is clickable)
   const openInvoices = (title: string, list: any[], note?: string) =>
-    setDrill({ title, note: note ?? `${salesPaged.count} invoices found (paged)`, invoices: list });
+    setDrill({ title, note: note ?? `${salesPaged.count} invoice(s) in current page range`, invoices: list });
 
 
   const openReturns = (title: string) =>
