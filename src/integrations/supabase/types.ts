@@ -3915,6 +3915,26 @@ export type Database = {
         Args: { _from?: string; _tenant_id: string; _to?: string }
         Returns: Json
       }
+      admin_shop_invoices: {
+        Args: {
+          _from?: string
+          _limit?: number
+          _offset?: number
+          _payment_status?: string
+          _tenant_id: string
+          _to?: string
+        }
+        Returns: {
+          balance: number
+          created_at: string
+          customer_name: string
+          id: string
+          invoice_no: string
+          paid_amount: number
+          total: number
+          total_count: number
+        }[]
+      }
       admin_tenant_audit: {
         Args: { _limit?: number; _tenant_id: string }
         Returns: {
