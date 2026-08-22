@@ -1,10 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -12,302 +8,140 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Wallet, Users, ShoppingCart, Package,
-  AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt, CalendarIcon,
+  AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt,
 } from "lucide-react";
-import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
-import { fmtMoney, fmtDate } from "@/lib/format";
+import { fmtMoney } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
-import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
-import { useEarliestDataDate } from "@/lib/earliest-date";
-import { cn } from "@/lib/utils";
-import { pktStartISO, pktEndISO } from "@/lib/pkt-range";
-
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
 
-const SPLIT_PAYMENT_PREFIX = "split:";
-
-function parsePaymentSplit(methodValue: string | null | undefined, paidValue: number) {
-  const raw = String(methodValue ?? "").trim();
-  const paid = +Math.max(0, Number(paidValue || 0)).toFixed(2);
-  if (!raw.startsWith(SPLIT_PAYMENT_PREFIX)) return [{ method: raw || "cash", amount: paid }];
-  const rows = raw
-    .slice(SPLIT_PAYMENT_PREFIX.length)
-    .split("|")
-    .filter(Boolean)
-    .map((part) => {
-      const [methodEncoded, amountRaw] = part.split("=");
-      let decoded = methodEncoded || "";
-      try { decoded = decodeURIComponent(methodEncoded || ""); } catch {}
-      return { method: decoded.trim() || "cash", amount: +Math.max(0, Number(amountRaw || 0)).toFixed(2) };
-    })
-    .filter((entry) => entry.amount > 0);
-  return rows.length ? rows : [{ method: "cash", amount: paid }];
-}
-
-const displayPaymentMethod = (methodValue: string | null | undefined) =>
-  parsePaymentSplit(methodValue, 0).map((r) => r.method).join(" + ");
-
-function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
-function endOfDay(d: Date) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
-function diffDays(a: Date, b: Date) {
-  return Math.max(1, Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / 86400000) + 1);
-}
+function startOfDay(d = new Date()) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return startOfDay(d); }
 
 function Page() {
   const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "Rs";
-
-  // Default range = shop's first ever transaction → today, so historical data is
-  // never hidden behind a narrow default. Explicit user selection always wins.
-  const { data: earliest } = useEarliestDataDate();
-  const [preset, setPreset] = useState<DatePreset | "custom">("all");
-  const [from, setFrom] = useState<Date>(new Date(2000, 0, 1));
-  const [to, setTo] = useState<Date>(startOfDay(new Date()));
-  const [userPicked, setUserPicked] = useState(false);
-
-  useEffect(() => {
-    if (userPicked || !earliest) return;
-    setFrom(startOfDay(earliest));
-    setTo(startOfDay(new Date()));
-  }, [earliest, userPicked]);
-
-  const applyPreset = (p: DatePreset) => {
-    setUserPicked(true);
-    setPreset(p);
-    const r = rangeFor(p);
-    if (p === "all") {
-      const now = new Date();
-      setFrom(earliest ? startOfDay(earliest) : new Date(2000, 0, 1));
-      setTo(startOfDay(now));
-    } else {
-      setFrom(startOfDay(new Date(r.from)));
-      setTo(startOfDay(new Date(r.to)));
-    }
-  };
-
-
-  // PKT business-day boundaries (UTC+5), independent of the browser timezone.
-  const fromISO = pktStartISO(from);
-  const toISO = pktEndISO(to);
-  const spanDays = diffDays(from, to);
-
-  const prevFrom = new Date(from.getTime() - spanDays * 86400000);
-  const prevTo = new Date(to.getTime() - spanDays * 86400000);
-  const prevFromISO = pktStartISO(prevFrom);
-  const prevToISO = pktEndISO(prevTo);
-
-
-  const [detailKey, setDetailKey] = useState<string | null>(null);
-
-  const { data: dashboardTimeseries = [] } = useQuery({
-    queryKey: ["dash-timeseries", fromISO, toISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_dashboard_timeseries", {
-        p_from_date: fromISO,
-        p_to_date: toISO
-      });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  const { data: topItems = [] } = useQuery({
-    queryKey: ["dash-top-items-rpc", fromISO, toISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_top_selling_items", {
-        p_from_date: fromISO,
-        p_to_date: toISO,
-        p_limit: 6
-      });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  const { data: lowStock = [] } = useQuery({
-    queryKey: ["dash-low-stock-rpc"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_low_stock_products", {
-        p_threshold: 5,
-        p_limit: 6
-      });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  const { data: inventoryValue = 0 } = useQuery({
-    queryKey: ["dash-inventory-value-rpc"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_inventory_value");
-      if (error) throw error;
-      return Number(data || 0);
-    },
-  });
-
-  const { data: stats } = useQuery({
-    queryKey: ["dash-stats-v2", fromISO, toISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_reports_summary", {
-        p_from_date: fromISO,
-        p_to_date: toISO
-      });
-      if (error) throw error;
-      return data as any;
-    },
-  });
-
-  const { data: prevStats } = useQuery({
-    queryKey: ["dash-stats-prev-v2", prevFromISO, prevToISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_reports_summary", {
-        p_from_date: prevFromISO,
-        p_to_date: prevToISO
-      });
-      if (error) throw error;
-      return data as any;
-    },
-  });
+  const sym = settings?.currency_symbol ?? "$";
+  const since = daysAgo(29).toISOString();
 
   const { data: sales = [] } = useQuery({
-    queryKey: ["dash-sales-detail", fromISO, toISO],
+    queryKey: ["dash-sales", since],
     queryFn: async () =>
-      (await supabase.from("sales").select("total,cost_total,tax,created_at,paid,payment_method,status")
-        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
-    enabled: !!detailKey && ["revenue", "invoices", "net", "profit"].includes(detailKey),
+      (await supabase.from("sales").select("total,cost_total,discount,tax,paid,status,created_at,payment_method")
+        .gte("created_at", since)).data ?? [],
   });
   const { data: purchases = [] } = useQuery({
-    queryKey: ["dash-purchases-detail", fromISO, toISO],
+    queryKey: ["dash-purchases", since],
     queryFn: async () =>
-      (await supabase.from("purchases").select("total,paid,created_at")
-        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
-    enabled: detailKey === "purch",
+      (await supabase.from("purchases").select("total,paid,created_at").gte("created_at", since)).data ?? [],
   });
   const { data: saleReturns = [] } = useQuery({
-    queryKey: ["dash-sale-returns-detail", fromISO, toISO],
+    queryKey: ["dash-sale-returns", since],
     queryFn: async () =>
-      (await supabase.from("sale_returns").select("total,subtotal,refund_amount,created_at,sale_return_items(qty,cost)")
-        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
-    enabled: !!detailKey && ["returns", "profit", "net"].includes(detailKey),
+      (await supabase.from("sale_returns").select("total,refund_amount,created_at").gte("created_at", since)).data ?? [],
   });
   const { data: products = [] } = useQuery({
-    queryKey: ["dash-products-detail"],
+    queryKey: ["dash-products"],
     queryFn: async () =>
-      fetchAll<any>((from: number, to: number) =>
+      fetchAll<any>((from, to) =>
         supabase
           .from("products")
           .select("id,name,stock,sell_price,cost_price,is_active")
           .eq("is_active", true)
           .range(from, to),
       ),
-    enabled: detailKey === "inventory",
+  });
+  const { data: topItemsRaw = [] } = useQuery({
+    queryKey: ["dash-top-items", since],
+    queryFn: async () =>
+      (await supabase.from("sale_items").select("name,qty,line_total,sales!inner(created_at)")
+        .gte("sales.created_at", since).limit(2000)).data ?? [],
   });
 
-  const revenue = Number(stats?.sales_total || 0);
-  const prevRevenue = Number(prevStats?.sales_total || 0);
-  
-  // profit = revenue - returns - cost_total
-  // We'll calculate it from summary stats
-  const salesProfit = Number(stats?.sales_total || 0) - Number(stats?.sales_cost || 0) - Number(stats?.sales_tax || 0);
-  const returnsLoss = Number(stats?.returns_total || 0); // Simplified loss from returns
-  const profit = salesProfit - returnsLoss;
-  
-  const prevSalesProfit = Number(prevStats?.sales_total || 0) - Number(prevStats?.sales_cost || 0) - Number(prevStats?.sales_tax || 0);
-  const prevReturnsLoss = Number(prevStats?.returns_total || 0);
-  const prevProfit = prevSalesProfit - prevReturnsLoss;
+  const today = startOfDay().getTime();
+  const yest = daysAgo(1).getTime();
 
-  const purchTotal = Number(stats?.purchases_total || 0);
-  const prevPurchTotal = Number(prevStats?.purchases_total || 0);
-  const returnsTotal = Number(stats?.returns_total || 0);
-  const prevReturnsTotal = Number(prevStats?.returns_total || 0);
-  
-  const netRevenue = revenue - returnsTotal;
-  const prevNetRevenue = prevRevenue - prevReturnsTotal;
+  const todaySales = sales.filter((s: any) => new Date(s.created_at).getTime() >= today);
+  const yestSales = sales.filter((s: any) => {
+    const t = new Date(s.created_at).getTime();
+    return t >= yest && t < today;
+  });
 
-  const pct = (curr: number, prev: number) => {
-    if (!prev) return curr ? 100 : 0;
-    return ((curr - prev) / Math.abs(prev)) * 100;
-  };
-  const dNet = pct(netRevenue, prevNetRevenue);
-  const dRevenue = pct(revenue, prevRevenue);
-  const dReturns = pct(returnsTotal, prevReturnsTotal);
-  const dProfit = pct(profit, prevProfit);
-  const dPurch = pct(purchTotal, prevPurchTotal);
+  const sum = (arr: any[], k: string) => arr.reduce((a, x) => a + Number(x[k] ?? 0), 0);
+  const revToday = sum(todaySales, "total");
+  const revYest = sum(yestSales, "total");
+  const profitToday = todaySales.reduce(
+    (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
+    0,
+  );
+  const profit30 = sales.reduce(
+    (s: number, x: any) => s + (Number(x.total) - Number(x.tax) - Number(x.cost_total)),
+    0,
+  );
+  const rev30 = sum(sales, "total");
+  const purch30 = sum(purchases, "total");
+  const returns30 = sum(saleReturns, "total");
+  const refunds30 = sum(saleReturns, "refund_amount");
 
-  const series = dashboardTimeseries;
+  const dayDelta = revYest > 0 ? ((revToday - revYest) / revYest) * 100 : 0;
+
+  // 30-day series
+  const series = useMemo(() => {
+    const map = new Map<string, { day: string; sales: number; profit: number; returns: number }>();
+    for (let i = 29; i >= 0; i--) {
+      const d = daysAgo(i);
+      const k = d.toISOString().slice(0, 10);
+      map.set(k, { day: k.slice(5), sales: 0, profit: 0, returns: 0 });
+    }
+    sales.forEach((s: any) => {
+      const k = new Date(s.created_at).toISOString().slice(0, 10);
+      const row = map.get(k);
+      if (!row) return;
+      row.sales += Number(s.total);
+      row.profit += Number(s.total) - Number(s.tax) - Number(s.cost_total);
+    });
+    saleReturns.forEach((r: any) => {
+      const k = new Date(r.created_at).toISOString().slice(0, 10);
+      const row = map.get(k);
+      if (!row) return;
+      row.returns += Number(r.total);
+    });
+    return Array.from(map.values());
+  }, [sales, saleReturns]);
 
   const methodMix = useMemo(() => {
     const m = new Map<string, number>();
-    sales.forEach((s: any) => {
-      const splits = parsePaymentSplit(s.payment_method, Number(s.paid));
-      const sumPaid = splits.reduce((sum, split) => sum + Number(split.amount || 0), 0);
-      for (const split of splits) {
-        const share = sumPaid > 0 ? Number(split.amount || 0) / sumPaid : 1 / splits.length;
-        const key = split.method || "cash";
-        m.set(key, (m.get(key) ?? 0) + Number(s.total) * share);
-      }
-    });
+    sales.forEach((s: any) => m.set(s.payment_method, (m.get(s.payment_method) ?? 0) + Number(s.total)));
     return Array.from(m, ([name, value]) => ({ name, value }));
   }, [sales]);
   const pieColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)", "var(--chart-5)", "var(--chart-3)"];
 
-  const inventoryValueAgg = inventoryValue; // rename to avoid conflict with detail logic if needed, but we replaced the old ones
-  const lowStockAgg = lowStock;
-  const topItemsAgg = topItems;
+  const topItems = useMemo(() => {
+    const m = new Map<string, { name: string; qty: number; total: number }>();
+    topItemsRaw.forEach((it: any) => {
+      const cur = m.get(it.name) ?? { name: it.name, qty: 0, total: 0 };
+      cur.qty += Number(it.qty);
+      cur.total += Number(it.line_total);
+      m.set(it.name, cur);
+    });
+    return Array.from(m.values()).sort((a, b) => b.total - a.total).slice(0, 6);
+  }, [topItemsRaw]);
 
-  const rangeLabel = preset === "custom"
-    ? `${format(from, "MMM d")} – ${format(to, "MMM d, yyyy")}`
-    : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
-
-  const detail = useMemo(() => {
-    if (!detailKey) return null;
-    const fmtDateStr = (d: string) => fmtDate(d);
-    const withProfit = (arr: any[]) => arr.map((s:any)=>({...s, profit: Number(s.total)-Number(s.tax)-Number(s.cost_total)}));
-    switch (detailKey) {
-      case "revenue":
-        return { title: `Revenue · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total"],
-          rows: sales.map((s:any)=>[fmtDateStr(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
-          total: fmtMoney(revenue, sym) };
-      case "profit":
-        return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
-          rows: [["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)], ["Returns loss reversed", `- ${fmtMoney(returnsLoss, sym)}`], ["Net profit", fmtMoney(profit, sym)]],
-          total: fmtMoney(profit, sym) };
-      case "purch":
-        return { title: `Purchases · ${rangeLabel}`, cols: ["Date", "Total", "Paid"],
-          rows: purchases.map((p:any)=>[fmtDateStr(p.created_at), fmtMoney(Number(p.total), sym), fmtMoney(Number(p.paid), sym)]),
-          total: fmtMoney(purchTotal, sym) };
-      case "inventory":
-        return { title: "Inventory value", cols: ["Product", "Stock", "Cost", "Value"],
-          rows: [...products].sort((a:any,b:any)=>Number(b.stock)*Number(b.cost_price)-Number(a.stock)*Number(a.cost_price)).map((p:any)=>[p.name, String(p.stock), fmtMoney(Number(p.cost_price), sym), fmtMoney(Number(p.stock)*Number(p.cost_price), sym)]),
-          total: fmtMoney(inventoryValueAgg, sym) };
-      case "returns":
-        return { title: `Returns · ${rangeLabel}`, cols: ["Date", "Total", "Refunded"],
-          rows: saleReturns.map((r:any)=>[fmtDateStr(r.created_at), fmtMoney(Number(r.total), sym), fmtMoney(Number(r.refund_amount), sym)]),
-          total: fmtMoney(returnsTotal, sym) };
-      case "invoices":
-        return { title: `Invoices · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total", "Paid"],
-          rows: sales.map((s:any)=>[fmtDateStr(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
-          total: `${sales.length} invoices` };
-      case "net":
-        return { title: `Net revenue · ${rangeLabel}`, cols: ["Metric", "Amount"],
-          rows: [["Revenue", fmtMoney(revenue, sym)], ["Returns", `- ${fmtMoney(returnsTotal, sym)}`], ["Net", fmtMoney(netRevenue, sym)]],
-          total: fmtMoney(netRevenue, sym) };
-    }
-    return null;
-  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, netRevenue, inventoryValueAgg, sym, rangeLabel, salesProfit, returnsLoss]);
+  const lowStock = products.filter((p: any) => Number(p.stock) <= 5)
+    .sort((a: any, b: any) => Number(a.stock) - Number(b.stock)).slice(0, 6);
+  const inventoryValue = products.reduce((s: number, p: any) => s + Number(p.stock) * Number(p.cost_price), 0);
 
   return (
     <div className="p-6 space-y-6">
       <PageHeader
         title="Dashboard"
-        description={`${rangeLabel} · ${new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`}
+        description={`Overview of the last 30 days · ${new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`}
         icon={<TrendingUp className="h-5 w-5" />}
         actions={
           <>
@@ -317,76 +151,30 @@ function Page() {
         }
       />
 
-      {/* Range selector */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={preset} onValueChange={(v) => applyPreset(v as DatePreset)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select period" />
-          </SelectTrigger>
-          <SelectContent>
-            {PRESETS.map((p) => (
-              <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
-            ))}
-            {preset === "custom" && <SelectItem value="custom">Custom</SelectItem>}
-          </SelectContent>
-        </Select>
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className={cn("justify-start text-left font-normal min-w-[220px]")}>
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              {format(from, "MMM d, yyyy")} – {format(to, "MMM d, yyyy")}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="range"
-              selected={{ from, to }}
-              onSelect={(r: any) => {
-                if (r?.from) setFrom(startOfDay(r.from));
-                if (r?.to) setTo(startOfDay(r.to));
-                else if (r?.from) setTo(startOfDay(r.from));
-                setUserPicked(true);
-                setPreset("custom");
-              }}
-              numberOfMonths={2}
-              initialFocus
-              className={cn("p-3 pointer-events-auto")}
-            />
-          </PopoverContent>
-        </Popover>
-
-        <Button variant="ghost" size="sm" onClick={() => applyPreset("today")}>Reset to Today</Button>
-      </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        <Kpi onClick={() => setDetailKey("net")}
-          icon={TrendingUp} label="Revenue" value={fmtMoney(netRevenue, sym)}
-          delta={dNet} sub={`${stats?.sales_count || 0} invoices · after returns`} tone="primary"
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <Kpi
+          icon={TrendingUp} label="Today's revenue" value={fmtMoney(revToday, sym)}
+          delta={dayDelta} sub={`${todaySales.length} invoices`} tone="primary"
         />
-        <Kpi onClick={() => setDetailKey("revenue")}
-          icon={Receipt} label="Gross sales" value={fmtMoney(revenue, sym)}
-          delta={dRevenue} sub="Before returns" tone="info"
+        <Kpi
+          icon={Wallet} label="Today's profit" value={fmtMoney(profitToday, sym)}
+          sub="After cost & tax" tone="success"
         />
-        <Kpi onClick={() => setDetailKey("returns")}
-          icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
-          delta={dReturns} deltaInverse sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
+        <Kpi
+          icon={TrendingDown} label="Purchases (30d)" value={fmtMoney(purch30, sym)}
+          sub={`${fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} today`} tone="warning"
         />
-        <Kpi onClick={() => setDetailKey("profit")}
-          icon={Wallet} label="Profit" value={fmtMoney(profit, sym)}
-          delta={dProfit} sub="Net of returns" tone="success"
-        />
-        <Kpi onClick={() => setDetailKey("purch")}
-          icon={TrendingDown} label="Purchases" value={fmtMoney(purchTotal, sym)}
-          delta={dPurch} deltaInverse sub={`${purchases.length} entries`} tone="warning"
-        />
-        <Kpi onClick={() => setDetailKey("inventory")}
+        <Kpi
           icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
           sub={`${products.length} active SKUs`} tone="info"
         />
+        <Kpi
+          icon={Undo2} label="Returns (30d)" value={fmtMoney(returns30, sym)}
+          sub={`${fmtMoney(refunds30, sym)} refunded`} tone="warning"
+        />
       </div>
-
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -394,7 +182,7 @@ function Page() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="font-semibold">Revenue & profit</h2>
-              <p className="text-xs text-muted-foreground">{rangeLabel}</p>
+              <p className="text-xs text-muted-foreground">Last 30 days</p>
             </div>
             <div className="flex gap-3 text-xs text-muted-foreground">
               <Legend2 color="var(--chart-1)" label="Sales" />
@@ -435,7 +223,7 @@ function Page() {
 
         <Card className="p-5">
           <h2 className="font-semibold">Payment mix</h2>
-          <p className="text-xs text-muted-foreground mb-2">By revenue · {rangeLabel}</p>
+          <p className="text-xs text-muted-foreground mb-2">By revenue (30d)</p>
           <div className="h-64">
             {methodMix.length === 0 ? (
               <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No data</div>
@@ -465,7 +253,7 @@ function Page() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="font-semibold">Top selling items</h2>
-              <p className="text-xs text-muted-foreground">{rangeLabel}</p>
+              <p className="text-xs text-muted-foreground">Last 30 days</p>
             </div>
           </div>
           <div className="h-64">
@@ -519,96 +307,53 @@ function Page() {
 
       {/* Period summary footer */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Mini onClick={() => setDetailKey("revenue")} label={`Revenue · ${rangeLabel}`} value={fmtMoney(revenue, sym)} icon={TrendingUp} />
-        <Mini onClick={() => setDetailKey("net")} label="Net revenue" value={fmtMoney(netRevenue, sym)} icon={TrendingUp} accent />
-        <Mini onClick={() => setDetailKey("profit")} label="Profit" value={fmtMoney(profit, sym)} icon={Wallet} accent />
-        <Mini onClick={() => setDetailKey("purch")} label="Purchases" value={fmtMoney(purchTotal, sym)} icon={TrendingDown} />
-        <Mini onClick={() => setDetailKey("invoices")} label="Invoices" value={String(sales.length)} icon={Users} />
+        <Mini label="Revenue 30d" value={fmtMoney(rev30, sym)} icon={TrendingUp} />
+        <Mini label="Profit 30d" value={fmtMoney(profit30, sym)} icon={Wallet} accent />
+        <Mini label="Purchases today" value={fmtMoney(purchases.filter((p:any)=>new Date(p.created_at).getTime()>=today).reduce((s:number,p:any)=>s+Number(p.total),0), sym)} icon={TrendingDown} accent />
+        <Mini label="Purchases 30d" value={fmtMoney(purch30, sym)} icon={TrendingDown} />
+        <Mini label="Invoices 30d" value={String(sales.length)} icon={Users} />
       </div>
-
-      <Dialog open={!!detailKey} onOpenChange={(o) => !o && setDetailKey(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{detail?.title}</DialogTitle>
-            <DialogDescription>Total: <span className="font-semibold text-foreground">{detail?.total}</span> · {detail?.rows.length ?? 0} record(s)</DialogDescription>
-          </DialogHeader>
-          <div className="overflow-auto border rounded-md">
-            {detail && detail.rows.length > 0 ? (
-              <table className="w-full text-sm">
-                <thead className="bg-muted sticky top-0">
-                  <tr>{detail.cols.map((c) => <th key={c} className="text-left px-3 py-2 font-medium">{c}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {detail.rows.map((r, i) => (
-                    <tr key={i} className="border-t">
-                      {r.map((cell, j) => <td key={j} className="px-3 py-2">{cell}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="p-8 text-center text-sm text-muted-foreground">No records</div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
 function Kpi({
-  icon: Icon, label, value, delta, deltaInverse, sub, tone, onClick,
-}: { icon: any; label: string; value: string; delta?: number; deltaInverse?: boolean; sub?: string; tone: string; onClick?: () => void }) {
+  icon: Icon, label, value, delta, sub, tone,
+}: { icon: any; label: string; value: string; delta?: number; sub?: string; tone: string }) {
   const ring: Record<string, string> = {
     primary: "from-primary/15 to-primary/0 text-primary",
     success: "from-success/15 to-success/0 text-success",
     warning: "from-warning/20 to-warning/0 text-accent-foreground",
     info: "from-chart-5/20 to-chart-5/0 text-foreground",
   };
-  const hasDelta = delta !== undefined && Number.isFinite(delta);
-  const positive = hasDelta ? (deltaInverse ? (delta as number) < 0 : (delta as number) >= 0) : true;
-  const deltaClass = !hasDelta
-    ? ""
-    : (delta === 0
-        ? "bg-muted text-muted-foreground"
-        : positive
-          ? "bg-success/10 text-success"
-          : "bg-destructive/10 text-destructive");
   return (
-    <Card onClick={onClick} className={`p-5 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200" : ""}`}>
+    <Card className="p-5 relative overflow-hidden">
       <div className={`absolute inset-0 bg-gradient-to-br ${ring[tone]} pointer-events-none`} />
       <div className="relative">
-        <div className="flex items-start justify-between">
-          <div className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
-          <div className={`h-8 w-8 rounded-lg bg-background/70 backdrop-blur flex items-center justify-center shadow-sm ${ring[tone].split(" ").pop()}`}>
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground uppercase tracking-wider">{label}</div>
+          <div className={`h-8 w-8 rounded-md bg-background/60 backdrop-blur flex items-center justify-center ${ring[tone].split(" ").pop()}`}>
             <Icon className="h-4 w-4" />
           </div>
         </div>
-        <div className="text-2xl md:text-[1.7rem] font-bold mt-2 tracking-tight tabular-nums">{value}</div>
-        <div className="flex items-center justify-between mt-2 gap-2">
-          {hasDelta ? (
-            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-semibold ${deltaClass}`}>
-              {(delta as number) === 0
-                ? "—"
-                : (delta as number) > 0
-                  ? <ArrowUpRight className="h-3 w-3" />
-                  : <ArrowDownRight className="h-3 w-3" />}
-              {Math.abs(delta as number).toFixed(1)}%
+        <div className="text-3xl font-bold mt-2">{value}</div>
+        <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+          <span>{sub}</span>
+          {delta !== undefined && delta !== 0 && (
+            <span className={`flex items-center gap-0.5 font-medium ${delta >= 0 ? "text-success" : "text-destructive"}`}>
+              {delta >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+              {Math.abs(delta).toFixed(1)}%
             </span>
-          ) : <span />}
-          <span className="text-[11px] text-muted-foreground truncate text-right">{sub}</span>
+          )}
         </div>
-        {hasDelta && (
-          <div className="text-[10px] text-muted-foreground mt-1">vs previous period</div>
-        )}
       </div>
     </Card>
   );
 }
 
-function Mini({ label, value, icon: Icon, accent, onClick }: { label: string; value: string; icon: any; accent?: boolean; onClick?: () => void }) {
+function Mini({ label, value, icon: Icon, accent }: { label: string; value: string; icon: any; accent?: boolean }) {
   return (
-    <Card onClick={onClick} className={`p-4 flex items-center gap-3 ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
+    <Card className="p-4 flex items-center gap-3">
       <div className={`h-9 w-9 rounded-md flex items-center justify-center ${accent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
         <Icon className="h-4 w-4" />
       </div>
