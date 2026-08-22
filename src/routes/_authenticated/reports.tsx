@@ -420,7 +420,7 @@ function Page() {
   const summaryStats = (summaryStatsRaw as any) || {};
 
   const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
-    queryKey: ["report-sales-paged", fromTime, toTime, salesPage],
+    queryKey: ["report-sales-paged", fromTime, toTime, salesPage, tab],
     queryFn: async () => {
       const q = supabase.from("sales")
         .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)", { count: "exact" })
