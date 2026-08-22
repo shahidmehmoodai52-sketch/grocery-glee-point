@@ -177,7 +177,7 @@ function Page() {
     queryFn: async () =>
       (await supabase.from("sales").select("total,cost_total,tax,created_at,paid,payment_method,status")
         .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
-    enabled: !!detailKey && ["revenue", "invoices", "net", "profit"].includes(detailKey),
+    enabled: !!detailKey && ["revenue", "invoices", "net", "profit", "credit"].includes(detailKey),
   });
   const { data: purchases = [] } = useQuery({
     queryKey: ["dash-purchases-detail", fromISO, toISO],
