@@ -834,17 +834,28 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
             <TableRow>
               <TableHead>When</TableHead>
               <TableHead>Action</TableHead>
-              <TableHead>Table</TableHead>
-              <TableHead>Record</TableHead>
+              <TableHead>Target Table</TableHead>
+              <TableHead>Changes / Record</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {audit.map((a) => (
               <TableRow key={a.id}>
-                <TableCell className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</TableCell>
                 <TableCell><StatusBadge tone={a.action === "DELETE" ? "danger" : a.action === "INSERT" ? "success" : "neutral"}>{a.action}</StatusBadge></TableCell>
-                <TableCell className="text-xs">{a.table_name}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{a.record_id?.slice(0, 8) ?? "—"}</TableCell>
+                <TableCell className="text-[10px] font-mono">{a.table_name}</TableCell>
+                <TableCell className="text-[10px] text-muted-foreground">
+                  <div className="font-mono mb-1">{a.record_id?.slice(0, 8) ?? "—"}</div>
+                  {a.changed_fields && (
+                    <div className="max-w-xs overflow-hidden text-[9px] border rounded p-1 bg-muted/20">
+                      {Object.entries(a.changed_fields).map(([k, v]) => (
+                        <div key={k} className="truncate">
+                          <span className="font-semibold text-primary/70">{k}:</span> {JSON.stringify(v)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
