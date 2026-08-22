@@ -924,3 +924,107 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
     </Card>
   );
 }
+
+function CreditSalesDrilldown({ tenantId, open, onOpenChange }: { tenantId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const [page, setPage] = useState(0);
+  const limit = 50;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-shop-credit-invoices", tenantId, page],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_shop_invoices", {
+        _tenant_id: tenantId,
+        _payment_status: "unpaid",
+        _limit: limit,
+        _offset: page * limit,
+      });
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const invoices = data ?? [];
+  const totalCount = invoices[0]?.total_count ? Number(invoices[0].total_count) : 0;
+  const totalBalance = invoices.reduce((acc, inv) => acc + Number(inv.balance), 0);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between pr-8">
+            <span>Credit Sales (Unpaid Invoices)</span>
+            <span className="text-sm font-normal text-muted-foreground">
+              Total Invoices: {totalCount}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-auto py-4">
+          {isLoading ? (
+            <TableSkeleton rows={10} columns={5} />
+          ) : invoices.length === 0 ? (
+            <EmptyState icon={ShoppingCart} title="No unpaid invoices" description="This shop has no outstanding credit sales." />
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice No</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((inv) => (
+                    <TableRow key={inv.id}>
+                      <TableCell className="font-mono text-xs">{inv.invoice_no}</TableCell>
+                      <TableCell className="text-xs">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-xs truncate max-w-[150px]">{inv.customer_name || "Walk-in"}</TableCell>
+                      <TableCell className="text-right text-xs">{fmtMoney(inv.total, "")}</TableCell>
+                      <TableCell className="text-right text-xs font-semibold text-destructive">{fmtMoney(inv.balance, "")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <div className="mt-4 flex items-center justify-between border-t pt-4">
+                <div className="text-xs text-muted-foreground">
+                  Showing {page * limit + 1}–{Math.min((page + 1) * limit, totalCount)} of {totalCount}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 0}
+                    onClick={() => setPage(p => p - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={(page + 1) * limit >= totalCount}
+                    onClick={() => setPage(p => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        
+        <div className="border-t pt-4 flex justify-end items-center gap-4">
+          <div className="text-sm">
+            <span className="text-muted-foreground mr-2">Page Balance Total:</span>
+            <span className="font-bold text-destructive">{fmtMoney(totalBalance, "Rs.")}</span>
+          </div>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
