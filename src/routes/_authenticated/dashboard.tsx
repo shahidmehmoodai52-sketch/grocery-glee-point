@@ -207,6 +207,7 @@ function Page() {
   });
 
   const revenue = Number(stats?.sales_total || 0);
+  const creditSales = Number(stats?.credit_sales_total || 0);
   const prevRevenue = Number(prevStats?.sales_total || 0);
   
   // profit = revenue - returns - cost_total
