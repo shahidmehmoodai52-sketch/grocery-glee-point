@@ -461,8 +461,8 @@ function Page() {
     queryFn: async () => {
       const { data, count, error } = await supabase.from("expenses")
         .select("amount,category,expense_date", { count: "exact" })
-        .gte("expense_date", from)
-        .lte("expense_date", to)
+        .gte("expense_date", fromTime.split("T")[0])
+        .lte("expense_date", toTime.split("T")[0])
         .order("expense_date", { ascending: false })
         .range(expensesPage * PAGE_SIZE, (expensesPage + 1) * PAGE_SIZE - 1);
       if (error) throw error;
