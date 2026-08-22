@@ -681,7 +681,13 @@ function SalesTab({ tenantId }: { tenantId: string }) {
               </TableHeader>
               <TableBody>
                 {data.by_method.map((m) => (
-                  <TableRow key={m.method}>
+                  <TableRow 
+                    key={m.method}
+                    className={cn(m.method.toLowerCase() === "credit" && "cursor-pointer hover:bg-muted/50")}
+                    onClick={() => {
+                      if (m.method.toLowerCase() === "credit") setDrilldownOpen(true);
+                    }}
+                  >
                     <TableCell className="capitalize">{m.method}</TableCell>
                     <TableCell className="text-right">{Number(m.orders)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(Number(m.total), "")}</TableCell>
