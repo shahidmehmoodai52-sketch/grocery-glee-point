@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_action_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+          reason: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_action_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_staff: {
         Row: {
           added_by: string | null
@@ -2847,6 +2897,7 @@ export type Database = {
           tax_id: string | null
           tax_rate: number
           tenant_id: string
+          timezone: string
           undo_window_minutes: number
           updated_at: string
         }
@@ -2898,6 +2949,7 @@ export type Database = {
           tax_id?: string | null
           tax_rate?: number
           tenant_id?: string
+          timezone?: string
           undo_window_minutes?: number
           updated_at?: string
         }
@@ -2949,6 +3001,7 @@ export type Database = {
           tax_id?: string | null
           tax_rate?: number
           tenant_id?: string
+          timezone?: string
           undo_window_minutes?: number
           updated_at?: string
         }
@@ -3107,6 +3160,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_health_log: {
+        Row: {
+          check_name: string
+          checked_at: string
+          detail: string | null
+          id: number
+          issue_count: number
+          severity: string
+          tenant_id: string | null
+        }
+        Insert: {
+          check_name: string
+          checked_at?: string
+          detail?: string | null
+          id?: number
+          issue_count: number
+          severity: string
+          tenant_id?: string | null
+        }
+        Update: {
+          check_name?: string
+          checked_at?: string
+          detail?: string | null
+          id?: number
+          issue_count?: number
+          severity?: string
+          tenant_id?: string | null
+        }
+        Relationships: []
       }
       tenant_invitations: {
         Row: {
@@ -3509,6 +3592,31 @@ export type Database = {
       }
     }
     Views: {
+      admin_action_log_view: {
+        Row: {
+          action: string | null
+          actor_id: string | null
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          metadata: Json | null
+          reason: string | null
+          tenant_id: string | null
+          tenant_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_action_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_batch_status: {
         Row: {
           batch_no: string | null
@@ -3788,15 +3896,17 @@ export type Database = {
         Args: { _expires_at: string; _tenant_id: string }
         Returns: undefined
       }
-      admin_set_tenant_plan: {
-        Args: {
-          _expires_at?: string
-          _plan_id: string
-          _status?: string
-          _tenant_id: string
-        }
-        Returns: undefined
-      }
+      admin_set_tenant_plan:
+        | { Args: { _plan: string; _tenant_id: string }; Returns: undefined }
+        | {
+            Args: {
+              _expires_at?: string
+              _plan_id: string
+              _status?: string
+              _tenant_id: string
+            }
+            Returns: undefined
+          }
       admin_set_tenant_status: {
         Args: { _reason?: string; _status: string; _tenant_id: string }
         Returns: undefined
@@ -3804,6 +3914,26 @@ export type Database = {
       admin_shop_analytics: {
         Args: { _from?: string; _tenant_id: string; _to?: string }
         Returns: Json
+      }
+      admin_shop_invoices: {
+        Args: {
+          _from?: string
+          _limit?: number
+          _offset?: number
+          _payment_status?: string
+          _tenant_id: string
+          _to?: string
+        }
+        Returns: {
+          balance: number
+          created_at: string
+          customer_name: string
+          id: string
+          invoice_no: string
+          paid_amount: number
+          total: number
+          total_count: number
+        }[]
       }
       admin_tenant_audit: {
         Args: { _limit?: number; _tenant_id: string }
@@ -4079,6 +4209,17 @@ export type Database = {
         Args: { _perm: string; _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      health_status: {
+        Args: never
+        Returns: {
+          check_name: string
+          detail: string
+          first_seen: string
+          issue_count: number
+          last_checked: string
+          severity: string
+        }[]
+      }
       hold_bill: {
         Args: {
           _customer: string
@@ -4104,6 +4245,19 @@ export type Database = {
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
+      }
+      log_admin_action: {
+        Args: {
+          _action: string
+          _after_state?: Json
+          _before_state?: Json
+          _entity_id?: string
+          _entity_type?: string
+          _metadata?: Json
+          _reason?: string
+          _tenant_id?: string
+        }
+        Returns: undefined
       }
       log_application_error: {
         Args: {
@@ -4186,6 +4340,7 @@ export type Database = {
           tax_id: string | null
           tax_rate: number
           tenant_id: string
+          timezone: string
           undo_window_minutes: number
           updated_at: string
         }[]
@@ -4219,6 +4374,18 @@ export type Database = {
           _reason: string
           _reference: string
           _type: string
+        }
+        Returns: string
+      }
+      record_cash_out: {
+        Args: {
+          p_account_id: string
+          p_amount: number
+          p_client_id?: string
+          p_customer_id: string
+          p_note?: string
+          p_occurred_on?: string
+          p_tenant_id?: string
         }
         Returns: string
       }
@@ -4288,6 +4455,15 @@ export type Database = {
       }
       resolve_payment_bucket: { Args: { p_method: string }; Returns: string }
       resume_bill: { Args: { _id: string }; Returns: Json }
+      run_health_check: {
+        Args: never
+        Returns: {
+          check_name: string
+          detail: string
+          issue_count: number
+          severity: string
+        }[]
+      }
       set_checklist_item: {
         Args: {
           _completed: boolean
@@ -4337,6 +4513,7 @@ export type Database = {
         Args: { _category: string; _tenant: string }
         Returns: boolean
       }
+      tenant_timezone: { Args: { p_tenant_id: string }; Returns: string }
       undo_last_sale: { Args: { _sale_id: string }; Returns: Json }
       update_party_payment: {
         Args: {

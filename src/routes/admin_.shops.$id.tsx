@@ -500,6 +500,7 @@ type Analytics = {
 };
 
 function SalesTab({ tenantId }: { tenantId: string }) {
+  const [drilldownOpen, setDrilldownOpen] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["admin-shop-analytics", tenantId],
     queryFn: async () => {
@@ -582,19 +583,38 @@ function SalesTab({ tenantId }: { tenantId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.by_method.map((m) => (
-                  <TableRow key={m.method}>
-                    <TableCell className="capitalize">{m.method}</TableCell>
-                    <TableCell className="text-right">{Number(m.orders)}</TableCell>
-                    <TableCell className="text-right">{fmtMoney(Number(m.total), "")}</TableCell>
-                  </TableRow>
-                ))}
+                {data.by_method.map((m) => {
+                  const isCredit = m.method.toLowerCase() === "credit";
+                  return (
+                    <TableRow
+                      key={m.method}
+                      className={isCredit ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                      onClick={() => isCredit && setDrilldownOpen(true)}
+                    >
+                      <TableCell className="capitalize flex items-center gap-2">
+                        {m.method}
+                        {isCredit && <Activity className="h-3 w-3 text-primary animate-pulse" />}
+                      </TableCell>
+                      <TableCell className="text-right">{Number(m.orders)}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {fmtMoney(Number(m.total), "")}
+                        {isCredit && <ChevronDown className="h-3 w-3 inline ml-1 opacity-50" />}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
           <div className="mt-3 text-xs text-muted-foreground">Expenses (30d): {fmtMoney(data.expenses_total, "")}</div>
         </Card>
       </div>
+
+      <CreditSalesDrilldown
+        tenantId={tenantId}
+        open={drilldownOpen}
+        onOpenChange={setDrilldownOpen}
+      />
     </div>
   );
 }
@@ -824,5 +844,139 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
         </Table>
       )}
     </Card>
+  );
+}
+
+function CreditSalesDrilldown({
+  tenantId,
+  open,
+  onOpenChange,
+}: {
+  tenantId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-credit-sales", tenantId, page],
+    enabled: open,
+    queryFn: async () => {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error, count } = await supabase
+        .from("sales")
+        .select("id, invoice_no, total, created_at, customer:customers(name)", { count: "exact" })
+        .eq("tenant_id", tenantId)
+        .eq("payment_method", "credit")
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+      return { items: data || [], total: count || 0 };
+    },
+  });
+
+  const totalPages = Math.ceil((data?.total || 0) / pageSize);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="p-6 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <CreditCard className="h-5 w-5 text-primary" />
+            Credit Sales (Unpaid Invoices)
+          </DialogTitle>
+          <div className="text-sm text-muted-foreground mt-1">
+            Showing all credit transactions for this shop.
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-auto px-6 py-2">
+          {isLoading ? (
+            <TableSkeleton rows={10} columns={4} />
+          ) : !data || data.items.length === 0 ? (
+            <EmptyState
+              icon={ShoppingCart}
+              title="No credit sales found"
+              description="This shop doesn't have any sales recorded with the 'credit' payment method."
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-md border border-border/60 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="w-[150px]">Date</TableHead>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.items.map((sale) => (
+                      <TableRow key={sale.id} className="hover:bg-muted/20">
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(sale.created_at).toLocaleDateString()}
+                          <span className="block text-[10px] opacity-70">
+                            {new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs font-medium">{sale.invoice_no}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
+                          {(sale.customer as any)?.name || "Walk-in Customer"}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-primary">
+                          {fmtMoney(Number(sale.total), "")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2 border-t border-border/40">
+                <div className="text-xs text-muted-foreground font-medium">
+                  Showing <span className="text-foreground">{page * pageSize + 1}</span> to{" "}
+                  <span className="text-foreground">{Math.min((page + 1) * pageSize, data.total)}</span> of{" "}
+                  <span className="text-foreground">{data.total}</span> entries
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-semibold"
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                  >
+                    Previous
+                  </Button>
+                  <div className="text-xs font-bold px-3 py-1 bg-muted rounded-md border border-border/40">
+                    Page {page + 1} of {totalPages || 1}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-semibold"
+                    onClick={() => setPage((p) => p + 1)}
+                    disabled={page >= totalPages - 1}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="p-6 pt-2 border-t border-border/40">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-semibold">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
