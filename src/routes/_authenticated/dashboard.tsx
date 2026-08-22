@@ -273,8 +273,8 @@ function Page() {
           rows: sales.map((s:any)=>[fmtDateStr(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
           total: fmtMoney(revenue, sym) };
       case "credit":
-        return { title: `Credit sales · ${rangeLabel}`, cols: ["Date", "Invoice", "Status", "Total"],
-          rows: sales.filter((s:any) => s.status === "credit").map((s:any)=>[fmtDateStr(s.created_at), s.invoice_no||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
+        return { title: `Credit sales · ${rangeLabel}`, cols: ["Date", "Invoice", "Status", "Total", "Paid"],
+          rows: sales.filter((s:any) => s.status === "credit").map((s:any)=>[fmtDateStr(s.created_at), s.invoice_no||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
           total: fmtMoney(creditSales, sym) };
       case "profit":
         return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
