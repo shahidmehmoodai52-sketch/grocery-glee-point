@@ -1,10 +1,10 @@
-import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
-  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2, LogOut
+  KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -28,52 +28,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { fmtMoney } from "@/lib/format";
 import { resetTenantOwnerPassword } from "@/lib/admin.functions";
-import { Toaster } from "@/components/ui/sonner";
-import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
-import { cn } from "@/lib/utils";
-
 
 export const Route = createFileRoute("/admin_/shops/$id")({
-  beforeLoad: async ({ location }) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw redirect({ to: "/admin-login", search: { next: location.pathname } });
-    }
-    const { data: isAdmin } = await supabase.rpc("am_i_admin_staff");
-    if (!isAdmin) {
-      await supabase.auth.signOut();
-      throw redirect({ to: "/admin-login" });
-    }
-  },
-  component: AdminShopDetailLayout,
+  component: ShopDetailPage,
 });
-
-function AdminShopDetailLayout() {
-  const navigate = useNavigate();
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate({ to: "/admin-login", replace: true });
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="h-14 border-b bg-card px-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          <h1 className="font-semibold text-lg">Tillix Admin</h1>
-        </div>
-        <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2 text-muted-foreground hover:text-foreground">
-          <LogOut className="h-4 w-4" />
-          <span>Sign out</span>
-        </Button>
-      </header>
-      <main className="flex-1">
-        <ShopDetailPage />
-      </main>
-      <Toaster richColors position="top-right" duration={4000} closeButton />
-    </div>
-  );
-}
 
 function ShopDetailPage() {
   const navigate = useNavigate();
@@ -81,7 +39,7 @@ function ShopDetailPage() {
   const { isSuperAdmin, loading } = useSuperAdmin();
 
   useEffect(() => {
-    if (!loading && !isSuperAdmin) navigate({ to: "/admin", replace: true });
+    if (!loading && !isSuperAdmin) navigate({ to: "/dashboard", replace: true });
   }, [loading, isSuperAdmin, navigate]);
 
   if (loading) return <div className="p-6"><TableSkeleton rows={6} columns={4} /></div>;
@@ -108,11 +66,6 @@ type TenantDetail = {
 function ShopDetail({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [suspendDialog, setSuspendDialog] = useState(false);
-  const [archiveDialog, setArchiveDialog] = useState(false);
-  const [deleteDialog, setDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
@@ -133,39 +86,37 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
   };
 
-  const suspend = () => setSuspendDialog(true);
-  const archive = () => setArchiveDialog(true);
-  const removeShop = () => setDeleteDialog(true);
-
-  const handleConfirmDelete = async () => {
-    if (!data) return;
-    const expected = data.tenant.name.trim();
-    setIsDeleting(true);
-    try {
-      let done = false;
-      while (!done) {
-        const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", { 
-          _tenant_id: tenantId, 
-          _confirm: expected 
-        });
-        if (error) throw error;
-        done = Boolean(
-          deletionResult
-          && typeof deletionResult === "object"
-          && "done" in deletionResult
-          && deletionResult.done,
-        );
-      }
-      toast.success(`Deleted "${expected}"`);
-      qc.invalidateQueries({ queryKey: ["admin-tenants"] });
-      navigate({ to: "/admin", replace: true });
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setIsDeleting(false);
-    }
+  const suspend = async () => {
+    const reason = window.prompt(`Suspend "${data?.tenant.name}"? Reason:`) ?? "";
+    if (!reason) return;
+    await setStatus("suspended", reason);
   };
 
+  const removeShop = async () => {
+    if (!data) return;
+    const expected = data.tenant.name.trim();
+    const typed = window.prompt(
+      `PERMANENTLY delete this shop and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone.\n\nType exactly:  ${expected}`,
+    );
+    if (typed === null) return;
+    if (typed.trim().toLowerCase() !== expected.toLowerCase()) {
+      return toast.error(`Confirmation did not match. Expected: "${expected}"`);
+    }
+    let done = false;
+    while (!done) {
+      const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: expected });
+      if (error) return toast.error(error.message);
+      done = Boolean(
+        deletionResult
+        && typeof deletionResult === "object"
+        && "done" in deletionResult
+        && deletionResult.done,
+      );
+    }
+    toast.success(`Deleted "${expected}"`);
+    qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    navigate({ to: "/admin", replace: true });
+  };
 
   if (isLoading || !data) return <div className="p-6"><TableSkeleton rows={6} columns={4} /></div>;
   const t = data.tenant;
@@ -213,11 +164,12 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
               {t.library_approved ? "Revoke library access" : "Grant library access"}
             </Button>
             {t.status !== "archived" && (
-              <Button size="sm" variant="ghost" onClick={archive}>
+              <Button size="sm" variant="ghost" onClick={() => {
+                if (confirm(`Archive "${t.name}"? Owner loses access.`)) setStatus("archived");
+              }}>
                 <Archive className="h-4 w-4 mr-1" /> Archive
               </Button>
             )}
-
             <Button size="sm" variant="destructive" onClick={removeShop}>
               <Trash2 className="h-4 w-4 mr-1" /> Delete shop
             </Button>
@@ -250,44 +202,9 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
           <ActivityTab tenantId={tenantId} />
         </TabsContent>
       </Tabs>
-
-      <TypedConfirmDialog
-        open={suspendDialog}
-        onOpenChange={setSuspendDialog}
-        title="Suspend Shop"
-        description={`Are you sure you want to suspend "${t.name}"? This will block access for all staff members.`}
-        confirmLabel="Suspend"
-        requireReason
-        destructive
-        onConfirm={async (reason) => { await setStatus("suspended", reason); }}
-      />
-
-      <TypedConfirmDialog
-        open={archiveDialog}
-        onOpenChange={setArchiveDialog}
-        title="Archive Shop"
-        description={`Are you sure you want to archive "${t.name}"? The owner and staff will lose access, but data will be preserved.`}
-        confirmLabel="Archive"
-        requireReason
-        destructive
-        onConfirm={async (reason) => { await setStatus("archived", reason); }}
-      />
-
-      <TypedConfirmDialog
-        open={deleteDialog}
-        onOpenChange={setDeleteDialog}
-        title="Permanently Delete Shop"
-        description={`This will permanently delete "${t.name}" and ALL its data. This action is irreversible.`}
-        confirmText={t.name}
-        confirmLabel="Delete Everything"
-        destructive
-        isLoading={isDeleting}
-        onConfirm={handleConfirmDelete}
-      />
     </div>
   );
 }
-
 
 function StatusIndicator({ status }: { status: string }) {
   if (status === "active") return <StatusBadge tone="success">Active</StatusBadge>;
@@ -580,7 +497,6 @@ type Analytics = {
   by_method: Array<{ method: string; orders: number; total: number }>;
   low_stock: number;
   expenses_total: number;
-  credit_sales_total?: number;
 };
 
 function SalesTab({ tenantId }: { tenantId: string }) {
@@ -600,29 +516,14 @@ function SalesTab({ tenantId }: { tenantId: string }) {
   const totalCost = data.daily.reduce((a, d) => a + Number(d.cost), 0);
   const totalOrders = data.daily.reduce((a, d) => a + Number(d.orders), 0);
 
-  const [drilldownOpen, setDrilldownOpen] = useState(false);
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} />
-        <StatCard 
-          label="Credit Sales (30d)" 
-          value={fmtMoney(data.credit_sales_total ?? 0, "")} 
-          icon={CreditCard} 
-          onClick={() => setDrilldownOpen(true)}
-          className="cursor-pointer hover:bg-muted/50 transition-colors"
-        />
         <StatCard label="Orders (30d)" value={totalOrders} icon={ShoppingCart} />
         <StatCard label="Est. profit" value={fmtMoney(totalRevenue - totalCost, "")} icon={Wallet} tone="success" />
         <StatCard label="Low stock" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock > 0 ? "warning" : "default"} />
       </div>
-
-      <CreditSalesDrilldown 
-        tenantId={tenantId} 
-        open={drilldownOpen} 
-        onOpenChange={setDrilldownOpen} 
-      />
 
       <Card className="p-4">
         <div className="text-sm font-medium mb-3">Daily revenue — last 30 days</div>
@@ -682,13 +583,7 @@ function SalesTab({ tenantId }: { tenantId: string }) {
               </TableHeader>
               <TableBody>
                 {data.by_method.map((m) => (
-                  <TableRow 
-                    key={m.method}
-                    className={cn(m.method.toLowerCase() === "credit" && "cursor-pointer hover:bg-muted/50")}
-                    onClick={() => {
-                      if (m.method.toLowerCase() === "credit") setDrilldownOpen(true);
-                    }}
-                  >
+                  <TableRow key={m.method}>
                     <TableCell className="capitalize">{m.method}</TableCell>
                     <TableCell className="text-right">{Number(m.orders)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(Number(m.total), "")}</TableCell>
@@ -929,109 +824,5 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
         </Table>
       )}
     </Card>
-  );
-}
-
-function CreditSalesDrilldown({ tenantId, open, onOpenChange }: { tenantId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const [page, setPage] = useState(0);
-  const limit = 50;
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-shop-credit-invoices", tenantId, page],
-    enabled: open,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_shop_invoices", {
-        _tenant_id: tenantId,
-        _payment_status: "unpaid",
-        _limit: limit,
-        _offset: page * limit,
-      });
-      if (error) throw error;
-      return (data as any[]) ?? [];
-    },
-  });
-
-  const invoices = data ?? [];
-  const totalCount = invoices[0]?.total_count ? Number(invoices[0].total_count) : 0;
-  const totalBalance = invoices.reduce((acc, inv) => acc + Number(inv.balance), 0);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between pr-8">
-            <span>Credit Sales (Unpaid Invoices)</span>
-            <span className="text-sm font-normal text-muted-foreground">
-              Total Invoices: {totalCount}
-            </span>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-auto py-4">
-          {isLoading ? (
-            <TableSkeleton rows={10} columns={5} />
-          ) : invoices.length === 0 ? (
-            <EmptyState icon={ShoppingCart} title="No unpaid invoices" description="This shop has no outstanding credit sales." />
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice No</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-mono text-xs">{inv.invoice_no}</TableCell>
-                      <TableCell className="text-xs">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]">{inv.customer_name || "Walk-in"}</TableCell>
-                      <TableCell className="text-right text-xs">{fmtMoney(inv.total, "")}</TableCell>
-                      <TableCell className="text-right text-xs font-semibold text-destructive">{fmtMoney(inv.balance, "")}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <div className="mt-4 flex items-center justify-between border-t pt-4">
-                <div className="text-xs text-muted-foreground">
-                  Showing {page * limit + 1}–{Math.min((page + 1) * limit, totalCount)} of {totalCount}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 0}
-                    onClick={() => setPage(p => p - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={(page + 1) * limit >= totalCount}
-                    onClick={() => setPage(p => p + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        
-        <div className="border-t pt-4 flex justify-end items-center gap-4">
-          <div className="text-sm">
-            <span className="text-muted-foreground mr-2">Page Balance Total:</span>
-            <span className="font-bold text-destructive">{fmtMoney(totalBalance, "Rs.")}</span>
-          </div>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
