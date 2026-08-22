@@ -733,7 +733,7 @@ function Page() {
         <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Cost of goods" value={fmtMoney(cogs, sym)} tone="destructive" />
         <Stat icon={Wallet} label="Gross profit" value={fmtMoney(grossProfit, sym)} tone="success" />
-        <Stat icon={CreditCard} label="Credit sales" value={fmtMoney(creditOut, sym)} tone="warning" />
+        <Stat icon={CreditCard} label="Credit sales" value={fmtMoney(creditOut, sym)} tone="warning" onClick={() => openInvoices("Credit sales (period)", (sales as any[]).filter((s) => s.status === "credit"))} />
         <Stat icon={TrendingDown} label="Expenses (period)" value={fmtMoney(expensesPeriod, sym)} tone="warning" />
       </div>
 
