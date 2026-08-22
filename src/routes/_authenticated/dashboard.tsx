@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Wallet, Users, ShoppingCart, Package,
-  AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt, CalendarIcon,
+  AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt, CalendarIcon, CreditCard,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
