@@ -662,6 +662,7 @@ function Page() {
   const q = search.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
     if (!q) return sales as any[];
+    if (q === "status:credit") return (sales as any[]).filter(s => s.status === "credit");
     return (sales as any[]).filter((s) =>
       String(s.invoice_no ?? "").toLowerCase().includes(q) ||
       String(s.customers?.name ?? "walk-in").toLowerCase().includes(q) ||
