@@ -943,7 +943,14 @@ function CreditSalesDrilldown({
                   Showing <span className="text-foreground">{page * pageSize + 1}</span> to{" "}
                   <span className="text-foreground">{Math.min((page + 1) * pageSize, data.total)}</span> of{" "}
                   <span className="text-foreground">{data.total}</span> entries
+                  <span className="block mt-1">
+                    Page total:{" "}
+                    <span className="text-foreground font-semibold">
+                      {fmtMoney(data.items.reduce((s, r) => s + Number(r.total || 0), 0), "")}
+                    </span>
+                  </span>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
