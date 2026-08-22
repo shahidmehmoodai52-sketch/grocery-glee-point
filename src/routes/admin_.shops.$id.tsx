@@ -30,7 +30,6 @@ import { fmtMoney } from "@/lib/format";
 import { resetTenantOwnerPassword } from "@/lib/admin.functions";
 import { Toaster } from "@/components/ui/sonner";
 import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
-import { cn } from "@/lib/utils";
 
 
 export const Route = createFileRoute("/admin_/shops/$id")({
@@ -682,13 +681,7 @@ function SalesTab({ tenantId }: { tenantId: string }) {
               </TableHeader>
               <TableBody>
                 {data.by_method.map((m) => (
-                  <TableRow 
-                    key={m.method}
-                    className={cn(m.method.toLowerCase() === "credit" && "cursor-pointer hover:bg-muted/50")}
-                    onClick={() => {
-                      if (m.method.toLowerCase() === "credit") setDrilldownOpen(true);
-                    }}
-                  >
+                  <TableRow key={m.method}>
                     <TableCell className="capitalize">{m.method}</TableCell>
                     <TableCell className="text-right">{Number(m.orders)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(Number(m.total), "")}</TableCell>
@@ -931,7 +924,6 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
     </Card>
   );
 }
-
 function CreditSalesDrilldown({ tenantId, open, onOpenChange }: { tenantId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   const [page, setPage] = useState(0);
   const limit = 50;
