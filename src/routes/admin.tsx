@@ -449,7 +449,7 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
                     <span className="text-[10px] text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</span>
                   </div>
                   <Button size="icon" variant="ghost" asChild className="h-8 w-8">
-                    <Link to="/admin_/shops/$id" params={{ id: t.id }}><Eye className="h-4 w-4" /></Link>
+                    <Link to="/admin/shops/$id" params={{ id: t.id }}><Eye className="h-4 w-4" /></Link>
                   </Button>
                 </div>
               </div>
