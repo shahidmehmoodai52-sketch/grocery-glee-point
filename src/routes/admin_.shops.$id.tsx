@@ -599,14 +599,29 @@ function SalesTab({ tenantId }: { tenantId: string }) {
   const totalCost = data.daily.reduce((a, d) => a + Number(d.cost), 0);
   const totalOrders = data.daily.reduce((a, d) => a + Number(d.orders), 0);
 
+  const [drilldownOpen, setDrilldownOpen] = useState(false);
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} />
+        <StatCard 
+          label="Credit Sales (30d)" 
+          value={fmtMoney(data.credit_sales_total ?? 0, "")} 
+          icon={CreditCard} 
+          onClick={() => setDrilldownOpen(true)}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        />
         <StatCard label="Orders (30d)" value={totalOrders} icon={ShoppingCart} />
         <StatCard label="Est. profit" value={fmtMoney(totalRevenue - totalCost, "")} icon={Wallet} tone="success" />
         <StatCard label="Low stock" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock > 0 ? "warning" : "default"} />
       </div>
+
+      <CreditSalesDrilldown 
+        tenantId={tenantId} 
+        open={drilldownOpen} 
+        onOpenChange={setDrilldownOpen} 
+      />
 
       <Card className="p-4">
         <div className="text-sm font-medium mb-3">Daily revenue — last 30 days</div>
