@@ -28,6 +28,7 @@ import {
   Activity,
   TrendingUp,
   Wallet,
+  LayoutDashboard,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -213,7 +214,7 @@ function AdminPanelPage() {
       />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-muted/50 p-1 flex-wrap h-auto justify-start">
-           <TabsTrigger value="dashboard"><Activity className="h-4 w-4 mr-1" />Dashboard</TabsTrigger>
+           <TabsTrigger value="dashboard"><LayoutDashboard className="h-4 w-4 mr-1" />Dashboard</TabsTrigger>
           <TabsTrigger value="tenants"><Store className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
           <TabsTrigger value="library"><BookOpen className="h-4 w-4 mr-1" />Library</TabsTrigger>
           <TabsTrigger value="printers"><Printer className="h-4 w-4 mr-1" />Printers</TabsTrigger>
