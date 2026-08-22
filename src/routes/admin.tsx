@@ -432,12 +432,12 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Latest Shop Activity
+              Recent Shops
             </h3>
             <Button variant="ghost" size="sm" onClick={() => setActiveTab("tenants")}>View all</Button>
           </div>
           <div className="space-y-3">
-            {tenants.slice(0, 5).map(t => (
+            {[...tenants].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5).map(t => (
               <div key={t.id} className="flex items-center justify-between p-2 rounded-lg border bg-muted/30">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{t.name}</span>
