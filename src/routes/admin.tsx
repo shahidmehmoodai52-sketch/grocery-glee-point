@@ -1283,7 +1283,8 @@ function SecurityTab() {
         </div>
       </Card>
 
-      <Card className="p-3">
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card className="p-3">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Lock className="h-4 w-4" />
@@ -1336,7 +1337,8 @@ function SecurityTab() {
             ))}
           </TableBody>
         </Table>
-      </Card>
+        </Card>
+      </div>
 
       <Card className="p-3">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
