@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
   KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2,
+  Calendar, Search, Filter,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -123,59 +124,65 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
   const owner = data.members.find((m) => m.user_id === t.owner_id) ?? null;
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center gap-2">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/admin"><ArrowLeft className="h-4 w-4 mr-1" /> Admin panel</Link>
+          <Link to="/admin"><ArrowLeft className="h-4 w-4 mr-1" /> Back to Panel</Link>
         </Button>
+        <div className="flex items-center gap-2">
+           <StatusIndicator status={t.status} />
+        </div>
       </div>
-      <PageHeader
-        title={t.name}
-        description={`${owner?.email ?? "No owner"} · ${t.slug ?? "—"} · Registered ${new Date(t.created_at).toLocaleDateString()}`}
-        icon={<Store className="h-5 w-5" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <StatusIndicator status={t.status} />
-            {t.status !== "active" && (
-              <Button size="sm" onClick={() => setStatus("active")}>
-                <CheckCircle2 className="h-4 w-4 mr-1" /> {t.status === "pending" ? "Approve" : "Activate"}
-              </Button>
-            )}
-            {t.status === "active" && (
-              <Button size="sm" variant="outline" onClick={suspend}>
-                <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant={t.library_approved ? "outline" : "default"}
-              onClick={async () => {
-                const next = !t.library_approved;
-                const { error } = await supabase
-                  .from("tenants")
-                  .update({ library_approved: next })
-                  .eq("id", t.id);
-                if (error) return toast.error(error.message);
-                toast.success(next ? "Global library access granted" : "Global library access revoked");
-                qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
-              }}
-            >
-              <Library className="h-4 w-4 mr-1" />
-              {t.library_approved ? "Revoke library access" : "Grant library access"}
-            </Button>
-            {t.status !== "archived" && (
-              <Button size="sm" variant="ghost" onClick={() => {
-                if (confirm(`Archive "${t.name}"? Owner loses access.`)) setStatus("archived");
-              }}>
-                <Archive className="h-4 w-4 mr-1" /> Archive
-              </Button>
-            )}
-            <Button size="sm" variant="destructive" onClick={removeShop}>
-              <Trash2 className="h-4 w-4 mr-1" /> Delete shop
-            </Button>
+
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-6">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+            <Store className="h-8 w-8" />
           </div>
-        }
-      />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{t.name}</h1>
+            <p className="text-muted-foreground mt-1 flex items-center gap-2">
+              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{t.slug ?? "no-slug"}</span>
+              <span>•</span>
+              <span>{owner?.email ?? "No owner email"}</span>
+              <span>•</span>
+              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(t.created_at).toLocaleDateString()}</span>
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2">
+          {t.status !== "active" && (
+            <Button onClick={() => setStatus("active")}>
+              <CheckCircle2 className="h-4 w-4 mr-1" /> {t.status === "pending" ? "Approve" : "Activate"}
+            </Button>
+          )}
+          {t.status === "active" && (
+            <Button variant="outline" onClick={suspend}>
+              <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
+            </Button>
+          )}
+          <Button
+            variant={t.library_approved ? "outline" : "secondary"}
+            onClick={async () => {
+              const next = !t.library_approved;
+              const { error } = await supabase
+                .from("tenants")
+                .update({ library_approved: next })
+                .eq("id", t.id);
+              if (error) return toast.error(error.message);
+              toast.success(next ? "Library access granted" : "Library access revoked");
+              qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
+            }}
+          >
+            <Library className="h-4 w-4 mr-1" />
+            {t.library_approved ? "Revoke Library" : "Grant Library"}
+          </Button>
+          <Button variant="destructive" size="icon" onClick={removeShop} title="Delete shop">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       <Tabs defaultValue="overview">
         <TabsList>
