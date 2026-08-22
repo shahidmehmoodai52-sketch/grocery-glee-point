@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon, Package, Search, ArrowUpDown } from "lucide-react";
+import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon, Package, Search, ArrowUpDown, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -521,8 +521,8 @@ function Page() {
   const grossProfit = revenue - cogs;
   const netProfit = grossProfit - expensesPeriod;
   const grossRevenue = revenue + Number(summaryStats.returns_total || 0);
-  const creditOut = 0; // Not in RPC yet
-  const cashIn = 0; // Not in RPC yet
+  const creditOut = Number(summaryStats.credit_sales_total || 0);
+  const cashIn = Number(summaryStats.cash_sales_total || 0);
   const returnsLoss = Number(summaryStats.returns_total || 0);
   const returnsSubtotal = returnsLoss;
 
@@ -729,10 +729,11 @@ function Page() {
       </div>
 
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Cost of goods" value={fmtMoney(cogs, sym)} tone="destructive" />
         <Stat icon={Wallet} label="Gross profit" value={fmtMoney(grossProfit, sym)} tone="success" />
+        <Stat icon={CreditCard} label="Credit sales" value={fmtMoney(creditOut, sym)} tone="warning" />
         <Stat icon={TrendingDown} label="Expenses (period)" value={fmtMoney(expensesPeriod, sym)} tone="warning" />
       </div>
 
@@ -769,7 +770,7 @@ function Page() {
                 <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", sales as any[])} />
                 <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
                 <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted onClick={() => openInvoices("Tax collected", (sales as any[]).filter((s) => Number(s.tax) > 0))} />
-                <Row label="Credit outstanding" value={fmtMoney(creditOut, sym)} muted onClick={() => openInvoices("Credit outstanding", (sales as any[]).filter((s) => s.status === "credit" && Number(s.total) - Number(s.paid) > 0))} />
+                <Row label="Credit sales (period)" value={fmtMoney(creditOut, sym)} muted onClick={() => openInvoices("Credit sales (period)", (sales as any[]).filter((s) => s.status === "credit"))} />
                 <Row label="Total purchases (period)" value={fmtMoney(totalPurchases, sym)} muted onClick={openPurchases} />
                 <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices("Net profit basis · all invoices", sales as any[])} />
 

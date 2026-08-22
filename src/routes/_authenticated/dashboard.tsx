@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Wallet, Users, ShoppingCart, Package,
-  AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt, CalendarIcon,
+  AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt, CalendarIcon, CreditCard,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
@@ -207,6 +207,7 @@ function Page() {
   });
 
   const revenue = Number(stats?.sales_total || 0);
+  const creditSales = Number(stats?.credit_sales_total || 0);
   const prevRevenue = Number(prevStats?.sales_total || 0);
   
   // profit = revenue - returns - cost_total
@@ -271,6 +272,10 @@ function Page() {
         return { title: `Revenue · ${rangeLabel}`, cols: ["Date", "Method", "Status", "Total"],
           rows: sales.map((s:any)=>[fmtDateStr(s.created_at), displayPaymentMethod(s.payment_method)||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
           total: fmtMoney(revenue, sym) };
+      case "credit":
+        return { title: `Credit sales · ${rangeLabel}`, cols: ["Date", "Invoice", "Status", "Total"],
+          rows: sales.filter((s:any) => s.status === "credit").map((s:any)=>[fmtDateStr(s.created_at), s.invoice_no||"-", s.status||"-", fmtMoney(Number(s.total), sym)]),
+          total: fmtMoney(creditSales, sym) };
       case "profit":
         return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
           rows: [["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)], ["Returns loss reversed", `- ${fmtMoney(returnsLoss, sym)}`], ["Net profit", fmtMoney(profit, sym)]],
@@ -356,7 +361,7 @@ function Page() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
         <Kpi onClick={() => setDetailKey("net")}
           icon={TrendingUp} label="Revenue" value={fmtMoney(netRevenue, sym)}
           delta={dNet} sub={`${stats?.sales_count || 0} invoices · after returns`} tone="primary"
@@ -364,6 +369,10 @@ function Page() {
         <Kpi onClick={() => setDetailKey("revenue")}
           icon={Receipt} label="Gross sales" value={fmtMoney(revenue, sym)}
           delta={dRevenue} sub="Before returns" tone="info"
+        />
+        <Kpi onClick={() => setDetailKey("credit")}
+          icon={CreditCard} label="Credit sales" value={fmtMoney(creditSales, sym)}
+          sub="Unpaid portion" tone="warning"
         />
         <Kpi onClick={() => setDetailKey("returns")}
           icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
