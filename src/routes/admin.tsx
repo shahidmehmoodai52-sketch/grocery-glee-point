@@ -598,10 +598,10 @@ function TenantsTab() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Total shops" value={totals.total} icon={Store} />
-        <StatCard label="Active" value={totals.active} icon={CheckCircle2} tone="success" />
-        <StatCard label="Pending" value={totals.pending} icon={Clock} tone="warning" />
-        <StatCard label="Suspended" value={totals.suspended} icon={Ban} tone="danger" />
+        <StatCard label="Total shops" value={totals.total} icon={Store} onClick={() => setFilter("all")} />
+        <StatCard label="Active" value={totals.active} icon={CheckCircle2} tone="success" onClick={() => setFilter("active")} />
+        <StatCard label="Pending" value={totals.pending} icon={Clock} tone="warning" onClick={() => setFilter("pending")} />
+        <StatCard label="Suspended" value={totals.suspended} icon={Ban} tone="danger" onClick={() => setFilter("suspended")} />
       </div>
 
       <Card className="p-3">
