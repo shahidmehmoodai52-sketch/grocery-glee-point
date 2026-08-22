@@ -579,7 +579,6 @@ type Analytics = {
   by_method: Array<{ method: string; orders: number; total: number }>;
   low_stock: number;
   expenses_total: number;
-  credit_sales_total?: number;
 };
 
 function SalesTab({ tenantId }: { tenantId: string }) {
@@ -603,15 +602,8 @@ function SalesTab({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} />
-        <StatCard 
-          label="Credit Sales (30d)" 
-          value={fmtMoney(data.credit_sales_total ?? 0, "")} 
-          icon={CreditCard} 
-          onClick={() => setDrilldownOpen(true)}
-          className="cursor-pointer hover:bg-muted/50 transition-colors"
-        />
         <StatCard label="Orders (30d)" value={totalOrders} icon={ShoppingCart} />
         <StatCard label="Est. profit" value={fmtMoney(totalRevenue - totalCost, "")} icon={Wallet} tone="success" />
         <StatCard label="Low stock" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock > 0 ? "warning" : "default"} />
@@ -681,7 +673,13 @@ function SalesTab({ tenantId }: { tenantId: string }) {
               </TableHeader>
               <TableBody>
                 {data.by_method.map((m) => (
-                  <TableRow key={m.method}>
+                  <TableRow 
+                    key={m.method}
+                    className={cn(m.method.toLowerCase() === "credit" && "cursor-pointer hover:bg-muted/50")}
+                    onClick={() => {
+                      if (m.method.toLowerCase() === "credit") setDrilldownOpen(true);
+                    }}
+                  >
                     <TableCell className="capitalize">{m.method}</TableCell>
                     <TableCell className="text-right">{Number(m.orders)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(Number(m.total), "")}</TableCell>
