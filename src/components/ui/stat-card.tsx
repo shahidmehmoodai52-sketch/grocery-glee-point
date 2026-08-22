@@ -30,7 +30,10 @@ export function StatCard({
 }: StatCardProps) {
   const t = toneStyles[tone];
   return (
-    <Card className={cn("p-5 transition-shadow hover:shadow-md", className)}>
+    <Card 
+      className={cn("p-5 transition-shadow hover:shadow-md", className, onClick && "cursor-pointer")}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {label}
