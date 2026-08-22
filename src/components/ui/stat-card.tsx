@@ -22,10 +22,11 @@ interface StatCardProps {
   delta?: number;
   sub?: string;
   className?: string;
+  onClick?: () => void;
 }
 
 export function StatCard({
-  label, value, icon: Icon, tone = "default", delta, sub, className,
+  label, value, icon: Icon, tone = "default", delta, sub, className, onClick,
 }: StatCardProps) {
   const t = toneStyles[tone];
   return (
