@@ -579,6 +579,7 @@ type Analytics = {
   by_method: Array<{ method: string; orders: number; total: number }>;
   low_stock: number;
   expenses_total: number;
+  credit_sales_total?: number;
 };
 
 function SalesTab({ tenantId }: { tenantId: string }) {
