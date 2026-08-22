@@ -1232,10 +1232,10 @@ function Page() {
 }
 
 
-function Stat({ icon: Icon, label, value, tone }: any) {
+function Stat({ icon: Icon, label, value, tone, onClick }: any) {
   const colors: Record<string, string> = { primary: "text-primary", success: "text-success", destructive: "text-destructive", warning: "text-warning" };
   return (
-    <Card className="p-4">
+    <Card className={`p-4 ${onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`} onClick={onClick}>
       <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5" />{label}</div>
       <div className={`text-2xl font-semibold mt-1 ${colors[tone]}`}>{value}</div>
     </Card>
