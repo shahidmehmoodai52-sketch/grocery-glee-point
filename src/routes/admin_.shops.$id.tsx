@@ -579,6 +579,7 @@ type Analytics = {
   by_method: Array<{ method: string; orders: number; total: number }>;
   low_stock: number;
   expenses_total: number;
+  credit_sales_total?: number;
 };
 
 function SalesTab({ tenantId }: { tenantId: string }) {
@@ -602,8 +603,15 @@ function SalesTab({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} />
+        <StatCard 
+          label="Credit Sales (30d)" 
+          value={fmtMoney(data.credit_sales_total ?? 0, "")} 
+          icon={CreditCard} 
+          onClick={() => setDrilldownOpen(true)}
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+        />
         <StatCard label="Orders (30d)" value={totalOrders} icon={ShoppingCart} />
         <StatCard label="Est. profit" value={fmtMoney(totalRevenue - totalCost, "")} icon={Wallet} tone="success" />
         <StatCard label="Low stock" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock > 0 ? "warning" : "default"} />
@@ -673,13 +681,7 @@ function SalesTab({ tenantId }: { tenantId: string }) {
               </TableHeader>
               <TableBody>
                 {data.by_method.map((m) => (
-                  <TableRow 
-                    key={m.method}
-                    className={cn(m.method.toLowerCase() === "credit" && "cursor-pointer hover:bg-muted/50")}
-                    onClick={() => {
-                      if (m.method.toLowerCase() === "credit") setDrilldownOpen(true);
-                    }}
-                  >
+                  <TableRow key={m.method}>
                     <TableCell className="capitalize">{m.method}</TableCell>
                     <TableCell className="text-right">{Number(m.orders)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(Number(m.total), "")}</TableCell>
@@ -920,215 +922,5 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
         </Table>
       )}
     </Card>
-  );
-}
-function CreditSalesDrilldown({ tenantId, open, onOpenChange }: { tenantId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const [page, setPage] = useState(0);
-  const limit = 50;
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-shop-credit-invoices", tenantId, page],
-    enabled: open,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_shop_invoices", {
-        _tenant_id: tenantId,
-        _payment_status: "unpaid",
-        _limit: limit,
-        _offset: page * limit,
-      });
-      if (error) throw error;
-      return (data as any[]) ?? [];
-    },
-  });
-
-  const invoices = data ?? [];
-  const totalCount = invoices[0]?.total_count ? Number(invoices[0].total_count) : 0;
-  const totalBalance = invoices.reduce((acc, inv) => acc + Number(inv.balance), 0);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between pr-8">
-            <span>Credit Sales (Unpaid Invoices)</span>
-            <span className="text-sm font-normal text-muted-foreground">
-              Total Invoices: {totalCount}
-            </span>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-auto py-4">
-          {isLoading ? (
-            <TableSkeleton rows={10} columns={5} />
-          ) : invoices.length === 0 ? (
-            <EmptyState icon={ShoppingCart} title="No unpaid invoices" description="This shop has no outstanding credit sales." />
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice No</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-mono text-xs">{inv.invoice_no}</TableCell>
-                      <TableCell className="text-xs">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]">{inv.customer_name || "Walk-in"}</TableCell>
-                      <TableCell className="text-right text-xs">{fmtMoney(inv.total, "")}</TableCell>
-                      <TableCell className="text-right text-xs font-semibold text-destructive">{fmtMoney(inv.balance, "")}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <div className="mt-4 flex items-center justify-between border-t pt-4">
-                <div className="text-xs text-muted-foreground">
-                  Showing {page * limit + 1}–{Math.min((page + 1) * limit, totalCount)} of {totalCount}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 0}
-                    onClick={() => setPage(p => p - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={(page + 1) * limit >= totalCount}
-                    onClick={() => setPage(p => p + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        
-        <div className="border-t pt-4 flex justify-end items-center gap-4">
-          <div className="text-sm">
-            <span className="text-muted-foreground mr-2">Page Balance Total:</span>
-            <span className="font-bold text-destructive">{fmtMoney(totalBalance, "Rs.")}</span>
-          </div>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CreditSalesDrilldown({ tenantId, open, onOpenChange }: { tenantId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const [page, setPage] = useState(0);
-  const limit = 50;
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-shop-credit-invoices", tenantId, page],
-    enabled: open,
-    queryFn: async () => {
-      // Use standard table fetch since RPC is gone
-      const { data, error, count } = await supabase
-        .from("sales")
-        .select("id, invoice_no, created_at, customer_name, total, paid_amount", { count: "exact" })
-        .eq("tenant_id", tenantId)
-        .in("payment_status", ["unpaid", "partial"])
-        .range(page * limit, (page + 1) * limit - 1)
-        .order("created_at", { ascending: false });
-        
-      if (error) throw error;
-      return { data: data ?? [], count: count ?? 0 };
-    },
-  });
-
-  const invoices = data?.data ?? [];
-  const totalCount = data?.count ?? 0;
-  const totalBalance = invoices.reduce((acc, inv) => acc + (Number(inv.total) - Number(inv.paid_amount)), 0);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between pr-8">
-            <span>Credit Sales (Unpaid Invoices)</span>
-            <span className="text-sm font-normal text-muted-foreground">
-              Total Invoices: {totalCount}
-            </span>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-auto py-4">
-          {isLoading ? (
-            <TableSkeleton rows={10} columns={5} />
-          ) : invoices.length === 0 ? (
-            <EmptyState icon={ShoppingCart} title="No unpaid invoices" description="This shop has no outstanding credit sales." />
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice No</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-mono text-xs">{inv.invoice_no}</TableCell>
-                      <TableCell className="text-xs">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]">{inv.customer_name || "Walk-in"}</TableCell>
-                      <TableCell className="text-right text-xs">{fmtMoney(inv.total, "")}</TableCell>
-                      <TableCell className="text-right text-xs font-semibold text-destructive">{fmtMoney(Number(inv.total) - Number(inv.paid_amount), "")}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <div className="mt-4 flex items-center justify-between border-t pt-4">
-                <div className="text-xs text-muted-foreground">
-                  Showing {page * limit + 1}–{Math.min((page + 1) * limit, totalCount)} of {totalCount}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 0}
-                    onClick={() => setPage(p => p - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={(page + 1) * limit >= totalCount}
-                    onClick={() => setPage(p => p + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        
-        <div className="border-t pt-4 flex justify-end items-center gap-4">
-          <div className="text-sm">
-            <span className="text-muted-foreground mr-2">Page Balance Total:</span>
-            <span className="font-bold text-destructive">{fmtMoney(totalBalance, "Rs.")}</span>
-          </div>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
