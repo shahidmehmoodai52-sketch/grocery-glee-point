@@ -50,6 +50,7 @@ import { Route as AuthenticatedExpensePersonsIdRouteImport } from './routes/_aut
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as AdminShopsRouteImport } from './routes/admin_.shops.'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -268,6 +269,11 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminShopsRoute = AdminShopsRouteImport.update({
+  id: '/admin_/shops/',
+  path: '/admin/shops/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -299,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/shifts': typeof AuthenticatedShiftsRoute
   '/shop-admin': typeof AuthenticatedShopAdminRoute
   '/users': typeof AuthenticatedUsersRoute
+  '/admin/shops/': typeof AdminShopsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
@@ -341,6 +348,7 @@ export interface FileRoutesByTo {
   '/shifts': typeof AuthenticatedShiftsRoute
   '/shop-admin': typeof AuthenticatedShopAdminRoute
   '/users': typeof AuthenticatedUsersRoute
+  '/admin/shops': typeof AdminShopsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
@@ -385,6 +393,7 @@ export interface FileRoutesById {
   '/_authenticated/shifts': typeof AuthenticatedShiftsRoute
   '/_authenticated/shop-admin': typeof AuthenticatedShopAdminRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
+  '/admin_/shops/': typeof AdminShopsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
@@ -429,6 +438,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/shop-admin'
     | '/users'
+    | '/admin/shops/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/customers/$id'
@@ -471,6 +481,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/shop-admin'
     | '/users'
+    | '/admin/shops'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/customers/$id'
@@ -514,6 +525,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shifts'
     | '/_authenticated/shop-admin'
     | '/_authenticated/users'
+    | '/admin_/shops/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/customers/$id'
@@ -537,6 +549,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  AdminShopsRoute: typeof AdminShopsRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   AdminShopsIdRoute: typeof AdminShopsIdRoute
@@ -831,6 +844,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/shops/': {
+      id: '/admin_/shops/'
+      path: '/admin/shops'
+      fullPath: '/admin/shops/'
+      preLoaderRoute: typeof AdminShopsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -923,6 +943,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  AdminShopsRoute: AdminShopsRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   AdminShopsIdRoute: AdminShopsIdRoute,
