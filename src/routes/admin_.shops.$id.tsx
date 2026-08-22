@@ -527,10 +527,10 @@ function SalesTab({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} />
+        <StatCard label="Revenue (30d)" value={fmtMoney(totalRevenue, "")} icon={TrendingUp} tone="primary" />
         <StatCard label="Orders (30d)" value={totalOrders} icon={ShoppingCart} />
         <StatCard label="Est. profit" value={fmtMoney(totalRevenue - totalCost, "")} icon={Wallet} tone="success" />
-        <StatCard label="Low stock" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock > 0 ? "warning" : "default"} />
+        <StatCard label="Expenses (30d)" value={fmtMoney(data.expenses_total || 0, "")} icon={ArrowLeft} tone="danger" />
       </div>
 
       <Card className="p-4">
@@ -582,7 +582,7 @@ function SalesTab({ tenantId }: { tenantId: string }) {
             <div className="text-sm text-muted-foreground">No payments recorded.</div>
           ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead>Method</TableHead>
                   <TableHead className="text-right">Orders</TableHead>
