@@ -2897,6 +2897,7 @@ export type Database = {
           tax_id: string | null
           tax_rate: number
           tenant_id: string
+          timezone: string
           undo_window_minutes: number
           updated_at: string
         }
@@ -2948,6 +2949,7 @@ export type Database = {
           tax_id?: string | null
           tax_rate?: number
           tenant_id?: string
+          timezone?: string
           undo_window_minutes?: number
           updated_at?: string
         }
@@ -2999,6 +3001,7 @@ export type Database = {
           tax_id?: string | null
           tax_rate?: number
           tenant_id?: string
+          timezone?: string
           undo_window_minutes?: number
           updated_at?: string
         }
@@ -3157,6 +3160,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_health_log: {
+        Row: {
+          check_name: string
+          checked_at: string
+          detail: string | null
+          id: number
+          issue_count: number
+          severity: string
+          tenant_id: string | null
+        }
+        Insert: {
+          check_name: string
+          checked_at?: string
+          detail?: string | null
+          id?: number
+          issue_count: number
+          severity: string
+          tenant_id?: string | null
+        }
+        Update: {
+          check_name?: string
+          checked_at?: string
+          detail?: string | null
+          id?: number
+          issue_count?: number
+          severity?: string
+          tenant_id?: string | null
+        }
+        Relationships: []
       }
       tenant_invitations: {
         Row: {
@@ -4156,6 +4189,17 @@ export type Database = {
         Args: { _perm: string; _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      health_status: {
+        Args: never
+        Returns: {
+          check_name: string
+          detail: string
+          first_seen: string
+          issue_count: number
+          last_checked: string
+          severity: string
+        }[]
+      }
       hold_bill: {
         Args: {
           _customer: string
@@ -4276,6 +4320,7 @@ export type Database = {
           tax_id: string | null
           tax_rate: number
           tenant_id: string
+          timezone: string
           undo_window_minutes: number
           updated_at: string
         }[]
@@ -4309,6 +4354,18 @@ export type Database = {
           _reason: string
           _reference: string
           _type: string
+        }
+        Returns: string
+      }
+      record_cash_out: {
+        Args: {
+          p_account_id: string
+          p_amount: number
+          p_client_id?: string
+          p_customer_id: string
+          p_note?: string
+          p_occurred_on?: string
+          p_tenant_id?: string
         }
         Returns: string
       }
@@ -4378,6 +4435,15 @@ export type Database = {
       }
       resolve_payment_bucket: { Args: { p_method: string }; Returns: string }
       resume_bill: { Args: { _id: string }; Returns: Json }
+      run_health_check: {
+        Args: never
+        Returns: {
+          check_name: string
+          detail: string
+          issue_count: number
+          severity: string
+        }[]
+      }
       set_checklist_item: {
         Args: {
           _completed: boolean
@@ -4427,6 +4493,7 @@ export type Database = {
         Args: { _category: string; _tenant: string }
         Returns: boolean
       }
+      tenant_timezone: { Args: { p_tenant_id: string }; Returns: string }
       undo_last_sale: { Args: { _sale_id: string }; Returns: Json }
       update_party_payment: {
         Args: {
