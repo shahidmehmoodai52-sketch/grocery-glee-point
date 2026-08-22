@@ -868,7 +868,7 @@ function CreditSalesDrilldown({
 
       const { data, error, count } = await supabase
         .from("sales")
-        .select("id, invoice_no, total_amount, created_at, customer:customers(full_name)", { count: "exact" })
+        .select("id, invoice_no, total, created_at, customer:customers(name)", { count: "exact" })
         .eq("tenant_id", tenantId)
         .eq("payment_method", "credit")
         .order("created_at", { ascending: false })
@@ -926,10 +926,10 @@ function CreditSalesDrilldown({
                         </TableCell>
                         <TableCell className="font-mono text-xs font-medium">{sale.invoice_no}</TableCell>
                         <TableCell className="max-w-[200px] truncate">
-                          {(sale.customer as any)?.full_name || "Walk-in Customer"}
+                          {(sale.customer as any)?.name || "Walk-in Customer"}
                         </TableCell>
                         <TableCell className="text-right font-bold text-primary">
-                          {fmtMoney(Number(sale.total_amount), "")}
+                          {fmtMoney(Number(sale.total), "")}
                         </TableCell>
                       </TableRow>
                     ))}
