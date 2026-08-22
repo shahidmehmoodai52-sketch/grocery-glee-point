@@ -30,6 +30,7 @@ import { fmtMoney } from "@/lib/format";
 import { resetTenantOwnerPassword } from "@/lib/admin.functions";
 import { Toaster } from "@/components/ui/sonner";
 import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
+import { cn } from "@/lib/utils";
 
 
 export const Route = createFileRoute("/admin_/shops/$id")({
