@@ -155,7 +155,7 @@ type AdminActionLog = {
 function AdminPanelPage() {
   const navigate = useNavigate();
   const { isSuperAdmin, isAdminStaff, canEnter, loading } = useAdminAccess();
-  const [activeTab, setActiveTab] = useState("shops");
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
     if (!loading && !canEnter) {
@@ -210,6 +210,7 @@ function AdminPanelPage() {
       />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-muted/50 p-1 flex-wrap h-auto justify-start">
+           <TabsTrigger value="dashboard"><Activity className="h-4 w-4 mr-1" />Dashboard</TabsTrigger>
           <TabsTrigger value="tenants"><Store className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
           <TabsTrigger value="library"><BookOpen className="h-4 w-4 mr-1" />Library</TabsTrigger>
           <TabsTrigger value="printers"><Printer className="h-4 w-4 mr-1" />Printers</TabsTrigger>
@@ -235,6 +236,7 @@ function AdminPanelPage() {
             )}
           </TabsTrigger>
         </TabsList>
+         <TabsContent value="dashboard" className="mt-3"><DashboardTab setActiveTab={setActiveTab} /></TabsContent>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
         <TabsContent value="library" className="mt-3"><LibraryTab /></TabsContent>
         <TabsContent value="printers" className="mt-3"><PrinterSettingsTab /></TabsContent>
@@ -355,6 +357,146 @@ function PrinterSettingsTab() {
 }
 
 
+
+function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const { data: tenants = [] } = useQuery({
+    queryKey: ["admin-tenants"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_tenants");
+      if (error) throw error;
+      return (data as TenantRow[]) ?? [];
+    },
+  });
+
+  const { data: summary } = useQuery({
+    queryKey: ["admin-security-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_security_summary");
+      if (error) throw error;
+      return (data as unknown as SecuritySummary) ?? null;
+    },
+  });
+
+  const totals = useMemo(() => {
+    return {
+      total: tenants.length,
+      active: tenants.filter((t) => t.status === "active").length,
+      pending: tenants.filter((t) => t.status === "pending").length,
+      suspended: tenants.filter((t) => t.status === "suspended").length,
+      revenue: tenants.reduce((a, t) => a + Number(t.sales_total || 0), 0),
+    };
+  }, [tenants]);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <StatCard 
+          label="Total shops" 
+          value={totals.total} 
+          icon={Store} 
+          onClick={() => setActiveTab("tenants")}
+        />
+        <StatCard 
+          label="Active" 
+          value={totals.active} 
+          icon={CheckCircle2} 
+          tone="success" 
+          onClick={() => setActiveTab("tenants")}
+        />
+        <StatCard 
+          label="Security alerts" 
+          value={summary?.critical_24h ?? 0} 
+          icon={ShieldAlert} 
+          tone={summary?.critical_24h ? "danger" : "default"} 
+          onClick={() => setActiveTab("security")}
+        />
+        <StatCard 
+          label="System errors" 
+          value="Check" 
+          icon={Bug} 
+          onClick={() => setActiveTab("errors")}
+        />
+        <StatCard 
+          label="Total Revenue" 
+          value={fmtMoney(totals.revenue, "")} 
+          icon={Wallet} 
+          tone="primary"
+        />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Latest Shop Activity
+            </h3>
+            <Button variant="ghost" size="sm" onClick={() => setActiveTab("tenants")}>View all</Button>
+          </div>
+          <div className="space-y-3">
+            {tenants.slice(0, 5).map(t => (
+              <div key={t.id} className="flex items-center justify-between p-2 rounded-lg border bg-muted/30">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{t.name}</span>
+                  <span className="text-xs text-muted-foreground">{t.owner_email}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right flex flex-col">
+                    <span className="text-xs font-medium">{fmtMoney(t.sales_total || 0, "PKR")}</span>
+                    <span className="text-[10px] text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <Button size="icon" variant="ghost" asChild className="h-8 w-8">
+                    <Link to={`/admin_/shops/${t.id}`}><Eye className="h-4 w-4" /></Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-warning" />
+              Recent Security Events
+            </h3>
+            <Button variant="ghost" size="sm" onClick={() => setActiveTab("security")}>Logs</Button>
+          </div>
+          <SecurityEventsMiniList />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function SecurityEventsMiniList() {
+  const { data: events = [] } = useQuery({
+    queryKey: ["admin-security-events", "all"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_security_events", { _limit: 5 });
+      if (error) throw error;
+      return (data as SecurityEvent[]) ?? [];
+    },
+  });
+
+  if (events.length === 0) return <EmptyState icon={ShieldCheck} title="Clean logs" description="No security events recorded." />;
+
+  return (
+    <div className="space-y-2">
+      {events.map(e => (
+        <div key={e.id} className="text-xs p-2 rounded border flex items-center justify-between">
+          <div className="flex flex-col gap-0.5">
+            <span className="font-medium">{e.event_type}</span>
+            <span className="text-muted-foreground">{e.ip_address || e.email || "System"}</span>
+          </div>
+          <StatusBadge tone={e.severity === "critical" ? "danger" : e.severity === "warning" ? "warning" : "neutral"}>
+            {e.severity}
+          </StatusBadge>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function TenantsTab() {
   const navigate = useNavigate();
