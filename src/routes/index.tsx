@@ -867,8 +867,8 @@ function LandingPage() {
               <a
                 key={label}
                 href={href}
-                target="_blank"
-                rel="noopener noreferrer"
+                target={label === "Email" ? undefined : "_blank"}
+                rel={label === "Email" ? undefined : (label === "WhatsApp" ? "noreferrer" : "noopener noreferrer")}
                 aria-label={`Follow Tillix on ${label}`}
                 className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5"
               >
