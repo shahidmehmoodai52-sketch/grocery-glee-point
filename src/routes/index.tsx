@@ -1040,13 +1040,13 @@ function LandingPage() {
                 { Icon: BrandLinkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
                 { Icon: BrandYoutube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
                 { Icon: BrandWhatsapp, label: "WhatsApp", href: "https://wa.me/923096431377" },
-                { Icon: Smartphone, label: "Call Us", href: "tel:+923096431377" },
+                { Icon: Mail, label: "Email", href: "mailto:info@tillix.co" },
               ].map(({ Icon, label, href }) => (
                 <a
                   key={label}
                   href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  target={label === "Email" ? undefined : "_blank"}
+                  rel={label === "Email" ? undefined : (label === "WhatsApp" ? "noreferrer" : "noopener noreferrer")}
                   aria-label={`Follow Tillix on ${label}`}
                   className="inline-flex transition hover:-translate-y-0.5 hover:drop-shadow-md"
                 >
