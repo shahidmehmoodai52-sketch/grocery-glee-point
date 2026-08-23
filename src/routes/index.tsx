@@ -862,7 +862,7 @@ function LandingPage() {
               { Icon: BrandLinkedin, label: "LinkedIn", handle: "tillix-co", href: "https://linkedin.com/company/tillix-co" },
               { Icon: BrandYoutube, label: "YouTube", handle: "@tillixpos", href: "https://www.youtube.com/@tillixpos" },
               { Icon: BrandWhatsapp, label: "WhatsApp", handle: "+923096431377", href: "https://wa.me/923096431377" },
-              { Icon: Smartphone, label: "Call Us", handle: "+92309 6431 377", href: "tel:+923096431377" },
+              { Icon: Mail, label: "Email", handle: "info@tillix.co", href: "mailto:info@tillix.co" },
             ].map(({ Icon, label, handle, href }) => (
               <a
                 key={label}
