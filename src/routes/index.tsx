@@ -982,15 +982,15 @@ function LandingPage() {
                     <div className="text-sm font-medium text-slate-500">{m.role}</div>
                   </div>
                 </div>
-                <div className="mt-5 border-t border-slate-100 pt-4">
+                <div className="mt-5 border-t border-slate-100 pt-4 flex justify-between items-center">
                   <a
-                    href={`tel:${m.phone.replace(/-/g, "")}`}
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition group-hover:text-tx-green-dark"
+                    href="https://wa.me/923096431377"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full bg-tx-green/10 px-3 py-1.5 text-xs font-bold text-tx-green-dark transition hover:bg-tx-green hover:text-white"
                   >
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-tx-green-light group-hover:text-tx-green-dark">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                    </span>
-                    {m.phone}
+                    <BrandWhatsapp className="h-4 w-4" />
+                    WhatsApp
                   </a>
                 </div>
               </div>
