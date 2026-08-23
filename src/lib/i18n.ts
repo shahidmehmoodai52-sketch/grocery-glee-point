@@ -1,18 +1,22 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
-import HttpApi from 'i18next-http-backend';
+
+// Import translation files statically
+import enTranslation from '../../public/locales/en/translation.json';
+import urTranslation from '../../public/locales/ur/translation.json';
+import arTranslation from '../../public/locales/ar/translation.json';
+import esTranslation from '../../public/locales/es/translation.json';
+import deTranslation from '../../public/locales/de/translation.json';
+import noTranslation from '../../public/locales/no/translation.json';
 
 // Synchronize document direction whenever language changes
 const syncDir = (lng: string) => {
-  console.log('i18n syncDir:', lng);
   const rtlLanguages = ['ur', 'ar'];
   const dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
   
   if (typeof document !== 'undefined') {
     document.documentElement.dir = dir;
-    // No layout recalc needed to avoid flickering
-    // document.body logic removed to fix flicker during language switch
     document.documentElement.lang = lng;
   }
   
@@ -21,19 +25,25 @@ const syncDir = (lng: string) => {
   }
 };
 
+const resources = {
+  en: { translation: enTranslation },
+  ur: { translation: urTranslation },
+  ar: { translation: arTranslation },
+  es: { translation: esTranslation },
+  de: { translation: deTranslation },
+  no: { translation: noTranslation },
+};
+
 i18n
-  .use(HttpApi)
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
+    resources,
     fallbackLng: 'en',
     supportedLngs: ['en', 'ur', 'ar', 'es', 'de', 'no'],
     debug: false,
     interpolation: {
       escapeValue: false,
-    },
-    backend: {
-      loadPath: '/locales/{{lng}}/translation.json',
     },
     detection: {
       order: ['localStorage', 'cookie', 'htmlTag', 'path', 'subdomain'],
