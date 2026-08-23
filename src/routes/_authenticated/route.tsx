@@ -115,59 +115,59 @@ function Layout() {
   useRealtimeSync();
   return (
     <SidebarProvider>
-      <div className="h-screen overflow-hidden flex w-full bg-background">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <PendingBanner />
-          <ExpiryCountdown />
+      <SuspendedGate>
+        <div className="h-screen overflow-hidden flex w-full bg-background">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col min-w-0">
+            <PendingBanner />
+            <ExpiryCountdown />
 
-          <header className="relative z-[500] h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print gap-2">
-            <SidebarTrigger />
-            <div className="flex-1 min-w-0">
-              <LowStockAlerts />
-            </div>
-            <LanguageSelect className="mr-1" />
-            <OfflineStatusBadge className="mr-1" />
-            <Button variant="outline" size="sm" onClick={() => handleSignOut(false)} className="gap-2">
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('common.logout')}</span>
-            </Button>
+            <header className="relative z-[500] h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print gap-2">
+              <SidebarTrigger />
+              <div className="flex-1 min-w-0">
+                <LowStockAlerts />
+              </div>
+              <LanguageSelect className="mr-1" />
+              <OfflineStatusBadge className="mr-1" />
+              <Button variant="outline" size="sm" onClick={() => handleSignOut(false)} className="gap-2">
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('common.logout')}</span>
+              </Button>
+            </header>
+            <main className="flex-1 min-w-0 overflow-auto">
+              <RouteGuard><Outlet /></RouteGuard>
+            </main>
 
+          </div>
+          <Toaster richColors position="top-right" duration={4000} closeButton />
 
-          </header>
-          <main className="flex-1 min-w-0 overflow-auto">
-            <RouteGuard><Outlet /></RouteGuard>
-          </main>
-
+          <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  Unsynced Data Detected
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have {pendingCount} transaction{pendingCount > 1 ? "s" : ""} waiting to be synced to the cloud.
+                  Logging out now will <strong>permanently delete</strong> these offline sales.
+                  <br /><br />
+                  Please connect to the internet and wait for the sync to complete, or confirm if you want to discard these transactions.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Go Back</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => handleSignOut(true)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Discard & Log Out
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
-        <Toaster richColors position="top-right" duration={4000} closeButton />
-
-        <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-                Unsynced Data Detected
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                You have {pendingCount} transaction{pendingCount > 1 ? "s" : ""} waiting to be synced to the cloud.
-                Logging out now will <strong>permanently delete</strong> these offline sales.
-                <br /><br />
-                Please connect to the internet and wait for the sync to complete, or confirm if you want to discard these transactions.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Go Back</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => handleSignOut(true)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Discard & Log Out
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      </SuspendedGate>
     </SidebarProvider>
   );
 }
