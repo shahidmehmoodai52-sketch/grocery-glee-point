@@ -1039,6 +1039,8 @@ function LandingPage() {
                 { Icon: BrandInstagram, label: "Instagram", href: "https://instagram.com/tillix.co" },
                 { Icon: BrandLinkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
                 { Icon: BrandYoutube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
+                { Icon: BrandWhatsapp, label: "WhatsApp", href: "https://wa.me/923096431377" },
+                { Icon: Smartphone, label: "Call Us", href: "tel:+923096431377" },
               ].map(({ Icon, label, href }) => (
                 <a
                   key={label}
