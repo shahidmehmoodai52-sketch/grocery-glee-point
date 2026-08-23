@@ -41,7 +41,7 @@ function mirrorServiceWorker() {
       ) as string[];
       targets = new Set(outDirs.map((dir) => resolve(root, dir)));
     },
-    closeBundle() {
+    closeBundle(this: any) {
       const from = resolve(root, SW_SOURCE_DIR);
       if (!existsSync(from)) return;
       const swFiles = readdirSync(from).filter((f) =>
