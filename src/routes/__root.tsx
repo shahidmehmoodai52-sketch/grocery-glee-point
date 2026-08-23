@@ -15,7 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { logAppError } from "../lib/log-app-error";
 import { AppErrorBoundary } from "../components/error-boundary";
 import { installChunkRecovery } from "../lib/chunk-recovery";
-import { SuspendedGate } from "../components/suspended-gate";
+
 import { useEnterAsClick } from "../hooks/use-enter-as-click";
 import { useSessionHeartbeat } from "../hooks/use-session-heartbeat";
 
@@ -233,10 +233,8 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppErrorBoundary module="root">
-        <SuspendedGate>
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
-        </SuspendedGate>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
       </AppErrorBoundary>
     </QueryClientProvider>
   );
