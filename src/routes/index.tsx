@@ -154,6 +154,11 @@ const BrandYoutube = ({ className = "" }: { className?: string }) => (
     <path fill="#fff" d="M9.6 15.6 15.8 12 9.6 8.4v7.2Z"/>
   </svg>
 );
+const BrandWhatsapp = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <path fill="#25D366" d="M12.037 21.996a9.97 9.97 0 0 1-5.105-1.397l-.366-.219-3.792 1.002.998-3.766-.234-.374a9.957 9.957 0 0 1-1.534-5.25c0-5.52 4.49-10.01 10.01-10.01 2.673 0 5.187 1.042 7.075 2.932 1.888 1.89 2.928 4.403 2.926 7.077 0 5.52-4.49 10.01-10.01 10.01h-.002Zm5.535-7.859c-.303-.153-1.795-.886-2.072-.988-.278-.102-.48-.153-.683.153-.203.305-.785.988-.962 1.191-.177.203-.355.23-.658.077a8.312 8.312 0 0 1-2.44-1.506 9.177 9.177 0 0 1-1.688-2.103c-.177-.305-.02-.47.133-.62.138-.135.305-.355.456-.533.152-.178.203-.305.305-.508.102-.203.05-.381-.025-.533-.076-.153-.683-1.65-.937-2.261-.247-.597-.497-.516-.683-.526l-.58-.01c-.203 0-.533.076-.812.381-.278.305-1.062 1.041-1.062 2.54 0 1.5 1.088 2.946 1.24 3.149.153.203 2.143 3.272 5.19 4.588.726.313 1.291.5 1.734.64.73.232 1.393.199 1.918.12.585-.087 1.795-.736 2.048-1.448.254-.71.254-1.321.177-1.448-.076-.127-.278-.203-.581-.355Z"/>
+  </svg>
+);
 const SITE_URL = "https://grocery-glee-point.lovable.app";
 const LOGO_URL = "/tillix-logo.jpeg?v=2";
 const OG_LOGO_URL = `${SITE_URL}${LOGO_URL}`;
@@ -856,6 +861,8 @@ function LandingPage() {
               { Icon: BrandInstagram, label: "Instagram", handle: "@tillix.co", href: "https://instagram.com/tillix.co" },
               { Icon: BrandLinkedin, label: "LinkedIn", handle: "tillix-co", href: "https://linkedin.com/company/tillix-co" },
               { Icon: BrandYoutube, label: "YouTube", handle: "@tillixpos", href: "https://www.youtube.com/@tillixpos" },
+              { Icon: BrandWhatsapp, label: "WhatsApp", handle: "+923096431377", href: "https://wa.me/923096431377" },
+              { Icon: Smartphone, label: "Call Us", handle: "+92309 6431 377", href: "tel:+923096431377" },
             ].map(({ Icon, label, handle, href }) => (
               <a
                 key={label}
@@ -975,15 +982,15 @@ function LandingPage() {
                     <div className="text-sm font-medium text-slate-500">{m.role}</div>
                   </div>
                 </div>
-                <div className="mt-5 border-t border-slate-100 pt-4">
+                <div className="mt-5 border-t border-slate-100 pt-4 flex justify-between items-center">
                   <a
-                    href={`tel:${m.phone.replace(/-/g, "")}`}
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition group-hover:text-tx-green-dark"
+                    href="https://wa.me/923096431377"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full bg-tx-green/10 px-3 py-1.5 text-xs font-bold text-tx-green-dark transition hover:bg-tx-green hover:text-white"
                   >
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-tx-green-light group-hover:text-tx-green-dark">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                    </span>
-                    {m.phone}
+                    <BrandWhatsapp className="h-4 w-4" />
+                    WhatsApp
                   </a>
                 </div>
               </div>
@@ -1032,6 +1039,8 @@ function LandingPage() {
                 { Icon: BrandInstagram, label: "Instagram", href: "https://instagram.com/tillix.co" },
                 { Icon: BrandLinkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
                 { Icon: BrandYoutube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
+                { Icon: BrandWhatsapp, label: "WhatsApp", href: "https://wa.me/923096431377" },
+                { Icon: Smartphone, label: "Call Us", href: "tel:+923096431377" },
               ].map(({ Icon, label, href }) => (
                 <a
                   key={label}
