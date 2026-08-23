@@ -7,11 +7,54 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
 
 // Electron desktop build uses the Nitro `node-server` preset so we can spawn a
 // local Node server from main.cjs. Enable via NITRO_PRESET=node-server (see the
 // `electron:build` script). Default cloud build stays on cloudflare-module.
 const nitroPreset = process.env.NITRO_PRESET;
+
+// vite-plugin-pwa writes the service worker to a fixed directory (`dist/client`).
+// Nitro, however, points the client/public output at a preset-specific folder
+// (e.g. `.vercel/output/static` on Vercel, `.output/public` for node-server).
+// Anything left in `dist/client` is then never published, so `/sw.js` 404s and
+// falls through to the SSR function. This plugin mirrors the generated worker
+// files into whatever directory the client build actually resolved to.
+const SW_SOURCE_DIR = "dist/client";
+function mirrorServiceWorker() {
+  let root = process.cwd();
+  let targets = new Set<string>();
+  return {
+    name: "tillix:mirror-service-worker",
+    apply: "build" as const,
+    enforce: "post" as const,
+    configResolved(config: any) {
+      root = config.root ?? process.cwd();
+      const outDirs = [
+        config.environments?.client?.build?.outDir,
+        config.build?.outDir,
+      ].filter(Boolean) as string[];
+      targets = new Set(outDirs.map((dir) => resolve(root, dir)));
+    },
+    closeBundle() {
+      const from = resolve(root, SW_SOURCE_DIR);
+      if (!existsSync(from)) return;
+      const swFiles = readdirSync(from).filter((f) =>
+        /^(sw\.js(\.map)?|workbox-[^/]+\.js(\.map)?|sw\.mjs)$/.test(f),
+      );
+      if (swFiles.length === 0) return;
+      for (const target of targets) {
+        if (target === from) continue;
+        mkdirSync(target, { recursive: true });
+        for (const file of swFiles) {
+          cpSync(resolve(from, file), resolve(target, file));
+        }
+        this.warn?.(`copied service worker (${swFiles.join(", ")}) to ${target}`);
+      }
+    },
+  };
+}
 
 export default defineConfig({
   tanstackStart: {
@@ -26,6 +69,9 @@ export default defineConfig({
         registerType: "autoUpdate",
         injectRegister: null, // registration happens from our guarded wrapper
         strategies: "injectManifest",
+        // vite-plugin-pwa needs a fixed outDir; mirrorServiceWorker() copies the
+        // result into the real client output directory for the active preset.
+        outDir: SW_SOURCE_DIR,
         srcDir: "src",
         filename: "sw.js",
         devOptions: { enabled: false },
@@ -47,6 +93,7 @@ export default defineConfig({
           ],
         },
       }),
+      mirrorServiceWorker(),
     ],
   },
   ...(nitroPreset
