@@ -986,7 +986,7 @@ function LandingPage() {
                   <a
                     href="https://wa.me/923096431377"
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noreferrer"
                     className="inline-flex items-center gap-2 rounded-full bg-tx-green/10 px-3 py-1.5 text-xs font-bold text-tx-green-dark transition hover:bg-tx-green hover:text-white"
                   >
                     <BrandWhatsapp className="h-4 w-4" />
