@@ -30,6 +30,7 @@ import { ExpiryCountdown } from "@/components/expiry-countdown";
 import { getUserAllowOffline } from "@/lib/offline/session";
 import { OfflineStatusBadge } from "@/components/offline-status";
 import { clearOfflineDataOnLogout, guardTenantScope } from "@/lib/offline/device";
+import { SuspendedGate } from "@/components/suspended-gate";
 
 
 
