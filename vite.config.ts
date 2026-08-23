@@ -21,7 +21,12 @@ const nitroPreset = process.env.NITRO_PRESET;
 // Anything left in `dist/client` is then never published, so `/sw.js` 404s and
 // falls through to the SSR function. This plugin mirrors the generated worker
 // files into whatever directory the client build actually resolved to.
-const SW_SOURCE_DIR = "dist/client";
+// Resolve the directory the client/public assets actually land in for the
+// active Nitro preset. Vercel builds publish `.vercel/output/static`; the
+// Cloudflare default (and the Lovable sandbox) uses `dist/client`.
+const SW_SOURCE_DIR = process.env.VERCEL
+  ? ".vercel/output/static"
+  : "dist/client";
 function mirrorServiceWorker() {
   let root = process.cwd();
   let targets = new Set<string>();
@@ -69,8 +74,8 @@ export default defineConfig({
         registerType: "autoUpdate",
         injectRegister: null, // registration happens from our guarded wrapper
         strategies: "injectManifest",
-        // vite-plugin-pwa needs a fixed outDir; mirrorServiceWorker() copies the
-        // result into the real client output directory for the active preset.
+        // vite-plugin-pwa needs an explicit outDir; mirrorServiceWorker() copies
+        // the result into the resolved client output dir if they ever diverge.
         outDir: SW_SOURCE_DIR,
         srcDir: "src",
         filename: "sw.js",
@@ -78,6 +83,8 @@ export default defineConfig({
         includeAssets: ["favicon.png", "offline.html"],
         injectManifest: {
           injectionPoint: 'self.__WB_MANIFEST',
+          // Precache the assets from the directory that is actually deployed.
+          globDirectory: SW_SOURCE_DIR,
         },
         manifest: {
           name: "Tillix POS",
