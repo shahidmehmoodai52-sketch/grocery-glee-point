@@ -26,16 +26,9 @@ export function isOfflineNow(): boolean {
 }
 
 export async function getUserAllowOffline(): Promise<User | null> {
-  try {
-    const { data, error } = await supabase.auth.getUser();
-    if (!error && data.user) {
-      cacheUser(data.user);
-      return data.user;
-    }
-  } catch {
-    // If the network is gone, fall through to the locally persisted session.
-  }
-
+  // 1. Prefer local session first — Supabase restores this from storage reliably
+  //    and does not need a network round-trip. This prevents transient network
+  //    hiccups from logging a valid user out.
   try {
     const { data } = await supabase.auth.getSession();
     if (data.session?.user) {
@@ -43,8 +36,21 @@ export async function getUserAllowOffline(): Promise<User | null> {
       return data.session.user;
     }
   } catch {
-    // Ignore and use the last cached user only while the browser is offline.
+    // Storage/session not ready yet — fall through to network revalidation.
   }
 
-  return isOfflineNow() ? readCachedUser() : null;
+  // 2. If no local session, try network revalidation.
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user) {
+      cacheUser(data.user);
+      return data.user;
+    }
+  } catch {
+    // Network or server error — fall through to cached fallback.
+  }
+
+  // 3. Last resort: use the cached user even if we are not strictly offline,
+  //    so a transient network glitch does not force a logout.
+  return readCachedUser();
 }
