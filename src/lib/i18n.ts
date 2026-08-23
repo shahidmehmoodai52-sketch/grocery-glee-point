@@ -11,9 +11,9 @@ const syncDir = (lng: string) => {
   
   if (typeof document !== 'undefined') {
     document.documentElement.dir = dir;
+    // No layout recalc needed to avoid flickering
+    // document.body logic removed to fix flicker during language switch
     document.documentElement.lang = lng;
-    if (body) {
-    }
   }
   
   if (typeof window !== 'undefined') {
