@@ -24,6 +24,7 @@
       "signup": "Sign Up"
     },
     "pricing": {
+      "eyebrow": "Pricing",
       "title": "Simple plans that grow with your shop",
       "sub": "Launch offer — save 50% for a limited time. Prices shown in your local currency ({{code}}).",
       "monthly": "Monthly",
@@ -95,7 +96,19 @@
       "perfect": "Perfect for businesses operating in:",
       "supported_cur": "Supported Currencies",
       "bill_in": "Bill in the currency your customers use",
-      "adapt": "From Pakistan POS to UAE POS software, Saudi Arabia POS and USA POS software — Tillix adapts to your market."
+      "adapt": "From Pakistan POS to UAE POS software, Saudi Arabia POS and USA POS software — Tillix adapts to your market.",
+      "card1_title": "Global Ready",
+      "card1_text": "Operate your business anywhere in the world with a truly international POS system.",
+      "card2_title": "Multi-Currency Support",
+      "card2_text": "Supports different currencies based on your business location — PKR, AED, SAR, USD, EUR and more.",
+      "card3_title": "Accurate Financial Reports",
+      "card3_text": "Reports are generated in your selected business currency for clean, reliable accounting.",
+      "card4_title": "Multi-Store Ready",
+      "card4_text": "Ideal multi store POS for businesses managing one or many retail locations.",
+      "card5_title": "Cloud Based",
+      "card5_text": "Cloud POS access — run your grocery, supermarket, pharmacy, restaurant or wholesale business securely from anywhere.",
+      "card6_title": "Secure & Reliable",
+      "card6_text": "Enterprise-grade security with fast, resilient cloud infrastructure."
     },
     "why": {
       "eyebrow": "Why Tillix",
@@ -128,14 +141,9 @@
       "title": "The people behind Tillix",
       "sub": "A dedicated crew building, supporting and scaling retail technology you can rely on."
     },
-    "footer": {
-      "desc": "Tillix — Smart Retail Starts Here. Cloud POS and retail management software for modern retailers, worldwide.",
-      "copyright": "All rights saved by tillix.co",
-      "product": "Product",
-      "get_started": "Get started",
-      "follow": "Follow Tillix"
-    },
     "testimonials": {
+      "eyebrow": "Loved by retailers",
+      "section_title": "What shop owners say about Tillix",
       "t1_quote": "Tillix cut our billing time in half and finally gave us real numbers on which products actually make money.",
       "t1_name": "Ahmed R.",
       "t1_role": "Supermarket owner, Dubai",
@@ -145,6 +153,12 @@
       "t3_quote": "Offline mode saved a whole weekend of sales during an outage. Everything synced perfectly when we came back online.",
       "t3_name": "Miguel A.",
       "t3_role": "Grocery owner, Madrid"
+    },
+    "connect": {
+      "eyebrow": "Connect",
+      "title": "Connect with Tillix",
+      "sub": "Follow us on social media and watch product videos on YouTube.",
+      "watch_videos": "Watch Tillix Product Videos"
     },
     "faq": {
       "eyebrow": "FAQ",
@@ -167,79 +181,9 @@
       "q8": "How much does Tillix cost?",
       "a8": "Tillix offers a free tier to get started and affordable monthly plans that grow with your business. No hidden fees, cancel anytime."
     },
-    "global": {
-      "eyebrow": "🌍 Global Ready",
-      "title": "Sell Anywhere with Multi-Currency Support",
-      "sub": "One POS Platform. Multiple Countries. Multiple Currencies. Tillix is a cloud POS and retail management software built for businesses operating across different countries and regions.",
-      "perfect": "Perfect for businesses operating in:",
-      "supported_cur": "Supported Currencies",
-      "bill_in": "Bill in the currency your customers use",
-      "adapt": "From Pakistan POS to UAE POS software, Saudi Arabia POS and USA POS software — Tillix adapts to your market.",
-      "card1_title": "Global Ready",
-      "card1_text": "Operate your business anywhere in the world with a truly international POS system.",
-      "card2_title": "Multi-Currency Support",
-      "card2_text": "Supports different currencies based on your business location — PKR, AED, SAR, USD, EUR and more.",
-      "card3_title": "Accurate Financial Reports",
-      "card3_text": "Reports are generated in your selected business currency for clean, reliable accounting.",
-      "card4_title": "Multi-Store Ready",
-      "card4_text": "Ideal multi store POS for businesses managing one or many retail locations.",
-      "card5_title": "Cloud Based",
-      "card5_text": "Cloud POS access — run your grocery, supermarket, pharmacy, restaurant or wholesale business securely from anywhere.",
-      "card6_title": "Secure & Reliable",
-      "card6_text": "Enterprise-grade security with fast, resilient cloud infrastructure."
-    },
-    "testimonials": {
-      "eyebrow": "Loved by retailers",
-      "section_title": "What shop owners say about Tillix",
-      "t1_quote": "Tillix cut our billing time in half and finally gave us real numbers on which products actually make money.",
-      "t1_name": "Ahmed R.",
-      "t1_role": "Supermarket owner, Dubai",
-      "t2_quote": "We run three branches on Tillix. Central stock and one dashboard — it's a night-and-day upgrade from spreadsheets.",
-      "t2_name": "Sara K.",
-      "t2_role": "Retail chain manager, Karachi",
-      "t3_quote": "Offline mode saved a whole weekend of sales during an outage. Everything synced perfectly when we came back online.",
-      "t3_name": "Miguel A.",
-      "t3_role": "Grocery owner, Madrid"
-    },
-    "connect": {
-      "eyebrow": "Connect",
-      "title": "Connect with Tillix",
-      "sub": "Follow us on social media and watch product videos on YouTube.",
-      "watch_videos": "Watch Tillix Product Videos"
-    },
-    "pricing": {
-      "eyebrow": "Pricing",
-      "title": "Simple plans that grow with your shop",
-      "sub": "Launch offer — save 50% for a limited time. Prices shown in your local currency ({{code}}).",
-      "monthly": "Monthly",
-      "yearly": "Yearly",
-      "save": "SAVE",
-      "basic_sub": "Perfect for a single shop getting started.",
-      "save_pct": "SAVE 50%",
-      "start_trial": "Start 7-day free trial",
-      "recommended": "Recommended",
-      "pro_sub": "For growing shops & multi-cashier teams.",
-      "auto_convert": "Prices auto-converted from USD based on your location. Taxes may apply. Cancel anytime.",
-      "trial_info": "7-day free trial · No credit card required",
-      "f1": "Unlimited products & barcodes",
-      "f2": "Fast POS billing & receipts",
-      "f3": "Inventory & low-stock alerts",
-      "f4": "Customers, suppliers & ledger",
-      "f5": "Purchases & purchase returns",
-      "f6": "Offline mode & auto-sync",
-      "f7": "Daily automatic backups",
-      "f8": "Email support",
-      "f9": "Everything in Basic",
-      "f10": "Multi-cashier with roles & permissions",
-      "f11": "Shifts, cash drawer & audit logs",
-      "f12": "Expiry, batch & wastage tracking",
-      "f13": "Bulk import & global product library",
-      "f14": "Advanced reports & P&L analytics",
-      "f15": "Priority support"
-    },
     "footer": {
       "desc": "Tillix — Smart Retail Starts Here. Cloud POS and retail management software for modern retailers, worldwide.",
-      "copyright": "All rights saved by tillix.co",
+      "copyright": "© {{year}} tillix.co All rights reserved.",
       "product": "Product",
       "get_started": "Get started",
       "follow": "Follow Tillix",
