@@ -24,6 +24,7 @@
       "signup": "Registrieren"
     },
     "pricing": {
+      "eyebrow": "Preise",
       "title": "Einfache Pläne, die mit Ihrem Geschäft wachsen",
       "sub": "Einführungsangebot – sparen Sie 50% für begrenzte Zeit. Preise werden in Ihrer Landeswährung ({{code}}) angezeigt.",
       "monthly": "Monatlich",
@@ -95,7 +96,19 @@
       "perfect": "Perfekt für Unternehmen in:",
       "supported_cur": "Unterstützte Währungen",
       "bill_in": "Stellen Sie Rechnungen in der Währung Ihrer Kunden aus",
-      "adapt": "Vom POS in Pakistan bis hin zu POS-Software in den VAE, Saudi-Arabien und den USA – Tillix passt sich Ihrem Markt an."
+      "adapt": "Vom POS in Pakistan bis hin zu POS-Software in den VAE, Saudi-Arabien und den USA – Tillix passt sich Ihrem Markt an.",
+      "card1_title": "Global einsatzbereit",
+      "card1_text": "Betreiben Sie Ihr Geschäft überall auf der Welt mit einem wahrhaft internationalen POS-System.",
+      "card2_title": "Multi-Währungs-Support",
+      "card2_text": "Unterstützt verschiedene Währungen basierend auf Ihrem Geschäftsstandort – PKR, AED, SAR, USD, EUR und mehr.",
+      "card3_title": "Genaue Finanzberichte",
+      "card3_text": "Berichte werden in Ihrer gewählten Geschäftswährung erstellt – für saubere, zuverlässige Buchhaltung.",
+      "card4_title": "Bereit für Filialen",
+      "card4_text": "Ideales Filial-POS für Unternehmen, die einen oder viele Einzelhandelsstandorte verwalten.",
+      "card5_title": "Cloud-basiert",
+      "card5_text": "Cloud-POS-Zugriff – verwalten Sie Ihr Lebensmittelgeschäft, Supermarkt, Apotheke, Restaurant oder Großhandelsgeschäft sicher von überall.",
+      "card6_title": "Sicher & zuverlässig",
+      "card6_text": "Unternehmenssicherheit mit schneller, resilienter Cloud-Infrastruktur."
     },
     "why": {
       "eyebrow": "Warum Tillix",
@@ -128,14 +141,9 @@
       "title": "Die Köpfe hinter Tillix",
       "sub": "Ein engagiertes Team, das Retail-Technologie für Sie baut und unterstützt."
     },
-    "footer": {
-      "desc": "Tillix — Smart Retail beginnt hier. Cloud-POS- und Einzelhandelsmanagement-Software für moderne Einzelhändler weltweit.",
-      "copyright": "Alle Rechte bei tillix.co vorbehalten",
-      "product": "Produkt",
-      "get_started": "Loslegen",
-      "follow": "Folgen Sie Tillix"
-    },
     "testimonials": {
+      "eyebrow": "Beliebt bei Einzelhändlern",
+      "section_title": "Was Geschäftsinhaber über Tillix sagen",
       "t1_quote": "Tillix hat unsere Abrechnungszeit halbiert und uns endlich echte Zahlen geliefert, welche Produkte wirklich Gewinn abwerfen.",
       "t1_name": "Ahmed R.",
       "t1_role": "Supermarktbesitzer, Dubai",
@@ -145,6 +153,12 @@
       "t3_quote": "Der Offline-Modus hat uns ein ganzes Verkaufswochenende gerettet. Alles wurde perfekt synchronisiert, als wir wieder online waren.",
       "t3_name": "Miguel A.",
       "t3_role": "Lebensmittelhändler, Madrid"
+    },
+    "connect": {
+      "eyebrow": "Verbinden",
+      "title": "Verbinden Sie sich mit Tillix",
+      "sub": "Folgen Sie uns in sozialen Medien und sehen Sie Produktvideos auf YouTube.",
+      "watch_videos": "Tillix-Produktvideos ansehen"
     },
     "faq": {
       "eyebrow": "FAQ",
@@ -167,79 +181,9 @@
       "q8": "Wie viel kostet Tillix?",
       "a8": "Tillix bietet eine kostenlose Basisversion und erschwingliche monatliche Pläne, die mit Ihrem Geschäft wachsen. Keine versteckten Gebühren, jederzeit kündbar."
     },
-    "global": {
-      "eyebrow": "🌍 Global einsatzbereit",
-      "title": "Überall verkaufen mit Multi-Währungs-Support",
-      "sub": "Eine POS-Plattform. Mehrere Länder. Mehrere Währungen. Tillix ist eine Cloud-POS- und Einzelhandelsmanagement-Software für Unternehmen in verschiedenen Ländern.",
-      "perfect": "Perfekt für Unternehmen in:",
-      "supported_cur": "Unterstützte Währungen",
-      "bill_in": "Stellen Sie Rechnungen in der Währung Ihrer Kunden aus",
-      "adapt": "Vom POS in Pakistan bis hin zu POS-Software in den VAE, Saudi-Arabien und den USA – Tillix passt sich Ihrem Markt an.",
-      "card1_title": "Global einsatzbereit",
-      "card1_text": "Betreiben Sie Ihr Geschäft überall auf der Welt mit einem wahrhaft internationalen POS-System.",
-      "card2_title": "Multi-Währungs-Support",
-      "card2_text": "Unterstützt verschiedene Währungen basierend auf Ihrem Geschäftsstandort – PKR, AED, SAR, USD, EUR und mehr.",
-      "card3_title": "Genaue Finanzberichte",
-      "card3_text": "Berichte werden in Ihrer gewählten Geschäftswährung erstellt – für saubere, zuverlässige Buchhaltung.",
-      "card4_title": "Bereit für Filialen",
-      "card4_text": "Ideales Filial-POS für Unternehmen, die einen oder viele Einzelhandelsstandorte verwalten.",
-      "card5_title": "Cloud-basiert",
-      "card5_text": "Cloud-POS-Zugriff – verwalten Sie Ihr Lebensmittelgeschäft, Supermarkt, Apotheke, Restaurant oder Großhandelsgeschäft sicher von überall.",
-      "card6_title": "Sicher & zuverlässig",
-      "card6_text": "Unternehmenssicherheit mit schneller, resilienter Cloud-Infrastruktur."
-    },
-    "testimonials": {
-      "eyebrow": "Beliebt bei Einzelhändlern",
-      "section_title": "Was Geschäftsinhaber über Tillix sagen",
-      "t1_quote": "Tillix hat unsere Abrechnungszeit halbiert und uns endlich echte Zahlen geliefert, welche Produkte wirklich Gewinn abwerfen.",
-      "t1_name": "Ahmed R.",
-      "t1_role": "Supermarktbesitzer, Dubai",
-      "t2_quote": "Wir betreiben drei Filialen mit Tillix. Zentraler Bestand und ein Dashboard – ein riesiges Upgrade gegenüber Excel.",
-      "t2_name": "Sara K.",
-      "t2_role": "Filialleiterin, Karachi",
-      "t3_quote": "Der Offline-Modus hat uns ein ganzes Verkaufswochenende gerettet. Alles wurde perfekt synchronisiert, als wir wieder online waren.",
-      "t3_name": "Miguel A.",
-      "t3_role": "Lebensmittelhändler, Madrid"
-    },
-    "connect": {
-      "eyebrow": "Verbinden",
-      "title": "Verbinden Sie sich mit Tillix",
-      "sub": "Folgen Sie uns in sozialen Medien und sehen Sie Produktvideos auf YouTube.",
-      "watch_videos": "Tillix-Produktvideos ansehen"
-    },
-    "pricing": {
-      "eyebrow": "Preise",
-      "title": "Einfache Pläne, die mit Ihrem Geschäft wachsen",
-      "sub": "Einführungsangebot – sparen Sie 50% für begrenzte Zeit. Preise werden in Ihrer Landeswährung ({{code}}) angezeigt.",
-      "monthly": "Monatlich",
-      "yearly": "Jährlich",
-      "save": "SPAREN",
-      "basic_sub": "Perfekt für ein einzelnes Geschäft, das gerade erst anfängt.",
-      "save_pct": "50% SPAREN",
-      "start_trial": "Kostenlose 7-Tage-Testversion starten",
-      "recommended": "Empfohlen",
-      "pro_sub": "Für wachsende Geschäfte und Teams mit mehreren Kassierern.",
-      "auto_convert": "Preise werden basierend auf Ihrem Standort automatisch von USD umgerechnet. Steuern können anfallen. Jederzeit kündbar.",
-      "trial_info": "Kostenlose 7-Tage-Testversion · Keine Kreditkarte erforderlich",
-      "f1": "Unbegrenzte Produkte und Barcodes",
-      "f2": "Schnelle POS-Abrechnung und Belege",
-      "f3": "Inventar- und Bestandsmeldungen",
-      "f4": "Kunden, Lieferanten und Buchhaltung",
-      "f5": "Einkäufe und Retouren",
-      "f6": "Offline-Modus und automatische Synchronisierung",
-      "f7": "Tägliche automatische Backups",
-      "f8": "E-Mail-Support",
-      "f9": "Alles aus dem Basis-Plan",
-      "f10": "Mehrere Kassierer mit Rollen und Berechtigungen",
-      "f11": "Schichten, Kassenschublade und Prüfprotokolle",
-      "f12": "Verfallsdatum, Chargen- und Schwundverfolgung",
-      "f13": "Massenimport und globale Produktbibliothek",
-      "f14": "Erweiterte Berichte und GuV-Analysen",
-      "f15": "Priorisierter Support"
-    },
     "footer": {
       "desc": "Tillix — Smart Retail beginnt hier. Cloud-POS- und Einzelhandelsmanagement-Software für moderne Einzelhändler weltweit.",
-      "copyright": "Alle Rechte bei tillix.co vorbehalten",
+      "copyright": "© {{year}} tillix.co Alle Rechte vorbehalten.",
       "product": "Produkt",
       "get_started": "Loslegen",
       "follow": "Folgen Sie Tillix",

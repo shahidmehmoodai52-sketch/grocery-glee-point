@@ -24,6 +24,7 @@
       "signup": "Registrer deg"
     },
     "pricing": {
+      "eyebrow": "Priser",
       "title": "Enkle planer som vokser med butikken din",
       "sub": "Lanseringstilbud – spar 50 % i en begrenset periode. Priser vises i din lokale valuta ({{code}}).",
       "monthly": "Månedlig",
@@ -95,7 +96,19 @@
       "perfect": "Perfekt for bedrifter i:",
       "supported_cur": "Støttede valutaer",
       "bill_in": "Fakturer i valutaen kundene dine bruker",
-      "adapt": "Fra POS i Pakistan til POS-programvare i UAE, Saudi-Arabia og USA — Tillix tilpasser seg ditt marked."
+      "adapt": "Fra POS i Pakistan til POS-programvare i UAE, Saudi-Arabia og USA — Tillix tilpasser seg ditt marked.",
+      "card1_title": "Globalt klar",
+      "card1_text": "Driv virksomheten din hvor som helst i verden med et virkelig internasjonalt POS-system.",
+      "card2_title": "Støtte for flere valutaer",
+      "card2_text": "Støtter ulike valutaer basert på din bedriftslokasjon – PKR, AED, SAR, USD, EUR og mer.",
+      "card3_title": "Nøyaktige økonomiske rapporter",
+      "card3_text": "Rapporter genereres i din valgte bedriftsvaluta for ren og pålitelig regnskapsføring.",
+      "card4_title": "Klar for kjeder",
+      "card4_text": "Ideell POS for bedrifter som administrerer én eller mange detaljhandelslokasjoner.",
+      "card5_title": "Skybasert",
+      "card5_text": "Sky-POS-tilgang – driv din dagligvarehandel, supermarked, apotek, restaurant eller grossistvirksomhet sikkert fra hvor som helst.",
+      "card6_title": "Sikker og pålitelig",
+      "card6_text": "Sikkerhet på bedriftsnivå med rask og robust skyinfrastruktur."
     },
     "why": {
       "eyebrow": "Hvorfor Tillix",
@@ -128,14 +141,9 @@
       "title": "Menneskene bak Tillix",
       "sub": "Et dedikert team som bygger og støtter detaljhandelsteknologi for deg."
     },
-    "footer": {
-      "desc": "Tillix — Smart detaljhandel starter her. Skybasert POS og administrasjonsprogramvare for moderne detaljister over hele verden.",
-      "copyright": "Alle rettigheter reservert tillix.co",
-      "product": "Produkt",
-      "get_started": "Kom i gang",
-      "follow": "Følg Tillix"
-    },
     "testimonials": {
+      "eyebrow": "Elsket av detaljister",
+      "section_title": "Hva butikkeiere sier om Tillix",
       "t1_quote": "Tillix halverte faktureringstiden vår og ga oss endelig ekte tall på hvilke produkter som faktisk tjener penger.",
       "t1_name": "Ahmed R.",
       "t1_role": "Supermarkedeier, Dubai",
@@ -145,6 +153,12 @@
       "t3_quote": "Frakoblet modus reddet en hel salgshelg under et brudd. Alt ble perfekt synkronisert da vi kom på nett igjen.",
       "t3_name": "Miguel A.",
       "t3_role": "Dagligvareeier, Madrid"
+    },
+    "connect": {
+      "eyebrow": "Koble til",
+      "title": "Koble til med Tillix",
+      "sub": "Følg oss på sosiale medier og se produktvideoer på YouTube.",
+      "watch_videos": "Se Tillix produktvideoer"
     },
     "faq": {
       "eyebrow": "FAQ",
@@ -167,79 +181,9 @@
       "q8": "Hvor mye koster Tillix?",
       "a8": "Tillix tilbyr et gratis nivå for å komme i gang og rimelige månedlige planer som vokser med virksomheten din. Ingen skjulte gebyrer, avbryt når som helst."
     },
-    "global": {
-      "eyebrow": "🌍 Globalt klar",
-      "title": "Selg hvor som helst med støtte for flere valutaer",
-      "sub": "Én POS-plattform. Flere land. Flere valutaer. Tillix er en skybasert POS og administrasjonsprogramvare for virksomheter i ulike land.",
-      "perfect": "Perfekt for bedrifter i:",
-      "supported_cur": "Støttede valutaer",
-      "bill_in": "Fakturer i valutaen kundene dine bruker",
-      "adapt": "Fra POS i Pakistan til POS-programvare i UAE, Saudi-Arabia og USA — Tillix tilpasser seg ditt marked.",
-      "card1_title": "Globalt klar",
-      "card1_text": "Driv virksomheten din hvor som helst i verden med et virkelig internasjonalt POS-system.",
-      "card2_title": "Støtte for flere valutaer",
-      "card2_text": "Støtter ulike valutaer basert på din bedriftslokasjon – PKR, AED, SAR, USD, EUR og mer.",
-      "card3_title": "Nøyaktige økonomiske rapporter",
-      "card3_text": "Rapporter genereres i din valgte bedriftsvaluta for ren og pålitelig regnskapsføring.",
-      "card4_title": "Klar for kjeder",
-      "card4_text": "Ideell POS for bedrifter som administrerer én eller mange detaljhandelslokasjoner.",
-      "card5_title": "Skybasert",
-      "card5_text": "Sky-POS-tilgang – driv din dagligvarehandel, supermarked, apotek, restaurant eller grossistvirksomhet sikkert fra hvor som helst.",
-      "card6_title": "Sikker og pålitelig",
-      "card6_text": "Sikkerhet på bedriftsnivå med rask og robust skyinfrastruktur."
-    },
-    "testimonials": {
-      "eyebrow": "Elsket av detaljister",
-      "section_title": "Hva butikkeiere sier om Tillix",
-      "t1_quote": "Tillix halverte faktureringstiden vår og ga oss endelig ekte tall på hvilke produkter som faktisk tjener penger.",
-      "t1_name": "Ahmed R.",
-      "t1_role": "Supermarkedeier, Dubai",
-      "t2_quote": "Vi driver tre avdelinger med Tillix. Sentralt lager og ett dashboard – en enorm oppgradering fra regneark.",
-      "t2_name": "Sara K.",
-      "t2_role": "Kjedesjef, Karachi",
-      "t3_quote": "Frakoblet modus reddet en hel salgshelg under et brudd. Alt ble perfekt synkronisert da vi kom på nett igjen.",
-      "t3_name": "Miguel A.",
-      "t3_role": "Dagligvareeier, Madrid"
-    },
-    "connect": {
-      "eyebrow": "Koble til",
-      "title": "Koble til med Tillix",
-      "sub": "Følg oss på sosiale medier og se produktvideoer på YouTube.",
-      "watch_videos": "Se Tillix produktvideoer"
-    },
-    "pricing": {
-      "eyebrow": "Priser",
-      "title": "Enkle planer som vokser med butikken din",
-      "sub": "Lanseringstilbud – spar 50 % i en begrenset periode. Priser vises i din lokale valuta ({{code}}).",
-      "monthly": "Månedlig",
-      "yearly": "Årlig",
-      "save": "SPAR",
-      "basic_sub": "Perfekt for en enkelt butikk som nettopp har startet.",
-      "save_pct": "SPAR 50 %",
-      "start_trial": "Start 7-dagers gratis prøveperiode",
-      "recommended": "Anbefalt",
-      "pro_sub": "For butikker i vekst og team med flere kassierere.",
-      "auto_convert": "Prisene konverteres automatisk fra USD basert på din posisjon. Avgifter kan påløpe. Avbryt når som helst.",
-      "trial_info": "7-dagers gratis prøveperiode · Ingen kredittkort kreves",
-      "f1": "Ubegrensede produkter og strekkoder",
-      "f2": "Rask POS-fakturering og kvitteringer",
-      "f3": "Lager- og varsler om lav beholdning",
-      "f4": "Kunder, leverandører og hovedbok",
-      "f5": "Innkjøp og returer",
-      "f6": "Frakoblet modus og automatisk synkronisering",
-      "f7": "Daglige automatiske sikkerhetskopier",
-      "f8": "E-poststøtte",
-      "f9": "Alt i Basic-planen",
-      "f10": "Flere kassierere med roller og tillatelser",
-      "f11": "Skift, kasseskuff og revisjonslogger",
-      "f12": "Utløpsdato, batch- og svinnsporing",
-      "f13": "Masseimport og globalt produktbibliotek",
-      "f14": "Avanserte rapporter og P&L-analyse",
-      "f15": "Prioritert støtte"
-    },
     "footer": {
       "desc": "Tillix — Smart detaljhandel starter her. Skybasert POS og administrasjonsprogramvare for moderne detaljister over hele verden.",
-      "copyright": "Alle rettigheter reservert tillix.co",
+      "copyright": "© {{year}} tillix.co Alle rettigheter reservert.",
       "product": "Produkt",
       "get_started": "Kom i gang",
       "follow": "Følg Tillix",
