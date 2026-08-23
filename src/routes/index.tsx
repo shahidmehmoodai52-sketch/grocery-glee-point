@@ -7,7 +7,7 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  PlayCircle, Sparkles,
+  PlayCircle, Sparkles, Mail,
 } from "lucide-react";
 
 /* ---------- IP-based currency localization ---------- */
