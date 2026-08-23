@@ -7,7 +7,7 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  PlayCircle, Sparkles,
+  PlayCircle, Sparkles, Mail,
 } from "lucide-react";
 
 /* ---------- IP-based currency localization ---------- */
@@ -862,13 +862,13 @@ function LandingPage() {
               { Icon: BrandLinkedin, label: "LinkedIn", handle: "tillix-co", href: "https://linkedin.com/company/tillix-co" },
               { Icon: BrandYoutube, label: "YouTube", handle: "@tillixpos", href: "https://www.youtube.com/@tillixpos" },
               { Icon: BrandWhatsapp, label: "WhatsApp", handle: "+923096431377", href: "https://wa.me/923096431377" },
-              { Icon: Smartphone, label: "Call Us", handle: "+92309 6431 377", href: "tel:+923096431377" },
+              { Icon: Mail, label: "Email", handle: "info@tillix.co", href: "mailto:info@tillix.co" },
             ].map(({ Icon, label, handle, href }) => (
               <a
                 key={label}
                 href={href}
-                target="_blank"
-                rel="noopener noreferrer"
+                target={label === "Email" ? undefined : "_blank"}
+                rel={label === "Email" ? undefined : (label === "WhatsApp" ? "noreferrer" : "noopener noreferrer")}
                 aria-label={`Follow Tillix on ${label}`}
                 className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5"
               >
@@ -986,7 +986,7 @@ function LandingPage() {
                   <a
                     href="https://wa.me/923096431377"
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noreferrer"
                     className="inline-flex items-center gap-2 rounded-full bg-tx-green/10 px-3 py-1.5 text-xs font-bold text-tx-green-dark transition hover:bg-tx-green hover:text-white"
                   >
                     <BrandWhatsapp className="h-4 w-4" />
@@ -1040,13 +1040,13 @@ function LandingPage() {
                 { Icon: BrandLinkedin, label: "LinkedIn", href: "https://linkedin.com/company/tillix-co" },
                 { Icon: BrandYoutube, label: "YouTube", href: "https://www.youtube.com/@tillixpos" },
                 { Icon: BrandWhatsapp, label: "WhatsApp", href: "https://wa.me/923096431377" },
-                { Icon: Smartphone, label: "Call Us", href: "tel:+923096431377" },
+                { Icon: Mail, label: "Email", href: "mailto:info@tillix.co" },
               ].map(({ Icon, label, href }) => (
                 <a
                   key={label}
                   href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  target={label === "Email" ? undefined : "_blank"}
+                  rel={label === "Email" ? undefined : (label === "WhatsApp" ? "noreferrer" : "noopener noreferrer")}
                   aria-label={`Follow Tillix on ${label}`}
                   className="inline-flex transition hover:-translate-y-0.5 hover:drop-shadow-md"
                 >
