@@ -36,10 +36,9 @@ function mirrorServiceWorker() {
     enforce: "post" as const,
     configResolved(config: any) {
       root = config.root ?? process.cwd();
-      const outDirs = [
-        config.environments?.client?.build?.outDir,
-        config.build?.outDir,
-      ].filter(Boolean) as string[];
+      const outDirs = [config.environments?.client?.build?.outDir].filter(
+        Boolean,
+      ) as string[];
       targets = new Set(outDirs.map((dir) => resolve(root, dir)));
     },
     closeBundle() {
