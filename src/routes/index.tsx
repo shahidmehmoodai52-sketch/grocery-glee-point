@@ -159,22 +159,14 @@ const LOGO_URL = "/tillix-logo.jpeg?v=2";
 const OG_LOGO_URL = `${SITE_URL}${LOGO_URL}`;
 
 const FAQS: { q: string; a: string }[] = [
-  { q: "What is Tillix POS software?",
-    a: "Tillix is a cloud-based Point of Sale and retail management system that handles billing, inventory, barcodes, customers, suppliers, purchases, staff and analytics — everything a modern shop needs, in one platform." },
-  { q: "Which businesses is Tillix best for?",
-    a: "Grocery stores, supermarkets, retail shops, pharmacies, restaurants, wholesalers and multi-store chains. Tillix scales from a single till to hundreds of outlets." },
-  { q: "Does Tillix work offline?",
-    a: "Yes. Tillix keeps selling even when the internet drops — sales, receipts and stock updates queue locally and sync automatically once you're back online." },
-  { q: "Can Tillix scan barcodes and print receipts?",
-    a: "Absolutely. Tillix supports USB and Bluetooth barcode scanners, thermal 58mm/80mm receipt printers, cash drawers and customer displays out of the box." },
-  { q: "Is Tillix available in my country?",
-    a: "Tillix is a cloud platform available worldwide — including the UAE, Saudi Arabia, Pakistan, the United States, the UK, the EU, Australia and New Zealand — with multi-currency, multi-tax and multi-language support." },
-  { q: "Is my data secure with Tillix?",
-    a: "Your data is encrypted in transit and at rest, backed up automatically, and protected by role-based permissions and audit logs. You own your data at all times." },
-  { q: "Can I manage multiple stores with one account?",
-    a: "Yes. Tillix is built for multi-store retail — centralize products, prices and stock across locations while each branch runs its own tills." },
-  { q: "How much does Tillix cost?",
-    a: "Tillix offers a free tier to get started and affordable monthly plans that grow with your business. No hidden fees, cancel anytime." },
+  { q: "landing.faq.q1", a: "landing.faq.a1" },
+  { q: "landing.faq.q2", a: "landing.faq.a2" },
+  { q: "landing.faq.q3", a: "landing.faq.a3" },
+  { q: "landing.faq.q4", a: "landing.faq.a4" },
+  { q: "landing.faq.q5", a: "landing.faq.a5" },
+  { q: "landing.faq.q6", a: "landing.faq.a6" },
+  { q: "landing.faq.q7", a: "landing.faq.a7" },
+  { q: "landing.faq.q8", a: "landing.faq.a8" },
 ];
 
 export const Route = createFileRoute("/")({
@@ -593,12 +585,12 @@ function LandingPage() {
 
           <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { icon: Globe2, title: "Global Ready", text: "Operate your business anywhere in the world with a truly international POS system." },
-              { icon: Landmark, title: "Multi-Currency Support", text: "Supports different currencies based on your business location — PKR, AED, SAR, USD, EUR and more." },
-              { icon: TrendingUp, title: "Accurate Financial Reports", text: "Reports are generated in your selected business currency for clean, reliable accounting." },
-              { icon: Store, title: "Multi-Store Ready", text: "Ideal multi store POS for businesses managing one or many retail locations." },
-              { icon: Cloud, title: "Cloud Based", text: "Cloud POS access — run your grocery, supermarket, pharmacy, restaurant or wholesale business securely from anywhere." },
-              { icon: Shield, title: "Secure & Reliable", text: "Enterprise-grade security with fast, resilient cloud infrastructure." },
+              { icon: Globe2, title: t('landing.global.card1_title'), text: t('landing.global.card1_text') },
+              { icon: Landmark, title: t('landing.global.card2_title'), text: t('landing.global.card2_text') },
+              { icon: TrendingUp, title: t('landing.global.card3_title'), text: t('landing.global.card3_text') },
+              { icon: Store, title: t('landing.global.card4_title'), text: t('landing.global.card4_text') },
+              { icon: Cloud, title: t('landing.global.card5_title'), text: t('landing.global.card5_text') },
+              { icon: Shield, title: t('landing.global.card6_title'), text: t('landing.global.card6_text') },
             ].map(({ icon: Icon, title, text }) => (
               <div key={title} className="group rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5">
                 <div className="grid h-11 w-11 place-items-center rounded-xl bg-tx-green-light text-tx-green-dark">
@@ -718,7 +710,7 @@ function LandingPage() {
       {/* TESTIMONIALS */}
       <section className="bg-slate-50/60">
         <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-          <SectionTitle eyebrow="Loved by retailers" title="What shop owners say about Tillix" />
+          <SectionTitle eyebrow={t('landing.testimonials.eyebrow')} title={t('landing.testimonials.section_title')} />
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {testimonials.map(t => (
               <figure key={t.name} className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -737,7 +729,7 @@ function LandingPage() {
       <section id="pricing" className="bg-slate-50/60">
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
           <SectionTitle
-            eyebrow="Pricing"
+            eyebrow={t('landing.pricing.eyebrow')}
             title={t('landing.pricing.title', 'Simple plans that grow with your shop')}
             sub={t('landing.pricing.sub', `Launch offer — save 50% for a limited time. Prices shown in your local currency (${cur.code}).`, { code: cur.code })}
           />
@@ -817,7 +809,7 @@ function LandingPage() {
               </div>
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-sm text-slate-400 line-through">{formatPrice(proOrig, cur)}</span>
-                <span className="rounded-md bg-tx-green px-2 py-0.5 text-[11px] font-bold text-white">SAVE 50%</span>
+                <span className="rounded-md bg-tx-green px-2 py-0.5 text-[11px] font-bold text-white">{t('landing.pricing.save_pct', 'SAVE 50%')}</span>
               </div>
               <ul className="mt-6 space-y-2.5 text-sm text-slate-100">
                 {[
@@ -854,9 +846,9 @@ function LandingPage() {
       <section id="connect" className="bg-white">
         <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
           <SectionTitle
-            eyebrow="Connect"
-            title="Connect with Tillix"
-            sub="Follow us on social media and watch product videos on YouTube."
+            eyebrow={t('landing.connect.eyebrow')}
+            title={t('landing.connect.title')}
+            sub={t('landing.connect.sub')}
           />
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -892,7 +884,7 @@ function LandingPage() {
               className="inline-flex items-center gap-2 rounded-full bg-tx-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-tx-green-dark hover:shadow-md"
             >
               <PlayCircle className="h-5 w-5" />
-              Watch Tillix Product Videos
+              {t('landing.connect.watch_videos')}
             </a>
           </div>
         </div>
@@ -903,7 +895,7 @@ function LandingPage() {
 
       <section id="faq" className="bg-slate-50/60">
         <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:px-8">
-          <SectionTitle eyebrow="FAQ" title="Frequently asked questions" sub="Everything you need to know about Tillix POS." />
+          <SectionTitle eyebrow={t('landing.faq.eyebrow')} title={t('landing.faq.title')} sub={t('landing.faq.sub')} />
           <div className="mt-10 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
             {FAQS.map((f, i) => {
               const open = openFaq === i;
@@ -915,11 +907,11 @@ function LandingPage() {
                     aria-expanded={open}
                     className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
                   >
-                    <span className="text-sm font-semibold text-tx-navy sm:text-base">{f.q}</span>
+                    <span className="text-sm font-semibold text-tx-navy sm:text-base">{t(f.q)}</span>
                     <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition ${open ? "rotate-180 text-tx-green" : ""}`} />
                   </button>
                   {open && (
-                    <div className="px-5 pb-5 pt-0 text-sm leading-relaxed text-slate-600">{f.a}</div>
+                    <div className="px-5 pb-5 pt-0 text-sm leading-relaxed text-slate-600">{t(f.a)}</div>
                   )}
                 </div>
               );
@@ -1061,7 +1053,7 @@ function LandingPage() {
               className="mt-4 inline-flex items-center gap-2 rounded-full border border-tx-green/30 bg-tx-green-light px-3.5 py-2 text-xs font-semibold text-tx-green-dark transition hover:-translate-y-0.5 hover:border-tx-green/60 hover:shadow-sm"
             >
               <PlayCircle className="h-4 w-4" />
-              Watch Tillix Product Videos
+              {t('landing.connect.watch_videos')}
             </a>
           </div>
 
@@ -1071,8 +1063,8 @@ function LandingPage() {
         </div>
         <div className="border-t border-slate-100 bg-slate-50">
           <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-slate-500 sm:flex-row sm:px-6 lg:px-8">
-            <div>© {new Date().getFullYear()} tillix.co All rights reserved.</div>
-            <div>Smart Retail Starts Here.</div>
+            <div>{t('landing.footer.copyright', '© {{year}} tillix.co All rights reserved.', { year: new Date().getFullYear() })}</div>
+            <div>{t('landing.footer.tagline')}</div>
           </div>
         </div>
       </footer>
