@@ -525,7 +525,8 @@ function Page() {
   const cogs = Number(summaryStats.sales_cost || 0);
   const grossProfit = revenue - cogs;
   const netProfit = grossProfit - expensesPeriod;
-  const grossRevenue = revenue + Number(summaryStats.returns_total || 0);
+  const grossRevenue = revenue;
+  const netOfReturns = revenue - returnsTotal;
   const creditOut = Number(summaryStats.credit_sales_total || 0);
   const cashIn = Number(summaryStats.cash_sales_total || 0);
   const returnsLoss = Number(summaryStats.returns_total || 0);
@@ -774,7 +775,7 @@ function Page() {
               <TableBody>
                 <Row label="Gross sales (before returns)" value={fmtMoney(grossRevenue, sym)} muted onClick={() => openInvoices("Gross sales (before returns)", sales as any[])} />
                 <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted onClick={() => openReturns("Sale returns")} />
-                <Row label="Sales (net of returns & discount)" value={fmtMoney(revenue, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", sales as any[])} />
+                <Row label="Sales (net of returns & discount)" value={fmtMoney(netOfReturns, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", sales as any[])} />
                 <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices("Cost of goods sold", sales as any[])} />
                 <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", sales as any[])} />
                 <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
