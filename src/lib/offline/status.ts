@@ -2,6 +2,53 @@
 import { useEffect, useState } from "react";
 import { db } from "./db";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+/** Real connectivity probe — navigator.onLine only reflects the network
+ *  interface, not actual reachability (Windows/Chrome NCSI can report
+ *  offline even when the internet works fine). This hits our own
+ *  Supabase REST endpoint with a short timeout as ground truth. */
+async function probeConnectivity(): Promise<boolean> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return navigator.onLine;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/store_settings?select=id&limit=1`, {
+      method: "HEAD",
+      headers: { apikey: SUPABASE_KEY },
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    return res.ok || res.status === 206;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+let consecutiveFailures = 0;
+let probing = false;
+async function runConnectivityProbe() {
+  if (probing) return;
+  probing = true;
+  try {
+    const ok = await probeConnectivity();
+    if (ok) {
+      consecutiveFailures = 0;
+      if (!state.online) { state = { ...state, online: true }; emit(); }
+    } else {
+      consecutiveFailures++;
+      if (consecutiveFailures >= 2 && state.online) {
+        state = { ...state, online: false }; emit();
+      }
+    }
+  } finally {
+    probing = false;
+  }
+}
+
 export type SyncPhase = "idle" | "syncing" | "error";
 
 export interface OfflineStatus {
@@ -91,10 +138,17 @@ export function bootOfflineStatus() {
     };
   } catch {}
 
-  window.addEventListener("online", () => { state = { ...state, online: true }; emit(); });
-  window.addEventListener("offline", () => { state = { ...state, online: false }; emit(); });
+  // "online" event is only a hint — verify with a real probe before trusting it.
+  window.addEventListener("online", () => { void runConnectivityProbe(); });
+  // "offline" (interface actually down) is reliable — trust it immediately.
+  window.addEventListener("offline", () => { consecutiveFailures = 0; state = { ...state, online: false }; emit(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void runConnectivityProbe();
+  });
   emit();
   void refreshPendingCount();
+  void runConnectivityProbe();
+  setInterval(() => { void runConnectivityProbe(); }, 15000);
 }
 
 export function useOfflineStatus(): OfflineStatus {
