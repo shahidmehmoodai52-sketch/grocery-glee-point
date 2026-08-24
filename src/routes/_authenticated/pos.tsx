@@ -3376,11 +3376,12 @@ function POSPage() {
         sale={printAsk}
         defaultAction="no"
         onYes={() => {
-          const s = printAsk;
+          // PrintPromptDialog's own doPrint() already fires printInvoiceDirect
+          // with the correct local printer settings before calling onYes —
+          // do not print again here (was causing a double-print race that
+          // could blank the first job's content, see receipt-root removal
+          // race in printReceipt()).
           setPrintAsk(null);
-          if (s) {
-            printInvoiceDirect(s, settings, "sale");
-          }
           setTimeout(() => searchRef.current?.focus(), 50);
         }}
         onNo={() => {
