@@ -607,8 +607,30 @@ function POSPage() {
   });
 
   const selectQuickAddMatch = async (product: any) => {
+    const scannedBarcodes = Array.from(
+      new Set(
+        [quickAdd.barcode, ...quickAdd.barcodes_text.split(/[\s,;\n]+/)]
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    );
+    if (scannedBarcodes.length) {
+      for (const bc of scannedBarcodes) {
+        try {
+          await insertOfflineAware("product_barcodes", {
+            product_id: product.id,
+            barcode: bc,
+          } as any);
+        } catch {
+          // Ignore duplicates / already-linked barcodes — best effort.
+        }
+      }
+      qc.invalidateQueries({ queryKey: ["product_barcodes"] });
+      toast.success(`Barcode linked to ${product.name}`);
+    } else {
+      toast.success(`Added ${product.name}`);
+    }
     addProduct(product);
-    toast.success(`Added ${product.name}`);
     setQuickAdd({
       open: false,
       barcode: "",
@@ -3428,13 +3450,13 @@ function POSPage() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Search existing item</Label>
+              <Label>Search existing item — select to link this barcode instead of creating a new item</Label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   autoFocus
                   className="pl-9"
-                  placeholder="Barcode, item code or name"
+                  placeholder="Search by name, SKU or barcode…"
                   value={quickAddLookup}
                   onChange={(e) => setQuickAddLookup(e.target.value)}
                 />
