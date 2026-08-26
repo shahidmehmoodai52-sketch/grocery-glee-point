@@ -617,7 +617,7 @@ function POSPage() {
     if (scannedBarcodes.length) {
       for (const bc of scannedBarcodes) {
         try {
-          await insertOfflineAware("product_barcodes", {
+          await insertOfflineAware("product_barcodes" as any, {
             product_id: product.id,
             barcode: bc,
           } as any);
