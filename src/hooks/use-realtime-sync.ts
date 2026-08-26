@@ -102,8 +102,7 @@ let tenantIdPromise: Promise<string | null> | null = null;
 async function resolveTenantId(): Promise<string | null> {
   if (cachedTenantId !== undefined) return cachedTenantId;
   if (!tenantIdPromise) {
-    tenantIdPromise = supabase
-      .rpc("current_tenant_id")
+    tenantIdPromise = Promise.resolve(supabase.rpc("current_tenant_id"))
       .then(({ data }) => {
         cachedTenantId = (data as string) ?? null;
         return cachedTenantId;
@@ -115,6 +114,7 @@ async function resolveTenantId(): Promise<string | null> {
   }
   return tenantIdPromise;
 }
+
 
 
 // Changed tables are coalesced and flushed once per window, during idle time,
