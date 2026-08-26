@@ -96,6 +96,27 @@ let channel: ReturnType<typeof supabase.channel> | null = null;
 let subscribers = 0;
 const clients = new Set<QueryClient>();
 
+let cachedTenantId: string | null | undefined;
+let tenantIdPromise: Promise<string | null> | null = null;
+
+async function resolveTenantId(): Promise<string | null> {
+  if (cachedTenantId !== undefined) return cachedTenantId;
+  if (!tenantIdPromise) {
+    tenantIdPromise = supabase
+      .rpc("current_tenant_id")
+      .then(({ data }) => {
+        cachedTenantId = (data as string) ?? null;
+        return cachedTenantId;
+      })
+      .catch(() => {
+        cachedTenantId = null;
+        return null;
+      });
+  }
+  return tenantIdPromise;
+}
+
+
 // Changed tables are coalesced and flushed once per window, during idle time,
 // so a burst of realtime events (or a reconnect replay) cannot trigger dozens
 // of simultaneous refetches while the cashier is typing.
@@ -130,12 +151,15 @@ export function useRealtimeSync() {
   useEffect(() => {
     clients.add(qc);
     subscribers += 1;
-    if (!channel) {
+    void resolveTenantId().then((tenantId) => {
+      if (!tenantId) return;
+      if (channel) return;
       const ch = supabase.channel("pos-live-sync");
       Object.keys(MAP).forEach((table) => {
+        const filterCol = table === "tenants" ? "id" : "tenant_id";
         ch.on(
           "postgres_changes" as any,
-          { event: "*", schema: "public", table },
+          { event: "*", schema: "public", table, filter: `${filterCol}=eq.${tenantId}` },
           () => {
             dirty.add(table);
             scheduleFlush();
@@ -144,7 +168,8 @@ export function useRealtimeSync() {
       });
       ch.subscribe();
       channel = ch;
-    }
+    });
+
     // Background sync reports the tables it actually refreshed — route them
     // through the same coalesced flush instead of a blanket invalidateQueries().
     let unsubSync: (() => void) | undefined;
@@ -171,7 +196,10 @@ export function useRealtimeSync() {
           supabase.removeChannel(channel);
           channel = null;
         }
+        cachedTenantId = undefined;
+        tenantIdPromise = null;
       }
+
     };
   }, [qc]);
 }
