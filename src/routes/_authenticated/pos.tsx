@@ -496,6 +496,7 @@ function POSPage() {
   // True while the user is navigating results with the keyboard — blocks hover
   // (including hover caused by auto-scrolling) from stealing the highlight.
   const kbNavRef = useRef(false);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
 
   const [scanFlash, setScanFlash] = useState(false);
   const [undoReason, setUndoReason] = useState<string>(UNDO_REASONS[0]);
@@ -2267,7 +2268,7 @@ function POSPage() {
 
       if (e.key === "Enter" && search.trim()) {
         e.preventDefault();
-        const raw = search.trim();
+        const raw = (searchRef.current?.value ?? search).trim();
         
         // 1. Exact barcode check
         const exact = productByBarcode[raw];
@@ -2415,7 +2416,7 @@ function POSPage() {
                     setCartCursor(-1);
                     return;
                   }
-                  const raw = search.trim();
+                  const raw = (searchRef.current?.value ?? search).trim();
                   // When search has text, arrows navigate the search results popup
                   if (raw && e.key === "ArrowDown" && filtered.length) {
                     e.preventDefault();
@@ -2782,7 +2783,14 @@ function POSPage() {
                             ref={(el) => {
                               searchRowRefs.current[i] = el;
                             }}
-                            onMouseMove={() => {
+                            onMouseMove={(e) => {
+                              const last = lastMousePosRef.current;
+                              const moved =
+                                !last ||
+                                Math.abs(e.clientX - last.x) > 2 ||
+                                Math.abs(e.clientY - last.y) > 2;
+                              lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                              if (!moved) return;
                               kbNavRef.current = false;
                               setHighlight(i);
                             }}
@@ -2790,7 +2798,7 @@ function POSPage() {
                               addProduct(p);
                               setSearch("");
                             }}
-                            className={`cursor-pointer border-b border-border ${isHi ? "bg-primary/15" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
+                            className={`cursor-pointer border-b border-border ${isHi ? "bg-primary/30 border-l-4 border-l-primary" : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-primary/10"}`}
                           >
                             <td className="px-2 py-1.5 font-mono text-xs">{code}</td>
                             <td className="px-2 py-1.5">
@@ -3413,6 +3421,7 @@ function POSPage() {
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  autoFocus
                   className="pl-9"
                   placeholder="Barcode, item code or name"
                   value={quickAddLookup}
@@ -3456,7 +3465,6 @@ function POSPage() {
             <div className="col-span-2">
               <Label>Item name <span className="text-destructive">*</span></Label>
               <Input
-                autoFocus
                 value={quickAdd.name}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, name: e.target.value }))}
                 onKeyDown={(e) => {
