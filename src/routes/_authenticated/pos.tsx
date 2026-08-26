@@ -2270,30 +2270,35 @@ function POSPage() {
         e.preventDefault();
         const raw = (searchRef.current?.value ?? search).trim();
         
-        // 1. Exact barcode check
-        const exact = productByBarcode[raw];
-        if (exact) {
-          addProduct(exact);
-          setSearch("");
-          triggerScanFlash();
-          searchRef.current?.focus();
-          return;
+        // 1. Exact barcode check — skipped if the user manually navigated
+        // the dropdown with arrow keys, so an arrow-selected item is never overridden.
+        if (!kbNavRef.current) {
+          const exact = productByBarcode[raw];
+          if (exact) {
+            addProduct(exact);
+            setSearch("");
+            triggerScanFlash();
+            searchRef.current?.focus();
+            return;
+          }
         }
         
         // 2. Exact match in filtered results (e.g. if scan matches exactly even if not indexed in productByBarcode)
-        const exactFiltered = filtered.find(p => {
-          const sku = (p.sku ?? "").toLowerCase();
-          const bcs = (barcodesByProduct[p.id] ?? []).map(b => b.toLowerCase());
-          const lRaw = raw.toLowerCase();
-          return sku === lRaw || bcs.includes(lRaw);
-        });
-        
-        if (exactFiltered) {
-          addProduct(exactFiltered);
-          setSearch("");
-          triggerScanFlash();
-          searchRef.current?.focus();
-          return;
+        if (!kbNavRef.current) {
+          const exactFiltered = filtered.find(p => {
+            const sku = (p.sku ?? "").toLowerCase();
+            const bcs = (barcodesByProduct[p.id] ?? []).map(b => b.toLowerCase());
+            const lRaw = raw.toLowerCase();
+            return sku === lRaw || bcs.includes(lRaw);
+          });
+          
+          if (exactFiltered) {
+            addProduct(exactFiltered);
+            setSearch("");
+            triggerScanFlash();
+            searchRef.current?.focus();
+            return;
+          }
         }
 
         // 3. Highlighted selection
@@ -2486,27 +2491,33 @@ function POSPage() {
                     }
                     return;
                   }
-                  const exact = productByBarcode[raw];
-                  if (exact) {
-                    addProduct(exact);
-                    setSearch("");
-                    triggerScanFlash();
-                    return;
+                  // Exact barcode check — skipped if the user manually navigated
+                  // the dropdown with arrow keys, so an arrow-selected item is never overridden.
+                  if (!kbNavRef.current) {
+                    const exact = productByBarcode[raw];
+                    if (exact) {
+                      addProduct(exact);
+                      setSearch("");
+                      triggerScanFlash();
+                      return;
+                    }
                   }
                   
                   // Double-check exact match in filtered results
-                  const exactFiltered = filtered.find(p => {
-                    const sku = (p.sku ?? "").toLowerCase();
-                    const bcs = (barcodesByProduct[p.id] ?? []).map(b => b.toLowerCase());
-                    const lRaw = raw.toLowerCase();
-                    return sku === lRaw || bcs.includes(lRaw);
-                  });
-                  
-                  if (exactFiltered) {
-                    addProduct(exactFiltered);
-                    setSearch("");
-                    triggerScanFlash();
-                    return;
+                  if (!kbNavRef.current) {
+                    const exactFiltered = filtered.find(p => {
+                      const sku = (p.sku ?? "").toLowerCase();
+                      const bcs = (barcodesByProduct[p.id] ?? []).map(b => b.toLowerCase());
+                      const lRaw = raw.toLowerCase();
+                      return sku === lRaw || bcs.includes(lRaw);
+                    });
+                    
+                    if (exactFiltered) {
+                      addProduct(exactFiltered);
+                      setSearch("");
+                      triggerScanFlash();
+                      return;
+                    }
                   }
 
                   if (filtered.length >= 1) {
