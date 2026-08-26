@@ -2463,7 +2463,7 @@ function POSPage() {
                   }
                   if (
                     !raw &&
-                    (e.key === "Delete" || (e.key === "Backspace" && cartCursor >= 0)) &&
+                    e.key === "Delete" &&
                     cartCursor >= 0 &&
                     cartCursor < tab.items.length
                   ) {
