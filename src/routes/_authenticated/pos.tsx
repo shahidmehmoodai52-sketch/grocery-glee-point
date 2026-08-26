@@ -596,7 +596,7 @@ function POSPage() {
       rack_location: "",
       allow_negative_stock: true,
     });
-    setQuickAddLookup(raw);
+    setQuickAddLookup("");
   };
 
   const { data: quickAddMatches = [], isFetching: quickAddMatchesLoading } = useQuery({
@@ -3449,18 +3449,25 @@ function POSPage() {
             <DialogTitle>Add new item to catalog</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {quickAdd.barcode && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Scanned barcode</span>
+                <span className="font-mono font-semibold text-sm">{quickAdd.barcode}</span>
+              </div>
+            )}
             <div>
-              <Label>Search existing item — select to link this barcode instead of creating a new item</Label>
+              <Label>Search existing item — select to link the barcode above to it</Label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   autoFocus
                   className="pl-9"
-                  placeholder="Search by name, SKU or barcode…"
+                  placeholder="Type item name, SKU or another barcode…"
                   value={quickAddLookup}
                   onChange={(e) => setQuickAddLookup(e.target.value)}
                 />
               </div>
+
               {quickAddLookup.trim().length >= 2 && (
                 <div className="mt-2 max-h-48 overflow-auto rounded-md border bg-muted/20 p-2 space-y-2">
                   {quickAddMatchesLoading && (
