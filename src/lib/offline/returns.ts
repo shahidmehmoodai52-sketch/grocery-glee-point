@@ -23,6 +23,10 @@ export interface SaleReturnPayload {
   refund_method: string;
   note: string | null;
   items: { product_id: string | null; name: string; qty: number; price: number }[];
+  /** "customer" (default) or "staff". Staff returns never pay out cash — the
+   *  RPC books the value to the staff member's ledger instead. */
+  party_type?: "customer" | "staff";
+  staff_user_id?: string | null;
 }
 
 /** Presentation/audit-only breakdown captured by the UI. Never sent to the RPC
@@ -117,11 +121,19 @@ export async function completeSaleReturnOfflineAware(
     line_total: +(i.qty * i.price).toFixed(2),
   }));
 
+  const partyType = payload.party_type ?? "customer";
+  const staffUserId = partyType === "staff" ? (payload.staff_user_id ?? null) : null;
+  // Staff returns never pay out cash locally either — mirrors the RPC's rule.
+  const effectiveRefund = partyType === "staff" ? 0 : Number(payload.refund_amount || 0);
+  const effectiveMethod = partyType === "staff" ? "staff_ledger" : payload.refund_method;
+
   const ret: any = {
     id: localId,
     return_no: nextLocalReturnNo(),
     sale_id: payload.sale_id,
-    customer_id: payload.customer_id,
+    customer_id: partyType === "staff" ? null : payload.customer_id,
+    party_type: partyType,
+    staff_user_id: staffUserId,
     tenant_id,
     device_id,
     user_id,
@@ -129,8 +141,8 @@ export async function completeSaleReturnOfflineAware(
     subtotal,
     tax: Number(payload.tax || 0),
     total,
-    refund_amount: Number(payload.refund_amount || 0),
-    refund_method: payload.refund_method,
+    refund_amount: effectiveRefund,
+    refund_method: effectiveMethod,
     note: payload.note,
     created_at: now,
     updated_at: now,
@@ -138,7 +150,7 @@ export async function completeSaleReturnOfflineAware(
     _original_invoice_no: originalInvoiceNo,
     _discounts: { effective: +Number(meta.discount ?? 0).toFixed(2) },
     _taxes: { total: Number(payload.tax || 0), breakdown: meta.tax_breakdown ?? [] },
-    _refund: { amount: Number(payload.refund_amount || 0), method: payload.refund_method },
+    _refund: { amount: effectiveRefund, method: effectiveMethod },
     _inventory_impact: payload.items
       .filter((i) => i.product_id)
       .map((i) => ({ product_id: i.product_id, qty_delta: i.qty })),
@@ -186,8 +198,10 @@ export async function completeSaleReturnOfflineAware(
         }
       }
 
+      // Staff returns adjust `tenant_members.staff_ledger_balance` server-side once
+      // this queued write syncs — there's no local staff-ledger mirror to update here.
       // Credit refunds reduce what the customer owes in the local mirror.
-      if (payload.customer_id && payload.refund_method === "credit") {
+      if (partyType === "customer" && payload.customer_id && payload.refund_method === "credit") {
         const c = await db().customers.get(payload.customer_id);
         if (c && typeof c.balance === "number") {
           await db().customers.put({

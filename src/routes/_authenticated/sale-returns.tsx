@@ -108,7 +108,9 @@ function Page() {
   const [saleId, setSaleId] = useState<string>("none");
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [partyType, setPartyType] = useState<"customer" | "staff">("customer");
   const [customer, setCustomer] = useState<string>("none");
+  const [staffId, setStaffId] = useState<string>("none");
   const [items, setItems] = useState<ItemRow[]>([]);
   const [tax, setTax] = useState(0);
   const [refund, setRefund] = useState(0);
@@ -188,6 +190,20 @@ function Page() {
           } catch {}
         },
       }),
+  });
+  // Coworkers in the current shop — used for "staff return" (no cash, credited
+  // to their own ledger instead). Any signed-in tenant member can list them.
+  const { data: staffList = [] } = useQuery({
+    queryKey: ["tenant-staff-for-return"],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.rpc("list_tenant_staff" as any);
+        if (error) throw error;
+        return (data ?? []) as { user_id: string; email: string; role: string }[];
+      } catch {
+        return [];
+      }
+    },
   });
 
   // Item-wise product search (works offline via the local mirror)
@@ -321,7 +337,9 @@ function Page() {
     setItems([]);
     setSaleId("none");
     setInvoiceSearch("");
+    setPartyType("customer");
     setCustomer("none");
+    setStaffId("none");
     setTax(0);
     setRefund(0);
     setMethod("cash");
@@ -338,17 +356,26 @@ function Page() {
         return toast.error(`${l.name}: return qty ${l.qty} exceeds sold qty ${l.max}`);
       }
     }
-    if (refund > total + 0.001) return toast.error("Refund cannot exceed total");
+    if (partyType === "staff" && staffId === "none") {
+      return toast.error("Select which staff member this return belongs to");
+    }
+    if (partyType === "customer" && refund > total + 0.001) {
+      return toast.error("Refund cannot exceed total");
+    }
     let offline = false;
     let localRet: any = null;
     try {
       const res = await completeSaleReturnOfflineAware(
         {
           sale_id: saleId === "none" ? null : saleId,
-          customer_id: customer === "none" ? null : customer,
+          customer_id: partyType === "customer" && customer !== "none" ? customer : null,
+          party_type: partyType,
+          staff_user_id: partyType === "staff" ? staffId : null,
           tax,
-          refund_amount: refund,
-          refund_method: method,
+          // Staff returns never pay cash out — the RPC books the value to
+          // the staff member's own ledger instead.
+          refund_amount: partyType === "staff" ? 0 : refund,
+          refund_method: partyType === "staff" ? "staff_ledger" : method,
           note,
           items: picked.map((l) => ({
             product_id: l.product_id,
@@ -455,7 +482,29 @@ function Page() {
                   </div>
                 )}
 
-                {saleId === "none" && (
+                <div>
+                  <Label>Return for</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={partyType === "customer" ? "default" : "outline"}
+                      onClick={() => setPartyType("customer")}
+                    >
+                      Walking customer
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={partyType === "staff" ? "default" : "outline"}
+                      onClick={() => setPartyType("staff")}
+                    >
+                      Staff
+                    </Button>
+                  </div>
+                </div>
+
+                {partyType === "customer" && saleId === "none" && (
                   <div>
                     <Label>Customer</Label>
                     <Select value={customer} onValueChange={setCustomer}>
@@ -471,6 +520,33 @@ function Page() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                )}
+
+                {partyType === "staff" && (
+                  <div>
+                    <Label>Staff member</Label>
+                    <Select value={staffId} onValueChange={setStaffId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select staff" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staffList.map((s) => (
+                          <SelectItem key={s.user_id} value={s.user_id}>
+                            {s.email}
+                          </SelectItem>
+                        ))}
+                        {staffList.length === 0 && (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                            No other staff found
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      No cash is paid out — the return value is credited to this staff
+                      member's own ledger.
+                    </p>
                   </div>
                 )}
               </div>
@@ -625,29 +701,43 @@ function Page() {
                 </div>
                 <div>
                   <Label>Refund</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={refund || ""}
-                    onChange={(e) => setRefund(Number(e.target.value))}
-                  />
+                  {partyType === "staff" ? (
+                    <div className="h-9 flex items-center text-sm text-muted-foreground">
+                      {fmtMoney(0, sym)} (staff ledger)
+                    </div>
+                  ) : (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={refund || ""}
+                      onChange={(e) => setRefund(Number(e.target.value))}
+                    />
+                  )}
                 </div>
                 <div>
                   <Label>Method</Label>
-                  <Select value={method} onValueChange={setMethod}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="card">Card</SelectItem>
-                      <SelectItem value="transfer">Transfer</SelectItem>
-                      <SelectItem value="credit">Store credit</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {partyType === "staff" ? (
+                    <div className="h-9 flex items-center">
+                      <Badge variant="outline">Staff ledger</Badge>
+                    </div>
+                  ) : (
+                    <Select value={method} onValueChange={setMethod}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="card">Card</SelectItem>
+                        <SelectItem value="transfer">Transfer</SelectItem>
+                        <SelectItem value="credit">Store credit</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="flex flex-col justify-end">
-                  <div className="text-sm text-muted-foreground">Total</div>
+                  <div className="text-sm text-muted-foreground">
+                    {partyType === "staff" ? "Credited to staff ledger" : "Total"}
+                  </div>
                   <div className="text-2xl font-semibold text-primary">{fmtMoney(total, sym)}</div>
                 </div>
               </div>
@@ -694,7 +784,16 @@ function Page() {
               <TableRow key={r.id}>
                 <TableCell className="font-mono text-xs">{r.return_no}</TableCell>
                 <TableCell className="text-sm">{new Date(r.created_at).toLocaleString()}</TableCell>
-                <TableCell>{r.customers?.name ?? "Walk-in"}</TableCell>
+                <TableCell>
+                  {r.party_type === "staff" ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Badge variant="secondary" className="text-[10px]">Staff</Badge>
+                      {staffList.find((s) => s.user_id === r.staff_user_id)?.email ?? "—"}
+                    </span>
+                  ) : (
+                    r.customers?.name ?? "Walk-in"
+                  )}
+                </TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(r.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(r.refund_amount, sym)}</TableCell>
                 <TableCell>

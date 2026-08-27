@@ -86,13 +86,17 @@ export const listStaff = createServerFn({ method: "GET" })
     const { supabaseAdmin, tenantId } = await resolveStaffAdmin(context);
 
     let allowedIds: string[] | null = null;
+    let ledgerBalances: Record<string, number> = {};
     if (tenantId) {
       const { data: members, error } = await supabaseAdmin
         .from("tenant_members")
-        .select("user_id")
+        .select("user_id, staff_ledger_balance")
         .eq("tenant_id", tenantId);
       if (error) throw error;
       allowedIds = (members ?? []).map((m: any) => m.user_id as string);
+      ledgerBalances = Object.fromEntries(
+        (members ?? []).map((m: any) => [m.user_id, Number(m.staff_ledger_balance ?? 0)]),
+      );
       if (allowedIds.length === 0) return [];
     }
 
@@ -113,6 +117,9 @@ export const listStaff = createServerFn({ method: "GET" })
       created_at: u.created_at,
       role: (roles ?? []).find((r) => r.user_id === u.id)?.role ?? "cashier",
       perms: (perms ?? []).filter((p) => p.user_id === u.id).map((p) => p.perm),
+      // Running total credited to this staff member from staff-return refunds
+      // (no cash is ever paid out for a staff return — see complete_sale_return RPC).
+      staff_ledger_balance: ledgerBalances[u.id] ?? 0,
     }));
   });
 
