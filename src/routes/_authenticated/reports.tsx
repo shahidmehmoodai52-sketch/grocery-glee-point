@@ -441,6 +441,61 @@ function Page() {
   });
   const sales = salesPaged.data;
 
+  // Full, unpaginated fetch for the whole date range — required by every
+  // aggregate below (product-wise, daily/profit, payments, supplier-wise).
+  // `sales` above is intentionally capped at PAGE_SIZE for the Invoice-wise
+  // tab's own list; aggregating from it silently dropped everything past
+  // the first page. These key names match the invalidations already fired
+  // elsewhere (sale-returns.tsx, use-realtime-sync.ts) which were pointing
+  // at query keys that didn't otherwise exist here.
+  const { data: allSales = [] } = useQuery({
+    queryKey: ["report-sales-full", fromTime, toTime],
+    queryFn: async () =>
+      await fetchAll<any>((fIdx: number, tIdx: number) =>
+        supabase
+          .from("sales")
+          .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
+          .gte("created_at", fromTime)
+          .lte("created_at", toTime)
+          .neq("status", "voided")
+          .order("created_at", { ascending: false })
+          .range(fIdx, tIdx),
+        1000,
+      ),
+  });
+
+  const { data: allSaleReturns = [] } = useQuery({
+    queryKey: ["report-sale-returns", fromTime, toTime],
+    queryFn: async () =>
+      await fetchAll<any>((fIdx: number, tIdx: number) =>
+        supabase
+          .from("sale_returns")
+          .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
+          .gte("created_at", fromTime)
+          .lte("created_at", toTime)
+          .order("created_at", { ascending: false })
+          .range(fIdx, tIdx),
+        1000,
+      ),
+  });
+
+  // Same pagination-vs-aggregate issue as sales: the "Total purchases" P&L
+  // drill-down needs every purchase in the period, not just one page of it.
+  const { data: allPurchases = [] } = useQuery({
+    queryKey: ["report-purchases-full", fromTime, toTime],
+    queryFn: async () =>
+      await fetchAll<any>((fIdx: number, tIdx: number) =>
+        supabase
+          .from("purchases")
+          .select("subtotal,tax,total,paid,created_at")
+          .gte("created_at", fromTime)
+          .lte("created_at", toTime)
+          .order("created_at", { ascending: false })
+          .range(fIdx, tIdx),
+        1000,
+      ),
+  });
+
   const { data: purchasesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-purchases-paged", fromTime, toTime, purchasesPage],
     queryFn: async () => {
@@ -572,7 +627,7 @@ function Page() {
       title: "Purchases (period)",
       note: `${purchasesPaged.count} purchase${purchasesPaged.count === 1 ? "" : "s"} · ${fmtMoney(totalPurchases, sym)}`,
       cols: ["Date", "Subtotal", "Tax", "Total", "Paid"],
-      rows: (purchases as any[]).map((p) => [
+      rows: (allPurchases as any[]).map((p) => [
         new Date(p.created_at).toLocaleString(),
         fmtMoney(Number(p.subtotal ?? 0), sym),
         fmtMoney(Number(p.tax ?? 0), sym),
@@ -585,7 +640,7 @@ function Page() {
   // Daily sale report
   const dailySales = useMemo(() => {
     const map = new Map<string, { date: string; invoices: number; qty: number; revenue: number; tax: number; total: number; profit: number }>();
-    for (const s of sales as any[]) {
+    for (const s of allSales as any[]) {
       const d = new Date(s.created_at).toISOString().slice(0, 10);
       const rev = Number(s.subtotal) - Number(s.discount);
       const profit = rev - Number(s.cost_total);
@@ -595,12 +650,12 @@ function Page() {
       map.set(d, cur);
     }
     return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
-  }, [sales]);
+  }, [allSales]);
 
   // Product-wise
   const productSales = useMemo(() => {
     const map = new Map<string, { name: string; qty: number; revenue: number; cost: number; profit: number }>();
-    for (const s of sales as any[]) {
+    for (const s of allSales as any[]) {
       for (const it of s.sale_items ?? []) {
         const key = it.product_id || it.name;
         const cur = map.get(key) ?? { name: it.name, qty: 0, revenue: 0, cost: 0, profit: 0 };
@@ -611,7 +666,7 @@ function Page() {
       }
     }
     // Subtract returned qty/revenue/cost per product so product-wise report reflects net sales
-    for (const r of saleReturns as any[]) {
+    for (const r of allSaleReturns as any[]) {
       for (const it of r.sale_return_items ?? []) {
         const key = it.product_id || it.name;
         const cur = map.get(key);
@@ -623,12 +678,12 @@ function Page() {
       }
     }
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [sales, saleReturns]);
+  }, [allSales, allSaleReturns]);
 
   // Payment method breakdown
   const paymentBreakdown = useMemo(() => {
     const map = new Map<string, { method: string; invoices: number; total: number; paid: number }>();
-    for (const s of sales as any[]) {
+    for (const s of allSales as any[]) {
       const splits = parsePaymentSplit(s.payment_method, Number(s.paid));
       const splitPaidTotal = splits.reduce((sum, split) => sum + Number(split.amount || 0), 0);
       for (const split of splits) {
@@ -642,7 +697,7 @@ function Page() {
       }
     }
     return Array.from(map.values()).sort((a, b) => b.paid - a.paid);
-  }, [sales]);
+  }, [allSales]);
 
   // Combined method cash-flow: money IN (sales + customer party-payments) vs money OUT (supplier party-payments)
   const methodFlow = useMemo(() => {
@@ -651,7 +706,7 @@ function Page() {
       const cur = map.get(m) ?? { method: m, in_sales: 0, in_customer: 0, out_supplier: 0, net: 0 };
       map.set(m, cur); return cur;
     };
-    for (const s of sales as any[]) {
+    for (const s of allSales as any[]) {
       const splits = parsePaymentSplit(s.payment_method, Number(s.paid));
       for (const split of splits) {
         const cur = get((split.method || "unknown").toLowerCase());
@@ -665,7 +720,7 @@ function Page() {
     }
     for (const v of map.values()) v.net = v.in_sales + v.in_customer - v.out_supplier;
     return Array.from(map.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
-  }, [sales, partyPayments]);
+  }, [allSales, partyPayments]);
 
   const q = search.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
@@ -780,14 +835,14 @@ function Page() {
             <h2 className="font-semibold mb-3">Profit &amp; Loss Statement</h2>
             <Table>
               <TableBody>
-                <Row label="Gross sales (before returns)" value={fmtMoney(grossRevenue, sym)} muted onClick={() => openInvoices("Gross sales (before returns)", sales as any[])} />
+                <Row label="Gross sales (before returns)" value={fmtMoney(grossRevenue, sym)} muted onClick={() => openInvoices("Gross sales (before returns)", allSales as any[])} />
                 <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted onClick={() => openReturns("Sale returns")} />
-                <Row label="Sales (net of returns & discount)" value={fmtMoney(netOfReturns, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", sales as any[])} />
-                <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices("Cost of goods sold", sales as any[])} />
-                <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", sales as any[])} />
+                <Row label="Sales (net of returns & discount)" value={fmtMoney(netOfReturns, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", allSales as any[])} />
+                <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices("Cost of goods sold", allSales as any[])} />
+                <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", allSales as any[])} />
                 <Row label="Sale returns (loss)" value={`(${fmtMoney(returnsTotal, sym)})`} onClick={() => openReturns("Sale returns")} />
                 <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
-                <Row label="Tax collected" value={`(${fmtMoney(taxCollected, sym)})`} onClick={() => openInvoices("Tax collected", (sales as any[]).filter((s) => Number(s.tax) > 0))} />
+                <Row label="Tax collected" value={`(${fmtMoney(taxCollected, sym)})`} onClick={() => openInvoices("Tax collected", (allSales as any[]).filter((s) => Number(s.tax) > 0))} />
                 <Row label="Credit sales (period)" value={fmtMoney(creditOut, sym)} muted onClick={() => {
                   setTab("invoice");
                   setSearch("status:credit");
@@ -796,7 +851,7 @@ function Page() {
                 {incentiveTotal > 0 && (
                   <Row label="Supplier incentives" value={`+${fmtMoney(incentiveTotal, sym)}`} onClick={openPurchases} />
                 )}
-                <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices("Net profit basis · all invoices", sales as any[])} />
+                <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices("Net profit basis · all invoices", allSales as any[])} />
 
               </TableBody>
             </Table>
@@ -818,7 +873,7 @@ function Page() {
                   <TableRow
                     key={d.date}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openInvoices(`Sales on ${d.date}`, (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                    onClick={() => openInvoices(`Sales on ${d.date}`, (allSales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
                   >
                     <TableCell>{d.date}</TableCell>
                     <TableCell className="text-right">{d.invoices}</TableCell>
@@ -860,7 +915,7 @@ function Page() {
                     <TableRow
                       key={d.date}
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => openInvoices(`Sales & profit on ${d.date}`, (sales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                      onClick={() => openInvoices(`Sales & profit on ${d.date}`, (allSales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
                     >
                       <TableCell>{d.date}</TableCell>
                       <TableCell className="text-right">{d.invoices}</TableCell>
@@ -883,15 +938,6 @@ function Page() {
                 )}
               </TableBody>
              </Table>
-             {purchasesPaged.count > PAGE_SIZE && (
-               <div className="p-4 flex items-center justify-between border-t text-sm">
-                 <div className="text-muted-foreground">Showing {purchasesPage * PAGE_SIZE + 1} to {Math.min((purchasesPage + 1) * PAGE_SIZE, purchasesPaged.count)} of {purchasesPaged.count} purchases</div>
-                 <div className="flex gap-2">
-                   <Button variant="outline" size="sm" onClick={() => setPurchasesPage(p => Math.max(0, p - 1))} disabled={purchasesPage === 0}>Previous</Button>
-                   <Button variant="outline" size="sm" onClick={() => setPurchasesPage(p => p + 1)} disabled={(purchasesPage + 1) * PAGE_SIZE >= purchasesPaged.count}>Next</Button>
-                 </div>
-               </div>
-             )}
            </Card>
         </TabsContent>
 
@@ -981,7 +1027,7 @@ function Page() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => {
                         const rows: (string | number)[][] = [];
-                        for (const s of sales as any[]) {
+                        for (const s of allSales as any[]) {
                           for (const it of (s.sale_items as any[]) ?? []) {
                             if (it.name !== p.name) continue;
                             rows.push([
@@ -1047,7 +1093,7 @@ function Page() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => openInvoices(
                         `Payments · ${p.method}`,
-                        (sales as any[]).filter((s) => parsePaymentSplit(s.payment_method, Number(s.paid)).some((x) => (x.method || "unknown") === p.method)),
+                        (allSales as any[]).filter((s) => parsePaymentSplit(s.payment_method, Number(s.paid)).some((x) => (x.method || "unknown") === p.method)),
                         `${p.invoices} invoice${p.invoices === 1 ? "" : "s"} · Received ${fmtMoney(p.paid, sym)}`,
                       )}
                     >
@@ -1095,7 +1141,7 @@ function Page() {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => {
                       const rows: (string | number)[][] = [];
-                      for (const s of sales as any[]) {
+                      for (const s of allSales as any[]) {
                         for (const split of parsePaymentSplit(s.payment_method, Number(s.paid))) {
                           if ((split.method || "unknown").toLowerCase() !== m.method) continue;
                           rows.push([new Date(s.created_at).toLocaleString(), "In · Sale", s.invoice_no, s.customers?.name ?? "Walk-in", fmtMoney(Number(split.amount), sym)]);
@@ -1188,8 +1234,8 @@ function Page() {
         </TabsContent>
         <TabsContent value="supplier">
           <SupplierWiseReport
-            sales={sales}
-            saleReturns={saleReturns}
+            sales={allSales}
+            saleReturns={allSaleReturns}
             currencySymbol={sym}
             onDrill={setDrill}
             search={search}
