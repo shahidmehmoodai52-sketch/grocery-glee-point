@@ -210,18 +210,21 @@ function Page() {
   const creditSales = Number(stats?.credit_sales_total || 0);
   const prevRevenue = Number(prevStats?.sales_total || 0);
   
-  // profit = revenue - returns - cost_total + supplier incentives
-  // We'll calculate it from summary stats
+  // Net profit = revenue − cost − tax − returns − expenses + supplier incentives.
+  // Kept identical to Reports' P&L formula (reports.tsx) on purpose — this
+  // tile and the Reports "Net profit" row must always show the same number.
   const salesProfit = Number(stats?.sales_total || 0) - Number(stats?.sales_cost || 0) - Number(stats?.sales_tax || 0);
   const returnsLoss = Number(stats?.returns_total || 0); // Simplified loss from returns
+  const expensesTotal = Number(stats?.expenses_total || 0);
   // Supplier target incentives never touch the purchase bill — pure bonus income.
   const incentiveTotal = Number(stats?.incentive_total || 0);
-  const profit = salesProfit - returnsLoss + incentiveTotal;
+  const profit = salesProfit - returnsLoss - expensesTotal + incentiveTotal;
 
   const prevSalesProfit = Number(prevStats?.sales_total || 0) - Number(prevStats?.sales_cost || 0) - Number(prevStats?.sales_tax || 0);
   const prevReturnsLoss = Number(prevStats?.returns_total || 0);
+  const prevExpensesTotal = Number(prevStats?.expenses_total || 0);
   const prevIncentiveTotal = Number(prevStats?.incentive_total || 0);
-  const prevProfit = prevSalesProfit - prevReturnsLoss + prevIncentiveTotal;
+  const prevProfit = prevSalesProfit - prevReturnsLoss - prevExpensesTotal + prevIncentiveTotal;
 
   const purchTotal = Number(stats?.purchases_total || 0);
   const prevPurchTotal = Number(prevStats?.purchases_total || 0);
@@ -284,6 +287,7 @@ function Page() {
           rows: [
             ["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)],
             ["Returns loss reversed", `- ${fmtMoney(returnsLoss, sym)}`],
+            ["Operating expenses", `- ${fmtMoney(expensesTotal, sym)}`],
             ...(incentiveTotal > 0 ? [["Supplier incentives", `+ ${fmtMoney(incentiveTotal, sym)}`]] : []),
             ["Net profit", fmtMoney(profit, sym)],
           ],
@@ -310,7 +314,7 @@ function Page() {
           total: fmtMoney(netRevenue, sym) };
     }
     return null;
-  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, netRevenue, inventoryValueAgg, sym, rangeLabel, salesProfit, returnsLoss, incentiveTotal]);
+  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, netRevenue, inventoryValueAgg, sym, rangeLabel, salesProfit, returnsLoss, incentiveTotal, expensesTotal]);
 
   return (
     <div className="p-6 space-y-6">

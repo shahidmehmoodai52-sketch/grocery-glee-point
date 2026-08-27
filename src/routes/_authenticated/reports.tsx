@@ -527,7 +527,11 @@ function Page() {
   // Supplier target incentives never touch the purchase bill — they're pure
   // bonus income, added straight to net profit.
   const incentiveTotal = Number(summaryStats.incentive_total || 0);
-  const netProfit = grossProfit - expensesPeriod + incentiveTotal;
+  // Kept identical to the Dashboard "Profit" tile (dashboard.tsx) on purpose —
+  // both must always show the same bottom-line number. Gross profit above is
+  // deliberately a narrower sales-margin figure (revenue − cost only); tax
+  // collected and sale returns only come off starting here, at net profit.
+  const netProfit = grossProfit - taxCollected - returnsTotal - expensesPeriod + incentiveTotal;
   const grossRevenue = revenue;
   const netOfReturns = revenue - returnsTotal;
   const creditOut = Number(summaryStats.credit_sales_total || 0);
@@ -781,8 +785,9 @@ function Page() {
                 <Row label="Sales (net of returns & discount)" value={fmtMoney(netOfReturns, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", sales as any[])} />
                 <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices("Cost of goods sold", sales as any[])} />
                 <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", sales as any[])} />
+                <Row label="Sale returns (loss)" value={`(${fmtMoney(returnsTotal, sym)})`} onClick={() => openReturns("Sale returns")} />
                 <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
-                <Row label="Tax collected" value={fmtMoney(taxCollected, sym)} muted onClick={() => openInvoices("Tax collected", (sales as any[]).filter((s) => Number(s.tax) > 0))} />
+                <Row label="Tax collected" value={`(${fmtMoney(taxCollected, sym)})`} onClick={() => openInvoices("Tax collected", (sales as any[]).filter((s) => Number(s.tax) > 0))} />
                 <Row label="Credit sales (period)" value={fmtMoney(creditOut, sym)} muted onClick={() => {
                   setTab("invoice");
                   setSearch("status:credit");
