@@ -199,13 +199,14 @@ function Page() {
                 <TableHead>Phone</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
+                <TableHead className="text-right">Incentive received</TableHead>
                 <TableHead className="text-right w-[260px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                     {rows.length === 0 ? "No suppliers yet — add your first supplier." : "No suppliers match your search."}
                   </TableCell>
                 </TableRow>
@@ -239,6 +240,9 @@ function Page() {
                       ) : (
                         <span className="text-muted-foreground text-sm">Settled</span>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {Number(c.incentive_total ?? 0) > 0 ? fmtMoney(Number(c.incentive_total), sym) : "—"}
                     </TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button size="sm" variant="ghost" asChild>

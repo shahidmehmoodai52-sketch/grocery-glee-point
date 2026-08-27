@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, FileDown, ChevronDown, ChevronRight, Pencil, DollarSign, Plus, Save } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, FileDown, ChevronDown, ChevronRight, Pencil, DollarSign, Plus, Save, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,7 +70,7 @@ function Page() {
       return (data ?? []).map((row: any) => ({
         id: row.id ?? undefined,
         date: row.occurred_at,
-        type: row.entry_type === "return" ? "return" : row.entry_type === "purchase" ? "purchase" : "payment",
+        type: row.entry_type === "return" ? "return" : row.entry_type === "purchase" ? "purchase" : row.entry_type === "incentive" ? "incentive" : "payment",
         entity: row.entry_type === "purchase" ? "purchase" : row.entry_type === "return" ? "purchase_return" : row.entry_type === "payment" ? "payment" : undefined,
         ref: row.reference,
         note: row.note ?? "",
@@ -119,6 +119,11 @@ function Page() {
   const closing = summary.closing;
   const closingLabel = summary.closingLabel;
   const closingTone = summary.closingTone;
+  // All-time (not date-filtered) — "how much incentive has this supplier given us to date".
+  const incentiveAllTime = useMemo(
+    () => entries.filter((x) => x.type === "incentive").reduce((s, x) => s + x.credit, 0),
+    [entries],
+  );
 
   return (
     <div className="p-6 space-y-4">
@@ -196,11 +201,12 @@ function Page() {
       </Card>
 
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
         <Stat icon={Receipt} label="Total In (+)" value={fmtMoney(totalIn, sym)} tone="primary" />
         <Stat icon={TrendingDown} label="Total Out (−)" value={fmtMoney(totalOut, sym)} tone="success" />
         <Stat icon={Wallet} label={closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
+        <Stat icon={Gift} label="Incentive received (all time)" value={fmtMoney(incentiveAllTime, sym)} tone="success" />
       </div>
 
       <Card className="p-3 print-area">

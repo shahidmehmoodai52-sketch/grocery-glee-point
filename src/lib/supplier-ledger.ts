@@ -1,7 +1,7 @@
 export type LedgerEntry = {
   id?: string;
   date: string;
-  type: "purchase" | "payment" | "return";
+  type: "purchase" | "payment" | "return" | "incentive";
   ref: string;
   note: string;
   debit: number;
