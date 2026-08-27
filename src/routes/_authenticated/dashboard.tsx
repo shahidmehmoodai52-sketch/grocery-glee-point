@@ -13,6 +13,7 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet, Users, ShoppingCart, Package,
   AlertTriangle, Undo2, ArrowUpRight, ArrowDownRight, Receipt, CalendarIcon, CreditCard,
+  PiggyBank,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
@@ -209,7 +210,15 @@ function Page() {
   const revenue = Number(stats?.sales_total || 0);
   const creditSales = Number(stats?.credit_sales_total || 0);
   const prevRevenue = Number(prevStats?.sales_total || 0);
-  
+
+  // Gross profit = revenue − cost of goods sold only. Kept identical to
+  // Reports' "Gross profit" row (reports.tsx) — tax/returns/expenses only
+  // come off further down, at net profit.
+  const cogs = Number(stats?.sales_cost || 0);
+  const grossProfit = revenue - cogs;
+  const prevCogs = Number(prevStats?.sales_cost || 0);
+  const prevGrossProfit = prevRevenue - prevCogs;
+
   // Net profit = revenue − cost − tax − returns − expenses + supplier incentives.
   // Kept identical to Reports' P&L formula (reports.tsx) on purpose — this
   // tile and the Reports "Net profit" row must always show the same number.
@@ -242,6 +251,7 @@ function Page() {
   const dRevenue = pct(revenue, prevRevenue);
   const dReturns = pct(returnsTotal, prevReturnsTotal);
   const dProfit = pct(profit, prevProfit);
+  const dGrossProfit = pct(grossProfit, prevGrossProfit);
   const dPurch = pct(purchTotal, prevPurchTotal);
 
   const series = dashboardTimeseries;
@@ -282,8 +292,16 @@ function Page() {
         return { title: `Credit sales · ${rangeLabel}`, cols: ["Date", "Invoice", "Status", "Total", "Paid"],
           rows: sales.filter((s:any) => s.status === "credit").map((s:any)=>[fmtDateStr(s.created_at), s.invoice_no||"-", s.status||"-", fmtMoney(Number(s.total), sym), fmtMoney(Number(s.paid), sym)]),
           total: fmtMoney(creditSales, sym) };
+      case "grossProfit":
+        return { title: `Gross profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
+          rows: [
+            ["Revenue (before returns)", fmtMoney(revenue, sym)],
+            ["Cost of goods sold", `- ${fmtMoney(cogs, sym)}`],
+            ["Gross profit", fmtMoney(grossProfit, sym)],
+          ],
+          total: fmtMoney(grossProfit, sym) };
       case "profit":
-        return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
+        return { title: `Net profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
           rows: [
             ["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)],
             ["Returns loss reversed", `- ${fmtMoney(returnsLoss, sym)}`],
@@ -314,7 +332,7 @@ function Page() {
           total: fmtMoney(netRevenue, sym) };
     }
     return null;
-  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, netRevenue, inventoryValueAgg, sym, rangeLabel, salesProfit, returnsLoss, incentiveTotal, expensesTotal]);
+  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, netRevenue, inventoryValueAgg, sym, rangeLabel, salesProfit, returnsLoss, incentiveTotal, expensesTotal, cogs, grossProfit]);
 
   return (
     <div className="p-6 space-y-6">
@@ -373,7 +391,7 @@ function Page() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Kpi onClick={() => setDetailKey("net")}
           icon={TrendingUp} label="Revenue" value={fmtMoney(netRevenue, sym)}
           delta={dNet} sub={`${stats?.sales_count || 0} invoices · after returns`} tone="primary"
@@ -390,9 +408,13 @@ function Page() {
           icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
           delta={dReturns} deltaInverse sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
         />
+        <Kpi onClick={() => setDetailKey("grossProfit")}
+          icon={PiggyBank} label="Gross profit" value={fmtMoney(grossProfit, sym)}
+          delta={dGrossProfit} sub="Revenue − cost" tone="success"
+        />
         <Kpi onClick={() => setDetailKey("profit")}
-          icon={Wallet} label="Profit" value={fmtMoney(profit, sym)}
-          delta={dProfit} sub="Net of returns" tone="success"
+          icon={Wallet} label="Net profit" value={fmtMoney(profit, sym)}
+          delta={dProfit} sub="After tax, returns & expenses" tone="success"
         />
         <Kpi onClick={() => setDetailKey("purch")}
           icon={TrendingDown} label="Purchases" value={fmtMoney(purchTotal, sym)}
@@ -538,7 +560,7 @@ function Page() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Mini onClick={() => setDetailKey("revenue")} label={`Revenue · ${rangeLabel}`} value={fmtMoney(revenue, sym)} icon={TrendingUp} />
         <Mini onClick={() => setDetailKey("net")} label="Net revenue" value={fmtMoney(netRevenue, sym)} icon={TrendingUp} accent />
-        <Mini onClick={() => setDetailKey("profit")} label="Profit" value={fmtMoney(profit, sym)} icon={Wallet} accent />
+        <Mini onClick={() => setDetailKey("profit")} label="Net profit" value={fmtMoney(profit, sym)} icon={Wallet} accent />
         <Mini onClick={() => setDetailKey("purch")} label="Purchases" value={fmtMoney(purchTotal, sym)} icon={TrendingDown} />
         <Mini onClick={() => setDetailKey("invoices")} label="Invoices" value={String(sales.length)} icon={Users} />
       </div>
@@ -592,16 +614,21 @@ function Kpi({
           ? "bg-success/10 text-success"
           : "bg-destructive/10 text-destructive");
   return (
-    <Card onClick={onClick} className={`p-5 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200" : ""}`}>
+    <Card onClick={onClick} className={`p-5 min-w-0 relative overflow-hidden ${onClick ? "cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200" : ""}`}>
       <div className={`absolute inset-0 bg-gradient-to-br ${ring[tone]} pointer-events-none`} />
-      <div className="relative">
-        <div className="flex items-start justify-between">
-          <div className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
-          <div className={`h-8 w-8 rounded-lg bg-background/70 backdrop-blur flex items-center justify-center shadow-sm ${ring[tone].split(" ").pop()}`}>
+      <div className="relative min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium truncate">{label}</div>
+          <div className={`h-8 w-8 shrink-0 rounded-lg bg-background/70 backdrop-blur flex items-center justify-center shadow-sm ${ring[tone].split(" ").pop()}`}>
             <Icon className="h-4 w-4" />
           </div>
         </div>
-        <div className="text-2xl md:text-[1.7rem] font-bold mt-2 tracking-tight tabular-nums">{value}</div>
+        <div
+          title={value}
+          className="text-xl sm:text-2xl font-bold mt-2 tracking-tight tabular-nums truncate"
+        >
+          {value}
+        </div>
         <div className="flex items-center justify-between mt-2 gap-2">
           {hasDelta ? (
             <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-semibold ${deltaClass}`}>
@@ -625,13 +652,13 @@ function Kpi({
 
 function Mini({ label, value, icon: Icon, accent, onClick }: { label: string; value: string; icon: any; accent?: boolean; onClick?: () => void }) {
   return (
-    <Card onClick={onClick} className={`p-4 flex items-center gap-3 ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
-      <div className={`h-9 w-9 rounded-md flex items-center justify-center ${accent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+    <Card onClick={onClick} className={`p-4 min-w-0 flex items-center gap-3 ${onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition" : ""}`}>
+      <div className={`h-9 w-9 shrink-0 rounded-md flex items-center justify-center ${accent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
         <Icon className="h-4 w-4" />
       </div>
-      <div>
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="text-lg font-semibold">{value}</div>
+      <div className="min-w-0">
+        <div className="text-xs text-muted-foreground truncate">{label}</div>
+        <div title={value} className="text-lg font-semibold tabular-nums truncate">{value}</div>
       </div>
     </Card>
   );
