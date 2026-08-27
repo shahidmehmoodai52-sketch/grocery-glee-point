@@ -210,15 +210,18 @@ function Page() {
   const creditSales = Number(stats?.credit_sales_total || 0);
   const prevRevenue = Number(prevStats?.sales_total || 0);
   
-  // profit = revenue - returns - cost_total
+  // profit = revenue - returns - cost_total + supplier incentives
   // We'll calculate it from summary stats
   const salesProfit = Number(stats?.sales_total || 0) - Number(stats?.sales_cost || 0) - Number(stats?.sales_tax || 0);
   const returnsLoss = Number(stats?.returns_total || 0); // Simplified loss from returns
-  const profit = salesProfit - returnsLoss;
-  
+  // Supplier target incentives never touch the purchase bill — pure bonus income.
+  const incentiveTotal = Number(stats?.incentive_total || 0);
+  const profit = salesProfit - returnsLoss + incentiveTotal;
+
   const prevSalesProfit = Number(prevStats?.sales_total || 0) - Number(prevStats?.sales_cost || 0) - Number(prevStats?.sales_tax || 0);
   const prevReturnsLoss = Number(prevStats?.returns_total || 0);
-  const prevProfit = prevSalesProfit - prevReturnsLoss;
+  const prevIncentiveTotal = Number(prevStats?.incentive_total || 0);
+  const prevProfit = prevSalesProfit - prevReturnsLoss + prevIncentiveTotal;
 
   const purchTotal = Number(stats?.purchases_total || 0);
   const prevPurchTotal = Number(prevStats?.purchases_total || 0);
@@ -278,7 +281,12 @@ function Page() {
           total: fmtMoney(creditSales, sym) };
       case "profit":
         return { title: `Profit · ${rangeLabel}`, cols: ["Metric", "Amount"],
-          rows: [["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)], ["Returns loss reversed", `- ${fmtMoney(returnsLoss, sym)}`], ["Net profit", fmtMoney(profit, sym)]],
+          rows: [
+            ["Sales profit (total − cost − tax)", fmtMoney(salesProfit, sym)],
+            ["Returns loss reversed", `- ${fmtMoney(returnsLoss, sym)}`],
+            ...(incentiveTotal > 0 ? [["Supplier incentives", `+ ${fmtMoney(incentiveTotal, sym)}`]] : []),
+            ["Net profit", fmtMoney(profit, sym)],
+          ],
           total: fmtMoney(profit, sym) };
       case "purch":
         return { title: `Purchases · ${rangeLabel}`, cols: ["Date", "Total", "Paid"],
@@ -302,7 +310,7 @@ function Page() {
           total: fmtMoney(netRevenue, sym) };
     }
     return null;
-  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, netRevenue, inventoryValueAgg, sym, rangeLabel, salesProfit, returnsLoss]);
+  }, [detailKey, sales, purchases, saleReturns, products, revenue, profit, purchTotal, returnsTotal, netRevenue, inventoryValueAgg, sym, rangeLabel, salesProfit, returnsLoss, incentiveTotal]);
 
   return (
     <div className="p-6 space-y-6">

@@ -524,7 +524,10 @@ function Page() {
   const taxCollected = Number(summaryStats.sales_tax || 0);
   const cogs = Number(summaryStats.sales_cost || 0);
   const grossProfit = revenue - cogs;
-  const netProfit = grossProfit - expensesPeriod;
+  // Supplier target incentives never touch the purchase bill — they're pure
+  // bonus income, added straight to net profit.
+  const incentiveTotal = Number(summaryStats.incentive_total || 0);
+  const netProfit = grossProfit - expensesPeriod + incentiveTotal;
   const grossRevenue = revenue;
   const netOfReturns = revenue - returnsTotal;
   const creditOut = Number(summaryStats.credit_sales_total || 0);
@@ -785,6 +788,9 @@ function Page() {
                   setSearch("status:credit");
                 }} />
                 <Row label="Total purchases (period)" value={fmtMoney(totalPurchases, sym)} muted onClick={openPurchases} />
+                {incentiveTotal > 0 && (
+                  <Row label="Supplier incentives" value={`+${fmtMoney(incentiveTotal, sym)}`} onClick={openPurchases} />
+                )}
                 <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices("Net profit basis · all invoices", sales as any[])} />
 
               </TableBody>

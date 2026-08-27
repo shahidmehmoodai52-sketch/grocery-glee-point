@@ -42,8 +42,10 @@ type Draft = {
   note: string;
   date: string;
   paySource?: string;
+  /** Supplier bonus for hitting a target — reporting only, never part of the bill. */
+  incentive?: number;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", date: new Date().toISOString().slice(0,10), paySource: "" };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", date: new Date().toISOString().slice(0,10), paySource: "", incentive: 0 };
 
 // Presets offered when the shop hasn't created these heads in Cash Flow yet.
 // Selecting one creates the matching cash account so purchase payments always
@@ -162,6 +164,9 @@ function Page() {
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
   const paySource = draft.paySource ?? "";
   const setPaySource = (v: string) => setDraft((d) => ({ ...d, paySource: v }));
+  const incentive = Number(draft.incentive ?? 0);
+  const setIncentive = (v: number) => setDraft((d) => ({ ...d, incentive: v }));
+  const [showIncentive, setShowIncentive] = useState(false);
 
 
 
@@ -271,7 +276,9 @@ function Page() {
       paid: Number(p.paid || 0),
       note: p.note || "",
       paySource: p.account_id ? String(p.account_id) : p.payment_method ? `preset:${p.payment_method}` : "",
+      incentive: Number(p.incentive_amount || 0),
     } as any);
+    setShowIncentive(Number(p.incentive_amount || 0) > 0);
   };
 
   const handleDeletePurchase = async () => {
@@ -626,6 +633,9 @@ function Page() {
       subtotal: sub, // Original subtotal (after line discounts, before bill discount)
       total,
       paid,
+      // Reporting only — never folded into subtotal/tax/total/paid, so it
+      // never touches the bill or the supplier balance.
+      incentive_amount: Number(incentive || 0),
       note,
       payment_method: account.name,
       account_id: account.id ?? undefined,
@@ -689,6 +699,7 @@ function Page() {
             tax: +(Number(payload.tax || 0).toFixed(2)),
             total: +(Number(payload.total || 0).toFixed(2)),
             paid: +(Number(payload.paid || 0).toFixed(2)),
+            incentive_amount: +(Number(payload.incentive_amount || 0).toFixed(2)),
             note: payload.note,
             payment_method: payload.payment_method,
             account_id: payload.account_id,
@@ -770,6 +781,7 @@ function Page() {
     toast.success(priceUpdates.length ? "Purchase recorded — stock & sale rates updated" : "Purchase recorded, stock updated");
     setConfirmOpen(false);
     clearDraft();
+    setShowIncentive(false);
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
@@ -781,7 +793,7 @@ function Page() {
 
 
   const draftHasContent = (d: Draft | null | undefined) =>
-    !!d && (d.lines.length > 0 || !!d.note || Number(d.tax || 0) > 0 || Number(d.discount || 0) > 0 || Number(d.paid || 0) > 0);
+    !!d && (d.lines.length > 0 || !!d.note || Number(d.tax || 0) > 0 || Number(d.discount || 0) > 0 || Number(d.paid || 0) > 0 || Number(d.incentive || 0) > 0);
   const hasParkedDrafts = savedDrafts.length > 0;
 
   /** Hide the entry form: park it as a draft. */
@@ -790,6 +802,7 @@ function Page() {
       setSavedDrafts((prev) => [...prev, { ...draft, open: false }]);
     }
     clearDraft();
+    setShowIncentive(false);
   };
   const startNewPurchase = () => {
     if (draftHasContent(draft)) {
@@ -799,6 +812,7 @@ function Page() {
   };
   const resumeDraft = (d: Draft, index: number) => {
     setDraft({ ...d, open: true });
+    setShowIncentive(Number(d.incentive || 0) > 0);
     setSavedDrafts((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -1144,7 +1158,7 @@ function Page() {
                 <div className="px-4 py-3 border-b">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · Tax +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · Bill disc −${fmtMoney(billDiscountAmt, sym)}` : ""}{lineDiscountTotal > 0 ? ` · Line disc −${fmtMoney(lineDiscountTotal, sym)}` : ""}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · Tax +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · Bill disc −${fmtMoney(billDiscountAmt, sym)}` : ""}{lineDiscountTotal > 0 ? ` · Line disc −${fmtMoney(lineDiscountTotal, sym)}` : ""}{incentive > 0 ? ` · Incentive +${fmtMoney(incentive, sym)} (profit only)` : ""}</div>
                   {paid > 0 && (
                     <div className="text-[10px] text-muted-foreground mt-1">Paid {fmtMoney(paid, sym)} · Balance {fmtMoney(Math.max(0, total - paid), sym)}</div>
                   )}
@@ -1223,6 +1237,46 @@ function Page() {
                 </div>
 
                 <div>
+                  {!showIncentive ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start text-muted-foreground"
+                      onClick={() => setShowIncentive(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                      Add supplier incentive
+                    </Button>
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <Label className="text-xs">Incentive (target bonus)</Label>
+                        <button
+                          type="button"
+                          className="text-[11px] text-muted-foreground hover:text-foreground"
+                          onClick={() => { setIncentive(0); setShowIncentive(false); }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={incentive || ""}
+                        onChange={(e) => setIncentive(Number(e.target.value))}
+                        className="h-9"
+                        placeholder="0.00"
+                      />
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        Bonus from the supplier for hitting a target — doesn't change this bill, added
+                        straight to profit in Reports &amp; Dashboard.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
                   <Label className="text-xs">Pay from</Label>
                   <Select value={effectivePaySource} onValueChange={setPaySource}>
                     <SelectTrigger className="h-9"><SelectValue placeholder="Cash / Cheque / Bank…" /></SelectTrigger>
@@ -1260,7 +1314,7 @@ function Page() {
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button variant="ghost" size="sm" onClick={hideKeepDraft}>Hide (keep draft)</Button>
                 <Button variant="outline" size="sm" onClick={() => {
-                  if (confirm("Discard this purchase?")) clearDraft();
+                  if (confirm("Discard this purchase?")) { clearDraft(); setShowIncentive(false); }
                 }}>Discard</Button>
                 <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>{editingId ? "Save changes" : "Record purchase"}</Button>
               </div>
