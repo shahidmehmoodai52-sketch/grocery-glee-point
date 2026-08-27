@@ -199,7 +199,7 @@ function Page() {
       try {
         const { data, error } = await supabase.rpc("list_tenant_staff" as any);
         if (error) throw error;
-        return (data ?? []) as { user_id: string; email: string; role: string }[];
+        return (data ?? []) as { user_id: string; email: string; role: string; display_name: string | null }[];
       } catch {
         return [];
       }
@@ -533,7 +533,7 @@ function Page() {
                       <SelectContent>
                         {staffList.map((s) => (
                           <SelectItem key={s.user_id} value={s.user_id}>
-                            {s.email}
+                            {s.display_name || s.email}
                           </SelectItem>
                         ))}
                         {staffList.length === 0 && (
@@ -788,7 +788,10 @@ function Page() {
                   {r.party_type === "staff" ? (
                     <span className="inline-flex items-center gap-1">
                       <Badge variant="secondary" className="text-[10px]">Staff</Badge>
-                      {staffList.find((s) => s.user_id === r.staff_user_id)?.email ?? "—"}
+                      {(() => {
+                        const s = staffList.find((x) => x.user_id === r.staff_user_id);
+                        return s ? s.display_name || s.email : "—";
+                      })()}
                     </span>
                   ) : (
                     r.customers?.name ?? "Walk-in"

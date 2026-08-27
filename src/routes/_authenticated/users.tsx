@@ -53,6 +53,7 @@ function Page() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["staff"] });
 
   const [newOpen, setNewOpen] = useState(false);
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [role, setRole] = useState<"admin" | "cashier">("cashier");
@@ -60,8 +61,8 @@ function Page() {
   const togglePerm = (k: string) => setPermsState((p) => p.includes(k) ? p.filter((x) => x !== k) : [...p, k]);
 
   const createMut = useMutation({
-    mutationFn: () => create({ data: { email, password: pwd, role, perms } }),
-    onSuccess: () => { toast.success("Staff created"); setNewOpen(false); setEmail(""); setPwd(""); setPermsState([]); setRole("cashier"); refresh(); },
+    mutationFn: () => create({ data: { name, email, password: pwd, role, perms } }),
+    onSuccess: () => { toast.success("Staff created"); setNewOpen(false); setName(""); setEmail(""); setPwd(""); setPermsState([]); setRole("cashier"); refresh(); },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
 
@@ -78,6 +79,7 @@ function Page() {
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Create staff account</DialogTitle></DialogHeader>
             <div className="space-y-3">
+              <div><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ahmed Khan" /></div>
               <div><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cashier@store.com" /></div>
               <div><Label>Password</Label><Input type="text" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="min 6 chars" /></div>
               <div>
@@ -113,7 +115,7 @@ function Page() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setNewOpen(false)}>Cancel</Button>
-              <Button onClick={() => createMut.mutate()} disabled={createMut.isPending}>{createMut.isPending ? "Creating…" : "Create"}</Button>
+              <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !name.trim()}>{createMut.isPending ? "Creating…" : "Create"}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -122,10 +124,10 @@ function Page() {
       <Card className="p-3">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Active devices</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Staff ledger</TableHead><TableHead className="text-right">Actions</TableHead>
+            <TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Active devices</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Staff ledger</TableHead><TableHead className="text-right">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
+            {isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
             {users.map((u: any) => <UserRow key={u.id} u={u} activeCount={activeSessions[u.id] ?? 0} reset={reset} del={del} refresh={refresh} sym={sym} />)}
           </TableBody>
         </Table>
@@ -138,12 +140,13 @@ function UserRow({ u, activeCount, reset, del, refresh, sym }: any) {
   const [editOpen, setEditOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
+  const [name, setName] = useState<string>(u.name ?? "");
   const [role, setRole] = useState<"admin" | "cashier">(u.role);
   const [perms, setPerms] = useState<string[]>(u.perms);
   const setPermsFn = useServerFn(setStaffPermissions);
 
   const saveMut = useMutation({
-    mutationFn: () => setPermsFn({ data: { user_id: u.id, role, perms } }),
+    mutationFn: () => setPermsFn({ data: { user_id: u.id, role, perms, name } }),
     onSuccess: () => { toast.success("Access updated"); setEditOpen(false); refresh(); },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
@@ -162,7 +165,8 @@ function UserRow({ u, activeCount, reset, del, refresh, sym }: any) {
 
   return (
     <TableRow>
-      <TableCell className="font-medium">{u.email}</TableCell>
+      <TableCell className="font-medium">{u.name || <span className="text-muted-foreground italic">Unnamed</span>}</TableCell>
+      <TableCell className="text-muted-foreground">{u.email}</TableCell>
       <TableCell><Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge></TableCell>
       <TableCell>
         <Badge variant={activeCount > 0 ? "default" : "outline"} className="gap-1">
@@ -189,6 +193,7 @@ function UserRow({ u, activeCount, reset, del, refresh, sym }: any) {
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Edit access — {u.email}</DialogTitle></DialogHeader>
             <div className="space-y-3">
+              <div><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ahmed Khan" /></div>
               <div>
                 <Label>Role</Label>
                 <div className="flex gap-2 mt-1">
@@ -222,7 +227,7 @@ function UserRow({ u, activeCount, reset, del, refresh, sym }: any) {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-              <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}><Save className="h-4 w-4 mr-1" />Save</Button>
+              <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !name.trim()}><Save className="h-4 w-4 mr-1" />Save</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

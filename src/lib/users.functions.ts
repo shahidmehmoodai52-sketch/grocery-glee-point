@@ -70,13 +70,25 @@ async function attachToTenant(
   tenantId: string | null,
   targetUserId: string,
   memberRole: TenantMemberRole = "cashier",
+  displayName?: string,
 ) {
   if (!tenantId) return;
+  // Preserve the staff ledger balance across the delete+reinsert below — this
+  // runs on every permissions/name edit, and a naive reinsert would silently
+  // wipe out whatever a staff member's returns had credited them.
+  const { data: existing } = await supabaseAdmin
+    .from("tenant_members")
+    .select("staff_ledger_balance")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", targetUserId)
+    .maybeSingle();
   await supabaseAdmin.from("tenant_members").delete().eq("user_id", targetUserId);
   await supabaseAdmin.from("tenant_members").insert({
     user_id: targetUserId,
     tenant_id: tenantId,
     role: memberRole,
+    staff_ledger_balance: existing?.staff_ledger_balance ?? 0,
+    ...(displayName ? { display_name: displayName } : {}),
   });
 }
 
@@ -87,15 +99,19 @@ export const listStaff = createServerFn({ method: "GET" })
 
     let allowedIds: string[] | null = null;
     let ledgerBalances: Record<string, number> = {};
+    let displayNames: Record<string, string | null> = {};
     if (tenantId) {
       const { data: members, error } = await supabaseAdmin
         .from("tenant_members")
-        .select("user_id, staff_ledger_balance")
+        .select("user_id, staff_ledger_balance, display_name")
         .eq("tenant_id", tenantId);
       if (error) throw error;
       allowedIds = (members ?? []).map((m: any) => m.user_id as string);
       ledgerBalances = Object.fromEntries(
         (members ?? []).map((m: any) => [m.user_id, Number(m.staff_ledger_balance ?? 0)]),
+      );
+      displayNames = Object.fromEntries(
+        (members ?? []).map((m: any) => [m.user_id, m.display_name ?? null]),
       );
       if (allowedIds.length === 0) return [];
     }
@@ -120,6 +136,7 @@ export const listStaff = createServerFn({ method: "GET" })
       // Running total credited to this staff member from staff-return refunds
       // (no cash is ever paid out for a staff return — see complete_sale_return RPC).
       staff_ledger_balance: ledgerBalances[u.id] ?? 0,
+      name: displayNames[u.id] ?? null,
     }));
   });
 
@@ -143,7 +160,7 @@ export const createStaff = createServerFn({ method: "POST" })
       );
     }
     // Attach the new user to the caller's own tenant only.
-    await attachToTenant(supabaseAdmin, tenantId, uid, data.role === "admin" ? "admin" : "cashier");
+    await attachToTenant(supabaseAdmin, tenantId, uid, data.role === "admin" ? "admin" : "cashier", data.name);
     return { id: uid };
   });
 
@@ -174,7 +191,7 @@ export const setStaffPermissions = createServerFn({ method: "POST" })
       );
     }
     // Keep the user inside the caller's tenant so RLS lets them see shop data.
-    await attachToTenant(supabaseAdmin, tenantId, data.user_id, data.role === "admin" ? "admin" : "cashier");
+    await attachToTenant(supabaseAdmin, tenantId, data.user_id, data.role === "admin" ? "admin" : "cashier", data.name);
     return { ok: true };
   });
 

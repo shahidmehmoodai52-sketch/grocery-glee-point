@@ -24,11 +24,14 @@ export const resetTenantOwnerPasswordInput = z.object({
   new_password: passwordSchema,
 });
 
+export const nameSchema = z.string().trim().min(1, "Name is required").max(100);
+
 export const createStaffInput = z.object({
   email: emailSchema,
   password: passwordSchema,
   role: staffRoleSchema,
   perms: permsSchema,
+  name: nameSchema,
 });
 
 export const createShopStaffInput = z.object({
@@ -47,6 +50,7 @@ export const setStaffAccessInput = z.object({
   user_id: uuidSchema,
   role: staffRoleSchema,
   perms: permsSchema,
+  name: nameSchema,
 });
 
 export const userIdInput = z.object({ user_id: uuidSchema });
