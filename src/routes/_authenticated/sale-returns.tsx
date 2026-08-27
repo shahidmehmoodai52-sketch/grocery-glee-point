@@ -531,16 +531,14 @@ function Page() {
                         <SelectValue placeholder="Select staff" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none" disabled>
+                          — Select staff —
+                        </SelectItem>
                         {staffList.map((s) => (
                           <SelectItem key={s.user_id} value={s.user_id}>
                             {s.display_name || s.email}
                           </SelectItem>
                         ))}
-                        {staffList.length === 0 && (
-                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                            No other staff found
-                          </div>
-                        )}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
