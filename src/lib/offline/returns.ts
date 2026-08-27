@@ -24,9 +24,12 @@ export interface SaleReturnPayload {
   note: string | null;
   items: { product_id: string | null; name: string; qty: number; price: number }[];
   /** "customer" (default) or "staff". Staff returns never pay out cash — the
-   *  RPC books the value to the staff member's ledger instead. */
+   *  RPC shrinks the linked "staff_purchase" expense row instead. Always tied
+   *  to `sale_id`; the RPC derives the expense person from that sale itself,
+   *  so `expense_person_id` here is only for the offline local record. */
   party_type?: "customer" | "staff";
-  staff_user_id?: string | null;
+  expense_person_id?: string | null;
+  expense_person_name?: string | null;
 }
 
 /** Presentation/audit-only breakdown captured by the UI. Never sent to the RPC
@@ -122,10 +125,10 @@ export async function completeSaleReturnOfflineAware(
   }));
 
   const partyType = payload.party_type ?? "customer";
-  const staffUserId = partyType === "staff" ? (payload.staff_user_id ?? null) : null;
+  const expensePersonId = partyType === "staff" ? (payload.expense_person_id ?? null) : null;
   // Staff returns never pay out cash locally either — mirrors the RPC's rule.
   const effectiveRefund = partyType === "staff" ? 0 : Number(payload.refund_amount || 0);
-  const effectiveMethod = partyType === "staff" ? "staff_ledger" : payload.refund_method;
+  const effectiveMethod = partyType === "staff" ? "staff" : payload.refund_method;
 
   const ret: any = {
     id: localId,
@@ -133,7 +136,7 @@ export async function completeSaleReturnOfflineAware(
     sale_id: payload.sale_id,
     customer_id: partyType === "staff" ? null : payload.customer_id,
     party_type: partyType,
-    staff_user_id: staffUserId,
+    expense_person_id: expensePersonId,
     tenant_id,
     device_id,
     user_id,
@@ -163,6 +166,7 @@ export async function completeSaleReturnOfflineAware(
     _device_id: device_id,
     _client_uuid: clientUuid,
     customers: customerName ? { name: customerName } : null,
+    expense_persons: payload.expense_person_name ? { name: payload.expense_person_name } : null,
   };
 
   await db().transaction(
@@ -198,8 +202,9 @@ export async function completeSaleReturnOfflineAware(
         }
       }
 
-      // Staff returns adjust `tenant_members.staff_ledger_balance` server-side once
-      // this queued write syncs — there's no local staff-ledger mirror to update here.
+      // Staff returns shrink the linked `expenses` row server-side once this
+      // queued write syncs — expense_persons isn't mirrored locally, so
+      // there's nothing to adjust offline here.
       // Credit refunds reduce what the customer owes in the local mirror.
       if (partyType === "customer" && payload.customer_id && payload.refund_method === "credit") {
         const c = await db().customers.get(payload.customer_id);

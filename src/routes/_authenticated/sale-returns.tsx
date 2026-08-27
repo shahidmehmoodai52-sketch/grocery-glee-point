@@ -110,7 +110,6 @@ function Page() {
   const [productSearch, setProductSearch] = useState("");
   const [partyType, setPartyType] = useState<"customer" | "staff">("customer");
   const [customer, setCustomer] = useState<string>("none");
-  const [staffId, setStaffId] = useState<string>("none");
   const [items, setItems] = useState<ItemRow[]>([]);
   const [tax, setTax] = useState(0);
   const [refund, setRefund] = useState(0);
@@ -128,7 +127,7 @@ function Page() {
           await fetchAllRows<any>((from: number, to: number) =>
             supabase
               .from("sale_returns")
-              .select("*, customers(name), sale_return_items(*)")
+              .select("*, customers(name), expense_persons(name), sale_return_items(*)")
               .order("created_at", { ascending: false })
               .range(from, to),
           ),
@@ -156,7 +155,9 @@ function Page() {
           await fetchAllRows<any>((from: number, to: number) =>
             supabase
               .from("sales")
-              .select("id,invoice_no,customer_id,total,created_at,customers(name),sale_items(*)")
+              .select(
+                "id,invoice_no,customer_id,expense_person_id,total,created_at,customers(name),expense_persons(name),sale_items(*)",
+              )
               .order("created_at", { ascending: false })
               .range(from, to),
           ),
@@ -191,21 +192,6 @@ function Page() {
         },
       }),
   });
-  // Coworkers in the current shop — used for "staff return" (no cash, credited
-  // to their own ledger instead). Any signed-in tenant member can list them.
-  const { data: staffList = [] } = useQuery({
-    queryKey: ["tenant-staff-for-return"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.rpc("list_tenant_staff" as any);
-        if (error) throw error;
-        return (data ?? []) as { user_id: string; email: string; role: string; display_name: string | null }[];
-      } catch {
-        return [];
-      }
-    },
-  });
-
   // Item-wise product search (works offline via the local mirror)
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
   useEffect(() => {
@@ -289,18 +275,22 @@ function Page() {
 
   const filteredSales = useMemo(() => {
     const q = invoiceSearch.trim().toLowerCase();
-    if (!q) return sales as any[];
-    return (sales as any[]).filter(
+    const base =
+      partyType === "staff"
+        ? (sales as any[]).filter((s) => s.expense_person_id)
+        : (sales as any[]);
+    if (!q) return base;
+    return base.filter(
       (s) =>
         String(s.invoice_no ?? "")
           .toLowerCase()
           .includes(q) ||
-        String(s.customers?.name ?? "")
+        String(s.customers?.name ?? s.expense_persons?.name ?? "")
           .toLowerCase()
           .includes(q) ||
         String(Number(s.total).toFixed(2)).includes(q),
     );
-  }, [sales, invoiceSearch]);
+  }, [sales, invoiceSearch, partyType]);
 
   const setItem = (i: number, patch: Partial<ItemRow>) =>
     setItems((ls) =>
@@ -339,7 +329,6 @@ function Page() {
     setInvoiceSearch("");
     setPartyType("customer");
     setCustomer("none");
-    setStaffId("none");
     setTax(0);
     setRefund(0);
     setMethod("cash");
@@ -356,8 +345,8 @@ function Page() {
         return toast.error(`${l.name}: return qty ${l.qty} exceeds sold qty ${l.max}`);
       }
     }
-    if (partyType === "staff" && staffId === "none") {
-      return toast.error("Select which staff member this return belongs to");
+    if (partyType === "staff" && !selectedSale?.expense_person_id) {
+      return toast.error("Pick the staff member's purchase invoice to return");
     }
     if (partyType === "customer" && refund > total + 0.001) {
       return toast.error("Refund cannot exceed total");
@@ -370,12 +359,13 @@ function Page() {
           sale_id: saleId === "none" ? null : saleId,
           customer_id: partyType === "customer" && customer !== "none" ? customer : null,
           party_type: partyType,
-          staff_user_id: partyType === "staff" ? staffId : null,
+          expense_person_id: partyType === "staff" ? (selectedSale?.expense_person_id ?? null) : null,
+          expense_person_name: partyType === "staff" ? (selectedSale?.expense_persons?.name ?? null) : null,
           tax,
-          // Staff returns never pay cash out — the RPC books the value to
-          // the staff member's own ledger instead.
+          // Staff returns never pay cash out — the RPC shrinks the linked
+          // "staff_purchase" expense row instead.
           refund_amount: partyType === "staff" ? 0 : refund,
-          refund_method: partyType === "staff" ? "staff_ledger" : method,
+          refund_method: partyType === "staff" ? "staff" : method,
           note,
           items: picked.map((l) => ({
             product_id: l.product_id,
@@ -433,24 +423,61 @@ function Page() {
               {/* Step 1: pick invoice */}
               <div className="grid grid-cols-1 gap-3">
                 <div>
+                  <Label>Return for</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={partyType === "customer" ? "default" : "outline"}
+                      onClick={() => {
+                        setPartyType("customer");
+                        setSaleId("none");
+                      }}
+                    >
+                      Walking customer
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={partyType === "staff" ? "default" : "outline"}
+                      onClick={() => {
+                        setPartyType("staff");
+                        setSaleId("none");
+                      }}
+                    >
+                      Staff
+                    </Button>
+                  </div>
+                  {partyType === "staff" && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Pick the staff member's own purchase invoice below — no cash is paid
+                      out, the return instead reduces what that invoice added to their
+                      expense ledger.
+                    </p>
+                  )}
+                </div>
+
+                <div>
                   <Label>Search invoice</Label>
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       value={invoiceSearch}
                       onChange={(e) => setInvoiceSearch(e.target.value)}
-                      placeholder="Invoice #, customer, amount…"
+                      placeholder="Invoice #, name, amount…"
                       className="pl-8"
                     />
                   </div>
                   <div className="mt-2 max-h-40 overflow-y-auto border rounded-md">
-                    <button
-                      type="button"
-                      onClick={() => setSaleId("none")}
-                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent ${saleId === "none" ? "bg-accent" : ""}`}
-                    >
-                      — Ad-hoc return (no invoice) —
-                    </button>
+                    {partyType === "customer" && (
+                      <button
+                        type="button"
+                        onClick={() => setSaleId("none")}
+                        className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent ${saleId === "none" ? "bg-accent" : ""}`}
+                      >
+                        — Ad-hoc return (no invoice) —
+                      </button>
+                    )}
                     {filteredSales.slice(0, 50).map((s: any) => (
                       <button
                         key={s.id}
@@ -460,14 +487,16 @@ function Page() {
                       >
                         <span className="font-mono">{s.invoice_no}</span>
                         <span className="text-muted-foreground truncate mx-2">
-                          {s.customers?.name ?? "Walk-in"}
+                          {s.customers?.name ?? s.expense_persons?.name ?? "Walk-in"}
                         </span>
                         <span>{fmtMoney(s.total, sym)}</span>
                       </button>
                     ))}
                     {filteredSales.length === 0 && (
                       <div className="text-center text-xs text-muted-foreground py-3">
-                        No invoices found
+                        {partyType === "staff"
+                          ? "No staff purchase invoices found"
+                          : "No invoices found"}
                       </div>
                     )}
                   </div>
@@ -478,31 +507,9 @@ function Page() {
                     Invoice <span className="font-mono">{selectedSale.invoice_no}</span> ·{" "}
                     {new Date(selectedSale.created_at).toLocaleString()} · Total{" "}
                     {fmtMoney(selectedSale.total, sym)} ·{" "}
-                    {selectedSale.customers?.name ?? "Walk-in"}
+                    {selectedSale.customers?.name ?? selectedSale.expense_persons?.name ?? "Walk-in"}
                   </div>
                 )}
-
-                <div>
-                  <Label>Return for</Label>
-                  <div className="flex gap-2 mt-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={partyType === "customer" ? "default" : "outline"}
-                      onClick={() => setPartyType("customer")}
-                    >
-                      Walking customer
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={partyType === "staff" ? "default" : "outline"}
-                      onClick={() => setPartyType("staff")}
-                    >
-                      Staff
-                    </Button>
-                  </div>
-                </div>
 
                 {partyType === "customer" && saleId === "none" && (
                   <div>
@@ -520,31 +527,6 @@ function Page() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                )}
-
-                {partyType === "staff" && (
-                  <div>
-                    <Label>Staff member</Label>
-                    <Select value={staffId} onValueChange={setStaffId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select staff" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none" disabled>
-                          — Select staff —
-                        </SelectItem>
-                        {staffList.map((s) => (
-                          <SelectItem key={s.user_id} value={s.user_id}>
-                            {s.display_name || s.email}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      No cash is paid out — the return value is credited to this staff
-                      member's own ledger.
-                    </p>
                   </div>
                 )}
               </div>
@@ -701,7 +683,7 @@ function Page() {
                   <Label>Refund</Label>
                   {partyType === "staff" ? (
                     <div className="h-9 flex items-center text-sm text-muted-foreground">
-                      {fmtMoney(0, sym)} (staff ledger)
+                      {fmtMoney(0, sym)} (expense ledger)
                     </div>
                   ) : (
                     <Input
@@ -716,7 +698,7 @@ function Page() {
                   <Label>Method</Label>
                   {partyType === "staff" ? (
                     <div className="h-9 flex items-center">
-                      <Badge variant="outline">Staff ledger</Badge>
+                      <Badge variant="outline">Expense ledger</Badge>
                     </div>
                   ) : (
                     <Select value={method} onValueChange={setMethod}>
@@ -734,7 +716,7 @@ function Page() {
                 </div>
                 <div className="flex flex-col justify-end">
                   <div className="text-sm text-muted-foreground">
-                    {partyType === "staff" ? "Credited to staff ledger" : "Total"}
+                    {partyType === "staff" ? "Reduces expense ledger by" : "Total"}
                   </div>
                   <div className="text-2xl font-semibold text-primary">{fmtMoney(total, sym)}</div>
                 </div>
@@ -786,10 +768,7 @@ function Page() {
                   {r.party_type === "staff" ? (
                     <span className="inline-flex items-center gap-1">
                       <Badge variant="secondary" className="text-[10px]">Staff</Badge>
-                      {(() => {
-                        const s = staffList.find((x) => x.user_id === r.staff_user_id);
-                        return s ? s.display_name || s.email : "—";
-                      })()}
+                      {r.expense_persons?.name ?? "—"}
                     </span>
                   ) : (
                     r.customers?.name ?? "Walk-in"

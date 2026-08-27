@@ -17,15 +17,11 @@ import { listStaff, createStaff, resetStaffPassword, setStaffPermissions, delete
 import { supabase } from "@/integrations/supabase/client";
 import { Monitor } from "lucide-react";
 import { NeedsInternetBanner } from "@/components/needs-internet-banner";
-import { useSettings } from "@/hooks/use-settings";
-import { fmtMoney } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/users")({ component: Page });
 
 function Page() {
   const qc = useQueryClient();
-  const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "Rs";
   const list = useServerFn(listStaff);
   const create = useServerFn(createStaff);
   const reset = useServerFn(resetStaffPassword);
@@ -124,11 +120,11 @@ function Page() {
       <Card className="p-3">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Active devices</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Staff ledger</TableHead><TableHead className="text-right">Actions</TableHead>
+            <TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Active devices</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Actions</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
-            {users.map((u: any) => <UserRow key={u.id} u={u} activeCount={activeSessions[u.id] ?? 0} reset={reset} del={del} refresh={refresh} sym={sym} />)}
+            {isLoading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
+            {users.map((u: any) => <UserRow key={u.id} u={u} activeCount={activeSessions[u.id] ?? 0} reset={reset} del={del} refresh={refresh} />)}
           </TableBody>
         </Table>
       </Card>
@@ -136,7 +132,7 @@ function Page() {
   );
 }
 
-function UserRow({ u, activeCount, reset, del, refresh, sym }: any) {
+function UserRow({ u, activeCount, reset, del, refresh }: any) {
   const [editOpen, setEditOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
@@ -183,9 +179,6 @@ function UserRow({ u, activeCount, reset, del, refresh, sym }: any) {
             {u.perms.length === 0 && <span className="text-xs text-muted-foreground">No extras</span>}
           </div>
         )}
-      </TableCell>
-      <TableCell className="text-right font-medium">
-        {fmtMoney(u.staff_ledger_balance ?? 0, sym)}
       </TableCell>
       <TableCell className="text-right space-x-1">
         <Dialog open={editOpen} onOpenChange={setEditOpen}>

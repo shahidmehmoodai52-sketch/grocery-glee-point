@@ -73,21 +73,11 @@ async function attachToTenant(
   displayName?: string,
 ) {
   if (!tenantId) return;
-  // Preserve the staff ledger balance across the delete+reinsert below — this
-  // runs on every permissions/name edit, and a naive reinsert would silently
-  // wipe out whatever a staff member's returns had credited them.
-  const { data: existing } = await supabaseAdmin
-    .from("tenant_members")
-    .select("staff_ledger_balance")
-    .eq("tenant_id", tenantId)
-    .eq("user_id", targetUserId)
-    .maybeSingle();
   await supabaseAdmin.from("tenant_members").delete().eq("user_id", targetUserId);
   await supabaseAdmin.from("tenant_members").insert({
     user_id: targetUserId,
     tenant_id: tenantId,
     role: memberRole,
-    staff_ledger_balance: existing?.staff_ledger_balance ?? 0,
     ...(displayName ? { display_name: displayName } : {}),
   });
 }
@@ -98,18 +88,14 @@ export const listStaff = createServerFn({ method: "GET" })
     const { supabaseAdmin, tenantId } = await resolveStaffAdmin(context);
 
     let allowedIds: string[] | null = null;
-    let ledgerBalances: Record<string, number> = {};
     let displayNames: Record<string, string | null> = {};
     if (tenantId) {
       const { data: members, error } = await supabaseAdmin
         .from("tenant_members")
-        .select("user_id, staff_ledger_balance, display_name")
+        .select("user_id, display_name")
         .eq("tenant_id", tenantId);
       if (error) throw error;
       allowedIds = (members ?? []).map((m: any) => m.user_id as string);
-      ledgerBalances = Object.fromEntries(
-        (members ?? []).map((m: any) => [m.user_id, Number(m.staff_ledger_balance ?? 0)]),
-      );
       displayNames = Object.fromEntries(
         (members ?? []).map((m: any) => [m.user_id, m.display_name ?? null]),
       );
@@ -133,9 +119,6 @@ export const listStaff = createServerFn({ method: "GET" })
       created_at: u.created_at,
       role: (roles ?? []).find((r) => r.user_id === u.id)?.role ?? "cashier",
       perms: (perms ?? []).filter((p) => p.user_id === u.id).map((p) => p.perm),
-      // Running total credited to this staff member from staff-return refunds
-      // (no cash is ever paid out for a staff return — see complete_sale_return RPC).
-      staff_ledger_balance: ledgerBalances[u.id] ?? 0,
       name: displayNames[u.id] ?? null,
     }));
   });
