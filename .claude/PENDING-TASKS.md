@@ -101,6 +101,37 @@ create and get a simple message template approved in WhatsApp Manager; Claude
 can then switch the trigger's payload from `type: text` to `type: template`
 once one exists.
 
+## 4. Multi-language: language switch only affects the landing page (pending — not started)
+
+User's ask: changing the selected language should apply to the **whole
+application** (POS, dashboard, reports, every authenticated screen), not
+just the public landing page.
+
+Root cause (checked 2026-08-28, not yet fixed): this is not a bug in the
+language switcher itself — `i18next`/`react-i18next` is a single global
+instance, so `i18n.changeLanguage()` already takes effect everywhere in
+principle. The real gap is coverage: only 3 of the ~30 files under
+`src/routes/_authenticated/` (plus a few shared components) actually call
+`useTranslation()`/`t(...)` at all — the rest (dashboard, reports,
+customers, suppliers, purchases, expenses, settings, etc.) have their
+labels, buttons, and messages as hardcoded English strings, so there is
+nothing for a language switch to translate on those screens.
+
+`public/locales/<lang>/translation.json` already has `landing.*` (fully
+used), plus `common.*` and `pos.*` namespaces with some real translated
+strings prepared but only partially wired up (`pos.tsx` uses a handful,
+e.g. table headers) — so there's a real head start, not a blank slate.
+
+To actually deliver this: audit each `_authenticated` route file, replace
+hardcoded strings with `t('namespace.key', 'English fallback')` calls
+(matching the existing `pos.*` pattern), add the missing keys to all 6
+`public/locales/*/translation.json` files (en, ur, ar, es, de, no), and
+make sure the header's `<LanguageSelect>` (already global, mounted in
+`src/routes/_authenticated/route.tsx`) is what drives it — it already is,
+so no new switcher is needed, just content to translate. Given ~30 files,
+this is worth doing as its own dedicated pass rather than folded into
+something else.
+
 ## Also noted (informational, no action needed)
 - Root `.env` is committed to the repo with Supabase URL + anon/publishable key
   only (no service-role/secret key) — not a critical leak, but best practice
