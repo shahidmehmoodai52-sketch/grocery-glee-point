@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
@@ -95,6 +96,7 @@ const DAMAGE_TYPES = ["broken", "leaking", "customer_return", "transport", "ware
 const WASTE_TYPES = ["expired", "damaged", "disposal", "donation", "internal_use"] as const;
 
 function ExpiryPage() {
+  const { t } = useTranslation();
   const { data: settings } = useSettings();
   const { isAdmin, can } = usePermissions();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -134,29 +136,29 @@ function ExpiryPage() {
   return (
     <div className="p-6 space-y-4">
       <PageHeader
-        title="Expiry, Damage & Waste"
-        description="Product lifecycle: batches, near-expiry, damage & waste tracking."
+        title={t('expiry.page_title', 'Expiry, Damage & Waste')}
+        description={t('expiry.page_desc', 'Product lifecycle: batches, near-expiry, damage & waste tracking.')}
         icon={<CalendarClock className="h-5 w-5" />}
       />
 
 
       {/* Dashboard cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <StatCard label="Expired today" value={String(stats.expiredToday)} tone="red" icon={Skull} />
-        <StatCard label="Expiring in 7 days" value={String(stats.in7)} tone="orange" icon={AlertTriangle} />
-        <StatCard label="Expiring in 30 days" value={String(stats.in30)} tone="amber" icon={CalendarClock} />
-        <StatCard label="Expired (all)" value={String(stats.expired)} tone="red" icon={Skull} />
-        <StatCard label="Expired value" value={fmtMoney(stats.expiredValue, sym)} tone="red" icon={TrendingDown} />
-        <StatCard label="Products at risk" value={String(stats.atRisk)} tone="amber" icon={AlertTriangle} />
+        <StatCard label={t('expiry.stat_expired_today', 'Expired today')} value={String(stats.expiredToday)} tone="red" icon={Skull} />
+        <StatCard label={t('expiry.stat_expiring_7', 'Expiring in 7 days')} value={String(stats.in7)} tone="orange" icon={AlertTriangle} />
+        <StatCard label={t('expiry.stat_expiring_30', 'Expiring in 30 days')} value={String(stats.in30)} tone="amber" icon={CalendarClock} />
+        <StatCard label={t('expiry.stat_expired_all', 'Expired (all)')} value={String(stats.expired)} tone="red" icon={Skull} />
+        <StatCard label={t('expiry.stat_expired_value', 'Expired value')} value={fmtMoney(stats.expiredValue, sym)} tone="red" icon={TrendingDown} />
+        <StatCard label={t('expiry.stat_products_at_risk', 'Products at risk')} value={String(stats.atRisk)} tone="amber" icon={AlertTriangle} />
       </div>
 
       <Tabs value={tab} onValueChange={(v) => navigate({ search: { tab: v }, replace: true })} className="mt-4">
         <TabsList>
-          <TabsTrigger value="batches">Batches</TabsTrigger>
-          <TabsTrigger value="damage">Damage log</TabsTrigger>
-          <TabsTrigger value="waste">Waste log</TabsTrigger>
-          <TabsTrigger value="shortexcess">Short & Excess</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="batches">{t('expiry.tab_batches', 'Batches')}</TabsTrigger>
+          <TabsTrigger value="damage">{t('expiry.tab_damage', 'Damage log')}</TabsTrigger>
+          <TabsTrigger value="waste">{t('expiry.tab_waste', 'Waste log')}</TabsTrigger>
+          <TabsTrigger value="shortexcess">{t('expiry.tab_shortexcess', 'Short & Excess')}</TabsTrigger>
+          <TabsTrigger value="reports">{t('expiry.tab_reports', 'Reports')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="batches" className="mt-4">
@@ -209,6 +211,7 @@ function StatCard({
 
 // ----------------- BATCHES TAB -----------------
 function BatchesTab({ batches, loading, sym, canWrite }: { batches: Batch[]; loading: boolean; sym: string; canWrite: boolean }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -259,26 +262,26 @@ function BatchesTab({ batches, loading, sym, canWrite }: { batches: Batch[]; loa
   return (
     <Card className="overflow-hidden">
       <div className="p-3 border-b flex flex-wrap gap-2 items-center">
-        <Input placeholder="Search product / SKU / batch…" className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input placeholder={t('expiry.search_placeholder', 'Search product / SKU / batch…')} className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
         <Select value={filter} onValueChange={setFilter}>
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="fresh">Fresh</SelectItem>
-            <SelectItem value="expiring_soon">Expiring soon</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-            <SelectItem value="expired">Expired</SelectItem>
-            <SelectItem value="no_expiry">No expiry</SelectItem>
+            <SelectItem value="all">{t('expiry.filter_all_statuses', 'All statuses')}</SelectItem>
+            <SelectItem value="fresh">{t('expiry.status_fresh', 'Fresh')}</SelectItem>
+            <SelectItem value="expiring_soon">{t('expiry.status_expiring_soon', 'Expiring soon')}</SelectItem>
+            <SelectItem value="critical">{t('expiry.status_critical', 'Critical')}</SelectItem>
+            <SelectItem value="expired">{t('expiry.status_expired', 'Expired')}</SelectItem>
+            <SelectItem value="no_expiry">{t('expiry.status_no_expiry', 'No expiry')}</SelectItem>
           </SelectContent>
         </Select>
         <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" onClick={exportCsv}>
-            <FileDown className="h-4 w-4 mr-1" /> Export
+            <FileDown className="h-4 w-4 mr-1" /> {t('expiry.export_btn', 'Export')}
           </Button>
           {canWrite && (
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
-                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add batch</Button>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {t('expiry.add_batch_btn', 'Add batch')}</Button>
               </DialogTrigger>
               <AddBatchDialog onClose={() => { setAddOpen(false); qc.invalidateQueries({ queryKey: ["batches-status"] }); }} />
             </Dialog>
@@ -288,21 +291,21 @@ function BatchesTab({ batches, loading, sym, canWrite }: { batches: Batch[]; loa
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Product</TableHead>
-            <TableHead>Batch</TableHead>
-            <TableHead>Purchased</TableHead>
-            <TableHead>Expires</TableHead>
-            <TableHead className="text-right">Days</TableHead>
-            <TableHead className="text-right">Qty</TableHead>
-            <TableHead className="text-right">Value</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+            <TableHead>{t('expiry.th_batch', 'Batch')}</TableHead>
+            <TableHead>{t('expiry.th_purchased', 'Purchased')}</TableHead>
+            <TableHead>{t('expiry.th_expires', 'Expires')}</TableHead>
+            <TableHead className="text-right">{t('expiry.th_days', 'Days')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_qty', 'Qty')}</TableHead>
+            <TableHead className="text-right">{t('expiry.th_value', 'Value')}</TableHead>
+            <TableHead>{t('sales.th_status', 'Status')}</TableHead>
             {canWrite && <TableHead />}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {loading && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground p-6">Loading…</TableCell></TableRow>}
+          {loading && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground p-6">{t('expiry.loading', 'Loading…')}</TableCell></TableRow>}
           {!loading && filtered.length === 0 && (
-            <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground p-6">No batches match.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground p-6">{t('expiry.no_batches_match', 'No batches match.')}</TableCell></TableRow>
           )}
           {filtered.map((b) => {
             const meta = STATUS_META[b.expiry_status];
@@ -323,7 +326,7 @@ function BatchesTab({ batches, loading, sym, canWrite }: { batches: Batch[]; loa
                 <TableCell className="text-right">{fmtMoney(b.value_remaining, sym)}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className={meta.classes}>
-                    <Icon className="h-3 w-3 mr-1" /> {meta.label}
+                    <Icon className="h-3 w-3 mr-1" /> {t(`expiry.status_${b.expiry_status}`, meta.label)}
                   </Badge>
                 </TableCell>
                 {canWrite && (
@@ -333,7 +336,7 @@ function BatchesTab({ batches, loading, sym, canWrite }: { batches: Batch[]; loa
                       size="sm"
                       onClick={() => { setActionBatch(b); setActionType("waste"); }}
                     >
-                      Dispose
+                      {t('expiry.dispose_btn', 'Dispose')}
                     </Button>
                   </TableCell>
                 )}
@@ -357,6 +360,7 @@ function BatchesTab({ batches, loading, sym, canWrite }: { batches: Batch[]; loa
 }
 
 function AddBatchDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const [productId, setProductId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [batchNo, setBatchNo] = useState("");
@@ -378,9 +382,9 @@ function AddBatchDialog({ onClose }: { onClose: () => void }) {
   });
 
   const save = async () => {
-    if (!productId) return toast.error("Pick a product");
+    if (!productId) return toast.error(t('expiry.toast_pick_product', 'Pick a product'));
     const q = Number(qty);
-    if (!q || q <= 0) return toast.error("Quantity must be positive");
+    if (!q || q <= 0) return toast.error(t('expiry.toast_qty_positive', 'Quantity must be positive'));
     setSaving(true);
     const { error } = await supabase.rpc("create_product_batch" as any, {
       _product_id: productId,
@@ -394,17 +398,17 @@ function AddBatchDialog({ onClose }: { onClose: () => void }) {
     });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Batch added");
+    toast.success(t('expiry.toast_batch_added', 'Batch added'));
     onClose();
   };
 
   return (
     <DialogContent className="max-w-lg">
-      <DialogHeader><DialogTitle>Add batch</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{t('expiry.add_batch_title', 'Add batch')}</DialogTitle></DialogHeader>
       <div className="space-y-3">
         <div>
-          <Label className="text-xs">Product</Label>
-          <Input placeholder="Search product…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Label className="text-xs">{t('expiry.field_product', 'Product')}</Label>
+          <Input placeholder={t('expiry.search_product_placeholder', 'Search product…')} value={search} onChange={(e) => setSearch(e.target.value)} />
           <div className="mt-2 max-h-40 overflow-y-auto border rounded">
             {(productsQ.data ?? []).map((p: any) => (
               <button
@@ -418,23 +422,24 @@ function AddBatchDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div><Label className="text-xs">Batch #</Label><Input value={batchNo} onChange={(e) => setBatchNo(e.target.value)} /></div>
-          <div><Label className="text-xs">Qty</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
-          <div><Label className="text-xs">Mfg date</Label><Input type="date" value={mfg} onChange={(e) => setMfg(e.target.value)} /></div>
-          <div><Label className="text-xs">Expiry date</Label><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></div>
-          <div className="col-span-2"><Label className="text-xs">Unit cost</Label><Input type="number" value={cost} onChange={(e) => setCost(e.target.value)} /></div>
+          <div><Label className="text-xs">{t('expiry.field_batch_no', 'Batch #')}</Label><Input value={batchNo} onChange={(e) => setBatchNo(e.target.value)} /></div>
+          <div><Label className="text-xs">{t('reports.th_qty', 'Qty')}</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
+          <div><Label className="text-xs">{t('expiry.field_mfg_date', 'Mfg date')}</Label><Input type="date" value={mfg} onChange={(e) => setMfg(e.target.value)} /></div>
+          <div><Label className="text-xs">{t('expiry.field_expiry_date', 'Expiry date')}</Label><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></div>
+          <div className="col-span-2"><Label className="text-xs">{t('expiry.field_unit_cost', 'Unit cost')}</Label><Input type="number" value={cost} onChange={(e) => setCost(e.target.value)} /></div>
         </div>
-        <p className="text-xs text-muted-foreground">Adding a batch here does not change on-hand stock — it tags existing stock. Use Purchases to receive new stock.</p>
+        <p className="text-xs text-muted-foreground">{t('expiry.add_batch_note', 'Adding a batch here does not change on-hand stock — it tags existing stock. Use Purchases to receive new stock.')}</p>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button onClick={save} disabled={saving}>Save batch</Button>
+        <Button variant="outline" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
+        <Button onClick={save} disabled={saving}>{t('expiry.save_batch_btn', 'Save batch')}</Button>
       </DialogFooter>
     </DialogContent>
   );
 }
 
 function BatchActionDialog({ batch, defaultType, onClose }: { batch: Batch; defaultType: string; onClose: () => void }) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"waste" | "damage">(defaultType === "damaged" ? "damage" : "waste");
   const [type, setType] = useState<string>(defaultType);
   const [qty, setQty] = useState<string>(String(batch.qty_remaining));
@@ -443,8 +448,8 @@ function BatchActionDialog({ batch, defaultType, onClose }: { batch: Batch; defa
 
   const save = async () => {
     const q = Number(qty);
-    if (!q || q <= 0) return toast.error("Quantity must be positive");
-    if (q > Number(batch.qty_remaining)) return toast.error(`Only ${batch.qty_remaining} left in batch`);
+    if (!q || q <= 0) return toast.error(t('expiry.toast_qty_positive', 'Quantity must be positive'));
+    if (q > Number(batch.qty_remaining)) return toast.error(t('expiry.toast_only_left', 'Only {{count}} left in batch', { count: batch.qty_remaining }));
     setSaving(true);
     const rpc = mode === "damage" ? "record_damage" : "record_waste";
     const { error } = await supabase.rpc(rpc as any, {
@@ -457,47 +462,47 @@ function BatchActionDialog({ batch, defaultType, onClose }: { batch: Batch; defa
     } as any);
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(mode === "damage" ? "Damage recorded" : "Waste recorded");
+    toast.success(mode === "damage" ? t('expiry.toast_damage_recorded', 'Damage recorded') : t('expiry.toast_waste_recorded', 'Waste recorded'));
     onClose();
   };
 
   return (
     <DialogContent>
-      <DialogHeader><DialogTitle>Dispose batch · {batch.product_name}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{t('expiry.dispose_title', 'Dispose batch · {{name}}', { name: batch.product_name })}</DialogTitle></DialogHeader>
       <div className="space-y-3">
         <div className="text-xs text-muted-foreground">
-          Batch {batch.batch_no ?? "—"} · {fmtQty(batch.qty_remaining)} left · expires {batch.expiry_date ?? "—"}
+          {t('expiry.batch_summary', 'Batch {{batch}} · {{qty}} left · expires {{expiry}}', { batch: batch.batch_no ?? "—", qty: fmtQty(batch.qty_remaining), expiry: batch.expiry_date ?? "—" })}
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label className="text-xs">Category</Label>
+            <Label className="text-xs">{t('expiry.field_category', 'Category')}</Label>
             <Select value={mode} onValueChange={(v) => { setMode(v as any); setType(v === "damage" ? "broken" : "expired"); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="waste">Waste / expired</SelectItem>
-                <SelectItem value="damage">Damage</SelectItem>
+                <SelectItem value="waste">{t('expiry.category_waste', 'Waste / expired')}</SelectItem>
+                <SelectItem value="damage">{t('expiry.category_damage', 'Damage')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label className="text-xs">Type</Label>
+            <Label className="text-xs">{t('expiry.field_type', 'Type')}</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(mode === "damage" ? DAMAGE_TYPES : WASTE_TYPES).map((t) => (
-                  <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                {(mode === "damage" ? DAMAGE_TYPES : WASTE_TYPES).map((opt) => (
+                  <SelectItem key={opt} value={opt}>{t(`expiry.${mode === "damage" ? "damage_type" : "waste_type"}_${opt}`, opt.replace(/_/g, " "))}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div><Label className="text-xs">Qty</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
+          <div><Label className="text-xs">{t('reports.th_qty', 'Qty')}</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
         </div>
-        <div><Label className="text-xs">Reason</Label><Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+        <div><Label className="text-xs">{t('expiry.field_reason', 'Reason')}</Label><Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button variant="outline" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
         <Button onClick={save} disabled={saving} variant="destructive">
-          <Trash2 className="h-4 w-4 mr-1" /> Record
+          <Trash2 className="h-4 w-4 mr-1" /> {t('expiry.record_btn', 'Record')}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -506,6 +511,7 @@ function BatchActionDialog({ batch, defaultType, onClose }: { batch: Batch; defa
 
 // ----------------- DAMAGE TAB -----------------
 function DamageTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const q = useQuery({
@@ -524,10 +530,10 @@ function DamageTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
   return (
     <Card>
       <div className="p-3 border-b flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">{q.data?.length ?? 0} damage entries</div>
+        <div className="text-sm text-muted-foreground">{t('expiry.damage_entries_count', '{{count}} damage entries', { count: q.data?.length ?? 0 })}</div>
         {canWrite && (
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Record damage</Button></DialogTrigger>
+            <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> {t('expiry.record_damage_btn', 'Record damage')}</Button></DialogTrigger>
             <RecordDialog mode="damage" onClose={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["damage-log"] }); qc.invalidateQueries({ queryKey: ["batches-status"] }); }} />
           </Dialog>
         )}
@@ -535,21 +541,21 @@ function DamageTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Product</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead className="text-right">Qty</TableHead>
-            <TableHead className="text-right">Value</TableHead>
-            <TableHead>Reason</TableHead>
+            <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+            <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+            <TableHead>{t('reports.th_type', 'Type')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_qty', 'Qty')}</TableHead>
+            <TableHead className="text-right">{t('expiry.th_value', 'Value')}</TableHead>
+            <TableHead>{t('expiry.field_reason', 'Reason')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {(q.data ?? []).length === 0 && <TableRow><TableCell colSpan={6} className="p-6 text-center text-muted-foreground">No damage recorded.</TableCell></TableRow>}
+          {(q.data ?? []).length === 0 && <TableRow><TableCell colSpan={6} className="p-6 text-center text-muted-foreground">{t('expiry.no_damage_recorded', 'No damage recorded.')}</TableCell></TableRow>}
           {(q.data ?? []).map((r: any) => (
             <TableRow key={r.id}>
               <TableCell className="text-xs">{format(new Date(r.created_at), "PP p")}</TableCell>
               <TableCell><div className="font-medium">{r.products?.name ?? "—"}</div><div className="text-xs text-muted-foreground">{r.products?.sku ?? ""}</div></TableCell>
-              <TableCell><Badge variant="outline">{String(r.damage_type).replace(/_/g, " ")}</Badge></TableCell>
+              <TableCell><Badge variant="outline">{t(`expiry.damage_type_${r.damage_type}`, String(r.damage_type).replace(/_/g, " "))}</Badge></TableCell>
               <TableCell className="text-right">{fmtQty(r.qty)} {r.products?.unit ?? ""}</TableCell>
               <TableCell className="text-right">{fmtMoney(r.total_value ?? 0, sym)}</TableCell>
               <TableCell className="text-xs text-muted-foreground">{r.reason ?? "—"}</TableCell>
@@ -563,6 +569,7 @@ function DamageTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
 
 // ----------------- WASTE TAB -----------------
 function WasteTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const q = useQuery({
@@ -581,10 +588,10 @@ function WasteTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
   return (
     <Card>
       <div className="p-3 border-b flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">{q.data?.length ?? 0} waste entries</div>
+        <div className="text-sm text-muted-foreground">{t('expiry.waste_entries_count', '{{count}} waste entries', { count: q.data?.length ?? 0 })}</div>
         {canWrite && (
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Record waste</Button></DialogTrigger>
+            <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> {t('expiry.record_waste_btn', 'Record waste')}</Button></DialogTrigger>
             <RecordDialog mode="waste" onClose={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["waste-log"] }); qc.invalidateQueries({ queryKey: ["batches-status"] }); }} />
           </Dialog>
         )}
@@ -592,21 +599,21 @@ function WasteTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Product</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead className="text-right">Qty</TableHead>
-            <TableHead className="text-right">Value</TableHead>
-            <TableHead>Reason</TableHead>
+            <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+            <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+            <TableHead>{t('reports.th_type', 'Type')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_qty', 'Qty')}</TableHead>
+            <TableHead className="text-right">{t('expiry.th_value', 'Value')}</TableHead>
+            <TableHead>{t('expiry.field_reason', 'Reason')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {(q.data ?? []).length === 0 && <TableRow><TableCell colSpan={6} className="p-6 text-center text-muted-foreground">No waste recorded.</TableCell></TableRow>}
+          {(q.data ?? []).length === 0 && <TableRow><TableCell colSpan={6} className="p-6 text-center text-muted-foreground">{t('expiry.no_waste_recorded', 'No waste recorded.')}</TableCell></TableRow>}
           {(q.data ?? []).map((r: any) => (
             <TableRow key={r.id}>
               <TableCell className="text-xs">{format(new Date(r.created_at), "PP p")}</TableCell>
               <TableCell><div className="font-medium">{r.products?.name ?? "—"}</div><div className="text-xs text-muted-foreground">{r.products?.sku ?? ""}</div></TableCell>
-              <TableCell><Badge variant="outline">{String(r.waste_type).replace(/_/g, " ")}</Badge></TableCell>
+              <TableCell><Badge variant="outline">{t(`expiry.waste_type_${r.waste_type}`, String(r.waste_type).replace(/_/g, " "))}</Badge></TableCell>
               <TableCell className="text-right">{fmtQty(r.qty)} {r.products?.unit ?? ""}</TableCell>
               <TableCell className="text-right">{fmtMoney(r.total_value ?? 0, sym)}</TableCell>
               <TableCell className="text-xs text-muted-foreground">{r.reason ?? "—"}</TableCell>
@@ -619,6 +626,7 @@ function WasteTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
 }
 
 function RecordDialog({ mode, onClose }: { mode: "damage" | "waste"; onClose: () => void }) {
+  const { t } = useTranslation();
   const [productId, setProductId] = useState("");
   const [search, setSearch] = useState("");
   const [qty, setQty] = useState("");
@@ -638,9 +646,9 @@ function RecordDialog({ mode, onClose }: { mode: "damage" | "waste"; onClose: ()
   });
 
   const save = async () => {
-    if (!productId) return toast.error("Pick a product");
+    if (!productId) return toast.error(t('expiry.toast_pick_product', 'Pick a product'));
     const n = Number(qty);
-    if (!n || n <= 0) return toast.error("Quantity must be positive");
+    if (!n || n <= 0) return toast.error(t('expiry.toast_qty_positive', 'Quantity must be positive'));
     setSaving(true);
     const rpc = mode === "damage" ? "record_damage" : "record_waste";
     const { error } = await supabase.rpc(rpc as any, {
@@ -653,17 +661,17 @@ function RecordDialog({ mode, onClose }: { mode: "damage" | "waste"; onClose: ()
     } as any);
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(mode === "damage" ? "Damage recorded" : "Waste recorded");
+    toast.success(mode === "damage" ? t('expiry.toast_damage_recorded', 'Damage recorded') : t('expiry.toast_waste_recorded', 'Waste recorded'));
     onClose();
   };
 
   return (
     <DialogContent className="max-w-lg">
-      <DialogHeader><DialogTitle>Record {mode}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{t('expiry.record_mode_title', 'Record {{mode}}', { mode: mode === "damage" ? t('expiry.mode_damage', 'damage') : t('expiry.mode_waste', 'waste') })}</DialogTitle></DialogHeader>
       <div className="space-y-3">
         <div>
-          <Label className="text-xs">Product</Label>
-          <Input placeholder="Search product…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Label className="text-xs">{t('expiry.field_product', 'Product')}</Label>
+          <Input placeholder={t('expiry.search_product_placeholder', 'Search product…')} value={search} onChange={(e) => setSearch(e.target.value)} />
           <div className="mt-2 max-h-40 overflow-y-auto border rounded">
             {(productsQ.data ?? []).map((p: any) => (
               <button key={p.id} onClick={() => { setProductId(p.id); setSearch(p.name); }} className={`w-full text-left px-2 py-1.5 text-sm hover:bg-accent ${productId === p.id ? "bg-accent" : ""}`}>
@@ -674,23 +682,23 @@ function RecordDialog({ mode, onClose }: { mode: "damage" | "waste"; onClose: ()
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label className="text-xs">Type</Label>
+            <Label className="text-xs">{t('expiry.field_type', 'Type')}</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(mode === "damage" ? DAMAGE_TYPES : WASTE_TYPES).map((t) => (
-                  <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                {(mode === "damage" ? DAMAGE_TYPES : WASTE_TYPES).map((opt) => (
+                  <SelectItem key={opt} value={opt}>{t(`expiry.${mode === "damage" ? "damage_type" : "waste_type"}_${opt}`, opt.replace(/_/g, " "))}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div><Label className="text-xs">Qty</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
+          <div><Label className="text-xs">{t('reports.th_qty', 'Qty')}</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
         </div>
-        <div><Label className="text-xs">Reason / note</Label><Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+        <div><Label className="text-xs">{t('expiry.field_reason_note', 'Reason / note')}</Label><Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button onClick={save} disabled={saving} variant="destructive">Record</Button>
+        <Button variant="outline" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
+        <Button onClick={save} disabled={saving} variant="destructive">{t('expiry.record_btn', 'Record')}</Button>
       </DialogFooter>
     </DialogContent>
   );
@@ -698,6 +706,7 @@ function RecordDialog({ mode, onClose }: { mode: "damage" | "waste"; onClose: ()
 
 // ----------------- REPORTS TAB -----------------
 function ReportsTab({ sym }: { sym: string }) {
+  const { t } = useTranslation();
   const [days, setDays] = useState("30");
 
   const q = useQuery({
@@ -733,44 +742,44 @@ function ReportsTab({ sym }: { sym: string }) {
   return (
     <div className="space-y-4">
       <Card className="p-3 flex items-center gap-3">
-        <Label className="text-xs">Window</Label>
+        <Label className="text-xs">{t('expiry.window_label', 'Window')}</Label>
         <Select value={days} onValueChange={setDays}>
           <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="7">Last 7 days</SelectItem>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-            <SelectItem value="365">Last 12 months</SelectItem>
+            <SelectItem value="7">{t('expiry.last_7_days', 'Last 7 days')}</SelectItem>
+            <SelectItem value="30">{t('expiry.last_30_days', 'Last 30 days')}</SelectItem>
+            <SelectItem value="90">{t('expiry.last_90_days', 'Last 90 days')}</SelectItem>
+            <SelectItem value="365">{t('expiry.last_12_months', 'Last 12 months')}</SelectItem>
           </SelectContent>
         </Select>
         <div className="ml-auto flex gap-6 text-sm">
-          <div><span className="text-muted-foreground">Damage loss:</span> <span className="font-semibold text-red-600">{fmtMoney(damageLoss, sym)}</span></div>
-          <div><span className="text-muted-foreground">Waste loss:</span> <span className="font-semibold text-red-600">{fmtMoney(wasteLoss, sym)}</span></div>
-          <div><span className="text-muted-foreground">Total:</span> <span className="font-semibold">{fmtMoney(damageLoss + wasteLoss, sym)}</span></div>
+          <div><span className="text-muted-foreground">{t('expiry.damage_loss_label', 'Damage loss:')}</span> <span className="font-semibold text-red-600">{fmtMoney(damageLoss, sym)}</span></div>
+          <div><span className="text-muted-foreground">{t('expiry.waste_loss_label', 'Waste loss:')}</span> <span className="font-semibold text-red-600">{fmtMoney(wasteLoss, sym)}</span></div>
+          <div><span className="text-muted-foreground">{t('expiry.total_colon_label', 'Total:')}</span> <span className="font-semibold">{fmtMoney(damageLoss + wasteLoss, sym)}</span></div>
         </div>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
-          <div className="p-3 border-b font-medium">Damage by type</div>
+          <div className="p-3 border-b font-medium">{t('expiry.damage_by_type', 'Damage by type')}</div>
           <Table>
-            <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Value</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>{t('reports.th_type', 'Type')}</TableHead><TableHead className="text-right">{t('reports.th_qty', 'Qty')}</TableHead><TableHead className="text-right">{t('expiry.th_value', 'Value')}</TableHead></TableRow></TableHeader>
             <TableBody>
-              {damageTotals.length === 0 && <TableRow><TableCell colSpan={3} className="p-4 text-center text-muted-foreground">No data</TableCell></TableRow>}
+              {damageTotals.length === 0 && <TableRow><TableCell colSpan={3} className="p-4 text-center text-muted-foreground">{t('reports.no_data', 'No data')}</TableCell></TableRow>}
               {damageTotals.map(([k, v]) => (
-                <TableRow key={k}><TableCell className="capitalize">{k.replace(/_/g, " ")}</TableCell><TableCell className="text-right">{fmtQty(v.qty)}</TableCell><TableCell className="text-right">{fmtMoney(v.value, sym)}</TableCell></TableRow>
+                <TableRow key={k}><TableCell className="capitalize">{t(`expiry.damage_type_${k}`, k.replace(/_/g, " "))}</TableCell><TableCell className="text-right">{fmtQty(v.qty)}</TableCell><TableCell className="text-right">{fmtMoney(v.value, sym)}</TableCell></TableRow>
               ))}
             </TableBody>
           </Table>
         </Card>
         <Card>
-          <div className="p-3 border-b font-medium">Waste by type</div>
+          <div className="p-3 border-b font-medium">{t('expiry.waste_by_type', 'Waste by type')}</div>
           <Table>
-            <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Value</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>{t('reports.th_type', 'Type')}</TableHead><TableHead className="text-right">{t('reports.th_qty', 'Qty')}</TableHead><TableHead className="text-right">{t('expiry.th_value', 'Value')}</TableHead></TableRow></TableHeader>
             <TableBody>
-              {wasteTotals.length === 0 && <TableRow><TableCell colSpan={3} className="p-4 text-center text-muted-foreground">No data</TableCell></TableRow>}
+              {wasteTotals.length === 0 && <TableRow><TableCell colSpan={3} className="p-4 text-center text-muted-foreground">{t('reports.no_data', 'No data')}</TableCell></TableRow>}
               {wasteTotals.map(([k, v]) => (
-                <TableRow key={k}><TableCell className="capitalize">{k.replace(/_/g, " ")}</TableCell><TableCell className="text-right">{fmtQty(v.qty)}</TableCell><TableCell className="text-right">{fmtMoney(v.value, sym)}</TableCell></TableRow>
+                <TableRow key={k}><TableCell className="capitalize">{t(`expiry.waste_type_${k}`, k.replace(/_/g, " "))}</TableCell><TableCell className="text-right">{fmtQty(v.qty)}</TableCell><TableCell className="text-right">{fmtMoney(v.value, sym)}</TableCell></TableRow>
               ))}
             </TableBody>
           </Table>
@@ -797,6 +806,7 @@ type SEItem = {
 };
 
 function ShortExcessTab({ sym }: { sym: string }) {
+  const { t } = useTranslation();
   const [days, setDays] = useState("30");
   const [filter, setFilter] = useState<"all" | "short" | "excess">("all");
   const [search, setSearch] = useState("");
@@ -842,7 +852,7 @@ function ShortExcessTab({ sym }: { sym: string }) {
           const cost = Number(p?.cost_price ?? 0);
           return {
             product_id: it.product_id,
-            product_name: p?.name ?? "Unknown",
+            product_name: p?.name ?? t('expiry.unknown_product', 'Unknown'),
             sku: p?.sku ?? null,
             unit: p?.unit ?? null,
             cost_price: cost,
@@ -903,58 +913,58 @@ function ShortExcessTab({ sym }: { sym: string }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Short qty (missing)" value={fmtQty(totals.shortQty)} tone="red" icon={TrendingDown} />
-        <StatCard label="Short value" value={fmtMoney(totals.shortVal, sym)} tone="red" icon={TrendingDown} />
-        <StatCard label="Excess qty (over)" value={fmtQty(totals.exQty)} tone="green" icon={TrendingUp} />
-        <StatCard label="Net variance" value={fmtMoney(totals.net, sym)} tone={totals.net < 0 ? "red" : "green"} icon={Scale} />
+        <StatCard label={t('expiry.stat_short_qty', 'Short qty (missing)')} value={fmtQty(totals.shortQty)} tone="red" icon={TrendingDown} />
+        <StatCard label={t('expiry.stat_short_value', 'Short value')} value={fmtMoney(totals.shortVal, sym)} tone="red" icon={TrendingDown} />
+        <StatCard label={t('expiry.stat_excess_qty', 'Excess qty (over)')} value={fmtQty(totals.exQty)} tone="green" icon={TrendingUp} />
+        <StatCard label={t('expiry.stat_net_variance', 'Net variance')} value={fmtMoney(totals.net, sym)} tone={totals.net < 0 ? "red" : "green"} icon={Scale} />
       </div>
 
       <Card className="overflow-hidden">
         <div className="p-3 border-b flex flex-wrap items-center gap-2">
-          <Input placeholder="Search product / SKU…" className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder={t('expiry.search_product_sku_placeholder', 'Search product / SKU…')} className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
           <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All variances</SelectItem>
-              <SelectItem value="short">Short only</SelectItem>
-              <SelectItem value="excess">Excess only</SelectItem>
+              <SelectItem value="all">{t('expiry.filter_all_variances', 'All variances')}</SelectItem>
+              <SelectItem value="short">{t('expiry.filter_short_only', 'Short only')}</SelectItem>
+              <SelectItem value="excess">{t('expiry.filter_excess_only', 'Excess only')}</SelectItem>
             </SelectContent>
           </Select>
           <Select value={days} onValueChange={setDays}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-              <SelectItem value="365">Last 12 months</SelectItem>
+              <SelectItem value="7">{t('expiry.last_7_days', 'Last 7 days')}</SelectItem>
+              <SelectItem value="30">{t('expiry.last_30_days', 'Last 30 days')}</SelectItem>
+              <SelectItem value="90">{t('expiry.last_90_days', 'Last 90 days')}</SelectItem>
+              <SelectItem value="365">{t('expiry.last_12_months', 'Last 12 months')}</SelectItem>
             </SelectContent>
           </Select>
           <div className="ml-auto flex gap-2">
             <Button variant="outline" size="sm" onClick={exportCsv}>
-              <FileDown className="h-4 w-4 mr-1" /> Export
+              <FileDown className="h-4 w-4 mr-1" /> {t('expiry.export_btn', 'Export')}
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link to="/stock-count">Open stock count</Link>
+              <Link to="/stock-count">{t('expiry.open_stock_count', 'Open stock count')}</Link>
             </Button>
           </div>
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead className="text-right">System</TableHead>
-              <TableHead className="text-right">Actual</TableHead>
-              <TableHead className="text-right">Diff</TableHead>
-              <TableHead className="text-right">Variance value</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Session</TableHead>
+              <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+              <TableHead className="text-right">{t('expiry.th_system', 'System')}</TableHead>
+              <TableHead className="text-right">{t('stock_count.th_actual', 'Actual')}</TableHead>
+              <TableHead className="text-right">{t('expiry.th_diff', 'Diff')}</TableHead>
+              <TableHead className="text-right">{t('stock_count.th_variance_value', 'Variance value')}</TableHead>
+              <TableHead>{t('sales.th_status', 'Status')}</TableHead>
+              <TableHead>{t('expiry.th_session', 'Session')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {q.isLoading && <TableRow><TableCell colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</TableCell></TableRow>}
+            {q.isLoading && <TableRow><TableCell colSpan={7} className="p-6 text-center text-muted-foreground">{t('expiry.loading', 'Loading…')}</TableCell></TableRow>}
             {!q.isLoading && filtered.length === 0 && (
               <TableRow><TableCell colSpan={7} className="p-6 text-center text-muted-foreground">
-                No variances in this window. Complete a stock count to see shortages and excesses here.
+                {t('expiry.no_variances', 'No variances in this window. Complete a stock count to see shortages and excesses here.')}
               </TableCell></TableRow>
             )}
             {filtered.map((r, i) => (
@@ -974,11 +984,11 @@ function ShortExcessTab({ sym }: { sym: string }) {
                 <TableCell>
                   {r.diff < 0 ? (
                     <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/30">
-                      <TrendingDown className="h-3 w-3 mr-1" /> Short
+                      <TrendingDown className="h-3 w-3 mr-1" /> {t('expiry.badge_short', 'Short')}
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30">
-                      <TrendingUp className="h-3 w-3 mr-1" /> Excess
+                      <TrendingUp className="h-3 w-3 mr-1" /> {t('expiry.badge_excess', 'Excess')}
                     </Badge>
                   )}
                 </TableCell>
