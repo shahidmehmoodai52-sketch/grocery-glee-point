@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Search, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -130,6 +131,7 @@ async function searchPurchaseProducts(term: string): Promise<{ products: PickerP
 
 
 function Page() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -204,7 +206,7 @@ function Page() {
     setNewProdOpen(true);
   };
   const saveNewProduct = async () => {
-    if (!newProd.name.trim()) return toast.error("Name required");
+    if (!newProd.name.trim()) return toast.error(t('common.name_required', 'Name required'));
     const primary = newProd.barcode.trim() || newProd.sku.trim() || newProd.name.trim();
     setNewProdSaving(true);
     const payload = {
@@ -231,7 +233,7 @@ function Page() {
     }
     setNewProdSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Product added");
+    toast.success(t('products.product_added', 'Product added'));
     setNewProdOpen(false);
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["product_barcodes"] });
@@ -288,7 +290,7 @@ function Page() {
     const { error } = await supabase.rpc("delete_purchase_v2", { _purchase_id: deleteTarget.id });
     setDeleting(false);
     if (error) return toast.error(error.message);
-    toast.success("Purchase deleted and stock restored");
+    toast.success(t('purchases.purchase_deleted', 'Purchase deleted and stock restored'));
     setDeleteTarget(null);
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
@@ -605,9 +607,9 @@ function Page() {
 
   const submit = async () => {
     if (savingRef.current) return false;
-    if (!supplier || supplier === "none") { toast.error("Supplier is required"); return false; }
+    if (!supplier || supplier === "none") { toast.error(t('purchases.supplier_required', 'Supplier is required')); return false; }
     const items = lines.filter((l) => l.name && l.qty > 0);
-    if (!items.length) { toast.error("Add at least one item"); return false; }
+    if (!items.length) { toast.error(t('purchase_returns.add_at_least_one_item', 'Add at least one item')); return false; }
     const { lineDiscountTotal: _, subtotal: sub, discountedSubtotal, billDiscountAmt, taxAmt } = calculatePurchaseTotals({
       lines: items,
       tax: Number(tax || 0),
@@ -623,7 +625,7 @@ function Page() {
     } catch (e: any) {
       setSaving(false);
       savingRef.current = false;
-      toast.error(e?.message ?? "Could not resolve payment account");
+      toast.error(e?.message ?? t('purchases.could_not_resolve_payment', 'Could not resolve payment account'));
       return false;
     }
     
@@ -764,7 +766,7 @@ function Page() {
     } catch (err: any) {
       setSaving(false);
       savingRef.current = false;
-      toast.error(err?.message ?? "Could not save purchase");
+      toast.error(err?.message ?? t('purchases.could_not_save', 'Could not save purchase'));
       return false;
     }
     setSaving(false);
@@ -778,7 +780,7 @@ function Page() {
       await supabase.from("products").update({ sell_price: Number(l.sale_price) }).eq("id", l.product_id as string);
     }
 
-    toast.success(priceUpdates.length ? "Purchase recorded — stock & sale rates updated" : "Purchase recorded, stock updated");
+    toast.success(priceUpdates.length ? t('purchases.recorded_with_rates', 'Purchase recorded — stock & sale rates updated') : t('purchases.recorded_stock_updated', 'Purchase recorded, stock updated'));
     setConfirmOpen(false);
     clearDraft();
     setShowIncentive(false);
@@ -820,8 +822,8 @@ function Page() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Purchases</h1>
-          <p className="text-sm text-muted-foreground">Record stock received from suppliers</p>
+          <h1 className="text-2xl font-semibold">{t('common.purchases', 'Purchases')}</h1>
+          <p className="text-sm text-muted-foreground">{t('purchases.subtitle', 'Record stock received from suppliers')}</p>
         </div>
         <div className="flex items-center gap-2">
           {hasParkedDrafts && !open && (
@@ -829,11 +831,11 @@ function Page() {
               <DialogTrigger asChild>
                 <Button variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20">
                   <Pencil className="h-4 w-4 mr-2" />
-                  Drafts ({savedDrafts.length})
+                  {t('purchases.drafts_count', 'Drafts ({{count}})', { count: savedDrafts.length })}
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Resume Draft</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{t('purchases.resume_draft_title', 'Resume Draft')}</DialogTitle></DialogHeader>
                 <div className="space-y-2 py-4">
                   {savedDrafts.map((d, i) => (
                     <button
@@ -842,8 +844,8 @@ function Page() {
                       className="w-full flex items-center justify-between p-3 rounded-md border hover:bg-accent text-left"
                     >
                       <div>
-                        <div className="font-medium">{suppliers.find(s => s.id === d.supplier)?.name || "No Supplier"}</div>
-                        <div className="text-xs text-muted-foreground">{d.lines.length} items · {d.date}</div>
+                        <div className="font-medium">{suppliers.find(s => s.id === d.supplier)?.name || t('purchases.no_supplier', 'No Supplier')}</div>
+                        <div className="text-xs text-muted-foreground">{t('purchases.draft_summary', '{{count}} items · {{date}}', { count: d.lines.length, date: d.date })}</div>
                       </div>
                       <Plus className="h-4 w-4 text-muted-foreground" />
                     </button>
@@ -852,18 +854,18 @@ function Page() {
               </DialogContent>
             </Dialog>
           )}
-        <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />New purchase</Button>
+        <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />{t('purchases.new_purchase', 'New purchase')}</Button>
         <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">
-              <DialogTitle>{editingId ? `Edit purchase #${editingId.slice(0, 8)}` : "New purchase"}</DialogTitle>
+              <DialogTitle>{editingId ? t('purchases.edit_purchase_title', 'Edit purchase #{{id}}', { id: editingId.slice(0, 8) }) : t('purchases.new_purchase', 'New purchase')}</DialogTitle>
             </DialogHeader>
 
 
 
             {/* Top bar: compact scan/search + manual add */}
             <div className="px-6 py-2 border-b bg-muted/30 shrink-0">
-              <Label className="text-xs">Item code, barcode, or product name</Label>
+              <Label className="text-xs">{t('purchases.search_label', 'Item code, barcode, or product name')}</Label>
               <div className="flex flex-wrap items-start gap-2">
                 <div className="relative min-w-[220px] flex-1 max-w-2xl">
                   <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -878,7 +880,7 @@ function Page() {
                       if (e.key === "ArrowUp") { e.preventDefault(); setEntryIndex((n) => Math.max(n - 1, 0)); }
                       if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
                     }}
-                    placeholder="🔍  Type 4-digit item code first, scan barcode, or type name…"
+                    placeholder={t('purchases.search_placeholder', '🔍  Type 4-digit item code first, scan barcode, or type name…')}
                     className="pl-10 h-9 text-sm"
                     autoFocus
                   />
@@ -891,7 +893,7 @@ function Page() {
                           className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
                         >
                           <Plus className="h-4 w-4 text-primary" />
-                          <span>Add <b>{entrySearch.trim()}</b> as a new product…</span>
+                          <span>{t('purchases.add_new_product_prefix', 'Add')} <b>{entrySearch.trim()}</b> {t('purchases.add_new_product_suffix', 'as a new product…')}</span>
                         </button>
                       ) : entryMatches.map((p, idx) => (
                         <button
@@ -905,13 +907,13 @@ function Page() {
                           <span className="min-w-0">
                             <span className="block truncate font-medium">{p.name}</span>
                             <span className="block truncate text-xs text-muted-foreground">
-                              Code {p.sku || "—"}{p.barcode ? ` · Barcode ${p.barcode}` : ""}
+                              {t('purchases.code_prefix', 'Code {{code}}', { code: p.sku || "—" })}{p.barcode ? ` · ${t('purchases.bc_prefix', 'Barcode {{barcode}}', { barcode: p.barcode })}` : ""}
                             </span>
                           </span>
                           <span className="shrink-0 text-right text-xs text-muted-foreground">
-                            <span className="block">stock {Number(p.stock ?? 0)}</span>
-                            <span className="block">P: {fmtMoney(Number(p.cost_price ?? 0), sym)}</span>
-                            <span className="block">S: {fmtMoney(Number(p.sell_price ?? 0), sym)}</span>
+                            <span className="block">{t('purchases.stock_inline', 'stock {{qty}}', { qty: Number(p.stock ?? 0) })}</span>
+                            <span className="block">{t('purchases.p_prefix', 'P: {{amount}}', { amount: fmtMoney(Number(p.cost_price ?? 0), sym) })}</span>
+                            <span className="block">{t('purchases.s_prefix', 'S: {{amount}}', { amount: fmtMoney(Number(p.sell_price ?? 0), sym) })}</span>
                           </span>
                         </button>
                       ))}
@@ -919,7 +921,7 @@ function Page() {
                   )}
                 </div>
                 <Button type="button" variant="outline" className="h-9 mt-0 shrink-0" onClick={() => openNewProduct("")}>
-                  <Plus className="h-4 w-4 mr-1" /> New item
+                  <Plus className="h-4 w-4 mr-1" /> {t('purchases.new_item', 'New item')}
                 </Button>
                 <div className="w-full sm:w-[240px] shrink-0">
                   <select
@@ -927,12 +929,12 @@ function Page() {
                     onChange={(e) => { setSupplier(e.target.value); focusSearch(); }}
                     className={`flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${supplier === "none" ? "border-destructive" : ""}`}
                   >
-                    <option value="none">— None —</option>
+                    <option value="none">{t('products.none_option', '— None —')}</option>
                     {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
                 <div className="w-full sm:w-[180px] shrink-0">
-                  <Label className="text-xs">Purchase date</Label>
+                  <Label className="text-xs">{t('purchases.purchase_date_label', 'Purchase date')}</Label>
                   <Input
                     type="date"
                     value={date || today}
@@ -951,10 +953,10 @@ function Page() {
                 <div className="flex items-center justify-between mb-1 shrink-0">
                   <div className="text-sm">
                     <span className="font-semibold">{lines.length}</span>
-                    <span className="text-muted-foreground"> item{lines.length === 1 ? "" : "s"}</span>
+                    <span className="text-muted-foreground"> {lines.length === 1 ? t('purchases.item_singular', 'item') : t('purchases.item_plural', 'items')}</span>
                   </div>
                   <Button type="button" size="sm" variant="outline" onClick={() => { addProductLine(null, ""); }} className="h-7">
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add empty row
+                    <Plus className="h-3.5 w-3.5 mr-1" /> {t('purchases.add_empty_row', 'Add empty row')}
                   </Button>
                 </div>
 
@@ -962,23 +964,23 @@ function Page() {
                   {lines.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
                       <Search className="h-10 w-10 mb-3 opacity-40" />
-                      <p className="text-sm font-medium">No items added yet</p>
-                      <p className="text-xs mt-1">Type the 4-digit item code, scan barcode, or type product name above, then press Enter.</p>
+                      <p className="text-sm font-medium">{t('purchases.no_items_added', 'No items added yet')}</p>
+                      <p className="text-xs mt-1">{t('purchases.no_items_hint', 'Type the 4-digit item code, scan barcode, or type product name above, then press Enter.')}</p>
                     </div>
                   ) : (
                     <Table className="w-full [&_td]:py-1 [&_th]:py-1.5 [&_th]:h-8">
                       <TableHeader className="sticky top-0 bg-background z-10">
                         <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead className="w-[120px]">Purchase rate</TableHead>
-                          <TableHead className="w-[120px]">Sale rate</TableHead>
-                          <TableHead className="w-[100px]">Qty</TableHead>
-                          <TableHead className="w-16 text-right">Old Avg</TableHead>
-                          <TableHead className="w-16 text-right">New Avg</TableHead>
+                          <TableHead>{t('common.name', 'Name')}</TableHead>
+                          <TableHead className="w-[120px]">{t('pos.qa_purchase_rate', 'Purchase rate')}</TableHead>
+                          <TableHead className="w-[120px]">{t('purchases.th_sale_rate', 'Sale rate')}</TableHead>
+                          <TableHead className="w-[100px]">{t('customers.th_qty', 'Qty')}</TableHead>
+                          <TableHead className="w-16 text-right">{t('purchases.th_old_avg', 'Old Avg')}</TableHead>
+                          <TableHead className="w-16 text-right">{t('purchases.th_new_avg', 'New Avg')}</TableHead>
                           <TableHead className="w-12 text-right">Δ%</TableHead>
-                          <TableHead className="w-[90px] text-right">Tax</TableHead>
-                          <TableHead className="w-[100px] text-right">Discount</TableHead>
-                          <TableHead className="w-[120px]">Total</TableHead>
+                          <TableHead className="w-[90px] text-right">{t('purchase_returns.tax', 'Tax')}</TableHead>
+                          <TableHead className="w-[100px] text-right">{t('common.discount', 'Discount')}</TableHead>
+                          <TableHead className="w-[120px]">{t('sales.th_total', 'Total')}</TableHead>
                           <TableHead className="w-9"></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1020,7 +1022,7 @@ function Page() {
                                 />
                                 {(l.item_code || l.barcode) && (
                                   <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                                    {l.item_code ? `Code ${l.item_code}` : `BC ${l.barcode}`} · stock {oldStock}
+                                    {l.item_code ? t('purchases.code_prefix', 'Code {{code}}', { code: l.item_code }) : t('purchases.bc_short', 'BC {{barcode}}', { barcode: l.barcode })} · {t('purchases.stock_inline', 'stock {{qty}}', { qty: oldStock })}
                                   </div>
                                 )}
                               </TableCell>
@@ -1037,8 +1039,8 @@ function Page() {
                                   className="h-8 text-right text-sm"
                                 />
                                 {taxShare > 0 && qty > 0 && (
-                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Cost including distributed tax">
-                                    +tax = {fmtMoney(effCost, sym)}
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title={t('purchases.cost_incl_tax_title', 'Cost including distributed tax')}>
+                                    {t('purchases.plus_tax', '+tax = {{amount}}', { amount: fmtMoney(effCost, sym) })}
                                   </div>
                                 )}
                               </TableCell>
@@ -1052,7 +1054,7 @@ function Page() {
                                   onChange={(e) => setLine(i, { sale_price: Number(e.target.value) })}
                                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCell("qty", i); } }}
                                   className="h-8 text-right text-sm"
-                                  title="Sale price — saved to the product when this purchase is recorded"
+                                  title={t('purchases.sale_price_title', 'Sale price — saved to the product when this purchase is recorded')}
                                 />
                                 {(() => {
                                   const sale = Number(l.sale_price || 0);
@@ -1061,8 +1063,8 @@ function Page() {
                                   const margin = cost > 0 ? ((sale - cost) / cost) * 100 : 0;
                                   return (
                                     <div className={`mt-0.5 text-right text-[10px] ${sale < cost ? "text-destructive" : "text-muted-foreground"}`}>
-                                      {cost > 0 ? `${margin >= 0 ? "+" : ""}${margin.toFixed(1)}% margin` : ""}
-                                      {oldSale > 0 && sale !== oldSale ? ` · was ${fmtMoney(oldSale, sym)}` : ""}
+                                      {cost > 0 ? t('products.margin', '{{pct}}% margin', { pct: `${margin >= 0 ? "+" : ""}${margin.toFixed(1)}` }) : ""}
+                                      {oldSale > 0 && sale !== oldSale ? t('purchases.was_suffix', ' · was {{amount}}', { amount: fmtMoney(oldSale, sym) }) : ""}
                                     </div>
                                   );
                                 })()}
@@ -1110,7 +1112,7 @@ function Page() {
                                   placeholder="0"
                                   onChange={(e) => setLine(i, { discount: Number(e.target.value) })}
                                   className="h-8 text-right text-sm"
-                                  title="Discount amount on this line (subtracted before tax)"
+                                  title={t('purchases.discount_line_title', 'Discount amount on this line (subtracted before tax)')}
                                 />
                               </TableCell>
                               <TableCell>
@@ -1130,12 +1132,12 @@ function Page() {
                                       setLine(i, { _total: t });
                                     }
                                   }}
-                                  title="Base total — cost auto-calculates as total ÷ qty. Tax is added below."
+                                  title={t('purchases.total_input_title', 'Base total — cost auto-calculates as total ÷ qty. Tax is added below.')}
                                   className="h-8 text-right text-sm font-medium"
                                 />
                                 {(taxShare > 0 || lineDiscount > 0 || billDiscShare > 0) && (
-                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title="Net line total: gross − line disc − bill disc share + tax share">
-                                    net = <span className="font-medium text-foreground">{fmtMoney(Math.max(0, totalDisplay - lineDiscount - billDiscShare) + taxShare, sym)}</span>
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title={t('purchases.net_title', 'Net line total: gross − line disc − bill disc share + tax share')}>
+                                    {t('purchases.net_label', 'net =')} <span className="font-medium text-foreground">{fmtMoney(Math.max(0, totalDisplay - lineDiscount - billDiscShare) + taxShare, sym)}</span>
                                   </div>
                                 )}
                               </TableCell>
@@ -1156,17 +1158,17 @@ function Page() {
               {/* Side panel — totals & extras (full-width below the items list on mobile) */}
               <aside className="w-full md:w-[260px] shrink-0 border-t md:border-t-0 md:border-l bg-muted/20 flex flex-col md:overflow-y-auto">
                 <div className="px-4 py-3 border-b">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('sales.th_total', 'Total')}</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Subtotal {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · Tax +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · Bill disc −${fmtMoney(billDiscountAmt, sym)}` : ""}{lineDiscountTotal > 0 ? ` · Line disc −${fmtMoney(lineDiscountTotal, sym)}` : ""}{incentive > 0 ? ` · Incentive +${fmtMoney(incentive, sym)} (profit only)` : ""}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">{t('purchase_returns.subtotal', 'Subtotal')} {fmtMoney(subtotal, sym)}{taxAmt > 0 ? ` · ${t('purchase_returns.tax', 'Tax')} +${fmtMoney(taxAmt, sym)}` : ""}{billDiscountAmt > 0 ? ` · ${t('purchases.bill_disc_word', 'Bill disc')} −${fmtMoney(billDiscountAmt, sym)}` : ""}{lineDiscountTotal > 0 ? ` · ${t('purchases.line_disc_word', 'Line disc')} −${fmtMoney(lineDiscountTotal, sym)}` : ""}{incentive > 0 ? ` · ${t('purchases.incentive_word', 'Incentive')} +${fmtMoney(incentive, sym)} ${t('purchases.profit_only_suffix', '(profit only)')}` : ""}</div>
                   {paid > 0 && (
-                    <div className="text-[10px] text-muted-foreground mt-1">Paid {fmtMoney(paid, sym)} · Balance {fmtMoney(Math.max(0, total - paid), sym)}</div>
+                    <div className="text-[10px] text-muted-foreground mt-1">{t('purchases.paid_word', 'Paid')} {fmtMoney(paid, sym)} · {t('purchases.balance_word', 'Balance')} {fmtMoney(Math.max(0, total - paid), sym)}</div>
                   )}
                 </div>
                 <div className="px-4 py-3 space-y-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <Label className="text-xs">Tax</Label>
+                    <Label className="text-xs">{t('purchase_returns.tax', 'Tax')}</Label>
                     <div className="inline-flex rounded-md border overflow-hidden text-[11px]">
                       <button
                         type="button"
@@ -1186,18 +1188,18 @@ function Page() {
                     value={tax || ""}
                     onChange={(e) => setTax(Number(e.target.value))}
                     className="h-9"
-                    placeholder={taxMode === "pct" ? "e.g. 5" : "0.00"}
+                    placeholder={taxMode === "pct" ? t('purchases.eg_5', 'e.g. 5') : "0.00"}
                   />
                   {taxAmt > 0 && (
                     <div className="text-[10px] text-muted-foreground mt-1">
-                      Tax on bill: <span className="font-medium text-foreground">{fmtMoney(taxAmt, sym)}</span>
-                      {taxMode === "pct" ? ` (${Number(tax || 0)}% of subtotal)` : ""} — distributed across all items.
+                      {t('purchases.tax_on_bill', 'Tax on bill:')} <span className="font-medium text-foreground">{fmtMoney(taxAmt, sym)}</span>
+                      {taxMode === "pct" ? ` ${t('purchases.pct_of_subtotal', '({{pct}}% of subtotal)', { pct: Number(tax || 0) })}` : ""} {t('purchases.distributed_note', '— distributed across all items.')}
                     </div>
                   )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <Label className="text-xs">Discount</Label>
+                    <Label className="text-xs">{t('common.discount', 'Discount')}</Label>
                     <div className="inline-flex rounded-md border overflow-hidden text-[11px]">
                       <button
                         type="button"
@@ -1217,22 +1219,22 @@ function Page() {
                     value={billDiscount || ""}
                     onChange={(e) => setBillDiscount(Number(e.target.value))}
                     className="h-9"
-                    placeholder={discountMode === "pct" ? "e.g. 2" : "0.00"}
+                    placeholder={discountMode === "pct" ? t('purchases.eg_2', 'e.g. 2') : "0.00"}
                   />
                   {billDiscountAmt > 0 && (
                     <div className="text-[10px] text-muted-foreground mt-1">
-                      Bill discount: <span className="font-medium text-foreground">−{fmtMoney(billDiscountAmt, sym)}</span>
-                      {discountMode === "pct" ? ` (${Number(billDiscount || 0)}% of subtotal)` : ""} — distributed across all items.
+                      {t('purchases.bill_discount_label', 'Bill discount:')} <span className="font-medium text-foreground">−{fmtMoney(billDiscountAmt, sym)}</span>
+                      {discountMode === "pct" ? ` ${t('purchases.pct_of_subtotal', '({{pct}}% of subtotal)', { pct: Number(billDiscount || 0) })}` : ""} {t('purchases.distributed_note', '— distributed across all items.')}
                     </div>
                   )}
                 </div>
 
 
                 <div>
-                  <Label className="text-xs">Paid</Label>
+                  <Label className="text-xs">{t('purchases.paid_word', 'Paid')}</Label>
                   <Input type="number" step="0.01" value={paid || ""} onChange={(e) => setPaid(Number(e.target.value))} className="h-9" />
                   <div className="text-[10px] text-muted-foreground mt-1">
-                    Due: <span className="font-medium text-foreground">{fmtMoney(Math.max(0, total - Number(paid || 0)), sym)}</span>
+                    {t('purchases.due_label', 'Due:')} <span className="font-medium text-foreground">{fmtMoney(Math.max(0, total - Number(paid || 0)), sym)}</span>
                   </div>
                 </div>
 
@@ -1246,18 +1248,18 @@ function Page() {
                       onClick={() => setShowIncentive(true)}
                     >
                       <Plus className="h-3.5 w-3.5 mr-1.5" />
-                      Add supplier incentive
+                      {t('purchases.add_incentive', 'Add supplier incentive')}
                     </Button>
                   ) : (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <Label className="text-xs">Incentive (target bonus)</Label>
+                        <Label className="text-xs">{t('purchases.incentive_target_label', 'Incentive (target bonus)')}</Label>
                         <button
                           type="button"
                           className="text-[11px] text-muted-foreground hover:text-foreground"
                           onClick={() => { setIncentive(0); setShowIncentive(false); }}
                         >
-                          Remove
+                          {t('common.remove', 'Remove')}
                         </button>
                       </div>
                       <Input
@@ -1269,39 +1271,38 @@ function Page() {
                         placeholder="0.00"
                       />
                       <div className="text-[10px] text-muted-foreground mt-1">
-                        Bonus from the supplier for hitting a target — doesn't change this bill, added
-                        straight to profit in Reports &amp; Dashboard.
+                        {t('purchases.incentive_note', "Bonus from the supplier for hitting a target — doesn't change this bill, added straight to profit in Reports & Dashboard.")}
                       </div>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <Label className="text-xs">Pay from</Label>
+                  <Label className="text-xs">{t('ledger.pay_from', 'Pay from')}</Label>
                   <Select value={effectivePaySource} onValueChange={setPaySource}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Cash / Cheque / Bank…" /></SelectTrigger>
+                    <SelectTrigger className="h-9"><SelectValue placeholder={t('purchases.pay_from_placeholder', 'Cash / Cheque / Bank…')} /></SelectTrigger>
                     <SelectContent>
                       {paySourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <div className="text-[10px] text-muted-foreground mt-1">
-                    Paid amount is deducted from this account in Cash Flow.
+                    {t('purchases.paid_deducted_note', 'Paid amount is deducted from this account in Cash Flow.')}
                   </div>
                 </div>
-                
+
                 <div className="pt-2">
-                  <Label className="text-xs">Notes</Label>
+                  <Label className="text-xs">{t('purchases.notes_label', 'Notes')}</Label>
                   <textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="Add purchase notes..."
+                    placeholder={t('purchases.notes_placeholder', 'Add purchase notes...')}
                     className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-xs">Note</Label>
-                  <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Reference / remarks" />
+                  <Label className="text-xs">{t('common.note', 'Note')}</Label>
+                  <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder={t('purchases.note_ref_placeholder', 'Reference / remarks')} />
                 </div>
               </div>
               </aside>
@@ -1309,14 +1310,14 @@ function Page() {
 
             <DialogFooter className="border-t bg-background px-6 py-2 shrink-0 sm:flex-row sm:justify-between gap-2">
               <div className="text-sm text-muted-foreground">
-                {lines.length} item{lines.length === 1 ? "" : "s"} • Total <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span>
+                {lines.length} {lines.length === 1 ? t('purchases.item_singular', 'item') : t('purchases.item_plural', 'items')} • {t('sales.th_total', 'Total')} <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span>
               </div>
               <div className="flex flex-wrap gap-2 justify-end">
-                <Button variant="ghost" size="sm" onClick={hideKeepDraft}>Hide (keep draft)</Button>
+                <Button variant="ghost" size="sm" onClick={hideKeepDraft}>{t('products.hide_keep_draft', 'Hide (keep draft)')}</Button>
                 <Button variant="outline" size="sm" onClick={() => {
-                  if (confirm("Discard this purchase?")) { clearDraft(); setShowIncentive(false); }
-                }}>Discard</Button>
-                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>{editingId ? "Save changes" : "Record purchase"}</Button>
+                  if (confirm(t('purchases.discard_confirm', 'Discard this purchase?'))) { clearDraft(); setShowIncentive(false); }
+                }}>{t('products.discard', 'Discard')}</Button>
+                <Button onClick={() => setConfirmOpen(true)} disabled={lines.length === 0}>{editingId ? t('purchases.save_changes', 'Save changes') : t('purchases.record_purchase', 'Record purchase')}</Button>
               </div>
             </DialogFooter>
           </DialogContent>
@@ -1328,16 +1329,16 @@ function Page() {
 
         <Dialog open={confirmOpen} onOpenChange={(v) => { if (!saving) setConfirmOpen(v); }}>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>{editingId ? "Confirm changes" : "Confirm purchase"}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? t('purchases.confirm_changes', 'Confirm changes') : t('purchases.confirm_purchase', 'Confirm purchase')}</DialogTitle></DialogHeader>
             <div className="space-y-2 text-sm">
-              <p>Save this purchase with <b>{lines.length}</b> item{lines.length === 1 ? "" : "s"}?</p>
-              <p className="text-muted-foreground">Total: <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span></p>
-              <p className="text-xs text-muted-foreground">Stock and costs will be updated. This cannot be undone.</p>
+              <p>{t('purchases.confirm_save_prefix', 'Save this purchase with')} <b>{lines.length}</b> {t('purchases.confirm_save_suffix', 'items?')}</p>
+              <p className="text-muted-foreground">{t('sales.th_total', 'Total')}: <span className="font-semibold text-foreground">{fmtMoney(total, sym)}</span></p>
+              <p className="text-xs text-muted-foreground">{t('purchases.stock_update_warning', 'Stock and costs will be updated. This cannot be undone.')}</p>
             </div>
             <DialogFooter className="gap-2 sm:justify-between">
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>Keep editing</Button>
-                <Button onClick={() => submit()} disabled={saving}>{saving ? "Saving…" : (editingId ? "Update purchase" : "Yes, save purchase")}</Button>
+                <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>{t('purchases.keep_editing', 'Keep editing')}</Button>
+                <Button onClick={() => submit()} disabled={saving}>{saving ? t('common.saving', 'Saving…') : (editingId ? t('purchases.update_purchase', 'Update purchase') : t('purchases.yes_save_purchase', 'Yes, save purchase'))}</Button>
               </div>
               <Button
                 variant="secondary"
@@ -1374,13 +1375,13 @@ function Page() {
                         }))
                       }, settings, "purchase" as any);
                     } else {
-                      toast.error("Could not find the purchase record for printing. Please try reprinting from the history.");
+                      toast.error(t('purchases.print_not_found', 'Could not find the purchase record for printing. Please try reprinting from the history.'));
                     }
                   }, 500);
                 }}
                 disabled={saving}
               >
-                {editingId ? "Update & Print" : "Save & Print"}
+                {editingId ? t('purchases.update_print', 'Update & Print') : t('purchases.save_print', 'Save & Print')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1388,86 +1389,86 @@ function Page() {
 
         <Dialog open={!!deleteTarget} onOpenChange={(v) => { if (!deleting && !v) setDeleteTarget(null); }}>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Delete purchase</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('purchases.delete_purchase_title', 'Delete purchase')}</DialogTitle></DialogHeader>
             <div className="space-y-2 text-sm">
-              <p>Delete purchase <b>{deleteTarget?.invoice_no ?? ""}</b>?</p>
-              <p className="text-muted-foreground">This will delete the purchase and its related items permanently.</p>
+              <p>{t('purchases.delete_purchase_title', 'Delete purchase')} <b>{deleteTarget?.invoice_no ?? ""}</b>{t('purchases.delete_purchase_suffix', '?')}</p>
+              <p className="text-muted-foreground">{t('purchases.delete_purchase_warning', 'This will delete the purchase and its related items permanently.')}</p>
             </div>
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDeletePurchase} disabled={deleting}>{deleting ? "Deleting…" : "Delete purchase"}</Button>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>{t('common.cancel', 'Cancel')}</Button>
+              <Button variant="destructive" onClick={handleDeletePurchase} disabled={deleting}>{deleting ? t('purchases.deleting', 'Deleting…') : t('purchases.delete_purchase_title', 'Delete purchase')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         <Dialog open={newProdOpen} onOpenChange={(v) => { if (!newProdSaving) setNewProdOpen(v); }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Add new product</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('purchases.add_new_product_title', 'Add new product')}</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div>
-                <Label>Supplier</Label>
+                <Label>{t('pos.qa_supplier', 'Supplier')}</Label>
                 <select
                   value={newProd.supplier_id || "none"}
                   onChange={(e) => setNewProd((prev) => ({ ...prev, supplier_id: e.target.value === "none" ? "" : e.target.value }))}
                   className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="none">— None —</option>
+                  <option value="none">{t('products.none_option', '— None —')}</option>
                   {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div>
-                <Label>Name</Label>
+                <Label>{t('common.name', 'Name')}</Label>
                 <Input autoFocus value={newProd.name} onChange={(e) => setNewProd({ ...newProd, name: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Item code (SKU)</Label>
+                  <Label>{t('purchases.item_code_sku_label', 'Item code (SKU)')}</Label>
                   <Input value={newProd.sku} onChange={(e) => setNewProd({ ...newProd, sku: e.target.value })} />
                 </div>
                 <div>
-                  <Label>Barcode</Label>
+                  <Label>{t('purchases.barcode_label', 'Barcode')}</Label>
                   <Input value={newProd.barcode} onChange={(e) => setNewProd({ ...newProd, barcode: e.target.value })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Category</Label>
+                  <Label>{t('pos.qa_category', 'Category')}</Label>
                   <Input value={newProd.category} onChange={(e) => setNewProd({ ...newProd, category: e.target.value })} />
                 </div>
                 <div>
-                  <Label>Unit</Label>
+                  <Label>{t('pos.qa_unit', 'Unit')}</Label>
                   <Input value={newProd.unit} onChange={(e) => setNewProd({ ...newProd, unit: e.target.value })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <Label>Purchase rate (Cost)</Label>
+                  <Label>{t('products.cost_label', 'Purchase rate (Cost)')}</Label>
                   <Input type="number" step="0.01" value={newProd.cost_price || ""} onChange={(e) => setNewProd({ ...newProd, cost_price: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <Label>Sell price</Label>
+                  <Label>{t('pos.qa_sell_price', 'Sell price')}</Label>
                   <Input type="number" step="0.01" value={newProd.sell_price || ""} onChange={(e) => setNewProd({ ...newProd, sell_price: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <Label>Tax %</Label>
+                  <Label>{t('pos.qa_tax_pct', 'Tax %')}</Label>
                   <Input type="number" step="0.01" value={newProd.tax_rate || ""} onChange={(e) => setNewProd({ ...newProd, tax_rate: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <Label>Low stock alert</Label>
+                  <Label>{t('purchases.low_stock_alert_label', 'Low stock alert')}</Label>
                   <Input type="number" step="1" value={newProd.low_stock_threshold || ""} onChange={(e) => setNewProd({ ...newProd, low_stock_threshold: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <Label>Batch no</Label>
+                  <Label>{t('purchases.batch_no_label', 'Batch no')}</Label>
                   <Input value={newProd.batch_no} onChange={(e) => setNewProd({ ...newProd, batch_no: e.target.value })} />
                 </div>
                 <div>
-                  <Label>Expiry date</Label>
+                  <Label>{t('pos.qa_expiry_date', 'Expiry date')}</Label>
                   <Input type="date" value={newProd.expiry_date} onChange={(e) => setNewProd({ ...newProd, expiry_date: e.target.value })} />
                 </div>
                 <div>
-                  <Label>Rack / location</Label>
+                  <Label>{t('purchases.rack_location_label', 'Rack / location')}</Label>
                   <Input value={newProd.rack_location} onChange={(e) => setNewProd({ ...newProd, rack_location: e.target.value })} />
                 </div>
               </div>
@@ -1478,13 +1479,13 @@ function Page() {
                   checked={newProd.allow_negative_stock}
                   onChange={(e) => setNewProd({ ...newProd, allow_negative_stock: e.target.checked })}
                 />
-                Allow selling below zero stock
+                {t('purchases.allow_negative_checkbox', 'Allow selling below zero stock')}
               </label>
-              <p className="text-xs text-muted-foreground">Opening stock stays 0 — this purchase will add the actual quantity.</p>
+              <p className="text-xs text-muted-foreground">{t('purchases.opening_stock_note', 'Opening stock stays 0 — this purchase will add the actual quantity.')}</p>
             </div>
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setNewProdOpen(false)} disabled={newProdSaving}>Cancel</Button>
-              <Button onClick={saveNewProduct} disabled={newProdSaving}>{newProdSaving ? "Saving…" : "Save & add to purchase"}</Button>
+              <Button variant="outline" onClick={() => setNewProdOpen(false)} disabled={newProdSaving}>{t('common.cancel', 'Cancel')}</Button>
+              <Button onClick={saveNewProduct} disabled={newProdSaving}>{newProdSaving ? t('common.saving', 'Saving…') : t('purchases.save_add_to_purchase', 'Save & add to purchase')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1499,22 +1500,22 @@ function Page() {
       <div className="grid gap-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Card className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Total purchases</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('purchases.stat_total_purchases', 'Total purchases')}</div>
             <div className="mt-2 text-2xl font-semibold">{filteredPurchases.length}</div>
           </Card>
           <Card className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Filtered amount</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('purchases.stat_filtered_amount', 'Filtered amount')}</div>
             <div className="mt-2 text-2xl font-semibold">{fmtMoney(filteredTotals.totalAmount, sym)}</div>
           </Card>
           <Card className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Today's purchase amount</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('purchases.stat_today_amount', "Today's purchase amount")}</div>
             <div className="mt-2 text-2xl font-semibold">{fmtMoney(filteredTotals.todayAmount, sym)}</div>
           </Card>
         </div>
         <Card className="p-4">
           <div className="grid gap-3 md:grid-cols-[220px_1fr_1fr] items-end">
             <div>
-              <Label className="text-xs">Date filter</Label>
+              <Label className="text-xs">{t('purchases.date_filter_label', 'Date filter')}</Label>
               <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as typeof dateFilter)}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1527,11 +1528,11 @@ function Page() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs">From</Label>
+              <Label className="text-xs">{t('customers.from_label', 'From')}</Label>
               <Input type="date" value={filterFrom} onChange={(e) => { setDateFilter("custom"); setFilterFrom(e.target.value); }} className="h-9" />
             </div>
             <div>
-              <Label className="text-xs">To</Label>
+              <Label className="text-xs">{t('customers.to_label', 'To')}</Label>
               <Input type="date" value={filterTo} onChange={(e) => { setDateFilter("custom"); setFilterTo(e.target.value); }} className="h-9" />
             </div>
           </div>
@@ -1542,7 +1543,7 @@ function Page() {
         <div className="relative max-w-sm">
           <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="Search invoice, supplier, or note…"
+            placeholder={t('purchases.search_purchases_placeholder', 'Search invoice, supplier, or note…')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 h-9"
@@ -1550,16 +1551,16 @@ function Page() {
         </div>
         {(purchases as any[]).length >= PURCHASE_LIST_LIMIT && (
           <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Showing the latest {PURCHASE_LIST_LIMIT.toLocaleString()} purchases for this period. Narrow the date range to see older invoices.
+            {t('purchases.limit_warning', 'Showing the latest {{limit}} purchases for this period. Narrow the date range to see older invoices.', { limit: PURCHASE_LIST_LIMIT.toLocaleString() })}
           </div>
         )}
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
-            <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead><TableHead className="w-24 text-right">Actions</TableHead>
+            <TableHead>{t('sales.th_invoice', 'Invoice')}</TableHead><TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead>{t('purchase_returns.th_supplier', 'Supplier')}</TableHead>
+            <TableHead className="text-right">{t('sales.th_total', 'Total')}</TableHead><TableHead className="text-right">{t('sales.th_paid', 'Paid')}</TableHead><TableHead>{t('sales.th_status', 'Status')}</TableHead><TableHead className="w-24 text-right">{t('customers.th_actions', 'Actions')}</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filteredPurchases.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{search.trim() ? "No matching purchases" : "No purchases yet"}</TableCell></TableRow>}
+            {filteredPurchases.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{search.trim() ? t('purchases.no_matching', 'No matching purchases') : t('purchases.no_purchases_yet', 'No purchases yet')}</TableCell></TableRow>}
             {filteredPurchases.map((p: any) => (
               <TableRow key={p.id} data-print-row-id={p.id}>
                 <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
@@ -1567,9 +1568,9 @@ function Page() {
                 <TableCell>{p.suppliers?.name ?? "—"}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(p.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
-                <TableCell><span className="text-xs">{p.status}</span></TableCell>
+                <TableCell><span className="text-xs">{t(`sales.status_${p.status}`, p.status)}</span></TableCell>
                 <TableCell className="text-right space-x-1">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title="Edit purchase">
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title={t('purchases.edit_purchase_tooltip', 'Edit purchase')}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button 
@@ -1603,11 +1604,11 @@ function Page() {
                         direct_print_enabled: localPrinter.direct_print_enabled
                       }, "purchase" as any);
                     }} 
-                    title="Print receipt"
+                    title={t('purchases.print_receipt_tooltip', 'Print receipt')}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-printer"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(p)} title="Delete purchase">
+                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(p)} title={t('purchases.delete_purchase_title', 'Delete purchase')}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </TableCell>
@@ -1620,13 +1621,13 @@ function Page() {
               return (
                 <>
                   <TableRow className="bg-muted/40 font-semibold border-t-2">
-                    <TableCell colSpan={3} className="text-right">Column totals</TableCell>
+                    <TableCell colSpan={3} className="text-right">{t('purchases.column_totals', 'Column totals')}</TableCell>
                     <TableCell className="text-right text-primary">{fmtMoney(allTotal, sym)}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(allPaid, sym)}</TableCell>
                     <TableCell colSpan={2}></TableCell>
                   </TableRow>
                   <TableRow className="bg-primary/5 font-bold">
-                    <TableCell colSpan={5} className="text-right text-base">Grand Total (Outstanding due)</TableCell>
+                    <TableCell colSpan={5} className="text-right text-base">{t('purchases.grand_total_due', 'Grand Total (Outstanding due)')}</TableCell>
                     <TableCell className={`text-right text-base ${due > 0 ? "text-destructive" : "text-success"}`}>{fmtMoney(due, sym)}</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
@@ -1636,8 +1637,8 @@ function Page() {
           </TableBody>
         </Table>
         <div className="flex flex-wrap gap-6 justify-end border-t mt-2 pt-3 px-2 text-sm">
-          <div><span className="text-muted-foreground">Filtered total: </span><span className="font-semibold text-primary">{fmtMoney(filteredTotals.totalAmount, sym)}</span></div>
-          <div><span className="text-muted-foreground">Today's filtered total: </span><span className="font-semibold">{fmtMoney(filteredTotals.todayAmount, sym)}</span></div>
+          <div><span className="text-muted-foreground">{t('purchases.filtered_total_label', 'Filtered total:')} </span><span className="font-semibold text-primary">{fmtMoney(filteredTotals.totalAmount, sym)}</span></div>
+          <div><span className="text-muted-foreground">{t('purchases.today_filtered_total_label', "Today's filtered total:")} </span><span className="font-semibold">{fmtMoney(filteredTotals.todayAmount, sym)}</span></div>
         </div>
       </Card>
     </div>
