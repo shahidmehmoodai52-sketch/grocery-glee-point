@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, HandCoins, BookOpen, Search, Truck, TrendingUp, TrendingDown, Wallet, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ function Stat({ icon: Icon, label, value, tone = "primary" }: { icon: any; label
 }
 
 function Page() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -66,10 +68,10 @@ function Page() {
 
   const saveEdit = async () => {
     if (!editRow) return;
-    if (!editForm.name.trim()) return toast.error("Name required");
+    if (!editForm.name.trim()) return toast.error(t('common.name_required', 'Name required'));
     const { error } = await supabase.from("suppliers").update(editForm).eq("id", editRow.id);
     if (error) return toast.error(error.message);
-    toast.success("Supplier updated");
+    toast.success(t('suppliers.supplier_updated', 'Supplier updated'));
     setEditRow(null);
     qc.invalidateQueries();
   };
@@ -110,19 +112,19 @@ function Page() {
   }, [rows]);
 
   const save = async () => {
-    if (!form.name) return toast.error("Name required");
+    if (!form.name) return toast.error(t('common.name_required', 'Name required'));
     try {
       const row = await insertOfflineAware("suppliers", { ...form, opening_balance: form.balance });
-      toast.success(row._offline_pending ? "Supplier saved offline — will sync" : "Supplier added");
-    } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
+      toast.success(row._offline_pending ? t('suppliers.supplier_saved_offline', 'Supplier saved offline — will sync') : t('suppliers.supplier_added', 'Supplier added'));
+    } catch (e: any) { return toast.error(e?.message ?? t('common.failed', 'Failed')); }
     setOpen(false);
     setForm({ name: "", phone: "", email: "", address: "", balance: 0 });
     qc.invalidateQueries({ queryKey: ["suppliers-with-balances"] });
   };
 
   const recordPayment = async () => {
-    if (!payOpen || pay.amount <= 0) return toast.error("Enter amount");
-    if (!pay.method) return toast.error("Pick a payment source");
+    if (!payOpen || pay.amount <= 0) return toast.error(t('customers.enter_amount', 'Enter amount'));
+    if (!pay.method) return toast.error(t('customers.pick_payment_source', 'Pick a payment source'));
     // Ensure a cash_accounts row exists for this method so it flows into Cash Flow
     let account = (cashAccounts as any[]).find((a) => a.name.toLowerCase() === pay.method.toLowerCase());
     if (!account) {
@@ -136,7 +138,7 @@ function Page() {
       p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: account.name, p_note: pay.note, p_account_id: account.id,
     });
     if (error) return toast.error(error.message);
-    toast.success("Payment sent");
+    toast.success(t('suppliers.payment_sent', 'Payment sent'));
 
     setPayOpen(null);
     setPay({ amount: 0, method: "Cash in hand", note: "", account_id: "" });
@@ -147,32 +149,32 @@ function Page() {
     <div className="p-6 space-y-5">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Suppliers</h1>
-          <p className="text-sm text-muted-foreground">Track supplier accounts and amounts you need to pay.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('suppliers.title', 'Suppliers')}</h1>
+          <p className="text-sm text-muted-foreground">{t('suppliers.subtitle', 'Track supplier accounts and amounts you need to pay.')}</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New supplier</Button></DialogTrigger>
+          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />{t('suppliers.new_supplier', 'New supplier')}</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>New supplier</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('suppliers.new_supplier', 'New supplier')}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div><Label>{t('common.name', 'Name')}</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-                <div><Label>Email</Label><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+                <div><Label>{t('common.phone', 'Phone')}</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+                <div><Label>{t('common.email', 'Email')}</Label><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               </div>
-              <div><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
-              <div><Label>Opening balance (we owe)</Label><Input type="number" step="0.01" value={form.balance || ""} onChange={(e) => setForm({ ...form, balance: Number(e.target.value) })} /></div>
+              <div><Label>{t('common.address', 'Address')}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+              <div><Label>{t('suppliers.opening_balance_label', 'Opening balance (we owe)')}</Label><Input type="number" step="0.01" value={form.balance || ""} onChange={(e) => setForm({ ...form, balance: Number(e.target.value) })} /></div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save}>Save</Button></DialogFooter>
+            <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>{t('common.cancel', 'Cancel')}</Button><Button onClick={save}>{t('common.save', 'Save')}</Button></DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat icon={Truck} label="Total suppliers" value={String(rows.length)} tone="primary" />
-        <Stat icon={TrendingUp} label="Payable (we owe)" value={fmtMoney(totals.payable, sym)} tone="destructive" />
-        <Stat icon={TrendingDown} label="Advances paid" value={fmtMoney(totals.advance, sym)} tone="success" />
-        <Stat icon={Wallet} label="Net payable" value={fmtMoney(totals.net, sym)} tone={totals.net > 0 ? "destructive" : totals.net < 0 ? "success" : "muted"} />
+        <Stat icon={Truck} label={t('suppliers.stat_total_suppliers', 'Total suppliers')} value={String(rows.length)} tone="primary" />
+        <Stat icon={TrendingUp} label={t('suppliers.stat_payable', 'Payable (we owe)')} value={fmtMoney(totals.payable, sym)} tone="destructive" />
+        <Stat icon={TrendingDown} label={t('suppliers.stat_advance', 'Advances paid')} value={fmtMoney(totals.advance, sym)} tone="success" />
+        <Stat icon={Wallet} label={t('suppliers.stat_net_payable', 'Net payable')} value={fmtMoney(totals.net, sym)} tone={totals.net > 0 ? "destructive" : totals.net < 0 ? "success" : "muted"} />
       </div>
 
       <Card className="p-4 space-y-3">
@@ -182,12 +184,12 @@ function Page() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, phone, email, address…"
+              placeholder={t('customers.search_placeholder', 'Search by name, phone, email, address…')}
               className="pl-9"
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {filtered.length} of {rows.length} shown
+            {t('customers.shown_count', '{{filtered}} of {{total}} shown', { filtered: filtered.length, total: rows.length })}
           </div>
         </div>
 
@@ -195,19 +197,19 @@ function Page() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead className="text-right">Incentive received</TableHead>
-                <TableHead className="text-right w-[260px]">Actions</TableHead>
+                <TableHead>{t('common.name', 'Name')}</TableHead>
+                <TableHead>{t('common.phone', 'Phone')}</TableHead>
+                <TableHead>{t('common.email', 'Email')}</TableHead>
+                <TableHead className="text-right">{t('customers.th_balance', 'Balance')}</TableHead>
+                <TableHead className="text-right">{t('suppliers.th_incentive', 'Incentive received')}</TableHead>
+                <TableHead className="text-right w-[260px]">{t('customers.th_actions', 'Actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
-                    {rows.length === 0 ? "No suppliers yet — add your first supplier." : "No suppliers match your search."}
+                    {rows.length === 0 ? t('suppliers.no_suppliers_yet', 'No suppliers yet — add your first supplier.') : t('suppliers.no_suppliers_match', 'No suppliers match your search.')}
                   </TableCell>
                 </TableRow>
               )}
@@ -234,11 +236,11 @@ function Page() {
                     <TableCell className="text-muted-foreground">{c.email ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       {bal > 0 ? (
-                        <Badge variant="destructive" className="font-medium">To pay {fmtMoney(bal, sym)}</Badge>
+                        <Badge variant="destructive" className="font-medium">{t('suppliers.to_pay', 'To pay {{amount}}', { amount: fmtMoney(bal, sym) })}</Badge>
                       ) : bal < 0 ? (
-                        <Badge className="bg-success/15 text-success hover:bg-success/20 font-medium">Advance {fmtMoney(-bal, sym)}</Badge>
+                        <Badge className="bg-success/15 text-success hover:bg-success/20 font-medium">{t('customers.advance', 'Advance {{amount}}', { amount: fmtMoney(-bal, sym) })}</Badge>
                       ) : (
-                        <span className="text-muted-foreground text-sm">Settled</span>
+                        <span className="text-muted-foreground text-sm">{t('customers.settled', 'Settled')}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
@@ -246,12 +248,12 @@ function Page() {
                     </TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button size="sm" variant="ghost" asChild>
-                        <Link to="/suppliers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
+                        <Link to="/suppliers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />{t('customers.ledger', 'Ledger')}</Link>
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "Cash in hand", note: "", account_id: "" }); }}>
-                        <HandCoins className="h-3.5 w-3.5 mr-1" />Pay
+                        <HandCoins className="h-3.5 w-3.5 mr-1" />{t('suppliers.pay', 'Pay')}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title="Edit supplier">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title={t('suppliers.edit_supplier', 'Edit supplier')}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
@@ -265,11 +267,11 @@ function Page() {
 
       <Dialog open={!!payOpen} onOpenChange={(o) => !o && setPayOpen(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Pay supplier — {payOpen?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('suppliers.pay_supplier_title', 'Pay supplier — {{name}}', { name: payOpen?.name })}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Amount</Label><Input type="number" step="0.01" value={pay.amount || ""} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></div>
+            <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={pay.amount || ""} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></div>
             <div>
-              <Label>Payment source</Label>
+              <Label>{t('ledger.payment_source', 'Payment source')}</Label>
               <div className="flex flex-wrap gap-2 mt-1">
                 {(() => {
                   const presets = ["Cash in hand", "Bank", "EasyPaisa", "JazzCash", "Card"];
@@ -294,32 +296,32 @@ function Page() {
                   });
                 })()}
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2">Deducts from this account in Cash Flow. New sources are created automatically.</p>
+              <p className="text-[11px] text-muted-foreground mt-2">{t('suppliers.deducts_note', 'Deducts from this account in Cash Flow. New sources are created automatically.')}</p>
             </div>
-            <div><Label>Note</Label><Input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
+            <div><Label>{t('common.note', 'Note')}</Label><Input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPayOpen(null)}>Cancel</Button>
-            <Button onClick={recordPayment}>Record</Button>
+            <Button variant="outline" onClick={() => setPayOpen(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={recordPayment}>{t('customers.record', 'Record')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit supplier</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('suppliers.edit_supplier', 'Edit supplier')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
+            <div><Label>{t('common.name', 'Name')}</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Phone</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
-              <div><Label>Email</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
+              <div><Label>{t('common.phone', 'Phone')}</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+              <div><Label>{t('common.email', 'Email')}</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
             </div>
-            <div><Label>Address</Label><Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></div>
-            <div><Label>Opening balance (we owe)</Label><Input type="number" step="0.01" value={editForm.opening_balance || ""} onChange={(e) => setEditForm({ ...editForm, opening_balance: Number(e.target.value) })} /></div>
+            <div><Label>{t('common.address', 'Address')}</Label><Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></div>
+            <div><Label>{t('suppliers.opening_balance_label', 'Opening balance (we owe)')}</Label><Input type="number" step="0.01" value={editForm.opening_balance || ""} onChange={(e) => setEditForm({ ...editForm, opening_balance: Number(e.target.value) })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditRow(null)}>Cancel</Button>
-            <Button onClick={saveEdit}>Save</Button>
+            <Button variant="outline" onClick={() => setEditRow(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveEdit}>{t('common.save', 'Save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

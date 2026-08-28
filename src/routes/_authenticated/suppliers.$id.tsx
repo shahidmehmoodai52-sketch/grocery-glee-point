@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt, FileDown, ChevronDown, ChevronRight, Pencil, DollarSign, Plus, Save, Gift } from "lucide-react";
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/suppliers/$id")({ componen
 
 
 function Page() {
+  const { t } = useTranslation();
   const { id } = Route.useParams();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -97,12 +99,12 @@ function Page() {
 
   const saveOpeningBalance = async () => {
     const v = Number(obValue);
-    if (!Number.isFinite(v)) return toast.error("Enter a valid number");
+    if (!Number.isFinite(v)) return toast.error(t('customers.enter_valid_number', 'Enter a valid number'));
     setObSaving(true);
     const { error } = await supabase.from("suppliers").update({ opening_balance: v }).eq("id", id);
     setObSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Opening balance saved");
+    toast.success(t('customers.opening_balance_saved', 'Opening balance saved'));
     qc.invalidateQueries({ queryKey: ["supplier", id] });
   };
 
@@ -130,19 +132,19 @@ function Page() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm" className="no-print">
-            <Link to="/suppliers"><ArrowLeft className="h-4 w-4 mr-1" />Suppliers</Link>
+            <Link to="/suppliers"><ArrowLeft className="h-4 w-4 mr-1" />{t('common.suppliers', 'Suppliers')}</Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold">{supplier?.name ?? "Supplier"}</h1>
+            <h1 className="text-2xl font-semibold">{supplier?.name ?? t('suppliers.supplier_fallback', 'Supplier')}</h1>
             <p className="text-sm text-muted-foreground">
               {supplier?.phone ?? "—"} · {supplier?.email ?? "—"}
             </p>
           </div>
         </div>
         <div className="flex items-end gap-2 no-print flex-wrap">
-          <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+          <div><Label className="text-xs">{t('customers.from_label', 'From')}</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
+          <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
+          <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
           <Button variant="outline" onClick={() => {
             const blob = buildLedgerPdf({
               storeName: settings?.store_name ?? "Store", storeAddress: settings?.address ?? "", storePhone: settings?.phone ?? "",
@@ -154,9 +156,9 @@ function Page() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a"); a.href = url; a.download = `Ledger-${supplier?.name?.replace(/\s+/g,"_")}.pdf`; a.click();
             setTimeout(() => URL.revokeObjectURL(url), 5000);
-          }}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
+          }}><FileDown className="h-4 w-4 mr-2" />{t('customers.pdf', 'PDF')}</Button>
           <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
-            <Plus className="h-4 w-4 mr-1" />Add payment
+            <Plus className="h-4 w-4 mr-1" />{t('ledger.add_payment', 'Add payment')}
           </Button>
         </div>
       </div>
@@ -174,7 +176,7 @@ function Page() {
             setFrom(r.from); setTo(r.to);
           }}
         >
-          <option value="">Quick range…</option>
+          <option value="">{t('customers.quick_range_placeholder', 'Quick range…')}</option>
           {PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
       </div>
@@ -182,7 +184,7 @@ function Page() {
       <Card className="p-3 no-print">
         <div className="flex items-end gap-2 flex-wrap">
           <div className="flex-1 min-w-[200px]">
-            <Label className="text-xs">Opening balance <span className="text-muted-foreground">(+ they owe us / − advance paid)</span></Label>
+            <Label className="text-xs">{t('customers.stat_opening_balance', 'Opening balance')} <span className="text-muted-foreground">{t('suppliers.opening_balance_hint', '(+ they owe us / − advance paid)')}</span></Label>
             <Input
               type="number"
               step="0.01"
@@ -192,21 +194,21 @@ function Page() {
             />
           </div>
           <Button onClick={saveOpeningBalance} disabled={obSaving}>
-            <Save className="h-4 w-4 mr-1" />{obSaving ? "Saving…" : "Save opening"}
+            <Save className="h-4 w-4 mr-1" />{obSaving ? t('common.saving', 'Saving…') : t('customers.save_opening', 'Save opening')}
           </Button>
           <div className="text-xs text-muted-foreground">
-            Current: <span className="font-medium text-foreground">{fmtMoney(initialOB, sym)}</span>
+            {t('customers.current_label', 'Current:')} <span className="font-medium text-foreground">{fmtMoney(initialOB, sym)}</span>
           </div>
         </div>
       </Card>
 
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
-        <Stat icon={Receipt} label="Total In (+)" value={fmtMoney(totalIn, sym)} tone="primary" />
-        <Stat icon={TrendingDown} label="Total Out (−)" value={fmtMoney(totalOut, sym)} tone="success" />
-        <Stat icon={Wallet} label={closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
-        <Stat icon={Gift} label="Incentive received (all time)" value={fmtMoney(incentiveAllTime, sym)} tone="success" />
+        <Stat icon={TrendingUp} label={from ? t('customers.stat_opening_before', 'Opening (before {{date}})', { date: from }) : t('customers.stat_opening_balance', 'Opening balance')} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
+        <Stat icon={Receipt} label={t('customers.stat_total_in', 'Total In (+)')} value={fmtMoney(totalIn, sym)} tone="primary" />
+        <Stat icon={TrendingDown} label={t('customers.stat_total_out', 'Total Out (−)')} value={fmtMoney(totalOut, sym)} tone="success" />
+        <Stat icon={Wallet} label={closingLabel === "Settled" ? t('customers.closing_settled', 'Settled') : closingLabel === "Outstanding (they owe)" ? t('customers.closing_outstanding', 'Outstanding (they owe)') : closingLabel === "Advance (credit)" ? t('customers.closing_advance', 'Advance (credit)') : closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
+        <Stat icon={Gift} label={t('suppliers.incentive_all_time', 'Incentive received (all time)')} value={fmtMoney(incentiveAllTime, sym)} tone="success" />
       </div>
 
       <Card className="p-3 print-area">
@@ -217,32 +219,32 @@ function Page() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Ref</TableHead>
-              <TableHead>Note</TableHead>
-              <TableHead className="text-right">In (+)</TableHead>
-              <TableHead className="text-right">Out (−)</TableHead>
-              <TableHead className="text-right">Balance</TableHead>
-              <TableHead className="text-right no-print w-32">Actions</TableHead>
+              <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+              <TableHead>{t('customers.th_type', 'Type')}</TableHead>
+              <TableHead>{t('customers.th_ref', 'Ref')}</TableHead>
+              <TableHead>{t('common.note', 'Note')}</TableHead>
+              <TableHead className="text-right">{t('customers.th_in', 'In (+)')}</TableHead>
+              <TableHead className="text-right">{t('customers.th_out', 'Out (−)')}</TableHead>
+              <TableHead className="text-right">{t('customers.th_balance', 'Balance')}</TableHead>
+              <TableHead className="text-right no-print w-32">{t('customers.th_actions', 'Actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow className="bg-muted/40 font-medium">
-              <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
+              <TableCell colSpan={4} className="text-muted-foreground">{t('customers.opening_balance_row', 'Opening balance')} {from ? t('customers.before_date', '(before {{date}})', { date: from }) : ""}</TableCell>
               <TableCell className="text-right">{opening > 0 ? fmtMoney(opening, sym) : "—"}</TableCell>
               <TableCell className="text-right text-success">{opening < 0 ? fmtMoney(-opening, sym) : "—"}</TableCell>
               <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
               <TableCell className="no-print"></TableCell>
             </TableRow>
             {ledgerError && (
-              <TableRow><TableCell colSpan={8} className="text-center text-destructive py-6">Could not load ledger. Please refresh and try again.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-destructive py-6">{t('suppliers.ledger_load_error', 'Could not load ledger. Please refresh and try again.')}</TableCell></TableRow>
             )}
             {!ledgerError && ledgerLoading && (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Loading ledger…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">{t('suppliers.loading_ledger', 'Loading ledger…')}</TableCell></TableRow>
             )}
             {!ledgerError && !ledgerLoading && rows.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">{t('customers.no_transactions_yet', 'No transactions yet')}</TableCell></TableRow>
             )}
             {rows.map((x, i) => {
               const isPurchase = x.entity === "purchase" && x.id;
@@ -264,7 +266,10 @@ function Page() {
                     <TableCell>
                       {x.type !== "purchase" && (
                         <Badge variant={x.type === "return" ? "secondary" : "outline"} className="capitalize">
-                          {x.type}
+                          {x.type === "return" ? t('suppliers.entry_type_return', 'return')
+                            : x.type === "incentive" ? t('suppliers.entry_type_incentive', 'incentive')
+                            : x.type === "payment" ? t('suppliers.entry_type_payment', 'payment')
+                            : x.type}
                         </Badge>
                       )}
                     </TableCell>
@@ -278,7 +283,7 @@ function Page() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {x.note || "—"}
-                      {isPurchase && due <= 0 && Number(x.data?.paid || 0) > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">Paid</Badge>}
+                      {isPurchase && due <= 0 && Number(x.data?.paid || 0) > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">{t('suppliers.paid_badge', 'Paid')}</Badge>}
 
                     </TableCell>
                     <TableCell className="text-right">{x.debit > 0 ? fmtMoney(x.debit, sym) : "—"}</TableCell>
@@ -290,7 +295,7 @@ function Page() {
                       <div className="flex justify-end gap-1">
                         {isPurchase && due > 0 && (
                           <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>
-                            <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
+                            <DollarSign className="h-3.5 w-3.5 mr-1" />{t('suppliers.pay', 'Pay')}
                           </Button>
                         )}
                         {x.entity === "payment" && x.id && (
@@ -310,16 +315,16 @@ function Page() {
                     <TableRow key={`${i}-d`} className="bg-muted/30">
                       <TableCell colSpan={8} className="p-0">
                         <div className="p-3">
-                          <div className="text-xs font-medium mb-2 text-muted-foreground">Items in {x.ref} · Total {fmtMoney(Number(x.data?.total||0), sym)} · Paid {fmtMoney(Number(x.data?.paid||0), sym)} · Due {fmtMoney(due, sym)}</div>
+                          <div className="text-xs font-medium mb-2 text-muted-foreground">{t('suppliers.items_summary', 'Items in {{ref}} · Total {{total}} · Paid {{paid}} · Due {{due}}', { ref: x.ref, total: fmtMoney(Number(x.data?.total||0), sym), paid: fmtMoney(Number(x.data?.paid||0), sym), due: fmtMoney(due, sym) })}</div>
                           {items.length === 0 ? (
-                            <div className="text-xs text-muted-foreground">No item details</div>
+                            <div className="text-xs text-muted-foreground">{t('suppliers.no_item_details', 'No item details')}</div>
                           ) : (
                             <Table>
                               <TableHeader><TableRow>
-                                <TableHead>Item</TableHead>
-                                <TableHead className="text-right w-20">Qty</TableHead>
-                                <TableHead className="text-right w-28">Cost</TableHead>
-                                <TableHead className="text-right w-28">Amount</TableHead>
+                                <TableHead>{t('customers.th_item', 'Item')}</TableHead>
+                                <TableHead className="text-right w-20">{t('customers.th_qty', 'Qty')}</TableHead>
+                                <TableHead className="text-right w-28">{t('suppliers.th_cost', 'Cost')}</TableHead>
+                                <TableHead className="text-right w-28">{t('customers.th_amount', 'Amount')}</TableHead>
                               </TableRow></TableHeader>
                               <TableBody>
                                 {items.map((it, j) => (
@@ -343,7 +348,7 @@ function Page() {
             {rows.length > 0 && (
               <>
                 <TableRow className="bg-muted/40 font-semibold">
-                  <TableCell colSpan={4}>Grand totals (incl. opening)</TableCell>
+                  <TableCell colSpan={4}>{t('customers.grand_totals_row', 'Grand totals (incl. opening)')}</TableCell>
                   <TableCell className="text-right">{fmtMoney(totalIn + Math.max(opening, 0), sym)}</TableCell>
                   <TableCell className="text-right text-success">{fmtMoney(totalOut + Math.max(-opening, 0), sym)}</TableCell>
                   <TableCell className={`text-right ${closing > 0 ? "text-destructive" : closing < 0 ? "text-success" : ""}`}>{fmtMoney(closing, sym)}</TableCell>
@@ -351,11 +356,11 @@ function Page() {
                 </TableRow>
                 <TableRow className="bg-primary/5 text-xs">
                   <TableCell colSpan={8} className="text-muted-foreground text-right">
-                    {fmtMoney(opening, sym)} (Opening) + {fmtMoney(totalIn, sym)} (In) − {fmtMoney(totalOut, sym)} (Out) = <span className="font-semibold text-foreground">{fmtMoney(closing, sym)}</span>
+                    {fmtMoney(opening, sym)} ({t('customers.formula_opening', 'Opening')}) + {fmtMoney(totalIn, sym)} ({t('customers.formula_in', 'In')}) − {fmtMoney(totalOut, sym)} ({t('customers.formula_out', 'Out')}) = <span className="font-semibold text-foreground">{fmtMoney(closing, sym)}</span>
                   </TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/10 font-bold">
-                  <TableCell colSpan={6}>Closing balance · {closingLabel}</TableCell>
+                  <TableCell colSpan={6}>{t('customers.closing_balance_row', 'Closing balance · {{label}}', { label: closingLabel === "Settled" ? t('customers.closing_settled', 'Settled') : closingLabel === "Outstanding (they owe)" ? t('customers.closing_outstanding', 'Outstanding (they owe)') : closingLabel === "Advance (credit)" ? t('customers.closing_advance', 'Advance (credit)') : closingLabel })}</TableCell>
                   <TableCell className={`text-right ${closing > 0 ? "text-destructive" : closing < 0 ? "text-success" : ""}`}>{fmtMoney(closing, sym)}</TableCell>
                   <TableCell className="no-print"></TableCell>
                 </TableRow>
