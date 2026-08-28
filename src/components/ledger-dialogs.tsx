@@ -217,6 +217,82 @@ export function AddPaymentDialog({
   );
 }
 
+/** Waives part of what a customer owes — settles the ledger like a payment,
+ *  but no cash actually comes in (no cash account, no cash_transactions
+ *  row) and it's tracked separately so it can be subtracted from profit. */
+export function AddDiscountDialog({
+  open, onOpenChange, partyId, party_name, defaultAmount = 0, onDone,
+}: {
+  open: boolean; onOpenChange: (o: boolean) => void;
+  partyId: string; party_name?: string;
+  defaultAmount?: number; onDone?: () => void;
+}) {
+  const qc = useQueryClient();
+  const [amount, setAmount] = useState(defaultAmount);
+  const [note, setNote] = useState("");
+  const [when, setWhen] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setAmount(defaultAmount);
+      setNote("");
+      setWhen(toLocalInputValue(new Date().toISOString()));
+    }
+  }, [open, defaultAmount]);
+
+  const save = async () => {
+    if (!amount || amount <= 0) return toast.error("Amount must be positive");
+    setSaving(true);
+    let error: any = null;
+    try {
+      const res = await supabase.rpc("record_payment", {
+        p_party_type: "customer", p_party_id: partyId, p_amount: amount, p_method: "discount", p_note: note || "",
+      });
+      error = res.error;
+      if (!error && when && res.data) {
+        const chosen = new Date(when);
+        const nowIso = new Date();
+        if (Math.abs(chosen.getTime() - nowIso.getTime()) > 60_000) {
+          const upd = await supabase.rpc("update_party_payment", {
+            _id: res.data as string, _amount: amount, _method: "discount", _note: note || "",
+            _created_at: chosen.toISOString(),
+          });
+          error = upd.error;
+        }
+      }
+    } catch (e: any) {
+      error = e;
+    }
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Discount recorded");
+    onOpenChange(false);
+    qc.invalidateQueries();
+    onDone?.();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Add discount{party_name ? ` — ${party_name}` : ""}</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <DateTimeField value={when} onChange={setWhen} />
+          <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
+          <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Rounded off / goodwill discount" /></div>
+          <p className="text-[11px] text-muted-foreground">
+            No cash moves — this reduces what the customer owes and comes off profit in Reports &amp; Dashboard. Nothing changes in Cash Flow.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function EditPaymentDialog({
   open, onOpenChange, payment, onDone,
 }: {
@@ -233,6 +309,7 @@ export function EditPaymentDialog({
   const [saving, setSaving] = useState(false);
   const cashAccountsQ = useCashAccounts();
   const cashAccounts = cashAccountsQ.data ?? [];
+  const isDiscount = payment?.method === "discount";
   useEffect(() => {
     if (payment) {
       setAmount(Number(payment.amount));
@@ -249,13 +326,13 @@ export function EditPaymentDialog({
     setSaving(true);
     const selected = cashAccounts.find((a: any) => a.id === accountId);
     const { error } = await supabase.rpc("update_party_payment", {
-      _id: payment.id, _amount: amount, _method: selected?.name ?? method, _note: note || "",
+      _id: payment.id, _amount: amount, _method: isDiscount ? "discount" : (selected?.name ?? method), _note: note || "",
       _created_at: when ? new Date(when).toISOString() : payment.created_at,
-      _account_id: accountId || undefined,
+      _account_id: isDiscount ? undefined : (accountId || undefined),
     });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Payment updated");
+    toast.success(isDiscount ? "Discount updated" : "Payment updated");
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
@@ -263,12 +340,12 @@ export function EditPaymentDialog({
 
   const remove = async () => {
     if (!payment) return;
-    if (!confirm("Delete this payment? Balance will be reversed.")) return;
+    if (!confirm(`Delete this ${isDiscount ? "discount" : "payment"}? Balance will be reversed.`)) return;
     setSaving(true);
     const { error } = await supabase.rpc("delete_party_payment", { _id: payment.id });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Payment deleted");
+    toast.success(isDiscount ? "Discount deleted" : "Payment deleted");
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
@@ -277,10 +354,15 @@ export function EditPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Edit payment</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isDiscount ? "Edit discount" : "Edit payment"}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <DateTimeField value={when} onChange={setWhen} />
           <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
+          {isDiscount ? (
+            <p className="text-[11px] text-muted-foreground">
+              No cash account — this is a discount, not a received payment.
+            </p>
+          ) : (
           <div>
             <Label>Payment source</Label>
             <Select
@@ -297,6 +379,7 @@ export function EditPaymentDialog({
               </SelectContent>
             </Select>
           </div>
+          )}
           <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
         <DialogFooter className="justify-between sm:justify-between">

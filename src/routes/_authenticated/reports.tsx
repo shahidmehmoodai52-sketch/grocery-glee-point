@@ -531,8 +531,12 @@ function Page() {
     queryFn: async () => {
       // No FK-based embed here: party_payments has no FK to customers/suppliers,
       // so PostgREST embedding fails (PGRST200). Resolve names client-side.
+      // Discounts are recorded as party_payments (method: "discount") so they
+      // settle the customer ledger, but no cash actually moves — they don't
+      // belong in a page about payment channels/cash flow.
       const base = supabase.from("party_payments")
         .select("id,party_type,party_id,amount,method,note,created_at")
+        .neq("method", "discount")
         .gte("created_at", fromTime)
         .lte("created_at", toTime)
         .order("created_at", { ascending: false });
@@ -586,7 +590,10 @@ function Page() {
   // both must always show the same bottom-line number. Gross profit above is
   // deliberately a narrower sales-margin figure (revenue − cost only); tax
   // collected and sale returns only come off starting here, at net profit.
-  const netProfit = grossProfit - taxCollected - returnsTotal - expensesPeriod + incentiveTotal;
+  // Customer discounts settle the ledger without cash — a real cost, so
+  // they come off profit the same way a return does.
+  const discountTotal = Number(summaryStats.discount_total || 0);
+  const netProfit = grossProfit - taxCollected - returnsTotal - expensesPeriod - discountTotal + incentiveTotal;
   const grossRevenue = revenue;
   const netOfReturns = revenue - returnsTotal;
   const creditOut = Number(summaryStats.credit_sales_total || 0);
@@ -843,6 +850,9 @@ function Page() {
                 <Row label="Sale returns (loss)" value={`(${fmtMoney(returnsTotal, sym)})`} onClick={() => openReturns("Sale returns")} />
                 <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
                 <Row label="Tax collected" value={`(${fmtMoney(taxCollected, sym)})`} onClick={() => openInvoices("Tax collected", (allSales as any[]).filter((s) => Number(s.tax) > 0))} />
+                {discountTotal > 0 && (
+                  <Row label="Customer discounts" value={`(${fmtMoney(discountTotal, sym)})`} muted />
+                )}
                 <Row label="Credit sales (period)" value={fmtMoney(creditOut, sym)} muted onClick={() => {
                   setTab("invoice");
                   setSearch("status:credit");

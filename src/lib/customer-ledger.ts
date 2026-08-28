@@ -67,17 +67,21 @@ export function buildLedgerEntries({
   }
 
   for (const p of payments) {
-    // Cash Out = money handed to the customer (DEBIT). Everything else is a
-    // received payment (CREDIT). Identify Cash Out ONLY by its note marker —
-    // every payment has a linked cash_transaction_id, so that flag cannot be used.
+    // Cash Out = money handed to the customer (DEBIT). Discount = balance
+    // waived, no cash moved either way. Everything else is a received
+    // payment (CREDIT). Discount is identified by its `method` (set by
+    // record_payment when called with p_method: "discount"); Cash Out is
+    // identified ONLY by its note marker — every payment has a linked
+    // cash_transaction_id, so that flag cannot be used.
     if (!p.party_type || p.party_type === "customer") {
       const note = String(p.note ?? "");
       const isCashOut = /^\s*cash\s*out\b/i.test(note);
+      const isDiscount = p.method === "discount";
       entries.push({
         id: p.id,
         date: p.created_at,
-        type: isCashOut ? "cash_out" : "payment",
-        ref: isCashOut ? "Cash Out" : (p.method || "Payment"),
+        type: isCashOut ? "cash_out" : isDiscount ? "discount" : "payment",
+        ref: isCashOut ? "Cash Out" : isDiscount ? "Discount" : (p.method || "Payment"),
         note,
         debit: isCashOut ? Number(p.amount || 0) : 0,
         credit: isCashOut ? 0 : Number(p.amount || 0),

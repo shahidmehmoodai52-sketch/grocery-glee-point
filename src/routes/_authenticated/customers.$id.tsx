@@ -18,7 +18,7 @@ import { fetchAll } from "@/lib/supabase-page";
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { Receipt, printReceipt } from "@/components/receipt";
-import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
+import { AddPaymentDialog, AddDiscountDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger, buildLedgerEntries } from "@/lib/customer-ledger";
 
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
@@ -27,7 +27,7 @@ type Entry = {
   id?: string;
   entity?: LedgerEntity;
   date: string;
-  type: "sale" | "payment" | "return" | "cash_out";
+  type: "sale" | "payment" | "return" | "cash_out" | "discount";
   ref: string;
   note: string;
   debit: number;
@@ -47,6 +47,7 @@ function Page() {
   const [openInvoice, setOpenInvoice] = useState<any>(null);
   const [pdfPrompt, setPdfPrompt] = useState(false);
   const [addPayOpen, setAddPayOpen] = useState(false);
+  const [addDiscountOpen, setAddDiscountOpen] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [payDefault, setPayDefault] = useState(0);
   const [editPayment, setEditPayment] = useState<any>(null);
@@ -192,6 +193,9 @@ function Page() {
           <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
           <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />Print</Button>
           <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
+          <Button variant="outline" onClick={() => { setPayDefault(Math.max(closing, 0)); setAddDiscountOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1" />Add discount
+          </Button>
           <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />Add payment
           </Button>
@@ -277,14 +281,15 @@ function Page() {
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest("button")) return;
                   if (x.type === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
+                  if (x.type === "discount" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: "discount", note: x.note, created_at: x.date });
                   if (x.type === "cash_out" && x.id) return setEditPayment({ id: x.id, amount: x.debit, method: "Cash Out", note: x.note, created_at: x.date });
-                  if (x.type && !["payment", "cash_out"].includes(x.type) && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
+                  if (x.type && !["payment", "discount", "cash_out"].includes(x.type) && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
                 }}
               >
 
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
                 <TableCell>
-                  <Badge variant={x.type === "sale" ? "default" : x.type === "return" ? "secondary" : x.type === "cash_out" ? "destructive" : "outline"} className="capitalize">
+                  <Badge variant={x.type === "sale" ? "default" : x.type === "return" ? "secondary" : x.type === "cash_out" ? "destructive" : "outline"} className={`capitalize ${x.type === "discount" ? "border-warning/50 text-warning" : ""}`}>
                     {x.type?.replace("_", " ")}
                   </Badge>
 
@@ -318,12 +323,12 @@ function Page() {
                         <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
                       </Button>
                     )}
-                    {(x.type === "payment" || x.type === "cash_out") && x.id && (
-                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.type === "payment" ? x.credit : x.debit, method: x.type === "cash_out" ? "Cash Out" : x.ref, note: x.note, created_at: x.date })}>
+                    {(x.type === "payment" || x.type === "discount" || x.type === "cash_out") && x.id && (
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.type === "cash_out" ? x.debit : x.credit, method: x.type === "cash_out" ? "Cash Out" : x.type === "discount" ? "discount" : x.ref, note: x.note, created_at: x.date })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    {x.type && !["payment", "cash_out"].includes(x.type) && x.id && (
+                    {x.type && !["payment", "discount", "cash_out"].includes(x.type) && x.id && (
                       <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: (x.type === "sale" ? "sale" : "sale_return") as any, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -378,6 +383,7 @@ function Page() {
       </Dialog>
 
       <AddPaymentDialog open={addPayOpen} onOpenChange={setAddPayOpen} party="customer" partyId={id} party_name={customer?.name} defaultAmount={payDefault} />
+      <AddDiscountDialog open={addDiscountOpen} onOpenChange={setAddDiscountOpen} partyId={id} party_name={customer?.name} defaultAmount={payDefault} />
       <EditPaymentDialog open={!!editPayment} onOpenChange={(o) => !o && setEditPayment(null)} payment={editPayment} />
       <EditEntryDialog open={!!editEntry} onOpenChange={(o) => !o && setEditEntry(null)} entity={editEntry?.entity ?? null} entry={editEntry?.entry ?? null} />
 
