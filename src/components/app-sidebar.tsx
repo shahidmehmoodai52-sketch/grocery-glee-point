@@ -1,4 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
   BarChart3, Settings, LogOut, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library, ShieldCheck, Box, Coins, Scale,
@@ -16,58 +17,59 @@ import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { OfflineStatusBadge } from "@/components/offline-status";
 
 
-type Item = { title: string; url: string; icon: any; perm: string; adminOnly?: boolean; search?: Record<string, any> };
-const groups: { label: string; items: Item[] }[] = [
+type Item = { titleKey: string; title: string; url: string; icon: any; perm: string; adminOnly?: boolean; search?: Record<string, any> };
+const groups: { labelKey: string; label: string; items: Item[] }[] = [
   {
-    label: "Overview",
+    labelKey: "common.group_overview", label: "Overview",
     items: [
-      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, perm: "dashboard" },
-      { title: "POS", url: "/pos", icon: ShoppingCart, perm: "pos" },
+      { titleKey: "common.dashboard", title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, perm: "dashboard" },
+      { titleKey: "common.pos", title: "POS", url: "/pos", icon: ShoppingCart, perm: "pos" },
     ],
   },
   {
-    label: "Transactions",
+    labelKey: "common.group_transactions", label: "Transactions",
     items: [
-      { title: "Sales", url: "/sales", icon: Receipt, perm: "sales" },
-      { title: "Sale returns", url: "/sale-returns", icon: Undo2, perm: "sale-returns" },
-      { title: "Purchases", url: "/purchases", icon: ClipboardList, perm: "purchases" },
-      { title: "Purchase returns", url: "/purchase-returns", icon: RotateCcw, perm: "purchase-returns" },
-      { title: "Expenses", url: "/expenses", icon: Wallet, perm: "expenses" },
-      { title: "Cash flow", url: "/cash-flow", icon: Coins, perm: "cash-flow" },
-      { title: "Shifts", url: "/shifts", icon: Clock, perm: "shifts" },
-      { title: "Operations", url: "/operations", icon: ClipboardCheck, perm: "operations" },
+      { titleKey: "common.sales", title: "Sales", url: "/sales", icon: Receipt, perm: "sales" },
+      { titleKey: "common.sale_returns", title: "Sale returns", url: "/sale-returns", icon: Undo2, perm: "sale-returns" },
+      { titleKey: "common.purchases", title: "Purchases", url: "/purchases", icon: ClipboardList, perm: "purchases" },
+      { titleKey: "common.purchase_returns", title: "Purchase returns", url: "/purchase-returns", icon: RotateCcw, perm: "purchase-returns" },
+      { titleKey: "common.expenses", title: "Expenses", url: "/expenses", icon: Wallet, perm: "expenses" },
+      { titleKey: "common.cash_flow", title: "Cash flow", url: "/cash-flow", icon: Coins, perm: "cash-flow" },
+      { titleKey: "common.shifts", title: "Shifts", url: "/shifts", icon: Clock, perm: "shifts" },
+      { titleKey: "common.operations", title: "Operations", url: "/operations", icon: ClipboardCheck, perm: "operations" },
 
 
     ],
   },
   {
-    label: "Catalog",
+    labelKey: "common.group_catalog", label: "Catalog",
     items: [
-      { title: "Products", url: "/products", icon: Package, perm: "products" },
-      { title: "Customers", url: "/customers", icon: Users, perm: "customers" },
-      { title: "Suppliers", url: "/suppliers", icon: Truck, perm: "suppliers" },
-      { title: "Bulk import", url: "/import", icon: Upload, perm: "import" },
-      { title: "Stock count", url: "/stock-count", icon: ClipboardCheck, perm: "stock-count" },
-      { title: "Expiry & waste", url: "/expiry", icon: CalendarClock, perm: "expiry" },
-      { title: "Short & Excess", url: "/expiry", icon: Scale, perm: "expiry", search: { tab: "shortexcess" } },
-      { title: "Intelligence", url: "/intelligence", icon: Brain, perm: "intelligence" },
-      { title: "Global library", url: "/library", icon: Library, perm: "library" },
-      { title: "Assets", url: "/assets", icon: Box, perm: "assets" },
+      { titleKey: "common.products", title: "Products", url: "/products", icon: Package, perm: "products" },
+      { titleKey: "common.customers", title: "Customers", url: "/customers", icon: Users, perm: "customers" },
+      { titleKey: "common.suppliers", title: "Suppliers", url: "/suppliers", icon: Truck, perm: "suppliers" },
+      { titleKey: "common.bulk_import", title: "Bulk import", url: "/import", icon: Upload, perm: "import" },
+      { titleKey: "common.stock_count", title: "Stock count", url: "/stock-count", icon: ClipboardCheck, perm: "stock-count" },
+      { titleKey: "common.expiry_waste", title: "Expiry & waste", url: "/expiry", icon: CalendarClock, perm: "expiry" },
+      { titleKey: "common.short_excess", title: "Short & Excess", url: "/expiry", icon: Scale, perm: "expiry", search: { tab: "shortexcess" } },
+      { titleKey: "common.intelligence", title: "Intelligence", url: "/intelligence", icon: Brain, perm: "intelligence" },
+      { titleKey: "common.global_library", title: "Global library", url: "/library", icon: Library, perm: "library" },
+      { titleKey: "common.assets", title: "Assets", url: "/assets", icon: Box, perm: "assets" },
     ],
 
   },
   {
-    label: "Insights",
+    labelKey: "common.group_insights", label: "Insights",
     items: [
-      { title: "Reports", url: "/reports", icon: BarChart3, perm: "reports" },
-      { title: "Auto backup", url: "/backup", icon: HardDriveDownload, perm: "backup" },
-      { title: "Settings", url: "/settings", icon: Settings, perm: "settings" },
-      { title: "Shop admin", url: "/shop-admin", icon: UserCog, perm: "shop-admin", adminOnly: true },
+      { titleKey: "common.reports", title: "Reports", url: "/reports", icon: BarChart3, perm: "reports" },
+      { titleKey: "common.auto_backup", title: "Auto backup", url: "/backup", icon: HardDriveDownload, perm: "backup" },
+      { titleKey: "common.settings", title: "Settings", url: "/settings", icon: Settings, perm: "settings" },
+      { titleKey: "common.shop_admin", title: "Shop admin", url: "/shop-admin", icon: UserCog, perm: "shop-admin", adminOnly: true },
     ],
   },
 ];
 
 export function AppSidebar() {
+  const { t } = useTranslation();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
@@ -121,7 +123,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="flex flex-col">
               <span className="text-sm font-semibold leading-tight">{settings?.store_name ?? "Grocery POS"}</span>
-              <span className="text-[11px] text-sidebar-foreground/60">Point of Sale</span>
+              <span className="text-[11px] text-sidebar-foreground/60">{t('common.point_of_sale', 'Point of Sale')}</span>
             </div>
           )}
         </div>
@@ -129,19 +131,22 @@ export function AppSidebar() {
       <SidebarContent>
         {visibleGroups.map((g) => (
           <SidebarGroup key={g.label}>
-            <SidebarGroupLabel>{g.label}</SidebarGroupLabel>
+            <SidebarGroupLabel>{t(g.labelKey, g.label)}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {g.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                      <Link to={item.url} search={item.search as any} className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {g.items.map((item) => {
+                  const label = t(item.titleKey, item.title);
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={label}>
+                        <Link to={item.url} search={item.search as any} className="flex items-center gap-2">
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{label}</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -157,11 +162,11 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={handleSignOut}
-              tooltip="Sign out"
+              tooltip={t('common.logout', 'Sign out')}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground font-medium"
             >
               <LogOut className="h-4 w-4" />
-              {!collapsed && <span>Sign out</span>}
+              {!collapsed && <span>{t('common.logout', 'Sign out')}</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
