@@ -2377,7 +2377,7 @@ function POSPage() {
               </button>
             ))}
             <Button size="sm" variant="ghost" onClick={addTab} className="h-7 px-2 text-xs">
-              <Plus className="h-3.5 w-3.5 mr-0.5" /> New (F2)
+              <Plus className="h-3.5 w-3.5 mr-0.5" /> {t('pos.new_tab', 'New (F2)')}
             </Button>
           </div>
         </ScrollArea>
@@ -2393,18 +2393,18 @@ function POSPage() {
               className="h-7 text-xs shrink-0"
               onClick={holdCurrent}
               disabled={holding || !tab.items.length}
-              title="Hold current bill (park cart)"
+              title={t('pos.hold_tooltip', 'Hold current bill (park cart)')}
             >
-              <PauseCircle className="h-3.5 w-3.5 mr-1" /> Hold
+              <PauseCircle className="h-3.5 w-3.5 mr-1" /> {t('pos.hold', 'Hold')}
             </Button>
             <Button
               size="sm"
               variant="outline"
               className="h-7 text-xs shrink-0"
               onClick={() => setHeldOpen(true)}
-              title="Resume a held bill"
+              title={t('pos.held_tooltip', 'Resume a held bill')}
             >
-              <Play className="h-3.5 w-3.5 mr-1" /> Held
+              <Play className="h-3.5 w-3.5 mr-1" /> {t('pos.held', 'Held')}
               {heldBills.length > 0 && (
                 <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
                   {heldBills.length}
@@ -2419,7 +2419,7 @@ function POSPage() {
           className="h-7 text-xs shrink-0"
           onClick={() => setReprintOpen(true)}
         >
-          <History className="h-3.5 w-3.5 mr-1" /> Reprint
+          <History className="h-3.5 w-3.5 mr-1" /> {t('pos.reprint', 'Reprint')}
         </Button>
       </div>
 
@@ -2578,7 +2578,7 @@ function POSPage() {
                   variant="outline"
                   className="border-warning text-warning text-[11px] shrink-0"
                 >
-                  Staff purchase
+                  {t('pos.staff_purchase_badge', 'Staff purchase')}
                 </Badge>
               )}
             </div>
@@ -2593,7 +2593,7 @@ function POSPage() {
               ) : (
                 <Eye className="h-3.5 w-3.5 mr-1" />
               )}
-              {showCost ? "Hide" : "Show"} P.Rate
+              {showCost ? t('pos.hide', 'Hide') : t('pos.show', 'Show')} {t('pos.p_rate', 'P.Rate')}
             </Button>
           </div>
 
@@ -2629,16 +2629,16 @@ function POSPage() {
                           📦
                         </div>
                         <div>
-                          <div className="text-lg font-semibold">Ready to start</div>
+                          <div className="text-lg font-semibold">{t('pos.ready_to_start', 'Ready to start')}</div>
                           <div className="text-sm text-muted-foreground mt-1">
-                            Scan a barcode or search a product to add to this bill.
+                            {t('pos.scan_to_add', 'Scan a barcode or search a product to add to this bill.')}
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-2">
-                          <Kbd label="F2" hint="New bill" />
-                          <Kbd label="F3" hint="Search" />
-                          <Kbd label="F4" hint="Complete sale" />
-                          <Kbd label="F10" hint="Undo last sale" />
+                          <Kbd label="F2" hint={t('pos.hint_new_bill', 'New bill')} />
+                          <Kbd label="F3" hint={t('pos.hint_search', 'Search')} />
+                          <Kbd label="F4" hint={t('pos.hint_complete_sale', 'Complete sale')} />
+                          <Kbd label="F10" hint={t('pos.hint_undo_last_sale', 'Undo last sale')} />
                         </div>
                       </div>
                     </td>
@@ -2791,11 +2791,11 @@ function POSPage() {
                   <table className="w-full text-sm border-collapse">
                     <thead className="sticky top-0 z-10 bg-primary text-primary-foreground text-[11px] uppercase tracking-wide">
                       <tr>
-                        <th className="px-2 py-2 text-left w-24">Code</th>
-                        <th className="px-2 py-2 text-left">Item Name</th>
-                        <th className="px-2 py-2 text-right w-20">Stock</th>
-                        {showCost && <th className="px-2 py-2 text-right w-24">P.Rate</th>}
-                        <th className="px-2 py-2 text-right w-28">Rate</th>
+                        <th className="px-2 py-2 text-left w-24">{t('pos.code', 'Code')}</th>
+                        <th className="px-2 py-2 text-left">{t('pos.item_name', 'Item Name')}</th>
+                        <th className="px-2 py-2 text-right w-20">{t('pos.stock', 'Stock')}</th>
+                        {showCost && <th className="px-2 py-2 text-right w-24">{t('pos.p_rate', 'P.Rate')}</th>}
+                        <th className="px-2 py-2 text-right w-28">{t('pos.rate', 'Rate')}</th>
                         <th className="px-2 py-2 w-10"></th>
                       </tr>
                     </thead>
@@ -2874,13 +2874,13 @@ function POSPage() {
                   <div className="text-center py-6">
                     {productsLoading || remoteProductsLoading ? (
                       <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
+                        <Loader2 className="h-4 w-4 animate-spin" /> {t('pos.loading_products', 'Loading products…')}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-3 text-sm">
-                        <span className="text-muted-foreground">No match for "{search}".</span>
+                        <span className="text-muted-foreground">{t('pos.no_match_for', 'No match for "{{term}}".', { term: search })}</span>
                         <Button size="sm" onClick={() => openQuickAdd(search)}>
-                          <Plus className="h-4 w-4 mr-1" /> Add
+                          <Plus className="h-4 w-4 mr-1" /> {t('pos.add', 'Add')}
                         </Button>
                       </span>
                     )}
@@ -2898,7 +2898,7 @@ function POSPage() {
             <div>
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Customer
+                  {t('pos.customer', 'Customer')}
                 </Label>
                 {tab.customer_id && (
                   <Link
@@ -2906,7 +2906,7 @@ function POSPage() {
                     params={{ id: tab.customer_id }}
                     className="text-xs text-primary hover:underline"
                   >
-                    View ledger →
+                    {t('pos.view_ledger', 'View ledger →')}
                   </Link>
                 )}
               </div>
@@ -2928,7 +2928,7 @@ function POSPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="walkin">Walk-in customer</SelectItem>
+                    <SelectItem value="walkin">{t('pos.walk_in_customer', 'Walk-in customer')}</SelectItem>
                     {customers.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
@@ -2972,7 +2972,7 @@ function POSPage() {
 
             {(showStaff || tab.expense_person_id) && (
               <div>
-                <Label className="text-xs text-muted-foreground">Staff / Owner purchase</Label>
+                <Label className="text-xs text-muted-foreground">{t('pos.staff_owner_purchase', 'Staff / Owner purchase')}</Label>
                 <Select
                   value={tab.expense_person_id ?? "none"}
                   onValueChange={(v) => {
@@ -2993,7 +2993,7 @@ function POSPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">— Not staff purchase —</SelectItem>
+                    <SelectItem value="none">{t('pos.not_staff_purchase', '— Not staff purchase —')}</SelectItem>
                     {persons.map((p: any) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} {p.role ? `· ${p.role}` : ""}
@@ -3007,7 +3007,7 @@ function POSPage() {
             <div>
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Payment
+                  {t('pos.payment', 'Payment')}
                 </Label>
                 <Button
                   type="button"
@@ -3034,7 +3034,7 @@ function POSPage() {
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                 >
-                  <UserCog className="h-3.5 w-3.5 mr-1" /> Staff
+                  <UserCog className="h-3.5 w-3.5 mr-1" /> {t('pos.staff', 'Staff')}
                 </Button>
               </div>
               <PaymentMethodGrid
@@ -3064,7 +3064,7 @@ function POSPage() {
               />
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Tender
+                  {t('pos.tender', 'Tender')}
                 </span>
                 <div className="flex items-center gap-1">
                   <CashOutDialog
@@ -3081,7 +3081,7 @@ function POSPage() {
                     className="h-7 px-2 text-[11px]"
                     onClick={addPaymentRow}
                   >
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Split
+                    <Plus className="h-3.5 w-3.5 mr-1" /> {t('pos.split', 'Split')}
                   </Button>
                 </div>
               </div>
@@ -3130,17 +3130,17 @@ function POSPage() {
           {/* Totals + discount + paid + note */}
           <div className="flex-1 min-h-0 overflow-auto px-2 py-1.5 space-y-1 bg-muted/10 flex flex-col">
             <Row
-              label="Items"
+              label={t('pos.items', 'Items')}
               value={`${tab.items.length} item${tab.items.length === 1 ? "" : "s"}`}
               muted
             />
-            <Row label="Subtotal" value={fmtMoney(subtotal, sym)} muted />
+            <Row label={t('pos.subtotal', 'Subtotal')} value={fmtMoney(subtotal, sym)} muted />
             {lineDiscountTotal > 0 && (
-              <Row label="Line discounts" value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
+              <Row label={t('pos.line_discounts', 'Line discounts')} value={`- ${fmtMoney(lineDiscountTotal, sym)}`} muted />
             )}
 
             <div className="flex items-center justify-between text-sm gap-2">
-              <span className="text-muted-foreground">Discount</span>
+              <span className="text-muted-foreground">{t('pos.discount', 'Discount')}</span>
               <div className="flex items-center gap-1.5">
                 <div className="relative">
                   <Input
@@ -3166,7 +3166,7 @@ function POSPage() {
             </div>
 
             <div className="flex items-center justify-between text-sm gap-2">
-              <span className="text-muted-foreground">Charges</span>
+              <span className="text-muted-foreground">{t('pos.charges', 'Charges')}</span>
               <div className="flex items-center gap-1.5">
                 <div className="relative">
                   <Input
@@ -3193,7 +3193,7 @@ function POSPage() {
 
             <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-1 mt-0.5 flex items-baseline justify-between gap-2">
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
-                Grand Total
+                {t('pos.grand_total', 'Grand Total')}
               </span>
               <span className="text-xl font-bold text-primary tabular-nums leading-tight">
                 {fmtMoney(total, sym)}
@@ -3202,7 +3202,7 @@ function POSPage() {
 
             <div>
               <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Paid
+                {t('pos.paid', 'Paid')}
               </Label>
               <div className="flex items-center gap-2 mt-0.5">
                 <Input
@@ -3242,17 +3242,17 @@ function POSPage() {
                   }}
                   className="text-xs text-primary hover:underline shrink-0 font-medium"
                 >
-                  Exact
+                  {t('pos.exact', 'Exact')}
                 </button>
               </div>
               <div className="mt-1">
                 {due > 0 ? (
                   <div className="rounded bg-destructive/10 border border-destructive/20 px-2 py-1 text-xs text-destructive font-semibold">
-                    Due: {fmtMoney(due, sym)}
+                    {t('pos.due', 'Due')}: {fmtMoney(due, sym)}
                   </div>
                 ) : (
                   <div className="rounded bg-success/10 border border-success/20 px-2 py-1 text-sm text-success font-bold tabular-nums">
-                    Change: {fmtMoney(change, sym)}
+                    {t('pos.change', 'Change')}: {fmtMoney(change, sym)}
                   </div>
                 )}
               </div>
@@ -3261,7 +3261,7 @@ function POSPage() {
             <Input
               value={tab.note}
               onChange={(e) => setTab({ note: e.target.value })}
-              placeholder="Note / House #, street…"
+              placeholder={t('pos.note_placeholder', 'Note / House #, street…')}
               className="h-7 text-xs"
             />
 
@@ -3278,13 +3278,13 @@ function POSPage() {
                       onClick={() => setShowProfit((v) => !v)}
                       className="flex items-center justify-between w-full text-muted-foreground hover:text-foreground"
                     >
-                      <span>{showProfit ? "Hide" : "Show"} profit</span>
+                      <span>{showProfit ? t('pos.hide', 'Hide') : t('pos.show', 'Show')} {t('pos.profit', 'profit')}</span>
                       {showProfit ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                     </button>
                     {showProfit && (
                       <div className="flex items-center justify-between pt-1 mt-1 border-t">
                         <span className="text-muted-foreground">
-                          Cost <span className="font-mono">{fmtMoney(cartCost, sym)}</span>
+                          {t('pos.cost', 'Cost')} <span className="font-mono">{fmtMoney(cartCost, sym)}</span>
                         </span>
                         <span
                           className={`font-semibold ${cartProfit >= 0 ? "text-success" : "text-destructive"}`}
@@ -3314,11 +3314,11 @@ function POSPage() {
 
       {/* Keyboard shortcut bar */}
       <div className="hidden md:flex items-center justify-center gap-4 border-t bg-muted/30 px-4 py-1.5 text-[11px] text-muted-foreground no-print shrink-0">
-        <ShortcutHint k="F2" label="New" />
-        <ShortcutHint k="F3" label="Search" />
-        <ShortcutHint k="F4" label="Complete sale" />
-        <ShortcutHint k="F10" label="Undo last" />
-        <ShortcutHint k="Esc" label="Clear" />
+        <ShortcutHint k="F2" label={t('pos.shortcut_new', 'New')} />
+        <ShortcutHint k="F3" label={t('pos.shortcut_search', 'Search')} />
+        <ShortcutHint k="F4" label={t('pos.shortcut_complete_sale', 'Complete sale')} />
+        <ShortcutHint k="F10" label={t('pos.shortcut_undo_last', 'Undo last')} />
+        <ShortcutHint k="Esc" label={t('pos.shortcut_clear', 'Clear')} />
       </div>
 
       {/* Reprint browser */}
