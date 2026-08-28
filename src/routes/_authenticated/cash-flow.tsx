@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Wallet, Banknote, CreditCard, Smartphone,
@@ -33,6 +34,7 @@ function DateRangeBar({
   preset: DatePreset; from: string; to: string;
   onPreset: (p: DatePreset) => void; onFrom: (v: string) => void; onTo: (v: string) => void;
 }) {
+  const { t } = useTranslation();
   const pick = (val: string, set: (v: string) => void, label: string) => (
     <Popover>
       <PopoverTrigger asChild>
@@ -59,10 +61,10 @@ function DateRangeBar({
           {PRESETS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
         </SelectContent>
       </Select>
-      {pick(from, onFrom, "From")}
-      {pick(to, onTo, "To")}
+      {pick(from, onFrom, t('cash_flow.from_placeholder', 'From'))}
+      {pick(to, onTo, t('cash_flow.to_placeholder', 'To'))}
       {(from || to) && (
-        <Button variant="ghost" size="sm" className="h-8" onClick={() => { onPreset("all"); onFrom(""); onTo(""); }}>Clear</Button>
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => { onPreset("all"); onFrom(""); onTo(""); }}>{t('cash_flow.clear', 'Clear')}</Button>
       )}
     </div>
   );
@@ -176,6 +178,7 @@ const PAGE_SIZE = 1000;
 
 
 function Page() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -460,7 +463,7 @@ function Page() {
     setAccOpen(true);
   };
   const saveAcc = async () => {
-    if (!accForm.name.trim()) { toast.error("Name is required"); return; }
+    if (!accForm.name.trim()) { toast.error(t('cash_flow.toast_name_required', 'Name is required')); return; }
     const payload = {
       name: accForm.name.trim(),
       type: accForm.type,
@@ -473,15 +476,15 @@ function Page() {
       : supabase.from("cash_accounts").insert(payload);
     const { error } = await q;
     if (error) { toast.error(error.message); return; }
-    toast.success(editingAccId ? "Account updated" : "Account added");
+    toast.success(editingAccId ? t('cash_flow.toast_account_updated', 'Account updated') : t('cash_flow.toast_account_added', 'Account added'));
     setAccOpen(false);
     qc.invalidateQueries({ queryKey: ["cash-accounts"] });
   };
   const deleteAcc = async (id: string) => {
-    if (!confirm("Delete this account and all its transactions?")) return;
+    if (!confirm(t('cash_flow.confirm_delete_account', 'Delete this account and all its transactions?'))) return;
     const { error } = await supabase.from("cash_accounts").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Deleted");
+    toast.success(t('cash_flow.toast_deleted', 'Deleted'));
     qc.invalidateQueries({ queryKey: ["cash-accounts"] });
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
   };
@@ -501,8 +504,8 @@ function Page() {
     setTxOpen(true);
   };
   const saveTx = async () => {
-    if (!txForm.account_id) { toast.error("Choose an account"); return; }
-    if (!txForm.amount || Number(txForm.amount) <= 0) { toast.error("Amount must be greater than zero"); return; }
+    if (!txForm.account_id) { toast.error(t('cash_flow.toast_choose_account', 'Choose an account')); return; }
+    if (!txForm.amount || Number(txForm.amount) <= 0) { toast.error(t('cash_flow.toast_amount_gt_zero', 'Amount must be greater than zero')); return; }
     const payload = {
       account_id: txForm.account_id,
       direction: txForm.direction,
@@ -519,15 +522,15 @@ function Page() {
       : supabase.from("cash_transactions").insert(payload);
     const { error } = await q;
     if (error) { toast.error(error.message); return; }
-    toast.success(editingTxId ? "Entry updated" : "Entry added");
+    toast.success(editingTxId ? t('cash_flow.toast_entry_updated', 'Entry updated') : t('cash_flow.toast_entry_added', 'Entry added'));
     setTxOpen(false);
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
   };
   const deleteTx = async (id: string) => {
-    if (!confirm("Delete this entry?")) return;
+    if (!confirm(t('cash_flow.confirm_delete_entry', 'Delete this entry?'))) return;
     const { error } = await supabase.from("cash_transactions").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Deleted");
+    toast.success(t('cash_flow.toast_deleted', 'Deleted'));
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
   };
 
@@ -564,14 +567,14 @@ function Page() {
   };
 
   const saveTransfer = async () => {
-    if (!tfForm.from_id || !tfForm.to_id) { toast.error("Pick both accounts"); return; }
-    if (tfForm.from_id === tfForm.to_id) { toast.error("Choose two different accounts"); return; }
+    if (!tfForm.from_id || !tfForm.to_id) { toast.error(t('cash_flow.toast_pick_both_accounts', 'Pick both accounts')); return; }
+    if (tfForm.from_id === tfForm.to_id) { toast.error(t('cash_flow.toast_choose_two_different', 'Choose two different accounts')); return; }
     const amt = Number(tfForm.amount);
-    if (!amt || amt <= 0) { toast.error("Amount must be greater than zero"); return; }
+    if (!amt || amt <= 0) { toast.error(t('cash_flow.toast_amount_gt_zero', 'Amount must be greater than zero')); return; }
     try {
       const from = await materializeAccount(tfForm.from_id);
       const to = await materializeAccount(tfForm.to_id);
-      if (!from || !to) { toast.error("Could not resolve accounts"); return; }
+      if (!from || !to) { toast.error(t('cash_flow.toast_could_not_resolve_accounts', 'Could not resolve accounts')); return; }
       const groupId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
       const rows = [
         { account_id: from.id, direction: "out", amount: amt, occurred_on: tfForm.occurred_on || today(), category: "transfer", notes: tfForm.notes || null, transfer_group_id: groupId },
@@ -579,22 +582,22 @@ function Page() {
       ];
       const { error } = await supabase.from("cash_transactions").insert(rows);
       if (error) { toast.error(error.message); return; }
-      toast.success("Transfer recorded");
+      toast.success(t('cash_flow.toast_transfer_recorded', 'Transfer recorded'));
       setTfOpen(false);
       qc.invalidateQueries({ queryKey: ["cash-transactions"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Transfer failed");
+      toast.error(e?.message ?? t('cash_flow.toast_transfer_failed', 'Transfer failed'));
     }
   };
 
   const saveSupplierPay = async () => {
-    if (!spForm.supplier_id) { toast.error("Choose a supplier"); return; }
-    if (!spForm.from_id) { toast.error("Choose a payment source account"); return; }
+    if (!spForm.supplier_id) { toast.error(t('cash_flow.toast_choose_supplier', 'Choose a supplier')); return; }
+    if (!spForm.from_id) { toast.error(t('cash_flow.toast_choose_source_account', 'Choose a payment source account')); return; }
     const amt = Number(spForm.amount);
-    if (!amt || amt <= 0) { toast.error("Amount must be greater than zero"); return; }
+    if (!amt || amt <= 0) { toast.error(t('cash_flow.toast_amount_gt_zero', 'Amount must be greater than zero')); return; }
     try {
       const from = await materializeAccount(spForm.from_id);
-      if (!from) { toast.error("Could not resolve source account"); return; }
+      if (!from) { toast.error(t('cash_flow.toast_could_not_resolve_source', 'Could not resolve source account')); return; }
       const { error } = await supabase.rpc("record_payment", {
         p_party_type: "supplier",
         p_party_id: spForm.supplier_id,
@@ -604,11 +607,11 @@ function Page() {
         p_account_id: from.id,
       });
       if (error) { toast.error(error.message); return; }
-      toast.success("Supplier paid");
+      toast.success(t('cash_flow.toast_supplier_paid', 'Supplier paid'));
       setSpOpen(false);
       qc.invalidateQueries();
     } catch (e: any) {
-      toast.error(e?.message ?? "Payment failed");
+      toast.error(e?.message ?? t('cash_flow.toast_payment_failed', 'Payment failed'));
     }
   };
 
@@ -629,16 +632,16 @@ function Page() {
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Coins className="h-6 w-6" /> Cash Flow</h1>
-          <p className="text-sm text-muted-foreground">Track where every rupee is — till, bank, card, EasyPaisa, JazzCash and more.</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Coins className="h-6 w-6" /> {t('cash_flow.page_title', 'Cash Flow')}</h1>
+          <p className="text-sm text-muted-foreground">{t('cash_flow.page_desc', 'Track where every rupee is — till, bank, card, EasyPaisa, JazzCash and more.')}</p>
         </div>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={openTransfer}><ArrowLeftRight className="h-4 w-4 mr-2" />Transfer</Button>
-            <Button variant="outline" onClick={openSupplierPay}><Truck className="h-4 w-4 mr-2" />Pay supplier</Button>
-            <Button variant="outline" onClick={() => openTxCreate("out")}><ArrowUpCircle className="h-4 w-4 mr-2" />Pay out</Button>
-            <Button onClick={() => openTxCreate("in")}><ArrowDownCircle className="h-4 w-4 mr-2" />Receive</Button>
-            <Button variant="secondary" onClick={openAccCreate}><Plus className="h-4 w-4 mr-2" />New account</Button>
+            <Button variant="outline" onClick={openTransfer}><ArrowLeftRight className="h-4 w-4 mr-2" />{t('cash_flow.btn_transfer', 'Transfer')}</Button>
+            <Button variant="outline" onClick={openSupplierPay}><Truck className="h-4 w-4 mr-2" />{t('cash_flow.btn_pay_supplier', 'Pay supplier')}</Button>
+            <Button variant="outline" onClick={() => openTxCreate("out")}><ArrowUpCircle className="h-4 w-4 mr-2" />{t('cash_flow.btn_pay_out', 'Pay out')}</Button>
+            <Button onClick={() => openTxCreate("in")}><ArrowDownCircle className="h-4 w-4 mr-2" />{t('cash_flow.btn_receive', 'Receive')}</Button>
+            <Button variant="secondary" onClick={openAccCreate}><Plus className="h-4 w-4 mr-2" />{t('cash_flow.btn_new_account', 'New account')}</Button>
           </div>
         )}
       </div>
@@ -670,9 +673,9 @@ function Page() {
           onClick={() => setDetails({ kind: "opening" })}
           className="p-4 cursor-pointer hover:shadow-md hover:border-primary/40 transition"
         >
-          <div className="text-xs text-muted-foreground">Opening balance</div>
+          <div className="text-xs text-muted-foreground">{t('cash_flow.card_opening', 'Opening balance')}</div>
           <div className="text-2xl font-bold mt-1">{fmt(totals.opening)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Click to see per-account opening</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{t('cash_flow.card_opening_sub', 'Click to see per-account opening')}</div>
         </Card>
         <Card
           role="button"
@@ -680,9 +683,9 @@ function Page() {
           onClick={() => setDetails({ kind: "in" })}
           className="p-4 cursor-pointer hover:shadow-md hover:border-emerald-500/40 transition"
         >
-          <div className="text-xs text-muted-foreground">Total received (POS + manual)</div>
+          <div className="text-xs text-muted-foreground">{t('cash_flow.card_total_received', 'Total received (POS + manual)')}</div>
           <div className="text-2xl font-bold mt-1 text-emerald-600">{fmt(totals.inSum)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Sales, customer payments & manual receipts</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{t('cash_flow.card_total_received_sub', 'Sales, customer payments & manual receipts')}</div>
         </Card>
         <Card
           role="button"
@@ -690,9 +693,9 @@ function Page() {
           onClick={() => setDetails({ kind: "out" })}
           className="p-4 cursor-pointer hover:shadow-md hover:border-rose-500/40 transition"
         >
-          <div className="text-xs text-muted-foreground">Total paid out</div>
+          <div className="text-xs text-muted-foreground">{t('cash_flow.card_total_paid', 'Total paid out')}</div>
           <div className="text-2xl font-bold mt-1 text-rose-600">{fmt(totals.outSum)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Purchases, expenses, supplier payments & refunds</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{t('cash_flow.card_total_paid_sub', 'Purchases, expenses, supplier payments & refunds')}</div>
         </Card>
         <Card
           role="button"
@@ -700,45 +703,45 @@ function Page() {
           onClick={() => setDetails({ kind: "balance" })}
           className="p-4 cursor-pointer hover:shadow-md border-primary/40 hover:border-primary transition"
         >
-          <div className="text-xs text-muted-foreground">Cash on hand (all accounts)</div>
+          <div className="text-xs text-muted-foreground">{t('cash_flow.card_cash_on_hand', 'Cash on hand (all accounts)')}</div>
           <div className="text-2xl font-bold mt-1">{fmt(totals.balance)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Click to see per-account balance</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{t('cash_flow.card_cash_on_hand_sub', 'Click to see per-account balance')}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Receivables (credit sales unpaid)</div>
+          <div className="text-xs text-muted-foreground">{t('cash_flow.card_receivables', 'Receivables (credit sales unpaid)')}</div>
           <div className="text-2xl font-bold mt-1 text-amber-600">{fmt(receivables)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Money customers owe you</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{t('cash_flow.card_receivables_sub', 'Money customers owe you')}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Payables (purchases unpaid)</div>
+          <div className="text-xs text-muted-foreground">{t('cash_flow.card_payables', 'Payables (purchases unpaid)')}</div>
           <div className="text-2xl font-bold mt-1 text-amber-600">{fmt(payables)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Money you owe suppliers</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{t('cash_flow.card_payables_sub', 'Money you owe suppliers')}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Net position</div>
+          <div className="text-xs text-muted-foreground">{t('cash_flow.card_net_position', 'Net position')}</div>
           <div className="text-2xl font-bold mt-1">{fmt(totals.balance + receivables - payables)}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Cash + receivables − payables</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{t('cash_flow.card_net_position_sub', 'Cash + receivables − payables')}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Auto-synced from POS</div>
+          <div className="text-xs text-muted-foreground">{t('cash_flow.card_auto_synced', 'Auto-synced from POS')}</div>
           <div className="text-2xl font-bold mt-1">{ledgerPaged.count}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Sales, returns, purchases, expenses & party payments</div>
+          <div className="text-[11px] text-muted-foreground mt-1">{t('cash_flow.card_auto_synced_sub', 'Sales, returns, purchases, expenses & party payments')}</div>
         </Card>
       </div>
 
 
       <Tabs defaultValue="accounts" className="w-full">
         <TabsList>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="report">Report</TabsTrigger>
+          <TabsTrigger value="accounts">{t('cash_flow.tab_accounts', 'Accounts')}</TabsTrigger>
+          <TabsTrigger value="transactions">{t('cash_flow.tab_transactions', 'Transactions')}</TabsTrigger>
+          <TabsTrigger value="report">{t('cash_flow.tab_report', 'Report')}</TabsTrigger>
         </TabsList>
 
         {/* Accounts */}
         <TabsContent value="accounts" className="mt-4">
           {allAccounts.length === 0 ? (
             <Card className="p-8 text-center text-muted-foreground">
-              No accounts yet. Add your Till, Bank, Card terminal, EasyPaisa or JazzCash to get started.
+              {t('cash_flow.no_accounts', 'No accounts yet. Add your Till, Bank, Card terminal, EasyPaisa or JazzCash to get started.')}
             </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -762,27 +765,27 @@ function Page() {
                         </div>
                         <div>
                           <div className="font-semibold">{a.name}</div>
-                          <div className="text-xs text-muted-foreground">{labelFor(a.type)}</div>
+                          <div className="text-xs text-muted-foreground">{t(`cash_flow.acc_type_${a.type}`, labelFor(a.type))}</div>
                         </div>
                       </div>
-                      {auto ? <Badge variant="outline">Auto</Badge> : !a.is_active && <Badge variant="secondary">Inactive</Badge>}
+                      {auto ? <Badge variant="outline">{t('cash_flow.badge_auto', 'Auto')}</Badge> : !a.is_active && <Badge variant="secondary">{t('cash_flow.badge_inactive', 'Inactive')}</Badge>}
                     </div>
                     <div className="mt-3 text-2xl font-bold">{fmt(bal)}</div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      <span>Opening {fmt(Number(a.opening_balance))}</span>
-                      <span className="text-emerald-600">In {fmt(b.inSum)}</span>
-                      <span className="text-rose-600">Out {fmt(b.outSum)}</span>
+                      <span>{t('cash_flow.opening_prefix', 'Opening {{amount}}', { amount: fmt(Number(a.opening_balance)) })}</span>
+                      <span className="text-emerald-600">{t('cash_flow.in_prefix', 'In {{amount}}', { amount: fmt(b.inSum) })}</span>
+                      <span className="text-rose-600">{t('cash_flow.out_prefix', 'Out {{amount}}', { amount: fmt(b.outSum) })}</span>
                     </div>
                     {isAdmin && !auto && (
                       <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Button size="sm" variant="secondary" onClick={() => openTxCreate("in", a.id)}>Receive</Button>
-                        <Button size="sm" variant="outline" onClick={() => openTxCreate("out", a.id)}>Pay</Button>
+                        <Button size="sm" variant="secondary" onClick={() => openTxCreate("in", a.id)}>{t('cash_flow.btn_receive_small', 'Receive')}</Button>
+                        <Button size="sm" variant="outline" onClick={() => openTxCreate("out", a.id)}>{t('cash_flow.btn_pay_small', 'Pay')}</Button>
                         <Button size="sm" variant="ghost" onClick={() => openAccEdit(a)}><Pencil className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" onClick={() => deleteAcc(a.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                       </div>
                     )}
                     {auto && (
-                      <div className="mt-3 text-[11px] text-muted-foreground">Auto bucket from POS. Create a matching account (same name/type) to customize opening balance.</div>
+                      <div className="mt-3 text-[11px] text-muted-foreground">{t('cash_flow.auto_bucket_note', 'Auto bucket from POS. Create a matching account (same name/type) to customize opening balance.')}</div>
                     )}
                   </Card>
                 );
@@ -797,78 +800,78 @@ function Page() {
           <div className="flex flex-wrap gap-2 items-end">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-8" placeholder="Search category, reference or notes" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input className="pl-8" placeholder={t('cash_flow.search_placeholder', 'Search category, reference or notes')} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <div>
-              <Label className="text-xs">Account</Label>
+              <Label className="text-xs">{t('cash_flow.account_label', 'Account')}</Label>
               <Select value={filterAcc} onValueChange={setFilterAcc}>
                 <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All accounts</SelectItem>
-                  {allAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}{isAutoAcc(a.id) ? " · Auto" : ""}</SelectItem>)}
+                  <SelectItem value="all">{t('cash_flow.all_accounts', 'All accounts')}</SelectItem>
+                  {allAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}{isAutoAcc(a.id) ? t('cash_flow.auto_suffix', ' · Auto') : ""}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Payment method</Label>
+              <Label className="text-xs">{t('cash_flow.payment_method_label', 'Payment method')}</Label>
               <Select value={filterMethod} onValueChange={setFilterMethod}>
                 <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All methods</SelectItem>
-                  {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{m.label}</SelectItem>)}
+                  <SelectItem value="all">{t('cash_flow.all_methods', 'All methods')}</SelectItem>
+                  {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{t(`cash_flow.pay_method_${m.v}`, m.label)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
+            <Button variant="outline" onClick={exportCsv}>{t('cash_flow.export_csv', 'Export CSV')}</Button>
           </div>
           <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Reference / Notes</TableHead>
-                  <TableHead className="text-right">In</TableHead>
-                  <TableHead className="text-right">Out</TableHead>
+                  <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+                  <TableHead>{t('cash_flow.th_account', 'Account')}</TableHead>
+                  <TableHead>{t('sales.th_method', 'Method')}</TableHead>
+                  <TableHead>{t('reports.th_category', 'Category')}</TableHead>
+                  <TableHead>{t('cash_flow.th_reference_notes', 'Reference / Notes')}</TableHead>
+                  <TableHead className="text-right">{t('cash_flow.th_in', 'In')}</TableHead>
+                  <TableHead className="text-right">{t('cash_flow.th_out', 'Out')}</TableHead>
                   {isAdmin && <TableHead className="w-[100px]"></TableHead>}
                 </TableRow>
 
               </TableHeader>
               <TableBody>
                 {filteredTx.length === 0 && (
-                  <TableRow><TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">{t('cash_flow.no_entries', 'No entries')}</TableCell></TableRow>
                 )}
-                {filteredTx.map((t) => {
-                  const acc = accById(t.account_id);
-                  const auto = isAutoTx(t.id);
+                {filteredTx.map((tx) => {
+                  const acc = accById(tx.account_id);
+                  const auto = isAutoTx(tx.id);
                   return (
-                    <TableRow key={t.id}>
-                      <TableCell className="whitespace-nowrap">{t.occurred_on}</TableCell>
+                    <TableRow key={tx.id}>
+                      <TableCell className="whitespace-nowrap">{tx.occurred_on}</TableCell>
                       <TableCell className="whitespace-nowrap">{acc?.name ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{payLabel(methodOf(t))}</TableCell>
+                      <TableCell className="whitespace-nowrap">{t(`cash_flow.pay_method_${methodOf(tx)}`, payLabel(methodOf(tx)))}</TableCell>
                       <TableCell className="capitalize">
 
-                        {t.category.replace(/_/g, " ")}
-                        {auto && <Badge variant="outline" className="ml-2 text-[10px]">Auto</Badge>}
+                        {t(`cash_flow.category_${tx.category}`, tx.category.replace(/_/g, " "))}
+                        {auto && <Badge variant="outline" className="ml-2 text-[10px]">{t('cash_flow.badge_auto', 'Auto')}</Badge>}
                       </TableCell>
                       <TableCell className="max-w-[300px] truncate">
-                        {t.reference && <span className="font-medium">{t.reference}</span>}
-                        {t.reference && t.notes && <span> — </span>}
-                        {t.notes && <span className="text-muted-foreground">{t.notes}</span>}
+                        {tx.reference && <span className="font-medium">{tx.reference}</span>}
+                        {tx.reference && tx.notes && <span> — </span>}
+                        {tx.notes && <span className="text-muted-foreground">{tx.notes}</span>}
                       </TableCell>
-                      <TableCell className="text-right text-emerald-600">{t.direction === "in" ? fmt(Number(t.amount)) : ""}</TableCell>
-                      <TableCell className="text-right text-rose-600">{t.direction === "out" ? fmt(Number(t.amount)) : ""}</TableCell>
+                      <TableCell className="text-right text-emerald-600">{tx.direction === "in" ? fmt(Number(tx.amount)) : ""}</TableCell>
+                      <TableCell className="text-right text-rose-600">{tx.direction === "out" ? fmt(Number(tx.amount)) : ""}</TableCell>
                       {isAdmin && (
                         <TableCell>
                           {!auto ? (
                             <div className="flex gap-1">
-                              <Button size="icon" variant="ghost" onClick={() => openTxEdit(t)}><Pencil className="h-4 w-4" /></Button>
-                              <Button size="icon" variant="ghost" onClick={() => deleteTx(t.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
+                              <Button size="icon" variant="ghost" onClick={() => openTxEdit(tx)}><Pencil className="h-4 w-4" /></Button>
+                              <Button size="icon" variant="ghost" onClick={() => deleteTx(tx.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                             </div>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground">from POS</span>
+                            <span className="text-[11px] text-muted-foreground">{t('cash_flow.from_pos', 'from POS')}</span>
                           )}
                         </TableCell>
                       )}
@@ -879,10 +882,10 @@ function Page() {
              </Table>
              {ledgerPaged.count > PAGE_SIZE_PAGED && (
                <div className="p-4 flex items-center justify-between border-t text-sm">
-                 <div className="text-muted-foreground">Showing {page * PAGE_SIZE_PAGED + 1} to {Math.min((page + 1) * PAGE_SIZE_PAGED, ledgerPaged.count)} of {ledgerPaged.count} entries</div>
+                 <div className="text-muted-foreground">{t('cash_flow.showing_entries', 'Showing {{from}} to {{to}} of {{total}} entries', { from: page * PAGE_SIZE_PAGED + 1, to: Math.min((page + 1) * PAGE_SIZE_PAGED, ledgerPaged.count), total: ledgerPaged.count })}</div>
                  <div className="flex gap-2">
-                   <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
-                   <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={(page + 1) * PAGE_SIZE_PAGED >= ledgerPaged.count}>Next</Button>
+                   <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>{t('reports.previous', 'Previous')}</Button>
+                   <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={(page + 1) * PAGE_SIZE_PAGED >= ledgerPaged.count}>{t('reports.next', 'Next')}</Button>
                  </div>
                </div>
              )}
@@ -893,26 +896,26 @@ function Page() {
         <TabsContent value="report" className="mt-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-end">
             <div className="text-xs text-muted-foreground ml-auto">
-              {dateFrom || dateTo ? `Filtered ${dateFrom || "…"} → ${dateTo || "…"}` : "Showing all history"}
+              {dateFrom || dateTo ? t('cash_flow.filtered_label', 'Filtered {{from}} → {{to}}', { from: dateFrom || "…", to: dateTo || "…" }) : t('cash_flow.showing_all_history', 'Showing all history')}
             </div>
           </div>
           <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Received (period)</TableHead>
-                  <TableHead className="text-right">Paid out (period)</TableHead>
-                  <TableHead className="text-right">Net (period)</TableHead>
-                  <TableHead className="text-right">Current balance</TableHead>
+                  <TableHead>{t('cash_flow.th_account', 'Account')}</TableHead>
+                  <TableHead>{t('reports.th_type', 'Type')}</TableHead>
+                  <TableHead className="text-right">{t('cash_flow.th_received_period', 'Received (period)')}</TableHead>
+                  <TableHead className="text-right">{t('cash_flow.th_paid_period', 'Paid out (period)')}</TableHead>
+                  <TableHead className="text-right">{t('cash_flow.th_net_period', 'Net (period)')}</TableHead>
+                  <TableHead className="text-right">{t('cash_flow.th_current_balance', 'Current balance')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {reportRows.map((r) => (
                   <TableRow key={r.acc.id}>
                     <TableCell className="font-medium">{r.acc.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{labelFor(r.acc.type)}</TableCell>
+                    <TableCell className="text-muted-foreground">{t(`cash_flow.acc_type_${r.acc.type}`, labelFor(r.acc.type))}</TableCell>
                     <TableCell className="text-right text-emerald-600">{fmt(r.inSum)}</TableCell>
                     <TableCell className="text-right text-rose-600">{fmt(r.outSum)}</TableCell>
                     <TableCell className={`text-right font-medium ${r.net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{fmt(r.net)}</TableCell>
@@ -920,7 +923,7 @@ function Page() {
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/40 font-semibold">
-                  <TableCell colSpan={2}>Totals</TableCell>
+                  <TableCell colSpan={2}>{t('cash_flow.totals_label', 'Totals')}</TableCell>
                   <TableCell className="text-right text-emerald-600">{fmt(reportRows.reduce((s, r) => s + r.inSum, 0))}</TableCell>
                   <TableCell className="text-right text-rose-600">{fmt(reportRows.reduce((s, r) => s + r.outSum, 0))}</TableCell>
                   <TableCell className="text-right">{fmt(reportRows.reduce((s, r) => s + r.net, 0))}</TableCell>
@@ -935,40 +938,40 @@ function Page() {
       {/* Account dialog */}
       <Dialog open={accOpen} onOpenChange={setAccOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editingAccId ? "Edit account" : "New account"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingAccId ? t('cash_flow.edit_account', 'Edit account') : t('cash_flow.new_account_title', 'New account')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Name *</Label>
-              <Input value={accForm.name} onChange={(e) => setAccForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="e.g. Main Till, HBL Bank, EasyPaisa" />
+              <Label>{t('cash_flow.name_required_label', 'Name *')}</Label>
+              <Input value={accForm.name} onChange={(e) => setAccForm((f: any) => ({ ...f, name: e.target.value }))} placeholder={t('cash_flow.name_placeholder', 'e.g. Main Till, HBL Bank, EasyPaisa')} />
             </div>
             <div>
-              <Label>Type</Label>
+              <Label>{t('cash_flow.type_label', 'Type')}</Label>
               <select
                 value={accForm.type}
                 onChange={(e) => setAccForm((f: any) => ({ ...f, type: e.target.value }))}
                 className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               >
-                {ACC_TYPES.map((t) => (
-                  <option key={t.v} value={t.v}>{t.label}</option>
+                {ACC_TYPES.map((opt) => (
+                  <option key={opt.v} value={opt.v}>{t(`cash_flow.acc_type_${opt.v}`, opt.label)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <Label>Opening balance</Label>
+              <Label>{t('cash_flow.opening_balance_label', 'Opening balance')}</Label>
               <Input type="number" step="0.01" value={accForm.opening_balance} onChange={(e) => setAccForm((f: any) => ({ ...f, opening_balance: e.target.value }))} />
             </div>
             <div>
-              <Label>Notes</Label>
+              <Label>{t('cash_flow.notes_label', 'Notes')}</Label>
               <Textarea value={accForm.notes} onChange={(e) => setAccForm((f: any) => ({ ...f, notes: e.target.value }))} />
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={accForm.is_active} onChange={(e) => setAccForm((f: any) => ({ ...f, is_active: e.target.checked }))} />
-              Active
+              {t('cash_flow.active_label', 'Active')}
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAccOpen(false)}>Cancel</Button>
-            <Button onClick={saveAcc}>Save</Button>
+            <Button variant="outline" onClick={() => setAccOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveAcc}>{t('common.save', 'Save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -977,27 +980,27 @@ function Page() {
       <Dialog open={txOpen} onOpenChange={setTxOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingTxId ? "Edit entry" : txForm.direction === "in" ? "Receive money" : "Pay out"}</DialogTitle>
+            <DialogTitle>{editingTxId ? t('cash_flow.edit_entry', 'Edit entry') : txForm.direction === "in" ? t('cash_flow.receive_money', 'Receive money') : t('cash_flow.pay_out_title', 'Pay out')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label>Direction</Label>
+                <Label>{t('cash_flow.direction_label', 'Direction')}</Label>
                 <Select value={txForm.direction} onValueChange={(v) => setTxForm((f: any) => ({ ...f, direction: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="in">Money in</SelectItem>
-                    <SelectItem value="out">Money out</SelectItem>
+                    <SelectItem value="in">{t('cash_flow.money_in', 'Money in')}</SelectItem>
+                    <SelectItem value="out">{t('cash_flow.money_out', 'Money out')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Date</Label>
+                <Label>{t('cash_flow.date_label', 'Date')}</Label>
                 <Input type="date" value={txForm.occurred_on} onChange={(e) => setTxForm((f: any) => ({ ...f, occurred_on: e.target.value }))} />
               </div>
             </div>
             <div>
-              <Label>Payment method</Label>
+              <Label>{t('cash_flow.payment_method_label', 'Payment method')}</Label>
               <Select
                 value={txForm.payment_method || "cash"}
                 onValueChange={(v) => setTxForm((f: any) => {
@@ -1009,15 +1012,15 @@ function Page() {
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{m.label}</SelectItem>)}
+                  {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{t(`cash_flow.pay_method_${m.v}`, m.label)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             {(txForm.payment_method || "cash") === "bank" ? (
               <div>
-                <Label>Select account</Label>
+                <Label>{t('cash_flow.select_account_label', 'Select account')}</Label>
                 <Select value={txForm.account_id} onValueChange={(v) => setTxForm((f: any) => ({ ...f, account_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Choose bank account" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('cash_flow.choose_bank_account', 'Choose bank account')} /></SelectTrigger>
                   <SelectContent>
                     {(accounts.filter((a) => a.type === "bank").length ? accounts.filter((a) => a.type === "bank") : accounts)
                       .map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
@@ -1026,9 +1029,9 @@ function Page() {
               </div>
             ) : (
               <div>
-                <Label>Account</Label>
+                <Label>{t('cash_flow.account_label', 'Account')}</Label>
                 <Select value={txForm.account_id} onValueChange={(v) => setTxForm((f: any) => ({ ...f, account_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Choose account" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('cash_flow.choose_account', 'Choose account')} /></SelectTrigger>
                   <SelectContent>
                     {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
@@ -1038,31 +1041,31 @@ function Page() {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label>Amount</Label>
+                <Label>{t('common.amount', 'Amount')}</Label>
                 <Input type="number" step="0.01" value={txForm.amount} onChange={(e) => setTxForm((f: any) => ({ ...f, amount: e.target.value }))} />
               </div>
               <div>
-                <Label>Category</Label>
+                <Label>{t('cash_flow.category_label', 'Category')}</Label>
                 <Select value={txForm.category} onValueChange={(v) => setTxForm((f: any) => ({ ...f, category: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{c.replace(/_/g, " ")}</SelectItem>)}
+                    {CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{t(`cash_flow.category_${c}`, c.replace(/_/g, " "))}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div>
-              <Label>Reference</Label>
-              <Input value={txForm.reference} onChange={(e) => setTxForm((f: any) => ({ ...f, reference: e.target.value }))} placeholder="Invoice #, cheque #, txn id…" />
+              <Label>{t('cash_flow.reference_label', 'Reference')}</Label>
+              <Input value={txForm.reference} onChange={(e) => setTxForm((f: any) => ({ ...f, reference: e.target.value }))} placeholder={t('cash_flow.reference_placeholder', 'Invoice #, cheque #, txn id…')} />
             </div>
             <div>
-              <Label>Notes</Label>
+              <Label>{t('cash_flow.notes_label', 'Notes')}</Label>
               <Textarea value={txForm.notes} onChange={(e) => setTxForm((f: any) => ({ ...f, notes: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTxOpen(false)}>Cancel</Button>
-            <Button onClick={saveTx}>Save</Button>
+            <Button variant="outline" onClick={() => setTxOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveTx}>{t('common.save', 'Save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1070,35 +1073,35 @@ function Page() {
       {/* Transfer dialog */}
       <Dialog open={tfOpen} onOpenChange={setTfOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Transfer between accounts</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('cash_flow.transfer_between', 'Transfer between accounts')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {allAccounts.length < 2 && (
               <div className="text-xs rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-amber-700">
-                You need at least two accounts to transfer. Add one from "New account", or start using POS to auto-create buckets.
+                {t('cash_flow.need_two_accounts', 'You need at least two accounts to transfer. Add one from "New account", or start using POS to auto-create buckets.')}
               </div>
             )}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label>From</Label>
+                <Label>{t('cash_flow.from_label', 'From')}</Label>
                 <Select value={tfForm.from_id} onValueChange={(v) => setTfForm((f: any) => ({ ...f, from_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Source account" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('cash_flow.source_account_placeholder', 'Source account')} /></SelectTrigger>
                   <SelectContent>
                     {allAccounts.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
-                        {a.name}{isAutoAcc(a.id) ? " · Auto" : ""}
+                        {a.name}{isAutoAcc(a.id) ? t('cash_flow.auto_suffix', ' · Auto') : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>To</Label>
+                <Label>{t('cash_flow.to_label', 'To')}</Label>
                 <Select value={tfForm.to_id} onValueChange={(v) => setTfForm((f: any) => ({ ...f, to_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Destination account" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('cash_flow.destination_account_placeholder', 'Destination account')} /></SelectTrigger>
                   <SelectContent>
                     {allAccounts.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
-                        {a.name}{isAutoAcc(a.id) ? " · Auto" : ""}
+                        {a.name}{isAutoAcc(a.id) ? t('cash_flow.auto_suffix', ' · Auto') : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1107,16 +1110,16 @@ function Page() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label>Amount</Label>
+                <Label>{t('common.amount', 'Amount')}</Label>
                 <Input type="number" step="0.01" value={tfForm.amount} onChange={(e) => setTfForm((f: any) => ({ ...f, amount: e.target.value }))} />
               </div>
               <div>
-                <Label>Date</Label>
+                <Label>{t('cash_flow.date_label', 'Date')}</Label>
                 <Input type="date" value={tfForm.occurred_on} onChange={(e) => setTfForm((f: any) => ({ ...f, occurred_on: e.target.value }))} />
               </div>
             </div>
             <div>
-              <Label>Notes</Label>
+              <Label>{t('cash_flow.notes_label', 'Notes')}</Label>
               <Textarea value={tfForm.notes} onChange={(e) => setTfForm((f: any) => ({ ...f, notes: e.target.value }))} />
             </div>
             <div className="pt-2 border-t">
@@ -1126,16 +1129,16 @@ function Page() {
                 onClick={() => { setTfOpen(false); openSupplierPay(); }}
               >
                 <Truck className="h-4 w-4 mr-2" />
-                Pay a supplier instead
+                {t('cash_flow.pay_supplier_instead', 'Pay a supplier instead')}
               </Button>
               <p className="text-[11px] text-muted-foreground mt-1 text-center">
-                Deducts from the chosen account and reduces the supplier's ledger balance.
+                {t('cash_flow.pay_supplier_instead_note', "Deducts from the chosen account and reduces the supplier's ledger balance.")}
               </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTfOpen(false)}>Cancel</Button>
-            <Button onClick={saveTransfer}>Record transfer</Button>
+            <Button variant="outline" onClick={() => setTfOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveTransfer}>{t('cash_flow.record_transfer', 'Record transfer')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1143,33 +1146,33 @@ function Page() {
       {/* Supplier payment dialog */}
       <Dialog open={spOpen} onOpenChange={setSpOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Pay a supplier</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('cash_flow.pay_a_supplier', 'Pay a supplier')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Supplier</Label>
+              <Label>{t('cash_flow.supplier_label', 'Supplier')}</Label>
               <Select value={spForm.supplier_id} onValueChange={(v) => {
                 const s = (suppliersQ.data ?? []).find((x: any) => x.id === v);
                 const owed = Math.max(Number(s?.balance ?? 0), 0);
                 setSpForm((f: any) => ({ ...f, supplier_id: v, amount: f.amount || owed }));
               }}>
-                <SelectTrigger><SelectValue placeholder="Choose supplier" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('cash_flow.choose_supplier', 'Choose supplier')} /></SelectTrigger>
                 <SelectContent>
                   {(suppliersQ.data ?? []).map((s: any) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name}{Number(s.balance) > 0 ? ` · owed ${fmt(Number(s.balance))}` : ""}
+                      {s.name}{Number(s.balance) > 0 ? t('cash_flow.owed_suffix', ' · owed {{amount}}', { amount: fmt(Number(s.balance)) }) : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Payment source (cash in hand, bank, wallet…)</Label>
+              <Label>{t('cash_flow.payment_source_label', 'Payment source (cash in hand, bank, wallet…)')}</Label>
               <Select value={spForm.from_id} onValueChange={(v) => setSpForm((f: any) => ({ ...f, from_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Choose account" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('cash_flow.choose_account', 'Choose account')} /></SelectTrigger>
                 <SelectContent>
                   {allAccounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name}{isAutoAcc(a.id) ? " · Auto" : ""} — {labelFor(a.type)}
+                      {a.name}{isAutoAcc(a.id) ? t('cash_flow.auto_suffix', ' · Auto') : ""} — {t(`cash_flow.acc_type_${a.type}`, labelFor(a.type))}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1177,22 +1180,22 @@ function Page() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label>Amount</Label>
+                <Label>{t('common.amount', 'Amount')}</Label>
                 <Input type="number" step="0.01" value={spForm.amount} onChange={(e) => setSpForm((f: any) => ({ ...f, amount: e.target.value }))} />
               </div>
               <div>
-                <Label>Date</Label>
+                <Label>{t('cash_flow.date_label', 'Date')}</Label>
                 <Input type="date" value={spForm.occurred_on} onChange={(e) => setSpForm((f: any) => ({ ...f, occurred_on: e.target.value }))} />
               </div>
             </div>
             <div>
-              <Label>Note</Label>
-              <Input value={spForm.note} onChange={(e) => setSpForm((f: any) => ({ ...f, note: e.target.value }))} placeholder="Optional reference" />
+              <Label>{t('common.note', 'Note')}</Label>
+              <Input value={spForm.note} onChange={(e) => setSpForm((f: any) => ({ ...f, note: e.target.value }))} placeholder={t('cash_flow.note_placeholder', 'Optional reference')} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSpOpen(false)}>Cancel</Button>
-            <Button onClick={saveSupplierPay}>Pay supplier</Button>
+            <Button variant="outline" onClick={() => setSpOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveSupplierPay}>{t('cash_flow.pay_supplier_btn', 'Pay supplier')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1204,7 +1207,7 @@ function Page() {
           {(() => {
             if (!details) return null;
             if (details.kind === "opening" || details.kind === "balance") {
-              const title = details.kind === "opening" ? "Opening balance — per account" : "Cash on hand — per account";
+              const title = details.kind === "opening" ? t('cash_flow.title_opening_per_account', 'Opening balance — per account') : t('cash_flow.title_balance_per_account', 'Cash on hand — per account');
               const perAcc = new Map<string, { prior: number; inSum: number; outSum: number }>();
               for (const a of allAccounts) perAcc.set(a.id, { prior: 0, inSum: 0, outSum: 0 });
               for (const t of detailTxs) {
@@ -1223,12 +1226,12 @@ function Page() {
                     <Table className="w-full">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Account</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead className="text-right">Opening</TableHead>
-                          <TableHead className="text-right">In</TableHead>
-                          <TableHead className="text-right">Out</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
+                          <TableHead>{t('cash_flow.th_account', 'Account')}</TableHead>
+                          <TableHead>{t('reports.th_type', 'Type')}</TableHead>
+                          <TableHead className="text-right">{t('cash_flow.th_opening', 'Opening')}</TableHead>
+                          <TableHead className="text-right">{t('cash_flow.th_in', 'In')}</TableHead>
+                          <TableHead className="text-right">{t('cash_flow.th_out', 'Out')}</TableHead>
+                          <TableHead className="text-right">{t('cash_flow.th_balance', 'Balance')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1239,7 +1242,7 @@ function Page() {
                           return (
                             <TableRow key={a.id}>
                               <TableCell className="font-medium">{a.name}</TableCell>
-                              <TableCell className="text-muted-foreground">{labelFor(a.type)}</TableCell>
+                              <TableCell className="text-muted-foreground">{t(`cash_flow.acc_type_${a.type}`, labelFor(a.type))}</TableCell>
                               <TableCell className="text-right">{fmt(opening)}</TableCell>
                               <TableCell className="text-right text-emerald-600">{fmt(r.inSum)}</TableCell>
                               <TableCell className="text-right text-rose-600">{fmt(r.outSum)}</TableCell>
@@ -1296,9 +1299,9 @@ function Page() {
             const closingBal = openingBal + inTot - outTot;
 
             const title =
-              details.kind === "in" ? "Every payment received"
-              : details.kind === "out" ? "Every payment sent"
-              : `${accById(accId!)?.name ?? "Account"} — full history`;
+              details.kind === "in" ? t('cash_flow.title_every_received', 'Every payment received')
+              : details.kind === "out" ? t('cash_flow.title_every_sent', 'Every payment sent')
+              : t('cash_flow.title_account_history', '{{name}} — full history', { name: accById(accId!)?.name ?? t('cash_flow.account_fallback', 'Account') });
             return (
               <>
                 <DialogHeader>
@@ -1309,66 +1312,66 @@ function Page() {
                   
                   {!accId && (
                     <Select value={dFilterAcc} onValueChange={setDFilterAcc}>
-                      <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue placeholder="All Accounts" /></SelectTrigger>
+                      <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue placeholder={t('cash_flow.all_accounts_placeholder', 'All Accounts')} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Accounts</SelectItem>
+                        <SelectItem value="all">{t('cash_flow.all_accounts_placeholder', 'All Accounts')}</SelectItem>
                         {allAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   )}
 
                   <Select value={dFilterMethod} onValueChange={setDFilterMethod}>
-                    <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue placeholder="All Methods" /></SelectTrigger>
+                    <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue placeholder={t('cash_flow.all_methods_placeholder', 'All Methods')} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Methods</SelectItem>
-                      {PAY_METHODS.map(m => <SelectItem key={m.v} value={m.v}>{m.label}</SelectItem>)}
+                      <SelectItem value="all">{t('cash_flow.all_methods_placeholder', 'All Methods')}</SelectItem>
+                      {PAY_METHODS.map(m => <SelectItem key={m.v} value={m.v}>{t(`cash_flow.pay_method_${m.v}`, m.label)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
 
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 my-2">
-                  <StatMini label="Opening" value={fmt(openingBal)} />
-                  <StatMini label="Period In" value={fmt(inTot)} tone="success" />
-                  <StatMini label="Period Out" value={fmt(outTot)} tone="destructive" />
-                  <StatMini label="Closing" value={fmt(closingBal)} />
+                  <StatMini label={t('cash_flow.stat_opening', 'Opening')} value={fmt(openingBal)} />
+                  <StatMini label={t('cash_flow.stat_period_in', 'Period In')} value={fmt(inTot)} tone="success" />
+                  <StatMini label={t('cash_flow.stat_period_out', 'Period Out')} value={fmt(outTot)} tone="destructive" />
+                  <StatMini label={t('cash_flow.stat_closing', 'Closing')} value={fmt(closingBal)} />
                 </div>
                 <div className="flex-1 overflow-auto min-h-0 border rounded-md">
 
                   <Table className="w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[100px]">Date</TableHead>
-                        {!accId && <TableHead>Account</TableHead>}
-                        <TableHead>Method</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Reference / Notes</TableHead>
-                        <TableHead className="text-right">In</TableHead>
-                        <TableHead className="text-right">Out</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead className="w-[100px]">{t('sales.th_date', 'Date')}</TableHead>
+                        {!accId && <TableHead>{t('cash_flow.th_account', 'Account')}</TableHead>}
+                        <TableHead>{t('sales.th_method', 'Method')}</TableHead>
+                        <TableHead>{t('reports.th_category', 'Category')}</TableHead>
+                        <TableHead>{t('cash_flow.th_reference_notes', 'Reference / Notes')}</TableHead>
+                        <TableHead className="text-right">{t('cash_flow.th_in', 'In')}</TableHead>
+                        <TableHead className="text-right">{t('cash_flow.th_out', 'Out')}</TableHead>
+                        <TableHead className="text-right">{t('cash_flow.th_balance', 'Balance')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {list.length === 0 && (
-                        <TableRow><TableCell colSpan={accId ? 7 : 8} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={accId ? 7 : 8} className="text-center text-muted-foreground py-8">{t('cash_flow.no_entries', 'No entries')}</TableCell></TableRow>
                       )}
-                      {list.map((t) => {
-                        const acc = accById(t.account_id);
+                      {list.map((tx) => {
+                        const acc = accById(tx.account_id);
                         return (
-                          <TableRow key={t.id}>
-                            <TableCell>{t.occurred_on}</TableCell>
+                          <TableRow key={tx.id}>
+                            <TableCell>{tx.occurred_on}</TableCell>
                             {!accId && <TableCell>{acc?.name ?? "—"}</TableCell>}
-                            <TableCell>{payLabel(methodOf(t))}</TableCell>
-                            <TableCell className="capitalize">{t.category.replace(/_/g, " ")}</TableCell>
+                            <TableCell>{t(`cash_flow.pay_method_${methodOf(tx)}`, payLabel(methodOf(tx)))}</TableCell>
+                            <TableCell className="capitalize">{t(`cash_flow.category_${tx.category}`, tx.category.replace(/_/g, " "))}</TableCell>
 
                             <TableCell className="max-w-[260px] break-words">
-                              {t.reference && <span className="font-medium">{t.reference}</span>}
-                              {t.reference && t.notes && <span> — </span>}
-                              {t.notes && <span className="text-muted-foreground">{t.notes}</span>}
+                              {tx.reference && <span className="font-medium">{tx.reference}</span>}
+                              {tx.reference && tx.notes && <span> — </span>}
+                              {tx.notes && <span className="text-muted-foreground">{tx.notes}</span>}
                             </TableCell>
-                            <TableCell className="text-right text-emerald-600">{t.direction === "in" ? fmt(Number(t.amount)) : ""}</TableCell>
-                            <TableCell className="text-right text-rose-600">{t.direction === "out" ? fmt(Number(t.amount)) : ""}</TableCell>
-                            <TableCell className="text-right font-semibold">{fmt(runMap.get(t.id) ?? 0)}</TableCell>
+                            <TableCell className="text-right text-emerald-600">{tx.direction === "in" ? fmt(Number(tx.amount)) : ""}</TableCell>
+                            <TableCell className="text-right text-rose-600">{tx.direction === "out" ? fmt(Number(tx.amount)) : ""}</TableCell>
+                            <TableCell className="text-right font-semibold">{fmt(runMap.get(tx.id) ?? 0)}</TableCell>
                           </TableRow>
                         );
                       })}
@@ -1379,7 +1382,7 @@ function Page() {
             );
           })()}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetails(null)}>Close</Button>
+            <Button variant="outline" onClick={() => setDetails(null)}>{t('common.close', 'Close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
