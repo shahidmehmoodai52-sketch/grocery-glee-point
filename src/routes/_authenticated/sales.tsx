@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Printer, Undo2, Ban, CalendarIcon, ArrowUpRight, ArrowDownRight, Receipt as ReceiptIcon, Wallet, TrendingUp } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -43,6 +44,7 @@ const displayPaymentMethod = (value: string | null | undefined) => {
 };
 
 function Page() {
+  const { t } = useTranslation();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs.";
   const qc = useQueryClient();
@@ -152,20 +154,20 @@ function Page() {
   const dRet = pct(rangeReturns, prevRangeReturns);
   const dProf = pct(rangeProfit, prevProfit);
 
-  const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
+  const presetLabel = preset === "custom" ? t('dashboard.custom_range', 'Custom range') : (PRESETS.find(p => p.key === preset)?.label ?? t('dashboard.today', 'Today'));
 
 
 
   const confirmVoid = async () => {
     if (!voidTarget) return;
-    if (voidRequireReason && !voidReason.trim()) return toast.error("Reason required");
+    if (voidRequireReason && !voidReason.trim()) return toast.error(t('sales.reason_required', 'Reason required'));
     setVoiding(true);
     const { error } = await supabase.rpc("void_sale", {
       _sale_id: voidTarget.id, _reason: voidReason.trim() || "voided",
     });
     setVoiding(false);
     if (error) return toast.error(error.message);
-    toast.success(`Sale ${voidTarget.invoice_no} voided`);
+    toast.success(t('sales.sale_voided', 'Sale {{invoice}} voided', { invoice: voidTarget.invoice_no }));
     setVoidTarget(null); setVoidReason("");
     qc.invalidateQueries({ queryKey: ["sales"] });
     qc.invalidateQueries({ queryKey: ["sale-returns-on-sales"] });
@@ -176,8 +178,8 @@ function Page() {
     <div className="p-6 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Sales history</h1>
-          <p className="text-sm text-muted-foreground">{sales.length} invoices · {presetLabel}</p>
+          <h1 className="text-2xl font-semibold">{t('sales.title', 'Sales history')}</h1>
+          <p className="text-sm text-muted-foreground">{t('sales.invoices_count', '{{count}} invoices', { count: sales.length })} · {presetLabel}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {PRESETS.map(p => (
@@ -200,7 +202,7 @@ function Page() {
                 <CalendarIcon className="h-4 w-4" />
                 {fromDate && toDate
                   ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
-                  : "Custom range"}
+                  : t('dashboard.custom_range', 'Custom range')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -221,11 +223,11 @@ function Page() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KpiCard icon={ReceiptIcon} tone="info" label={`${presetLabel} · invoices`} value={String(sales.length)} delta={dCount} sub={`${prevSales.length} last period`} />
-        <KpiCard icon={TrendingUp} tone="primary" label={`${presetLabel} · revenue`} value={fmtMoney(netRevenue, sym)} delta={dRev} sub="After returns" />
-        <KpiCard icon={TrendingUp} tone="info" label={`${presetLabel} · gross sales`} value={fmtMoney(rangeTotal, sym)} delta={dGross} sub="Before returns" />
-        <KpiCard icon={Undo2} tone="destructive" label={`${presetLabel} · returns`} value={`-${fmtMoney(rangeReturns, sym)}`} delta={dRet} deltaInverse sub={`${returns.length} refund${returns.length === 1 ? "" : "s"}`} />
-        <KpiCard icon={Wallet} tone="success" label={`${presetLabel} · profit`} value={fmtMoney(rangeProfit, sym)} delta={dProf} sub="Net of returns" />
+        <KpiCard icon={ReceiptIcon} tone="info" label={t('sales.kpi_invoices', '{{preset}} · invoices', { preset: presetLabel })} value={String(sales.length)} delta={dCount} sub={t('sales.last_period', '{{count}} last period', { count: prevSales.length })} />
+        <KpiCard icon={TrendingUp} tone="primary" label={t('sales.kpi_revenue', '{{preset}} · revenue', { preset: presetLabel })} value={fmtMoney(netRevenue, sym)} delta={dRev} sub={t('sales.after_returns', 'After returns')} />
+        <KpiCard icon={TrendingUp} tone="info" label={t('sales.kpi_gross_sales', '{{preset}} · gross sales', { preset: presetLabel })} value={fmtMoney(rangeTotal, sym)} delta={dGross} sub={t('sales.before_returns', 'Before returns')} />
+        <KpiCard icon={Undo2} tone="destructive" label={t('sales.kpi_returns', '{{preset}} · returns', { preset: presetLabel })} value={`-${fmtMoney(rangeReturns, sym)}`} delta={dRet} deltaInverse sub={t('sales.refunds_count', '{{count}} refunds', { count: returns.length })} />
+        <KpiCard icon={Wallet} tone="success" label={t('sales.kpi_profit', '{{preset}} · profit', { preset: presetLabel })} value={fmtMoney(rangeProfit, sym)} delta={dProf} sub={t('sales.net_of_returns', 'Net of returns')} />
       </div>
 
 
@@ -233,32 +235,35 @@ function Page() {
       <Card className="p-3">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
-            <TableHead>Method</TableHead><TableHead className="text-right">Total</TableHead>
-            <TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+            <TableHead>{t('sales.th_invoice', 'Invoice')}</TableHead><TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead>{t('sales.th_customer', 'Customer')}</TableHead>
+            <TableHead>{t('sales.th_method', 'Method')}</TableHead><TableHead className="text-right">{t('sales.th_total', 'Total')}</TableHead>
+            <TableHead className="text-right">{t('sales.th_paid', 'Paid')}</TableHead><TableHead>{t('sales.th_status', 'Status')}</TableHead><TableHead></TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {sales.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No sales yet</TableCell></TableRow>}
+            {sales.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">{t('sales.no_sales_yet', 'No sales yet')}</TableCell></TableRow>}
             {sales.map((s: any) => (
               <TableRow key={s.id}>
                 <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
                 <TableCell className="text-sm">{fmtDate(s.created_at)}</TableCell>
-                <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
+                <TableCell>{s.customers?.name ?? t('common.walk_in', 'Walk-in')}</TableCell>
                 <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(s.paid, sym)}</TableCell>
                 <TableCell>
                   <Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>
-                    {s.status}
+                    {s.status === "completed" ? t('sales.status_completed', 'Completed')
+                      : s.status === "credit" ? t('sales.status_credit', 'Credit')
+                      : s.status === "voided" ? t('sales.status_voided', 'Voided')
+                      : s.status}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right whitespace-nowrap">
-                  <Button asChild variant="ghost" size="sm" title="Create return">
+                  <Button asChild variant="ghost" size="sm" title={t('sales.create_return', 'Create return')}>
                     <Link to="/sale-returns"><Undo2 className="h-4 w-4" /></Link>
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setViewing(s)} title="View invoice"><Eye className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => setViewing(s)} title={t('sales.view_invoice', 'View invoice')}><Eye className="h-4 w-4" /></Button>
                   {s.status !== "voided" && (
-                    <Button variant="ghost" size="icon" onClick={() => { setVoidTarget(s); setVoidReason(""); }} title="Void sale">
+                    <Button variant="ghost" size="icon" onClick={() => { setVoidTarget(s); setVoidReason(""); }} title={t('sales.void_sale', 'Void sale')}>
                       <Ban className="h-4 w-4 text-destructive" />
                     </Button>
                   )}
@@ -271,33 +276,33 @@ function Page() {
 
       <div className="flex items-center justify-between pt-2">
         <div>
-          <h2 className="text-lg font-semibold">Sale returns</h2>
-          <p className="text-xs text-muted-foreground">{returns.length} refund{returns.length === 1 ? "" : "s"} · stock restored automatically</p>
+          <h2 className="text-lg font-semibold">{t('sales.returns_heading', 'Sale returns')}</h2>
+          <p className="text-xs text-muted-foreground">{t('sales.returns_sub', '{{count}} refunds · stock restored automatically', { count: returns.length })}</p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link to="/sale-returns"><Undo2 className="h-4 w-4 mr-1" />New return</Link>
+          <Link to="/sale-returns"><Undo2 className="h-4 w-4 mr-1" />{t('sales.new_return', 'New return')}</Link>
         </Button>
       </div>
       <Card className="p-3">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Return #</TableHead><TableHead>Date</TableHead><TableHead>Original invoice</TableHead>
-            <TableHead>Customer</TableHead><TableHead className="text-right">Total</TableHead>
-            <TableHead className="text-right">Refund</TableHead><TableHead>Method</TableHead><TableHead></TableHead>
+            <TableHead>{t('sales.th_return_no', 'Return #')}</TableHead><TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead>{t('sales.th_original_invoice', 'Original invoice')}</TableHead>
+            <TableHead>{t('sales.th_customer', 'Customer')}</TableHead><TableHead className="text-right">{t('sales.th_total', 'Total')}</TableHead>
+            <TableHead className="text-right">{t('sales.th_refund', 'Refund')}</TableHead><TableHead>{t('sales.th_method', 'Method')}</TableHead><TableHead></TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {returns.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No returns in this range</TableCell></TableRow>}
+            {returns.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">{t('sales.no_returns_in_range', 'No returns in this range')}</TableCell></TableRow>}
             {returns.map((r: any) => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono text-xs">{r.return_no}</TableCell>
                 <TableCell className="text-sm">{fmtDate(r.created_at)}</TableCell>
                 <TableCell className="font-mono text-xs">{r.sales?.invoice_no ?? "—"}</TableCell>
-                <TableCell>{r.customers?.name ?? "Walk-in"}</TableCell>
+                <TableCell>{r.customers?.name ?? t('common.walk_in', 'Walk-in')}</TableCell>
                 <TableCell className="text-right font-medium text-destructive">-{fmtMoney(r.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(r.refund_amount, sym)}</TableCell>
                 <TableCell><Badge variant="outline" className="capitalize">{r.refund_method}</Badge></TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => setViewing({ ...r, __isReturn: true, sale_items: r.sale_return_items })} title="View return">
+                  <Button variant="ghost" size="icon" onClick={() => setViewing({ ...r, __isReturn: true, sale_items: r.sale_return_items })} title={t('sales.view_return', 'View return')}>
                     <Eye className="h-4 w-4" />
                   </Button>
                 </TableCell>
@@ -309,7 +314,7 @@ function Page() {
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>{viewing?.__isReturn ? `Return ${viewing?.return_no}` : `Invoice ${viewing?.invoice_no}`}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{viewing?.__isReturn ? t('sales.return_title', 'Return {{no}}', { no: viewing?.return_no }) : t('sales.invoice_title', 'Invoice {{no}}', { no: viewing?.invoice_no })}</DialogTitle></DialogHeader>
           {viewing && (
             <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
               <div className="print-area">
@@ -320,7 +325,7 @@ function Page() {
             </div>
           )}
           <DialogFooter className="no-print">
-            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -328,26 +333,26 @@ function Page() {
       <Dialog open={!!voidTarget} onOpenChange={(o) => !o && setVoidTarget(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Void sale {voidTarget?.invoice_no}?</DialogTitle>
+            <DialogTitle>{t('sales.void_confirm_title', 'Void sale {{invoice}}?', { invoice: voidTarget?.invoice_no })}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <p className="text-muted-foreground">
-              Voiding restores stock and reverses ledger entries. This action is logged.
+              {t('sales.void_confirm_desc', 'Voiding restores stock and reverses ledger entries. This action is logged.')}
             </p>
             <div>
-              <label className="text-xs font-medium">Reason {voidRequireReason && <span className="text-destructive">*</span>}</label>
+              <label className="text-xs font-medium">{t('sales.void_reason_label', 'Reason')} {voidRequireReason && <span className="text-destructive">*</span>}</label>
               <Textarea
                 value={voidReason}
                 onChange={(e) => setVoidReason(e.target.value)}
-                placeholder="Why is this sale being voided?"
+                placeholder={t('sales.void_reason_placeholder', 'Why is this sale being voided?')}
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setVoidTarget(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setVoidTarget(null)}>{t('common.cancel', 'Cancel')}</Button>
             <Button variant="destructive" onClick={confirmVoid} disabled={voiding}>
-              {voiding ? "Voiding…" : "Void sale"}
+              {voiding ? t('sales.voiding', 'Voiding…') : t('sales.void_sale', 'Void sale')}
             </Button>
           </DialogFooter>
         </DialogContent>
