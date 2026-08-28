@@ -759,7 +759,17 @@
     "no_expenses_period": "Sin gastos en este período",
     "no_people_yet": "Aún no se han añadido personas",
     "open_ledger": "Abrir historial",
-    "unassigned": "Sin asignar"
+    "unassigned": "Sin asignar",
+    "back": "Atrás",
+    "person_fallback": "Persona",
+    "quick_range": "Rango rápido",
+    "opening_before_range": "Inicial (antes del rango)",
+    "period_spent": "Gastado en el período",
+    "all_time_total": "Total histórico",
+    "no_entries": "Sin entradas",
+    "opening_balance_before": "Saldo inicial (antes de {{date}})",
+    "period_total": "Total del período",
+    "closing_balance_formula": "Saldo final (Inicial + Período)"
   },
   "users": {
     "heading": "Personal y accesos",

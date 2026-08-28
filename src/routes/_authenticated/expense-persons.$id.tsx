@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Printer, Receipt as ReceiptIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,11 @@ import { rangeFor, type DatePreset } from "@/lib/date-presets";
 export const Route = createFileRoute("/_authenticated/expense-persons/$id")({ component: Page });
 
 function Page() {
+  const { t } = useTranslation();
   const { id } = Route.useParams();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
+  const categoryLabel = (c: string) => t(`expenses.category_${c}`, c.replace(/_/g, " "));
 
   const [preset, setPreset] = useState<DatePreset>("all");
   const [from, setFrom] = useState("");
@@ -79,17 +82,17 @@ function Page() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="sm"><Link to="/expenses"><ArrowLeft className="h-4 w-4 mr-1" />Back</Link></Button>
+          <Button asChild variant="ghost" size="sm"><Link to="/expenses"><ArrowLeft className="h-4 w-4 mr-1" />{t('expenses.back', 'Back')}</Link></Button>
           <div>
-            <h1 className="text-2xl font-semibold">{person?.name ?? "Person"}</h1>
+            <h1 className="text-2xl font-semibold">{person?.name ?? t('expenses.person_fallback', 'Person')}</h1>
             <div className="text-xs text-muted-foreground">
-              {person?.role ?? "—"} {person?.phone ? `· ${person.phone}` : ""}
+              {person?.role ? t(`expenses.role_${person.role}`, person.role) : "—"} {person?.phone ? `· ${person.phone}` : ""}
             </div>
           </div>
         </div>
         <div className="flex items-end gap-2 no-print">
           <div className="w-40">
-            <Label className="text-xs">Quick range</Label>
+            <Label className="text-xs">{t('expenses.quick_range', 'Quick range')}</Label>
             <Select value={preset} onValueChange={(v) => applyPreset(v as DatePreset)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -103,51 +106,51 @@ function Page() {
               </SelectContent>
             </Select>
           </div>
-          <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset("custom" as any); }} className="h-9" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset("custom" as any); }} className="h-9" /></div>
-          <Button variant="outline" size="sm" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />Print</Button>
+          <div><Label className="text-xs">{t('customers.from_label', 'From')}</Label><Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset("custom" as any); }} className="h-9" /></div>
+          <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset("custom" as any); }} className="h-9" /></div>
+          <Button variant="outline" size="sm" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />{t('common.print', 'Print')}</Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4"><div className="text-xs text-muted-foreground">Opening (before range)</div><div className="text-2xl font-semibold mt-1">{fmtMoney(opening, sym)}</div></Card>
-        <Card className="p-4"><div className="text-xs text-muted-foreground">Period spent</div><div className="text-2xl font-semibold mt-1 text-destructive">{fmtMoney(totalPeriod, sym)}</div></Card>
-        <Card className="p-4"><div className="text-xs text-muted-foreground">All-time total</div><div className="text-2xl font-semibold mt-1">{fmtMoney(totalAll, sym)}</div></Card>
-        <Card className="p-4"><div className="text-xs text-muted-foreground">Entries</div><div className="text-2xl font-semibold mt-1">{filtered.length}</div></Card>
+        <Card className="p-4"><div className="text-xs text-muted-foreground">{t('expenses.opening_before_range', 'Opening (before range)')}</div><div className="text-2xl font-semibold mt-1">{fmtMoney(opening, sym)}</div></Card>
+        <Card className="p-4"><div className="text-xs text-muted-foreground">{t('expenses.period_spent', 'Period spent')}</div><div className="text-2xl font-semibold mt-1 text-destructive">{fmtMoney(totalPeriod, sym)}</div></Card>
+        <Card className="p-4"><div className="text-xs text-muted-foreground">{t('expenses.all_time_total', 'All-time total')}</div><div className="text-2xl font-semibold mt-1">{fmtMoney(totalAll, sym)}</div></Card>
+        <Card className="p-4"><div className="text-xs text-muted-foreground">{t('expenses.stat_entries', 'Entries')}</div><div className="text-2xl font-semibold mt-1">{filtered.length}</div></Card>
       </div>
 
       <Card className="p-3">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="text-right">Invoice</TableHead>
+            <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+            <TableHead>{t('pos.qa_category', 'Category')}</TableHead>
+            <TableHead>{t('expenses.th_description', 'Description')}</TableHead>
+            <TableHead>{t('sales.th_method', 'Method')}</TableHead>
+            <TableHead className="text-right">{t('common.amount', 'Amount')}</TableHead>
+            <TableHead className="text-right">{t('sales.th_invoice', 'Invoice')}</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {from && opening > 0 && (
               <TableRow className="bg-muted/50">
                 <TableCell>{from}</TableCell>
-                <TableCell colSpan={3} className="font-medium text-muted-foreground">Opening balance (before {from})</TableCell>
+                <TableCell colSpan={3} className="font-medium text-muted-foreground">{t('expenses.opening_balance_before', 'Opening balance (before {{date}})', { date: from })}</TableCell>
                 <TableCell className="text-right font-semibold">{fmtMoney(opening, sym)}</TableCell>
                 <TableCell></TableCell>
               </TableRow>
             )}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No entries</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('expenses.no_entries', 'No entries')}</TableCell></TableRow>
             )}
             {filtered.map((r: any) => (
               <TableRow key={r.id} className={r.sale_id ? "bg-red-50/40 dark:bg-red-950/10" : ""}>
                 <TableCell>{r.expense_date}</TableCell>
-                <TableCell><Badge variant="secondary" className="capitalize">{r.category.replace("_", " ")}</Badge></TableCell>
+                <TableCell><Badge variant="secondary" className="capitalize">{categoryLabel(r.category)}</Badge></TableCell>
                 <TableCell className="max-w-[360px] truncate">{r.description ?? "—"}</TableCell>
-                <TableCell className="text-xs uppercase text-muted-foreground">{r.method}</TableCell>
+                <TableCell className="text-xs uppercase text-muted-foreground">{t(`expenses.method_${r.method}`, r.method)}</TableCell>
                 <TableCell className="text-right font-medium text-destructive">{fmtMoney(r.amount, sym)}</TableCell>
                 <TableCell className="text-right">
                   {r.sale_id ? (
-                    <Button size="sm" variant="ghost" onClick={() => openSale(r.sale_id)} title="View invoice">
+                    <Button size="sm" variant="ghost" onClick={() => openSale(r.sale_id)} title={t('sales.view_invoice', 'View invoice')}>
                       <ReceiptIcon className="h-3.5 w-3.5" />
                     </Button>
                   ) : "—"}
@@ -155,12 +158,12 @@ function Page() {
               </TableRow>
             ))}
             <TableRow className="bg-muted/40 font-semibold">
-              <TableCell colSpan={4} className="text-right">Period total</TableCell>
+              <TableCell colSpan={4} className="text-right">{t('expenses.period_total', 'Period total')}</TableCell>
               <TableCell className="text-right">{fmtMoney(totalPeriod, sym)}</TableCell>
               <TableCell></TableCell>
             </TableRow>
             <TableRow className="bg-primary/10 font-bold">
-              <TableCell colSpan={4} className="text-right">Closing balance (Opening + Period)</TableCell>
+              <TableCell colSpan={4} className="text-right">{t('expenses.closing_balance_formula', 'Closing balance (Opening + Period)')}</TableCell>
               <TableCell className="text-right">{fmtMoney(opening + totalPeriod, sym)}</TableCell>
               <TableCell></TableCell>
             </TableRow>
@@ -170,11 +173,11 @@ function Page() {
 
       <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Invoice {view?.invoice_no}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('sales.invoice_title', 'Invoice {{no}}', { no: view?.invoice_no })}</DialogTitle></DialogHeader>
           {view && <Receipt invoice={view} settings={settings} />}
           <div className="flex justify-end gap-2 no-print">
-            <Button variant="outline" onClick={() => setView(null)}>Close</Button>
-            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />Print</Button>
+            <Button variant="outline" onClick={() => setView(null)}>{t('common.close', 'Close')}</Button>
+            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />{t('common.print', 'Print')}</Button>
           </div>
           <div className="text-xs text-muted-foreground">{view?.created_at && fmtDate(view.created_at)}</div>
         </DialogContent>

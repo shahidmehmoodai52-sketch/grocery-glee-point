@@ -759,7 +759,17 @@
     "no_expenses_period": "No expenses in this period",
     "no_people_yet": "No people added yet",
     "open_ledger": "Open ledger",
-    "unassigned": "Unassigned"
+    "unassigned": "Unassigned",
+    "back": "Back",
+    "person_fallback": "Person",
+    "quick_range": "Quick range",
+    "opening_before_range": "Opening (before range)",
+    "period_spent": "Period spent",
+    "all_time_total": "All-time total",
+    "no_entries": "No entries",
+    "opening_balance_before": "Opening balance (before {{date}})",
+    "period_total": "Period total",
+    "closing_balance_formula": "Closing balance (Opening + Period)"
   },
   "users": {
     "heading": "Staff & access",

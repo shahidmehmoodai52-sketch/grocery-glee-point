@@ -759,7 +759,17 @@
     "no_expenses_period": "اس مدت میں کوئی خرچہ نہیں",
     "no_people_yet": "ابھی تک کوئی شخص شامل نہیں",
     "open_ledger": "لیجر کھولیں",
-    "unassigned": "غیر متعین"
+    "unassigned": "غیر متعین",
+    "back": "واپس",
+    "person_fallback": "شخص",
+    "quick_range": "فوری مدت",
+    "opening_before_range": "افتتاحی (مدت سے پہلے)",
+    "period_spent": "مدت میں خرچ",
+    "all_time_total": "کل وقت کا کل",
+    "no_entries": "کوئی اندراج نہیں",
+    "opening_balance_before": "افتتاحی بیلنس ({{date}} سے پہلے)",
+    "period_total": "مدت کا کل",
+    "closing_balance_formula": "اختتامی بیلنس (افتتاحی + مدت)"
   },
   "users": {
     "heading": "اسٹاف اور رسائی",

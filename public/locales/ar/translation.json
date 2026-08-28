@@ -759,7 +759,17 @@
     "no_expenses_period": "لا توجد مصروفات في هذه الفترة",
     "no_people_yet": "لم تتم إضافة أشخاص بعد",
     "open_ledger": "فتح دفتر الحسابات",
-    "unassigned": "غير محدد"
+    "unassigned": "غير محدد",
+    "back": "رجوع",
+    "person_fallback": "شخص",
+    "quick_range": "نطاق سريع",
+    "opening_before_range": "الافتتاحي (قبل النطاق)",
+    "period_spent": "مصروف الفترة",
+    "all_time_total": "إجمالي كل الأوقات",
+    "no_entries": "لا توجد إدخالات",
+    "opening_balance_before": "الرصيد الافتتاحي (قبل {{date}})",
+    "period_total": "إجمالي الفترة",
+    "closing_balance_formula": "الرصيد الختامي (الافتتاحي + الفترة)"
   },
   "users": {
     "heading": "الموظفون والصلاحيات",

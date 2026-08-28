@@ -759,7 +759,17 @@
     "no_expenses_period": "Keine Ausgaben in diesem Zeitraum",
     "no_people_yet": "Noch keine Personen hinzugefügt",
     "open_ledger": "Kontoauszug öffnen",
-    "unassigned": "Nicht zugewiesen"
+    "unassigned": "Nicht zugewiesen",
+    "back": "Zurück",
+    "person_fallback": "Person",
+    "quick_range": "Schnellauswahl",
+    "opening_before_range": "Anfang (vor Zeitraum)",
+    "period_spent": "Zeitraum ausgegeben",
+    "all_time_total": "Gesamt (alle Zeit)",
+    "no_entries": "Keine Einträge",
+    "opening_balance_before": "Anfangssaldo (vor {{date}})",
+    "period_total": "Zeitraum gesamt",
+    "closing_balance_formula": "Endsaldo (Anfang + Zeitraum)"
   },
   "users": {
     "heading": "Personal & Zugriff",

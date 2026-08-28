@@ -759,7 +759,17 @@
     "no_expenses_period": "Ingen utgifter i denne perioden",
     "no_people_yet": "Ingen personer lagt til ennå",
     "open_ledger": "Åpne kundekonto",
-    "unassigned": "Ikke tildelt"
+    "unassigned": "Ikke tildelt",
+    "back": "Tilbake",
+    "person_fallback": "Person",
+    "quick_range": "Hurtigperiode",
+    "opening_before_range": "Inngående (før periode)",
+    "period_spent": "Brukt i perioden",
+    "all_time_total": "Totalt (all tid)",
+    "no_entries": "Ingen oppføringer",
+    "opening_balance_before": "Inngående saldo (før {{date}})",
+    "period_total": "Periodesum",
+    "closing_balance_formula": "Utgående saldo (Inngående + Periode)"
   },
   "users": {
     "heading": "Ansatte og tilgang",
