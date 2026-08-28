@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Printer, TrendingUp, TrendingDown, Wallet, Receipt as ReceiptIcon, FileDown, Eye, Pencil, DollarSign, Plus, Save, Ban } from "lucide-react";
@@ -38,6 +39,7 @@ type Entry = {
 
 
 function Page() {
+  const { t } = useTranslation();
   const { id } = Route.useParams();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
@@ -105,12 +107,12 @@ function Page() {
 
   const saveOpeningBalance = async () => {
     const v = Number(obValue);
-    if (!Number.isFinite(v)) return toast.error("Enter a valid number");
+    if (!Number.isFinite(v)) return toast.error(t('customers.enter_valid_number', 'Enter a valid number'));
     setObSaving(true);
     const { error } = await supabase.from("customers").update({ opening_balance: v }).eq("id", id);
     setObSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Opening balance saved");
+    toast.success(t('customers.opening_balance_saved', 'Opening balance saved'));
     qc.invalidateQueries({ queryKey: ["customer", id] });
   };
 
@@ -153,12 +155,12 @@ function Page() {
 
   const voidSale = async (sale: any) => {
     if (!sale) return;
-    if (!confirm(`Void invoice ${sale.invoice_no ?? sale.id}?`)) return;
+    if (!confirm(t('customers.void_invoice_confirm', 'Void invoice {{no}}?', { no: sale.invoice_no ?? sale.id }))) return;
     setVoiding(true);
     const { error } = await supabase.rpc("void_sale", { _sale_id: sale.id, _reason: "Voided from customer page" });
     setVoiding(false);
     if (error) return toast.error(error.message);
-    toast.success("Invoice voided");
+    toast.success(t('customers.invoice_voided', 'Invoice voided'));
     qc.invalidateQueries();
   };
 
@@ -179,25 +181,25 @@ function Page() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm" className="no-print">
-            <Link to="/customers"><ArrowLeft className="h-4 w-4 mr-1" />Customers</Link>
+            <Link to="/customers"><ArrowLeft className="h-4 w-4 mr-1" />{t('common.customers', 'Customers')}</Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold">{customer?.name ?? "Customer"}</h1>
+            <h1 className="text-2xl font-semibold">{customer?.name ?? t('customers.customer_fallback', 'Customer')}</h1>
             <p className="text-sm text-muted-foreground">
               {customer?.phone ?? "—"} · {customer?.email ?? "—"}
             </p>
           </div>
         </div>
         <div className="flex items-end gap-2 no-print flex-wrap">
-          <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />Print</Button>
-          <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />PDF</Button>
+          <div><Label className="text-xs">{t('customers.from_label', 'From')}</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
+          <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
+          <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
+          <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />{t('customers.pdf', 'PDF')}</Button>
           <Button variant="outline" onClick={() => { setPayDefault(Math.max(closing, 0)); setAddDiscountOpen(true); }}>
-            <Plus className="h-4 w-4 mr-1" />Add discount
+            <Plus className="h-4 w-4 mr-1" />{t('ledger.add_discount', 'Add discount')}
           </Button>
           <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
-            <Plus className="h-4 w-4 mr-1" />Add payment
+            <Plus className="h-4 w-4 mr-1" />{t('ledger.add_payment', 'Add payment')}
           </Button>
         </div>
       </div>
@@ -215,7 +217,7 @@ function Page() {
             setFrom(r.from); setTo(r.to);
           }}
         >
-          <option value="">Quick range…</option>
+          <option value="">{t('customers.quick_range_placeholder', 'Quick range…')}</option>
           {PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
       </div>
@@ -224,7 +226,7 @@ function Page() {
       <Card className="p-3 no-print">
         <div className="flex items-end gap-2 flex-wrap">
           <div className="flex-1 min-w-[200px]">
-            <Label className="text-xs">Opening balance <span className="text-muted-foreground">(+ they owe / − advance)</span></Label>
+            <Label className="text-xs">{t('customers.stat_opening_balance', 'Opening balance')} <span className="text-muted-foreground">{t('customers.opening_balance_hint', '(+ they owe / − advance)')}</span></Label>
             <Input
               type="number"
               step="0.01"
@@ -234,19 +236,19 @@ function Page() {
             />
           </div>
           <Button onClick={saveOpeningBalance} disabled={obSaving}>
-            <Save className="h-4 w-4 mr-1" />{obSaving ? "Saving…" : "Save opening"}
+            <Save className="h-4 w-4 mr-1" />{obSaving ? t('common.saving', 'Saving…') : t('customers.save_opening', 'Save opening')}
           </Button>
           <div className="text-xs text-muted-foreground">
-            Current: <span className="font-medium text-foreground">{fmtMoney(initialOB, sym)}</span>
+            {t('customers.current_label', 'Current:')} <span className="font-medium text-foreground">{fmtMoney(initialOB, sym)}</span>
           </div>
         </div>
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat icon={TrendingUp} label={from ? `Opening (before ${from})` : "Opening balance"} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
-        <Stat icon={ReceiptIcon} label="Total In (+)" value={fmtMoney(totalIn, sym)} tone="primary" />
-        <Stat icon={TrendingDown} label="Total Out (−)" value={fmtMoney(totalOut, sym)} tone="success" />
-        <Stat icon={Wallet} label={closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
+        <Stat icon={TrendingUp} label={from ? t('customers.stat_opening_before', 'Opening (before {{date}})', { date: from }) : t('customers.stat_opening_balance', 'Opening balance')} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
+        <Stat icon={ReceiptIcon} label={t('customers.stat_total_in', 'Total In (+)')} value={fmtMoney(totalIn, sym)} tone="primary" />
+        <Stat icon={TrendingDown} label={t('customers.stat_total_out', 'Total Out (−)')} value={fmtMoney(totalOut, sym)} tone="success" />
+        <Stat icon={Wallet} label={closingLabel === "Settled" ? t('customers.closing_settled', 'Settled') : closingLabel === "Outstanding (they owe)" ? t('customers.closing_outstanding', 'Outstanding (they owe)') : closingLabel === "Advance (credit)" ? t('customers.closing_advance', 'Advance (credit)') : closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
       </div>
 
       <Card className="p-3 print-area">
@@ -256,22 +258,22 @@ function Page() {
         </div>
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Ref</TableHead>
-            <TableHead>Note</TableHead>
-            <TableHead className="text-right">In (+)</TableHead>
-            <TableHead className="text-right">Out (−)</TableHead>
-            <TableHead className="text-right">Balance</TableHead>
-            <TableHead className="text-right no-print w-52">Actions</TableHead>
+            <TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead>{t('customers.th_type', 'Type')}</TableHead><TableHead>{t('customers.th_ref', 'Ref')}</TableHead>
+            <TableHead>{t('common.note', 'Note')}</TableHead>
+            <TableHead className="text-right">{t('customers.th_in', 'In (+)')}</TableHead>
+            <TableHead className="text-right">{t('customers.th_out', 'Out (−)')}</TableHead>
+            <TableHead className="text-right">{t('customers.th_balance', 'Balance')}</TableHead>
+            <TableHead className="text-right no-print w-52">{t('customers.th_actions', 'Actions')}</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             <TableRow className="bg-muted/40 font-medium">
-              <TableCell colSpan={4} className="text-muted-foreground">Opening balance {from ? `(before ${from})` : ""}</TableCell>
+              <TableCell colSpan={4} className="text-muted-foreground">{t('customers.opening_balance_row', 'Opening balance')} {from ? t('customers.before_date', '(before {{date}})', { date: from }) : ""}</TableCell>
               <TableCell className="text-right">{opening > 0 ? fmtMoney(opening, sym) : "—"}</TableCell>
               <TableCell className="text-right text-success">{opening < 0 ? fmtMoney(-opening, sym) : "—"}</TableCell>
               <TableCell className={`text-right ${opening > 0 ? "text-destructive" : opening < 0 ? "text-success" : ""}`}>{fmtMoney(opening, sym)}</TableCell>
               <TableCell className="no-print"></TableCell>
             </TableRow>
-            {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No transactions yet</TableCell></TableRow>}
+            {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">{t('customers.no_transactions_yet', 'No transactions yet')}</TableCell></TableRow>}
             {rows.map((x, i) => {
               const due = x.type === "sale" ? Math.max(Number((x.data as any)?.total || 0) - Number((x.data as any)?.paid || 0), 0) : 0;
               return (
@@ -290,7 +292,12 @@ function Page() {
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleString()}</TableCell>
                 <TableCell>
                   <Badge variant={x.type === "sale" ? "default" : x.type === "return" ? "secondary" : x.type === "cash_out" ? "destructive" : "outline"} className={`capitalize ${x.type === "discount" ? "border-warning/50 text-warning" : ""}`}>
-                    {x.type?.replace("_", " ")}
+                    {x.type === "sale" ? t('customers.entry_type_sale', 'sale')
+                      : x.type === "payment" ? t('customers.entry_type_payment', 'payment')
+                      : x.type === "return" ? t('customers.entry_type_return', 'return')
+                      : x.type === "cash_out" ? t('customers.entry_type_cash_out', 'cash out')
+                      : x.type === "discount" ? t('customers.entry_type_discount', 'discount')
+                      : (x.type as string | undefined)?.replace("_", " ")}
                   </Badge>
 
                 </TableCell>
@@ -320,7 +327,7 @@ function Page() {
                     )}
                     {x.type === "sale" && due > 0 && (
                       <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>
-                        <DollarSign className="h-3.5 w-3.5 mr-1" />Pay
+                        <DollarSign className="h-3.5 w-3.5 mr-1" />{t('customers.pay', 'Pay')}
                       </Button>
                     )}
                     {(x.type === "payment" || x.type === "discount" || x.type === "cash_out") && x.id && (
@@ -342,7 +349,7 @@ function Page() {
             {rows.length > 0 && (
               <>
                 <TableRow className="bg-muted/40 font-semibold">
-                  <TableCell colSpan={4}>Grand totals (incl. opening)</TableCell>
+                  <TableCell colSpan={4}>{t('customers.grand_totals_row', 'Grand totals (incl. opening)')}</TableCell>
                   <TableCell className="text-right">{fmtMoney(totalIn + Math.max(opening, 0), sym)}</TableCell>
                   <TableCell className="text-right text-success">{fmtMoney(totalOut + Math.max(-opening, 0), sym)}</TableCell>
                   <TableCell className={`text-right ${closing > 0 ? "text-destructive" : closing < 0 ? "text-success" : ""}`}>{fmtMoney(closing, sym)}</TableCell>
@@ -350,11 +357,11 @@ function Page() {
                 </TableRow>
                 <TableRow className="bg-primary/5 text-xs">
                   <TableCell colSpan={8} className="text-muted-foreground text-right">
-                    {fmtMoney(opening, sym)} (Opening) + {fmtMoney(totalIn, sym)} (In) − {fmtMoney(totalOut, sym)} (Out) = <span className="font-semibold text-foreground">{fmtMoney(closing, sym)}</span>
+                    {fmtMoney(opening, sym)} ({t('customers.formula_opening', 'Opening')}) + {fmtMoney(totalIn, sym)} ({t('customers.formula_in', 'In')}) − {fmtMoney(totalOut, sym)} ({t('customers.formula_out', 'Out')}) = <span className="font-semibold text-foreground">{fmtMoney(closing, sym)}</span>
                   </TableCell>
                 </TableRow>
                 <TableRow className="bg-primary/10 font-bold">
-                  <TableCell colSpan={6}>Closing balance · {closingLabel}</TableCell>
+                  <TableCell colSpan={6}>{t('customers.closing_balance_row', 'Closing balance · {{label}}', { label: closingLabel === "Settled" ? t('customers.closing_settled', 'Settled') : closingLabel === "Outstanding (they owe)" ? t('customers.closing_outstanding', 'Outstanding (they owe)') : closingLabel === "Advance (credit)" ? t('customers.closing_advance', 'Advance (credit)') : closingLabel })}</TableCell>
                   <TableCell className={`text-right ${closing > 0 ? "text-destructive" : closing < 0 ? "text-success" : ""}`}>{fmtMoney(closing, sym)}</TableCell>
                   <TableCell className="no-print"></TableCell>
                 </TableRow>
@@ -368,7 +375,7 @@ function Page() {
       <Dialog open={!!openInvoice} onOpenChange={(o) => !o && setOpenInvoice(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Invoice {openInvoice?.invoice_no}</DialogTitle>
+            <DialogTitle>{t('sales.invoice_title', 'Invoice {{no}}', { no: openInvoice?.invoice_no })}</DialogTitle>
           </DialogHeader>
           <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
             <div className="print-area">
@@ -376,8 +383,8 @@ function Page() {
             </div>
           </div>
           <DialogFooter className="no-print">
-            <Button variant="outline" onClick={() => setOpenInvoice(null)}>Close</Button>
-            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />Print</Button>
+            <Button variant="outline" onClick={() => setOpenInvoice(null)}>{t('common.close', 'Close')}</Button>
+            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -393,18 +400,18 @@ function Page() {
       <Dialog open={pdfPrompt} onOpenChange={setPdfPrompt}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Generate PDF</DialogTitle>
+            <DialogTitle>{t('customers.generate_pdf_title', 'Generate PDF')}</DialogTitle>
           </DialogHeader>
           <div className="text-sm text-muted-foreground">
-            Choose how you want the ledger PDF: a clean summary with only bills & payments, or a full version that also includes item-wise details for every invoice.
+            {t('customers.pdf_choice_desc', 'Choose how you want the ledger PDF: a clean summary with only bills & payments, or a full version that also includes item-wise details for every invoice.')}
           </div>
           <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => setPdfPrompt(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setPdfPrompt(false)}>{t('common.cancel', 'Cancel')}</Button>
             <Button variant="secondary" onClick={() => downloadPdf(false)}>
-              <FileDown className="h-4 w-4 mr-2" />Summary (bills only)
+              <FileDown className="h-4 w-4 mr-2" />{t('customers.summary_bills_only', 'Summary (bills only)')}
             </Button>
             <Button onClick={() => downloadPdf(true)}>
-              <FileDown className="h-4 w-4 mr-2" />Full + item-wise
+              <FileDown className="h-4 w-4 mr-2" />{t('customers.full_item_wise', 'Full + item-wise')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -412,16 +419,16 @@ function Page() {
 
       <Card className="p-3 print-area">
 
-        <div className="mb-2 font-semibold">Item-wise details</div>
+        <div className="mb-2 font-semibold">{t('customers.item_wise_details', 'Item-wise details')}</div>
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Date</TableHead><TableHead>Invoice</TableHead><TableHead>Item</TableHead>
-            <TableHead className="text-right">Qty</TableHead>
-            <TableHead className="text-right">Rate</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
+            <TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead>{t('sales.th_invoice', 'Invoice')}</TableHead><TableHead>{t('customers.th_item', 'Item')}</TableHead>
+            <TableHead className="text-right">{t('customers.th_qty', 'Qty')}</TableHead>
+            <TableHead className="text-right">{t('pos.rate', 'Rate')}</TableHead>
+            <TableHead className="text-right">{t('customers.th_amount', 'Amount')}</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {items.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No items in this period</TableCell></TableRow>}
+            {items.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('customers.no_items_in_period', 'No items in this period')}</TableCell></TableRow>}
             {items.map((it, i) => (
               <TableRow key={i}>
                 <TableCell className="whitespace-nowrap">{new Date(it.date).toLocaleDateString()}</TableCell>

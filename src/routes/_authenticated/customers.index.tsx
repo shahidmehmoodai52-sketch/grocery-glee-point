@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, HandCoins, BookOpen, Search, Users, TrendingUp, TrendingDown, Wallet, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ function Stat({ icon: Icon, label, value, tone = "primary" }: { icon: any; label
 }
 
 function Page() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -66,19 +68,19 @@ function Page() {
 
   const saveEdit = async () => {
     if (!editRow) return;
-    if (!editForm.name.trim()) return toast.error("Name required");
+    if (!editForm.name.trim()) return toast.error(t('common.name_required', 'Name required'));
     const { error } = await supabase.from("customers").update(editForm).eq("id", editRow.id);
     if (error) return toast.error(error.message);
-    toast.success("Customer updated");
+    toast.success(t('customers.customer_updated', 'Customer updated'));
     setEditRow(null);
     qc.invalidateQueries();
   };
 
   const deleteCustomer = async (customer: any) => {
-    if (!confirm(`Delete customer ${customer.name ?? "this customer"}? This cannot be undone.`)) return;
+    if (!confirm(t('customers.delete_confirm', 'Delete customer {{name}}? This cannot be undone.', { name: customer.name ?? "this customer" }))) return;
     const { error } = await supabase.from("customers").delete().eq("id", customer.id);
     if (error) return toast.error(error.message);
-    toast.success("Customer deleted");
+    toast.success(t('customers.customer_deleted', 'Customer deleted'));
     qc.invalidateQueries();
   };
 
@@ -161,19 +163,19 @@ function Page() {
   }, [rows, customerBalances]);
 
   const save = async () => {
-    if (!form.name) return toast.error("Name required");
+    if (!form.name) return toast.error(t('common.name_required', 'Name required'));
     try {
       const row = await insertOfflineAware("customers", { ...form, opening_balance: form.balance });
-      toast.success(row._offline_pending ? "Customer saved offline — will sync" : "Customer added");
-    } catch (e: any) { return toast.error(e?.message ?? "Failed"); }
+      toast.success(row._offline_pending ? t('customers.customer_saved_offline', 'Customer saved offline — will sync') : t('customers.customer_added', 'Customer added'));
+    } catch (e: any) { return toast.error(e?.message ?? t('common.failed', 'Failed')); }
     setOpen(false);
     setForm({ name: "", phone: "", email: "", address: "", balance: 0 });
     qc.invalidateQueries({ queryKey: ["customers"] });
   };
 
   const recordPayment = async () => {
-    if (!payOpen || pay.amount <= 0) return toast.error("Enter amount");
-    if (!pay.method) return toast.error("Pick a payment source");
+    if (!payOpen || pay.amount <= 0) return toast.error(t('customers.enter_amount', 'Enter amount'));
+    if (!pay.method) return toast.error(t('customers.pick_payment_source', 'Pick a payment source'));
     let account = (cashAccounts as any[]).find((a) => a.name.toLowerCase() === pay.method.toLowerCase());
     if (!account) {
       const t = pay.method.toLowerCase();
@@ -186,7 +188,7 @@ function Page() {
       p_party_type: "customer", p_party_id: payOpen.id, p_amount: pay.amount, p_method: account.name, p_note: pay.note, p_account_id: account.id,
     });
     if (error) return toast.error(error.message);
-    toast.success("Payment recorded");
+    toast.success(t('customers.payment_recorded', 'Payment recorded'));
 
     setPayOpen(null);
     setPay({ amount: 0, method: "Cash in hand", note: "", account_id: "" });
@@ -197,32 +199,32 @@ function Page() {
     <div className="p-6 space-y-5">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Customers</h1>
-          <p className="text-sm text-muted-foreground">Manage customer accounts and view outstanding balances.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('customers.title', 'Customers')}</h1>
+          <p className="text-sm text-muted-foreground">{t('customers.subtitle', 'Manage customer accounts and view outstanding balances.')}</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New customer</Button></DialogTrigger>
+          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />{t('customers.new_customer', 'New customer')}</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>New customer</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('customers.new_customer', 'New customer')}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div><Label>{t('common.name', 'Name')}</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-                <div><Label>Email</Label><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+                <div><Label>{t('common.phone', 'Phone')}</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+                <div><Label>{t('common.email', 'Email')}</Label><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               </div>
-              <div><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
-              <div><Label>Opening balance (they owe)</Label><Input type="number" step="0.01" value={form.balance || ""} onChange={(e) => setForm({ ...form, balance: Number(e.target.value) })} /></div>
+              <div><Label>{t('common.address', 'Address')}</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+              <div><Label>{t('customers.opening_balance_label', 'Opening balance (they owe)')}</Label><Input type="number" step="0.01" value={form.balance || ""} onChange={(e) => setForm({ ...form, balance: Number(e.target.value) })} /></div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save}>Save</Button></DialogFooter>
+            <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>{t('common.cancel', 'Cancel')}</Button><Button onClick={save}>{t('common.save', 'Save')}</Button></DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat icon={Users} label="Total customers" value={String(rows.length)} tone="primary" />
-        <Stat icon={TrendingUp} label="Receivable (they owe)" value={fmtMoney(totals.receivable, sym)} tone="destructive" />
-        <Stat icon={TrendingDown} label="Advances held" value={fmtMoney(totals.advance, sym)} tone="success" />
-        <Stat icon={Wallet} label="Net receivable" value={fmtMoney(totals.net, sym)} tone={totals.net > 0 ? "destructive" : totals.net < 0 ? "success" : "muted"} />
+        <Stat icon={Users} label={t('customers.stat_total_customers', 'Total customers')} value={String(rows.length)} tone="primary" />
+        <Stat icon={TrendingUp} label={t('customers.stat_receivable', 'Receivable (they owe)')} value={fmtMoney(totals.receivable, sym)} tone="destructive" />
+        <Stat icon={TrendingDown} label={t('customers.stat_advance', 'Advances held')} value={fmtMoney(totals.advance, sym)} tone="success" />
+        <Stat icon={Wallet} label={t('customers.stat_net_receivable', 'Net receivable')} value={fmtMoney(totals.net, sym)} tone={totals.net > 0 ? "destructive" : totals.net < 0 ? "success" : "muted"} />
       </div>
 
       <Card className="p-4 space-y-3">
@@ -232,12 +234,12 @@ function Page() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, phone, email, address…"
+              placeholder={t('customers.search_placeholder', 'Search by name, phone, email, address…')}
               className="pl-9"
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {filtered.length} of {rows.length} shown
+            {t('customers.shown_count', '{{filtered}} of {{total}} shown', { filtered: filtered.length, total: rows.length })}
           </div>
         </div>
 
@@ -245,18 +247,18 @@ function Page() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead className="text-right w-[260px]">Actions</TableHead>
+                <TableHead>{t('common.name', 'Name')}</TableHead>
+                <TableHead>{t('common.phone', 'Phone')}</TableHead>
+                <TableHead>{t('common.email', 'Email')}</TableHead>
+                <TableHead className="text-right">{t('customers.th_balance', 'Balance')}</TableHead>
+                <TableHead className="text-right w-[260px]">{t('customers.th_actions', 'Actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
-                    {rows.length === 0 ? "No customers yet — add your first customer." : "No customers match your search."}
+                    {rows.length === 0 ? t('customers.no_customers_yet', 'No customers yet — add your first customer.') : t('customers.no_customers_match', 'No customers match your search.')}
                   </TableCell>
                 </TableRow>
               )}
@@ -276,24 +278,24 @@ function Page() {
                     <TableCell className="text-muted-foreground">{c.email ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       {bal > 0 ? (
-                        <Badge variant="destructive" className="font-medium">Owes {fmtMoney(bal, sym)}</Badge>
+                        <Badge variant="destructive" className="font-medium">{t('customers.owes', 'Owes {{amount}}', { amount: fmtMoney(bal, sym) })}</Badge>
                       ) : bal < 0 ? (
-                        <Badge className="bg-success/15 text-success hover:bg-success/20 font-medium">Advance {fmtMoney(-bal, sym)}</Badge>
+                        <Badge className="bg-success/15 text-success hover:bg-success/20 font-medium">{t('customers.advance', 'Advance {{amount}}', { amount: fmtMoney(-bal, sym) })}</Badge>
                       ) : (
-                        <span className="text-muted-foreground text-sm">Settled</span>
+                        <span className="text-muted-foreground text-sm">{t('customers.settled', 'Settled')}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button size="sm" variant="ghost" asChild>
-                        <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />Ledger</Link>
+                        <Link to="/customers/$id" params={{ id: c.id }}><BookOpen className="h-3.5 w-3.5 mr-1" />{t('customers.ledger', 'Ledger')}</Link>
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setPayOpen(c); setPay({ amount: Math.max(bal, 0), method: "Cash in hand", note: "", account_id: "" }); }}>
-                        <HandCoins className="h-3.5 w-3.5 mr-1" />Receive
+                        <HandCoins className="h-3.5 w-3.5 mr-1" />{t('customers.receive', 'Receive')}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title="Edit customer">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(c)} title={t('customers.edit_customer', 'Edit customer')}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => deleteCustomer(c)} title="Delete customer">
+                      <Button size="sm" variant="destructive" onClick={() => deleteCustomer(c)} title={t('customers.delete_customer', 'Delete customer')}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
@@ -307,11 +309,11 @@ function Page() {
 
       <Dialog open={!!payOpen} onOpenChange={(o) => !o && setPayOpen(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Receive payment — {payOpen?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('customers.receive_payment_title', 'Receive payment — {{name}}', { name: payOpen?.name })}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Amount</Label><Input type="number" step="0.01" value={pay.amount || ""} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></div>
+            <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={pay.amount || ""} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></div>
             <div>
-              <Label>Receive in</Label>
+              <Label>{t('customers.receive_in', 'Receive in')}</Label>
               <div className="flex flex-wrap gap-2 mt-1">
                 {(() => {
                   const presets = ["Cash in hand", "Bank", "EasyPaisa", "JazzCash", "Card"];
@@ -336,32 +338,32 @@ function Page() {
                   });
                 })()}
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2">Adds to this account in Cash Flow. New sources are created automatically.</p>
+              <p className="text-[11px] text-muted-foreground mt-2">{t('customers.receive_in_note', 'Adds to this account in Cash Flow. New sources are created automatically.')}</p>
             </div>
-            <div><Label>Note</Label><Input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
+            <div><Label>{t('common.note', 'Note')}</Label><Input value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPayOpen(null)}>Cancel</Button>
-            <Button onClick={recordPayment}>Record</Button>
+            <Button variant="outline" onClick={() => setPayOpen(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={recordPayment}>{t('customers.record', 'Record')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit customer</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('customers.edit_customer', 'Edit customer')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
+            <div><Label>{t('common.name', 'Name')}</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Phone</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
-              <div><Label>Email</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
+              <div><Label>{t('common.phone', 'Phone')}</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+              <div><Label>{t('common.email', 'Email')}</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
             </div>
-            <div><Label>Address</Label><Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></div>
-            <div><Label>Opening balance (they owe)</Label><Input type="number" step="0.01" value={editForm.opening_balance || ""} onChange={(e) => setEditForm({ ...editForm, opening_balance: Number(e.target.value) })} /></div>
+            <div><Label>{t('common.address', 'Address')}</Label><Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></div>
+            <div><Label>{t('customers.opening_balance_label', 'Opening balance (they owe)')}</Label><Input type="number" step="0.01" value={editForm.opening_balance || ""} onChange={(e) => setEditForm({ ...editForm, opening_balance: Number(e.target.value) })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditRow(null)}>Cancel</Button>
-            <Button onClick={saveEdit}>Save</Button>
+            <Button variant="outline" onClick={() => setEditRow(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveEdit}>{t('common.save', 'Save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

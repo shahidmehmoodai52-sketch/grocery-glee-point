@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,13 +31,14 @@ function toLocalInputValue(iso?: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function DateTimeField({ label = "Date & time", value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
+function DateTimeField({ label, value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation();
   const datePart = value ? value.slice(0, 10) : "";
   const timePart = value ? value.slice(11, 16) : "00:00";
   const selected = datePart ? new Date(`${datePart}T00:00:00`) : undefined;
   return (
     <div>
-      <Label>{label}</Label>
+      <Label>{label ?? t('ledger.date_time', 'Date & time')}</Label>
       <div className="flex gap-2">
         <Popover>
           <PopoverTrigger asChild>
@@ -46,7 +48,7 @@ function DateTimeField({ label = "Date & time", value, onChange }: { label?: str
               className={cn("flex-1 justify-start text-left font-normal", !datePart && "text-muted-foreground")}
             >
               <CalendarIcon className="h-4 w-4 mr-2" />
-              {selected ? format(selected, "PPP") : <span>Pick a date</span>}
+              {selected ? format(selected, "PPP") : <span>{t('ledger.pick_a_date', 'Pick a date')}</span>}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
@@ -104,6 +106,7 @@ export function AddPaymentDialog({
   party: Party; partyId: string; party_name?: string;
   defaultAmount?: number; onDone?: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [amount, setAmount] = useState(defaultAmount);
   const [method, setMethod] = useState("cash");
@@ -149,7 +152,7 @@ export function AddPaymentDialog({
   };
 
   const save = async () => {
-    if (!amount || amount <= 0) return toast.error("Amount must be positive");
+    if (!amount || amount <= 0) return toast.error(t('ledger.amount_positive', 'Amount must be positive'));
     setSaving(true);
     let error: any = null;
     try {
@@ -174,7 +177,7 @@ export function AddPaymentDialog({
     }
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Payment recorded");
+    toast.success(t('ledger.payment_recorded', 'Payment recorded'));
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
@@ -183,12 +186,12 @@ export function AddPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Add payment{party_name ? ` — ${party_name}` : ""}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{party_name ? t('ledger.add_payment_for', 'Add payment — {{name}}', { name: party_name }) : t('ledger.add_payment', 'Add payment')}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <DateTimeField value={when} onChange={setWhen} />
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
+          <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div>
-            <Label>{party === "supplier" ? "Pay from" : "Receive in"}</Label>
+            <Label>{party === "supplier" ? t('ledger.pay_from', 'Pay from') : t('ledger.receive_in', 'Receive in')}</Label>
             <Select
               value={accountId}
               onValueChange={(value) => {
@@ -197,20 +200,20 @@ export function AddPaymentDialog({
                 if (selected) setMethod(selected.name);
               }}
             >
-              <SelectTrigger><SelectValue placeholder="Choose Cash, Bank, EasyPaisa…" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('ledger.choose_source_placeholder', 'Choose Cash, Bank, EasyPaisa…')} /></SelectTrigger>
               <SelectContent>
                 {sourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground mt-1">
-              This account is updated in Cash Flow and reports.
+              {t('ledger.account_updated_note', 'This account is updated in Cash Flow and reports.')}
             </p>
           </div>
-          <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
+          <div><Label>{t('common.note', 'Note')}</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+          <Button onClick={save} disabled={saving}>{saving ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -227,6 +230,7 @@ export function AddDiscountDialog({
   partyId: string; party_name?: string;
   defaultAmount?: number; onDone?: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [amount, setAmount] = useState(defaultAmount);
   const [note, setNote] = useState("");
@@ -242,7 +246,7 @@ export function AddDiscountDialog({
   }, [open, defaultAmount]);
 
   const save = async () => {
-    if (!amount || amount <= 0) return toast.error("Amount must be positive");
+    if (!amount || amount <= 0) return toast.error(t('ledger.amount_positive', 'Amount must be positive'));
     setSaving(true);
     let error: any = null;
     try {
@@ -266,7 +270,7 @@ export function AddDiscountDialog({
     }
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Discount recorded");
+    toast.success(t('ledger.discount_recorded', 'Discount recorded'));
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
@@ -275,18 +279,18 @@ export function AddDiscountDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Add discount{party_name ? ` — ${party_name}` : ""}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{party_name ? t('ledger.add_discount_for', 'Add discount — {{name}}', { name: party_name }) : t('ledger.add_discount', 'Add discount')}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <DateTimeField value={when} onChange={setWhen} />
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
-          <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Rounded off / goodwill discount" /></div>
+          <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
+          <div><Label>{t('common.note', 'Note')}</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('ledger.discount_placeholder', 'e.g. Rounded off / goodwill discount')} /></div>
           <p className="text-[11px] text-muted-foreground">
-            No cash moves — this reduces what the customer owes and comes off profit in Reports &amp; Dashboard. Nothing changes in Cash Flow.
+            {t('ledger.discount_note', 'No cash moves — this reduces what the customer owes and comes off profit in Reports & Dashboard. Nothing changes in Cash Flow.')}
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+          <Button onClick={save} disabled={saving}>{saving ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -300,6 +304,7 @@ export function EditPaymentDialog({
   payment: { id: string; amount: number; method: string; note: string; created_at: string } | null;
   onDone?: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState("cash");
@@ -322,7 +327,7 @@ export function EditPaymentDialog({
 
   const save = async () => {
     if (!payment) return;
-    if (!amount || amount <= 0) return toast.error("Amount must be positive");
+    if (!amount || amount <= 0) return toast.error(t('ledger.amount_positive', 'Amount must be positive'));
     setSaving(true);
     const selected = cashAccounts.find((a: any) => a.id === accountId);
     const { error } = await supabase.rpc("update_party_payment", {
@@ -332,7 +337,7 @@ export function EditPaymentDialog({
     });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(isDiscount ? "Discount updated" : "Payment updated");
+    toast.success(isDiscount ? t('ledger.discount_updated', 'Discount updated') : t('ledger.payment_updated', 'Payment updated'));
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
@@ -340,12 +345,12 @@ export function EditPaymentDialog({
 
   const remove = async () => {
     if (!payment) return;
-    if (!confirm(`Delete this ${isDiscount ? "discount" : "payment"}? Balance will be reversed.`)) return;
+    if (!confirm(isDiscount ? t('ledger.delete_confirm_discount', 'Delete this discount? Balance will be reversed.') : t('ledger.delete_confirm_payment', 'Delete this payment? Balance will be reversed.'))) return;
     setSaving(true);
     const { error } = await supabase.rpc("delete_party_payment", { _id: payment.id });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(isDiscount ? "Discount deleted" : "Payment deleted");
+    toast.success(isDiscount ? t('ledger.discount_deleted', 'Discount deleted') : t('ledger.payment_deleted', 'Payment deleted'));
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
@@ -354,17 +359,17 @@ export function EditPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>{isDiscount ? "Edit discount" : "Edit payment"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isDiscount ? t('ledger.edit_discount', 'Edit discount') : t('ledger.edit_payment', 'Edit payment')}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <DateTimeField value={when} onChange={setWhen} />
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
+          <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           {isDiscount ? (
             <p className="text-[11px] text-muted-foreground">
-              No cash account — this is a discount, not a received payment.
+              {t('ledger.no_cash_account_note', 'No cash account — this is a discount, not a received payment.')}
             </p>
           ) : (
           <div>
-            <Label>Payment source</Label>
+            <Label>{t('ledger.payment_source', 'Payment source')}</Label>
             <Select
               value={accountId}
               onValueChange={(value) => {
@@ -373,20 +378,20 @@ export function EditPaymentDialog({
                 if (selected) setMethod(selected.name);
               }}
             >
-              <SelectTrigger><SelectValue placeholder={method || "Keep current source"} /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={method || t('ledger.keep_current_source', 'Keep current source')} /></SelectTrigger>
               <SelectContent>
                 {cashAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           )}
-          <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
+          <div><Label>{t('common.note', 'Note')}</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
         <DialogFooter className="justify-between sm:justify-between">
-          <Button variant="destructive" onClick={remove} disabled={saving}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+          <Button variant="destructive" onClick={remove} disabled={saving}><Trash2 className="h-4 w-4 mr-1" />{t('common.delete', 'Delete')}</Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={save} disabled={saving}>{saving ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</Button>
           </div>
         </DialogFooter>
       </DialogContent>
@@ -402,6 +407,7 @@ export function EditEntryDialog({
   entry: { id: string; ref: string; note: string; created_at: string } | null;
   onDone?: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [note, setNote] = useState("");
   const [when, setWhen] = useState("");
@@ -420,26 +426,31 @@ export function EditEntryDialog({
     }).eq("id", entry.id);
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Entry updated");
+    toast.success(t('ledger.entry_updated', 'Entry updated'));
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
   };
 
+  const entityLabels: Record<string, string> = {
+    sale: t('ledger.entity_sale', 'Sale'), purchase: t('ledger.entity_purchase', 'Purchase'),
+    sale_return: t('ledger.entity_sale_return', 'Sale return'), purchase_return: t('ledger.entity_purchase_return', 'Purchase return'),
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Edit {entity?.replace("_"," ")} · {entry?.ref}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t('ledger.edit_entry_title', 'Edit {{entity}} · {{ref}}', { entity: entity ? entityLabels[entity] : "", ref: entry?.ref })}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <DateTimeField value={when} onChange={setWhen} />
-          <div><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
+          <div><Label>{t('common.note', 'Note')}</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">
-            Amount is derived from items and cannot be changed here. Delete or re-create the transaction to change amounts.
+            {t('ledger.amount_derived_note', 'Amount is derived from items and cannot be changed here. Delete or re-create the transaction to change amounts.')}
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+          <Button onClick={save} disabled={saving}>{saving ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
