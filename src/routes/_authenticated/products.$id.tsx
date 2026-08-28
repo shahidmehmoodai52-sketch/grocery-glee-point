@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -133,6 +134,7 @@ const TYPE_META: Record<
 };
 
 function ProductDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams({ from: "/_authenticated/products/$id" });
   const { data: settings } = useSettings();
   const { isAdmin } = usePermissions();
@@ -148,6 +150,8 @@ function ProductDetailPage() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Movement | null>(null);
   const PAGE_SIZE = 50;
+
+  const typeLabel = (key: string) => t(`products.movement_${key}`, TYPE_META[key]?.label ?? key);
 
   const productQ = useQuery({
     queryKey: ["product", id],
@@ -249,22 +253,22 @@ function ProductDetailPage() {
 
   const statusMeta = {
     healthy: {
-      label: "Healthy",
+      label: t('products.status_healthy', 'Healthy'),
       classes: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",
       icon: TrendingUp,
     },
     low: {
-      label: "Low",
+      label: t('products.status_low', 'Low'),
       classes: "bg-amber-500/15 text-amber-600 border-amber-500/30",
       icon: TrendingDown,
     },
     critical: {
-      label: "Critical",
+      label: t('products.status_critical', 'Critical'),
       classes: "bg-red-500/15 text-red-600 border-red-500/30",
       icon: AlertTriangle,
     },
     dead: {
-      label: "Dead Stock",
+      label: t('products.status_dead', 'Dead Stock'),
       classes: "bg-slate-500/15 text-slate-600 border-slate-500/30",
       icon: Skull,
     },
@@ -277,19 +281,19 @@ function ProductDetailPage() {
       <div className="flex items-center gap-2">
         <Link to="/products">
           <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Products
+            <ArrowLeft className="h-4 w-4 mr-1" /> {t('common.products', 'Products')}
           </Button>
         </Link>
         <div className="ml-auto text-sm text-muted-foreground">
-          {product?.sku ? `SKU · ${product.sku}` : null}
+          {product?.sku ? t('products.sku_prefix', 'SKU · {{sku}}', { sku: product.sku }) : null}
         </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">{product?.name ?? "Product"}</h1>
+          <h1 className="text-2xl font-semibold">{product?.name ?? t('products.product_fallback', 'Product')}</h1>
           <p className="text-sm text-muted-foreground">
-            {product?.category ?? "Uncategorized"}
+            {product?.category ?? t('products.uncategorized', 'Uncategorized')}
             {product?.barcode ? ` · ${product.barcode}` : ""}
           </p>
         </div>
@@ -303,26 +307,26 @@ function ProductDetailPage() {
 
       {/* Health panel */}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-        <HealthCard label="Current Stock" value={`${fmtQty(product?.stock ?? 0)} ${product?.unit ?? ""}`} />
+        <HealthCard label={t('products.health_current_stock', 'Current Stock')} value={`${fmtQty(product?.stock ?? 0)} ${product?.unit ?? ""}`} />
         {showCost && (
           <HealthCard
-            label="Inventory Value"
+            label={t('products.health_inventory_value', 'Inventory Value')}
             value={fmtMoney(
               Number(product?.stock ?? 0) * Number(product?.cost_price ?? 0),
               sym,
             )}
           />
         )}
-        <HealthCard label="Last Purchase" value={health.lastPurchase ? format(new Date(health.lastPurchase), "PP") : "—"} />
-        <HealthCard label="Last Sale" value={health.lastSale ? format(new Date(health.lastSale), "PP") : "—"} />
-        <HealthCard label="30-day Sales" value={fmtQty(health.last30Sales)} />
-        <HealthCard label="Avg / day" value={fmtQty(health.avgDaily)} />
+        <HealthCard label={t('products.health_last_purchase', 'Last Purchase')} value={health.lastPurchase ? format(new Date(health.lastPurchase), "PP") : "—"} />
+        <HealthCard label={t('products.health_last_sale', 'Last Sale')} value={health.lastSale ? format(new Date(health.lastSale), "PP") : "—"} />
+        <HealthCard label={t('products.health_30day_sales', '30-day Sales')} value={fmtQty(health.last30Sales)} />
+        <HealthCard label={t('products.health_avg_day', 'Avg / day')} value={fmtQty(health.avgDaily)} />
         <HealthCard
-          label="Days Remaining"
-          value={health.daysRemaining == null ? "—" : `${Math.round(health.daysRemaining)}d`}
+          label={t('products.health_days_remaining', 'Days Remaining')}
+          value={health.daysRemaining == null ? "—" : t('products.days_suffix', '{{days}}d', { days: Math.round(health.daysRemaining) })}
         />
         <HealthCard
-          label="Last Adjustment"
+          label={t('products.health_last_adjustment', 'Last Adjustment')}
           value={health.lastAdjustment ? format(new Date(health.lastAdjustment), "PP") : "—"}
         />
       </div>
@@ -331,28 +335,28 @@ function ProductDetailPage() {
       <Card className="p-3">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <Label className="text-xs">Movement type</Label>
+            <Label className="text-xs">{t('products.movement_type_label', 'Movement type')}</Label>
             <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(0); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                {Object.entries(TYPE_META).map(([k, m]) => (
-                  <SelectItem key={k} value={k}>{m.label}</SelectItem>
+                <SelectItem value="all">{t('products.all_types', 'All types')}</SelectItem>
+                {Object.entries(TYPE_META).map(([k]) => (
+                  <SelectItem key={k} value={k}>{typeLabel(k)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label className="text-xs">From</Label>
+            <Label className="text-xs">{t('customers.from_label', 'From')}</Label>
             <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(0); }} />
           </div>
           <div>
-            <Label className="text-xs">To</Label>
+            <Label className="text-xs">{t('customers.to_label', 'To')}</Label>
             <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(0); }} />
           </div>
           <div>
-            <Label className="text-xs">Invoice / Ref</Label>
-            <Input placeholder="INV-…" value={refSearch} onChange={(e) => { setRefSearch(e.target.value); setPage(0); }} />
+            <Label className="text-xs">{t('products.invoice_ref_label', 'Invoice / Ref')}</Label>
+            <Input placeholder={t('products.invoice_ref_placeholder', 'INV-…')} value={refSearch} onChange={(e) => { setRefSearch(e.target.value); setPage(0); }} />
           </div>
         </div>
       </Card>
@@ -360,22 +364,23 @@ function ProductDetailPage() {
       {/* Timeline */}
       <Card className="p-0 overflow-hidden">
         <div className="p-3 border-b flex items-center justify-between">
-          <div className="font-medium">Stock Timeline</div>
+          <div className="font-medium">{t('products.stock_timeline_heading', 'Stock Timeline')}</div>
           <div className="text-xs text-muted-foreground">
-            {movementsQ.data?.count ?? 0} movements
+            {t('products.movements_count', '{{count}} movements', { count: movementsQ.data?.count ?? 0 })}
           </div>
         </div>
         <div className="divide-y">
           {movementsQ.isLoading && (
-            <div className="p-6 text-center text-sm text-muted-foreground">Loading…</div>
+            <div className="p-6 text-center text-sm text-muted-foreground">{t('pos.loading', 'Loading…')}</div>
           )}
           {!movementsQ.isLoading && (movementsQ.data?.rows.length ?? 0) === 0 && (
             <div className="p-6 text-center text-sm text-muted-foreground">
-              No movements match your filters.
+              {t('products.no_movements_match', 'No movements match your filters.')}
             </div>
           )}
           {movementsQ.data?.rows.map((m) => {
             const meta = TYPE_META[m.movement_type] ?? TYPE_META.adjustment;
+            const metaKey = TYPE_META[m.movement_type] ? m.movement_type : "adjustment";
             const Icon = meta.icon;
             const positive = Number(m.qty_change) > 0;
             return (
@@ -389,7 +394,7 @@ function ProductDetailPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{meta.label}</span>
+                    <span className="font-medium">{typeLabel(metaKey)}</span>
                     {m.reference_no && (
                       <Badge variant="outline" className="font-mono text-xs">
                         {m.reference_no}
@@ -415,10 +420,10 @@ function ProductDetailPage() {
         </div>
         {totalPages > 1 && (
           <div className="p-3 border-t flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Page {page + 1} of {totalPages}</span>
+            <span className="text-muted-foreground">{t('products.page_of_alt', 'Page {{page}} of {{total}}', { page: page + 1, total: totalPages })}</span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Prev</Button>
-              <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>{t('products.prev', 'Prev')}</Button>
+              <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>{t('products.next', 'Next')}</Button>
             </div>
           </div>
         )}
@@ -429,7 +434,7 @@ function ProductDetailPage() {
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
-              {selected && (TYPE_META[selected.movement_type]?.label ?? "Movement")}
+              {selected && (TYPE_META[selected.movement_type] ? typeLabel(selected.movement_type) : t('products.movement_fallback', 'Movement'))}
             </SheetTitle>
             <SheetDescription>
               {selected && format(new Date(selected.created_at), "PPpp")}
@@ -437,19 +442,19 @@ function ProductDetailPage() {
           </SheetHeader>
           {selected && (
             <div className="mt-4 space-y-3 text-sm">
-              <Row label="Reference" value={selected.reference_no ?? selected.reference_type} />
-              <Row label="Quantity" value={`${Number(selected.qty_change) > 0 ? "+" : ""}${fmtQty(selected.qty_change)} ${product?.unit ?? ""}`} />
-              <Row label="Stock before" value={fmtQty(selected.stock_before)} />
-              <Row label="Stock after" value={fmtQty(selected.stock_after)} />
+              <Row label={t('products.row_reference', 'Reference')} value={selected.reference_no ?? selected.reference_type} />
+              <Row label={t('products.row_quantity', 'Quantity')} value={`${Number(selected.qty_change) > 0 ? "+" : ""}${fmtQty(selected.qty_change)} ${product?.unit ?? ""}`} />
+              <Row label={t('products.row_stock_before', 'Stock before')} value={fmtQty(selected.stock_before)} />
+              <Row label={t('products.row_stock_after', 'Stock after')} value={fmtQty(selected.stock_after)} />
               {showCost && selected.unit_cost != null && (
-                <Row label="Unit cost" value={fmtMoney(selected.unit_cost, sym)} />
+                <Row label={t('products.row_unit_cost', 'Unit cost')} value={fmtMoney(selected.unit_cost, sym)} />
               )}
               {showCost && selected.total_cost != null && (
-                <Row label="Total cost" value={fmtMoney(selected.total_cost, sym)} />
+                <Row label={t('products.row_total_cost', 'Total cost')} value={fmtMoney(selected.total_cost, sym)} />
               )}
               {isAdmin && showCost && showSell && selected.movement_type === "sale" && selected.unit_cost != null && (
                 <Row
-                  label="Profit (est.)"
+                  label={t('products.row_profit_est', 'Profit (est.)')}
                   value={fmtMoney(
                     (Number(product?.sell_price ?? 0) - Number(selected.unit_cost)) *
                       Math.abs(Number(selected.qty_change)),
@@ -457,8 +462,8 @@ function ProductDetailPage() {
                   )}
                 />
               )}
-              {selected.reason && <Row label="Reason" value={selected.reason} />}
-              {selected.note && <Row label="Note" value={selected.note} />}
+              {selected.reason && <Row label={t('products.row_reason', 'Reason')} value={selected.reason} />}
+              {selected.note && <Row label={t('common.note', 'Note')} value={selected.note} />}
             </div>
           )}
         </SheetContent>

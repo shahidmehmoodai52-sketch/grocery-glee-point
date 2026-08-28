@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Search, History, Package, ArrowUpDown } from "lucide-react";
 
@@ -55,6 +56,7 @@ function safeTerm(q: string) {
 }
 
 function ProductsPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const { data: priceVisibility } = usePriceVisibility();
@@ -154,7 +156,7 @@ function ProductsPage() {
   const invalidateProducts = () => qc.invalidateQueries({ queryKey: ["products"] });
 
   const save = async () => {
-    if (!form.name) return toast.error("Name is required");
+    if (!form.name) return toast.error(t('products.name_required', 'Name is required'));
     const allBarcodes = parseBarcodes(form.barcodes_text);
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
     const { barcodes_text: _bt, stock: rawStock, ...rest } = form;
@@ -195,7 +197,7 @@ function ProductsPage() {
         if (bcErr) return toast.error(bcErr.message);
       }
     }
-    toast.success(form.id ? "Product updated" : "Product added");
+    toast.success(form.id ? t('products.product_updated', 'Product updated') : t('products.product_added', 'Product added'));
     clearOpen();
     clearForm();
 
@@ -204,10 +206,10 @@ function ProductsPage() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this product?")) return;
+    if (!confirm(t('products.delete_confirm', 'Delete this product?'))) return;
     const { error } = await supabase.from("products").delete().eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("Deleted");
+    toast.success(t('products.deleted', 'Deleted'));
     invalidateProducts();
   };
 
@@ -239,33 +241,33 @@ function ProductsPage() {
   return (
     <div className="p-6 space-y-4">
       <PageHeader
-        title="Products"
-        description={`${(counts?.total ?? total).toLocaleString()} items in catalog`}
+        title={t('common.products', 'Products')}
+        description={t('products.items_in_catalog', '{{count}} items in catalog', { count: (counts?.total ?? total).toLocaleString() })}
         icon={<Package className="h-5 w-5" />}
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />New product</Button>
+              <Button><Plus className="h-4 w-4 mr-2" />{t('products.new_product', 'New product')}</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{form.id ? "Edit" : "New"} product</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{form.id ? t('products.edit_product', 'Edit product') : t('products.new_product', 'New product')}</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                <div className="col-span-2"><Label>{t('common.name', 'Name')}</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div className="col-span-2">
-                  <Label>Supplier</Label>
+                  <Label>{t('pos.qa_supplier', 'Supplier')}</Label>
                   <select
                     value={form.preferred_supplier_id || "none"}
                     onChange={(e) => setForm((prev) => ({ ...prev, preferred_supplier_id: e.target.value === "none" ? "" : e.target.value }))}
                     className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <option value="none">— None —</option>
+                    <option value="none">{t('products.none_option', '— None —')}</option>
                     {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-                <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
-                <div><Label>Primary barcode</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="Optional" /></div>
+                <div><Label>{t('pos.qa_sku', 'SKU')}</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
+                <div><Label>{t('pos.qa_primary_barcode', 'Primary barcode')}</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder={t('common.optional', 'Optional')} /></div>
                 <div className="col-span-2">
-                  <Label>Additional barcodes (one per line — for different versions/packs of the same item)</Label>
+                  <Label>{t('products.additional_barcodes_full', 'Additional barcodes (one per line — for different versions/packs of the same item)')}</Label>
                   <textarea
                     className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={form.barcodes_text}
@@ -273,28 +275,28 @@ function ProductsPage() {
                     placeholder={"8964000000001\n8964000000002"}
                   />
                 </div>
-                <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
-                <div><Label>Unit</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
-                {showCost && <div><Label>Purchase rate (Cost)</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>}
+                <div><Label>{t('pos.qa_category', 'Category')}</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
+                <div><Label>{t('pos.qa_unit', 'Unit')}</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
+                {showCost && <div><Label>{t('products.cost_label', 'Purchase rate (Cost)')}</Label><Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: Number(e.target.value) })} /></div>}
                 {showSell && (
                   <div>
                     <Label className="flex items-center justify-between">
-                      <span>Price</span>
+                      <span>{t('products.price_label', 'Price')}</span>
                       {form.cost_price > 0 && form.sell_price > 0 && (
                         <span className={`text-xs ${form.sell_price >= form.cost_price ? "text-emerald-600" : "text-destructive"}`}>
-                          {(((form.sell_price - form.cost_price) / form.cost_price) * 100).toFixed(1)}% margin
+                          {t('products.margin', '{{pct}}% margin', { pct: (((form.sell_price - form.cost_price) / form.cost_price) * 100).toFixed(1) })}
                         </span>
                       )}
                     </Label>
                     <Input type="number" step="0.01" value={form.sell_price} onChange={(e) => setForm({ ...form, sell_price: Number(e.target.value) })} />
                   </div>
                 )}
-                <div><Label>Stock</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: roundToTillixQty(Number(e.target.value)) })} /></div>
-                <div><Label>Low-stock alert at</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: roundToTillixQty(Number(e.target.value)) })} /></div>
-                <div><Label>Tax %</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
-                <div><Label>Batch #</Label><Input value={form.batch_no} onChange={(e) => setForm({ ...form, batch_no: e.target.value })} placeholder="e.g. B-2026-01" /></div>
-                <div><Label>Expiry date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
-                <div className="col-span-2"><Label>Rack / Shelf location</Label><Input value={form.rack_location} onChange={(e) => setForm({ ...form, rack_location: e.target.value })} placeholder="e.g. A-3, Shelf 2" /></div>
+                <div><Label>{t('pos.stock', 'Stock')}</Label><Input type="number" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: roundToTillixQty(Number(e.target.value)) })} /></div>
+                <div><Label>{t('pos.qa_low_stock_alert', 'Low-stock alert at')}</Label><Input type="number" step="0.001" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: roundToTillixQty(Number(e.target.value)) })} /></div>
+                <div><Label>{t('pos.qa_tax_pct', 'Tax %')}</Label><Input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: Number(e.target.value) })} /></div>
+                <div><Label>{t('pos.qa_batch_no', 'Batch #')}</Label><Input value={form.batch_no} onChange={(e) => setForm({ ...form, batch_no: e.target.value })} placeholder={t('pos.qa_batch_placeholder', 'e.g. B-2026-01')} /></div>
+                <div><Label>{t('pos.qa_expiry_date', 'Expiry date')}</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
+                <div className="col-span-2"><Label>{t('pos.qa_rack_location', 'Rack / Shelf location')}</Label><Input value={form.rack_location} onChange={(e) => setForm({ ...form, rack_location: e.target.value })} placeholder={t('pos.qa_rack_placeholder', 'e.g. A-3, Shelf 2')} /></div>
                 <div className="col-span-2 flex items-start gap-2 rounded-md border p-3 bg-muted/30">
                   <input
                     id="allow-neg-stock"
@@ -304,17 +306,17 @@ function ProductsPage() {
                     onChange={(e) => setForm({ ...form, allow_negative_stock: e.target.checked })}
                   />
                   <label htmlFor="allow-neg-stock" className="text-sm cursor-pointer">
-                    <div className="font-medium">Allow negative stock</div>
+                    <div className="font-medium">{t('pos.qa_allow_negative_stock', 'Allow negative stock')}</div>
                     <div className="text-xs text-muted-foreground">
-                      If checked, POS will keep selling this item even after stock is zero. If unchecked, POS blocks the sale when stock is insufficient.
+                      {t('products.allow_negative_stock_desc', 'If checked, POS will keep selling this item even after stock is zero. If unchecked, POS blocks the sale when stock is insufficient.')}
                     </div>
                   </label>
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="ghost" onClick={() => setOpen(false)}>Hide (keep draft)</Button>
-                <Button variant="outline" onClick={() => { clearOpen(); clearForm(); }}>Discard</Button>
-                <Button onClick={save}>Save</Button>
+                <Button variant="ghost" onClick={() => setOpen(false)}>{t('products.hide_keep_draft', 'Hide (keep draft)')}</Button>
+                <Button variant="outline" onClick={() => { clearOpen(); clearForm(); }}>{t('products.discard', 'Discard')}</Button>
+                <Button onClick={save}>{t('common.save', 'Save')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -325,22 +327,22 @@ function ProductsPage() {
         <div className="mb-3 flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search by name, SKU, barcode…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            <Input placeholder={t('products.search_placeholder', 'Search by name, SKU, barcode…')} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder={t('pos.qa_category', 'Category')} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
+              <SelectItem value="all">{t('products.all_categories', 'All categories')}</SelectItem>
               {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All stock</SelectItem>
-              <SelectItem value="in">In stock</SelectItem>
-              <SelectItem value="low">Low stock</SelectItem>
-              <SelectItem value="out">Out of stock</SelectItem>
+              <SelectItem value="all">{t('products.all_stock', 'All stock')}</SelectItem>
+              <SelectItem value="in">{t('products.in_stock', 'In stock')}</SelectItem>
+              <SelectItem value="low">{t('products.low_stock', 'Low stock')}</SelectItem>
+              <SelectItem value="out">{t('products.out_of_stock', 'Out of stock')}</SelectItem>
             </SelectContent>
           </Select>
           {(() => {
@@ -357,19 +359,19 @@ function ProductsPage() {
                   ref={(el) => { if (el) el.indeterminate = someChecked; }}
                   onChange={async (e) => {
                     const next = e.target.checked;
-                    if (!confirm(`${next ? "Enable" : "Disable"} negative stock for ALL ${totalAll} products?`)) return;
+                    if (!confirm(next ? t('products.confirm_enable_negative', 'Enable negative stock for ALL {{count}} products?', { count: totalAll }) : t('products.confirm_disable_negative', 'Disable negative stock for ALL {{count}} products?', { count: totalAll }))) return;
                     const { error } = await supabase
                       .from("products")
                       .update({ allow_negative_stock: next })
                       .not("id", "is", null);
                     if (error) return toast.error(error.message);
-                    toast.success(`Negative stock ${next ? "enabled" : "disabled"} for all products`);
+                    toast.success(next ? t('products.negative_enabled_all', 'Negative stock enabled for all products') : t('products.negative_disabled_all', 'Negative stock disabled for all products'));
                     invalidateProducts();
                   }}
                 />
                 <span className="text-sm">
-                  <div className="font-medium leading-tight">Allow negative stock (all products)</div>
-                  <div className="text-xs text-muted-foreground">{allowedCount}/{totalAll} currently allow negative stock</div>
+                  <div className="font-medium leading-tight">{t('products.allow_negative_all_label', 'Allow negative stock (all products)')}</div>
+                  <div className="text-xs text-muted-foreground">{t('products.allow_negative_all_count', '{{allowed}}/{{total}} currently allow negative stock', { allowed: allowedCount, total: totalAll })}</div>
                 </span>
               </label>
             );
@@ -378,12 +380,12 @@ function ProductsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <SortHead k="name">Name</SortHead>
-              <SortHead k="sku">SKU</SortHead>
-              <SortHead k="category">Category</SortHead>
-              {showCost && <SortHead k="cost_price" className="text-right">Cost</SortHead>}
-              {showSell && <SortHead k="sell_price" className="text-right">Price</SortHead>}
-              <SortHead k="stock" className="text-right">Stock</SortHead>
+              <SortHead k="name">{t('common.name', 'Name')}</SortHead>
+              <SortHead k="sku">{t('pos.qa_sku', 'SKU')}</SortHead>
+              <SortHead k="category">{t('pos.qa_category', 'Category')}</SortHead>
+              {showCost && <SortHead k="cost_price" className="text-right">{t('pos.cost', 'Cost')}</SortHead>}
+              {showSell && <SortHead k="sell_price" className="text-right">{t('products.price_label', 'Price')}</SortHead>}
+              <SortHead k="stock" className="text-right">{t('pos.stock', 'Stock')}</SortHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -393,7 +395,7 @@ function ProductsPage() {
             )}
             {!isLoading && pageRows.length === 0 && (
               <TableRow><TableCell colSpan={tableColCount} className="py-8">
-                <EmptyState icon={Package} title="No products found" description="Try a different search or filter, or add a new product." />
+                <EmptyState icon={Package} title={t('products.no_products_found', 'No products found')} description={t('products.no_products_desc', 'Try a different search or filter, or add a new product.')} />
               </TableCell></TableRow>
             )}
             {pageRows.map((p) => (
@@ -406,16 +408,16 @@ function ProductsPage() {
                 <TableCell className="text-right">
                   {(() => {
                     const s = Number(p.stock);
-                    const t = Number(p.low_stock_threshold ?? 5);
-                    if (s <= 0) return <StatusBadge tone="danger">Out · {fmtQty(p.stock)} {p.unit}</StatusBadge>;
-                    if (s <= t) return <StatusBadge tone="warning">Low · {fmtQty(p.stock)} {p.unit}</StatusBadge>;
+                    const threshold = Number(p.low_stock_threshold ?? 5);
+                    if (s <= 0) return <StatusBadge tone="danger">{t('products.stock_out', 'Out · {{qty}} {{unit}}', { qty: fmtQty(p.stock), unit: p.unit })}</StatusBadge>;
+                    if (s <= threshold) return <StatusBadge tone="warning">{t('products.stock_low', 'Low · {{qty}} {{unit}}', { qty: fmtQty(p.stock), unit: p.unit })}</StatusBadge>;
                     return <StatusBadge tone="neutral">{fmtQty(p.stock)} {p.unit}</StatusBadge>;
                   })()}
                 </TableCell>
 
                 <TableCell className="text-right">
                   <Link to="/products/$id" params={{ id: p.id }}>
-                    <Button variant="ghost" size="icon" title="Stock timeline"><History className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" title={t('products.stock_timeline', 'Stock timeline')}><History className="h-4 w-4" /></Button>
                   </Link>
                   <Button variant="ghost" size="icon" onClick={() => edit(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -427,12 +429,12 @@ function ProductsPage() {
         </Table>
         <div className="flex items-center justify-between mt-3 text-sm">
           <div className="text-muted-foreground">
-            Showing {rangeLabel}{isFetching && !isLoading ? " · updating…" : ""}
+            {t('products.showing_range', 'Showing {{range}}', { range: rangeLabel })}{isFetching && !isLoading ? t('products.updating_suffix', ' · updating…') : ""}
           </div>
           <div className="flex gap-2 items-center">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
-            <span className="px-2 py-1">Page {page} / {totalPages}</span>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t('products.prev', 'Prev')}</Button>
+            <span className="px-2 py-1">{t('products.page_of', 'Page {{page}} / {{total}}', { page, total: totalPages })}</span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>{t('products.next', 'Next')}</Button>
           </div>
         </div>
       </Card>
