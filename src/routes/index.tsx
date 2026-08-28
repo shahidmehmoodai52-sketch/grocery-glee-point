@@ -421,7 +421,7 @@ function LandingPage() {
               <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-navy">{t('landing.nav.login')}</Link>
               <Link to="/auth" onClick={() => setMenuOpen(false)} className="py-2 text-sm font-semibold text-tx-green-dark">{t('landing.pricing.start_trial')}</Link>
               <div className="py-2">
-                <div className="mb-1 text-xs font-medium text-slate-500">{t('pos.settings.currency', 'Currency')}</div>
+                <div className="mb-1 text-xs font-medium text-slate-500">{t('common.currency', 'Currency')}</div>
                 <CurrencySelect value={cur.code} onChange={(code) => setCur(code)} />
               </div>
 

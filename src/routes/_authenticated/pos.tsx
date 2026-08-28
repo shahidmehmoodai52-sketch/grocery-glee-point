@@ -3446,23 +3446,23 @@ function POSPage() {
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add new item to catalog</DialogTitle>
+            <DialogTitle>{t('pos.qa_title', 'Add new item to catalog')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {quickAdd.barcode && (
               <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Scanned barcode</span>
+                <span className="text-xs text-muted-foreground">{t('pos.qa_scanned_barcode', 'Scanned barcode')}</span>
                 <span className="font-mono font-semibold text-sm">{quickAdd.barcode}</span>
               </div>
             )}
             <div>
-              <Label>Search existing item — select to link the barcode above to it</Label>
+              <Label>{t('pos.qa_search_existing', 'Search existing item — select to link the barcode above to it')}</Label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   autoFocus
                   className="pl-9"
-                  placeholder="Type item name, SKU or another barcode…"
+                  placeholder={t('pos.qa_search_placeholder', 'Type item name, SKU or another barcode…')}
                   value={quickAddLookup}
                   onChange={(e) => setQuickAddLookup(e.target.value)}
                 />
@@ -3471,10 +3471,10 @@ function POSPage() {
               {quickAddLookup.trim().length >= 2 && (
                 <div className="mt-2 max-h-48 overflow-auto rounded-md border bg-muted/20 p-2 space-y-2">
                   {quickAddMatchesLoading && (
-                    <div className="text-xs text-muted-foreground">Searching…</div>
+                    <div className="text-xs text-muted-foreground">{t('pos.qa_searching', 'Searching…')}</div>
                   )}
                   {!quickAddMatchesLoading && quickAddMatches.length === 0 && (
-                    <div className="text-xs text-muted-foreground">No existing item found</div>
+                    <div className="text-xs text-muted-foreground">{t('pos.qa_no_existing_found', 'No existing item found')}</div>
                   )}
                   {(quickAddMatches ?? []).map((product: any) => (
                     <button
@@ -3491,7 +3491,7 @@ function POSPage() {
                       </div>
                       <div className="ml-3 shrink-0 text-right">
                         <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Stock
+                          {t('pos.stock', 'Stock')}
                         </div>
                         <div className="font-semibold">{fmtQty(product.stock ?? 0)}</div>
                       </div>
@@ -3503,7 +3503,7 @@ function POSPage() {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <Label>Item name <span className="text-destructive">*</span></Label>
+              <Label>{t('pos.qa_item_name', 'Item name')} <span className="text-destructive">*</span></Label>
               <Input
                 value={quickAdd.name}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, name: e.target.value }))}
@@ -3521,13 +3521,13 @@ function POSPage() {
               />
             </div>
             <div className="col-span-2">
-              <Label>Supplier</Label>
+              <Label>{t('pos.qa_supplier', 'Supplier')}</Label>
               <select
                 value={quickAdd.supplier_id || ""}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, supplier_id: e.target.value }))}
                 className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="">— None —</option>
+                <option value="">{t('pos.qa_none_option', '— None —')}</option>
                 {quickAddSuppliers.map((s: any) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -3536,21 +3536,21 @@ function POSPage() {
               </select>
             </div>
             <div>
-              <Label>SKU</Label>
+              <Label>{t('pos.qa_sku', 'SKU')}</Label>
               <Input
                 value={quickAdd.sku}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, sku: e.target.value }))}
               />
             </div>
             <div>
-              <Label>Primary barcode</Label>
+              <Label>{t('pos.qa_primary_barcode', 'Primary barcode')}</Label>
               <Input
                 value={quickAdd.barcode}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, barcode: e.target.value }))}
               />
             </div>
             <div className="col-span-2">
-              <Label>Additional barcodes (one per line)</Label>
+              <Label>{t('pos.qa_additional_barcodes', 'Additional barcodes (one per line)')}</Label>
               <textarea
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={quickAdd.barcodes_text}
@@ -3559,10 +3559,10 @@ function POSPage() {
               />
             </div>
             <div>
-              <Label>Category</Label>
+              <Label>{t('pos.qa_category', 'Category')}</Label>
               <Input
                 list="quickadd-category-list"
-                placeholder="e.g. Grocery, Drinks"
+                placeholder={t('pos.qa_category_placeholder', 'e.g. Grocery, Drinks')}
                 value={quickAdd.category}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, category: e.target.value }))}
               />
@@ -3573,14 +3573,14 @@ function POSPage() {
               </datalist>
             </div>
             <div>
-              <Label>Unit</Label>
+              <Label>{t('pos.qa_unit', 'Unit')}</Label>
               <Input
                 value={quickAdd.unit}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, unit: e.target.value }))}
               />
             </div>
             <div>
-              <Label>Purchase rate</Label>
+              <Label>{t('pos.qa_purchase_rate', 'Purchase rate')}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -3589,7 +3589,7 @@ function POSPage() {
               />
             </div>
             <div>
-              <Label>Sell price</Label>
+              <Label>{t('pos.qa_sell_price', 'Sell price')}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -3598,7 +3598,7 @@ function POSPage() {
               />
             </div>
             <div>
-              <Label>Stock</Label>
+              <Label>{t('pos.stock', 'Stock')}</Label>
               <Input
                 type="number"
                 step="0.001"
@@ -3607,7 +3607,7 @@ function POSPage() {
               />
             </div>
             <div>
-              <Label>Low-stock alert at</Label>
+              <Label>{t('pos.qa_low_stock_alert', 'Low-stock alert at')}</Label>
               <Input
                 type="number"
                 step="0.001"
@@ -3618,7 +3618,7 @@ function POSPage() {
               />
             </div>
             <div>
-              <Label>Tax %</Label>
+              <Label>{t('pos.qa_tax_pct', 'Tax %')}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -3627,15 +3627,15 @@ function POSPage() {
               />
             </div>
             <div>
-              <Label>Batch #</Label>
+              <Label>{t('pos.qa_batch_no', 'Batch #')}</Label>
               <Input
                 value={quickAdd.batch_no}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, batch_no: e.target.value }))}
-                placeholder="e.g. B-2026-01"
+                placeholder={t('pos.qa_batch_placeholder', 'e.g. B-2026-01')}
               />
             </div>
             <div>
-              <Label>Expiry date</Label>
+              <Label>{t('pos.qa_expiry_date', 'Expiry date')}</Label>
               <Input
                 type="date"
                 value={quickAdd.expiry_date}
@@ -3643,11 +3643,11 @@ function POSPage() {
               />
             </div>
             <div className="col-span-2">
-              <Label>Rack / Shelf location</Label>
+              <Label>{t('pos.qa_rack_location', 'Rack / Shelf location')}</Label>
               <Input
                 value={quickAdd.rack_location}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, rack_location: e.target.value }))}
-                placeholder="e.g. A-3, Shelf 2"
+                placeholder={t('pos.qa_rack_placeholder', 'e.g. A-3, Shelf 2')}
               />
             </div>
             <div className="col-span-2 flex items-start gap-2 rounded-md border p-3 bg-muted/30">
@@ -3661,9 +3661,9 @@ function POSPage() {
                 }
               />
               <label htmlFor="quickadd-allow-neg-stock" className="text-sm cursor-pointer">
-                <div className="font-medium">Allow negative stock</div>
+                <div className="font-medium">{t('pos.qa_allow_negative_stock', 'Allow negative stock')}</div>
                 <div className="text-xs text-muted-foreground">
-                  If checked, POS can continue selling this item after stock reaches zero.
+                  {t('pos.qa_allow_negative_stock_desc', 'If checked, POS can continue selling this item after stock reaches zero.')}
                 </div>
               </label>
             </div>
@@ -3679,9 +3679,9 @@ function POSPage() {
                 setTimeout(() => searchRef.current?.focus(), 0);
               }}
             >
-              Cancel
+              {t('pos.cancel', 'Cancel')}
             </Button>
-            <Button onClick={saveQuickAdd}>Save & add to bill</Button>
+            <Button onClick={saveQuickAdd}>{t('pos.qa_save_add', 'Save & add to bill')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3690,26 +3690,25 @@ function POSPage() {
       <Dialog open={undoOpen} onOpenChange={(o) => !undoing && setUndoOpen(o)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Undo last sale?</DialogTitle>
+            <DialogTitle>{t('pos.undo_title', 'Undo last sale?')}</DialogTitle>
           </DialogHeader>
           {undoCandidate && (
             <div className="space-y-3 text-sm">
               <p className="text-muted-foreground">
-                This will reverse the sale, restore stock and any customer balance, and put the
-                items back in a new bill for editing.
+                {t('pos.undo_desc', 'This will reverse the sale, restore stock and any customer balance, and put the items back in a new bill for editing.')}
               </p>
               <div className="rounded-md border bg-muted/40 p-3 space-y-1.5">
-                <Row label="Invoice" value={undoCandidate.invoice_no} />
-                <Row label="Total" value={fmtMoney(undoCandidate.total, sym)} />
-                <Row label="Items" value={String(undoCandidate.item_count)} />
+                <Row label={t('pos.invoice', 'Invoice')} value={undoCandidate.invoice_no} />
+                <Row label={t('pos.total', 'Total')} value={fmtMoney(undoCandidate.total, sym)} />
+                <Row label={t('pos.items', 'Items')} value={String(undoCandidate.item_count)} />
                 <Row
-                  label="Elapsed"
+                  label={t('pos.elapsed', 'Elapsed')}
                   value={`${Math.floor(undoAgeSeconds / 60)}m ${undoAgeSeconds % 60}s of ${undoWindowMin}m window`}
                   muted
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Reason (optional)</Label>
+                <Label className="text-xs text-muted-foreground">{t('pos.reason_optional', 'Reason (optional)')}</Label>
                 <Select value={undoReason} onValueChange={setUndoReason}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
@@ -3727,20 +3726,20 @@ function POSPage() {
                     rows={2}
                     value={undoReasonNote}
                     onChange={(e) => setUndoReasonNote(e.target.value)}
-                    placeholder="Describe reason…"
+                    placeholder={t('pos.describe_reason', 'Describe reason…')}
                   />
                 )}
               </div>
               {undoExpired && (
                 <p className="text-destructive text-xs">
-                  Undo window has expired. Please create a Sale Return instead.
+                  {t('pos.undo_expired_msg', 'Undo window has expired. Please create a Sale Return instead.')}
                 </p>
               )}
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setUndoOpen(false)} disabled={undoing}>
-              Cancel
+              {t('pos.cancel', 'Cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -3748,7 +3747,7 @@ function POSPage() {
               disabled={undoing || undoExpired || !undoCandidate}
             >
               {undoing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Undo sale
+              {t('pos.undo_sale_btn', 'Undo sale')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3758,11 +3757,11 @@ function POSPage() {
       <Dialog open={quickAddCustomerOpen} onOpenChange={setQuickAddCustomerOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Add customer</DialogTitle>
+            <DialogTitle>{t('pos.add_customer', 'Add customer')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Name</Label>
+              <Label>{t('pos.name', 'Name')}</Label>
               <Input
                 autoFocus
                 value={newCustomer.name}
@@ -3776,7 +3775,7 @@ function POSPage() {
               />
             </div>
             <div>
-              <Label>Phone (optional)</Label>
+              <Label>{t('pos.phone_optional', 'Phone (optional)')}</Label>
               <Input
                 value={newCustomer.phone}
                 onChange={(e) => setNewCustomer((c) => ({ ...c, phone: e.target.value }))}
@@ -3785,9 +3784,9 @@ function POSPage() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setQuickAddCustomerOpen(false)}>
-              Cancel
+              {t('pos.cancel', 'Cancel')}
             </Button>
-            <Button onClick={saveQuickCustomer}>Save</Button>
+            <Button onClick={saveQuickCustomer}>{t('pos.save', 'Save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3826,6 +3825,7 @@ function PaymentMethodGrid({
   expensePersonId: string | null;
   onSelectStaff: (personId: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const accQ = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
     queryFn: fetchActiveCashAccounts,
@@ -3848,7 +3848,7 @@ function PaymentMethodGrid({
 
   const activeAccount = online.find((o) => isAccountActive(o));
   const bankActive = isCashBack || !!activeAccount;
-  const bankLabel = isCashBack ? "Digital + CB" : (activeAccount?.label ?? "Bank");
+  const bankLabel = isCashBack ? t('pos.digital_cb', 'Digital + CB') : (activeAccount?.label ?? t('pos.bank_fallback', 'Bank'));
 
   const btn = (active: boolean) =>
     `h-9 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap px-1 ${
@@ -3861,10 +3861,10 @@ function PaymentMethodGrid({
     <div className="mt-1.5 space-y-1.5">
       <div className="grid grid-cols-3 gap-1.5">
         <button type="button" onClick={() => onChange("cash")} className={btn(normalizedValue === "cash")}>
-          Cash
+          {t('pos.cash', 'Cash')}
         </button>
         <button type="button" onClick={() => onChange("credit")} className={btn(normalizedValue === "credit")}>
-          Credit
+          {t('pos.credit', 'Credit')}
         </button>
         <Popover open={bankOpen} onOpenChange={setBankOpen}>
           <PopoverTrigger asChild>
@@ -3872,7 +3872,7 @@ function PaymentMethodGrid({
               type="button"
               disabled={online.length === 0}
               className={`${btn(bankActive)} leading-tight flex items-center justify-center gap-1 disabled:opacity-50`}
-              title="Bank / other payment accounts from Cash Flow"
+              title={t('pos.bank_tooltip', 'Bank / other payment accounts from Cash Flow')}
             >
               <span className="truncate">{bankLabel}</span>
               <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
@@ -3880,7 +3880,7 @@ function PaymentMethodGrid({
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 p-2.5 space-y-2">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Payment accounts
+              {t('pos.payment_accounts', 'Payment accounts')}
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               {online.map((o) => (
@@ -3907,18 +3907,18 @@ function PaymentMethodGrid({
                   onSelectCashBackAccount(digitalAccountId ?? online[0]?.id ?? null);
                 }}
               >
-                Digital + CB
+                {t('pos.digital_cb', 'Digital + CB')}
               </button>
               {isCashBack && (
                 <div className="space-y-2 mb-2 bg-muted/30 p-2 rounded-md border border-dashed">
                   <div className="space-y-1">
-                    <Label className="text-[10px]">Digital account</Label>
+                    <Label className="text-[10px]">{t('pos.digital_account', 'Digital account')}</Label>
                     <Select
                       value={digitalAccountId ?? ""}
                       onValueChange={(v) => onSelectCashBackAccount(v || null)}
                     >
                       <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select account" />
+                        <SelectValue placeholder={t('pos.select_account', 'Select account')} />
                       </SelectTrigger>
                       <SelectContent>
                         {online.map((o) => (
@@ -3930,7 +3930,7 @@ function PaymentMethodGrid({
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[10px]">Amount received</Label>
+                    <Label className="text-[10px]">{t('pos.amount_received', 'Amount received')}</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -3943,18 +3943,18 @@ function PaymentMethodGrid({
                   </div>
                   <div className="rounded-md border border-dashed px-2 py-1 text-[11px] space-y-0.5">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Cash back</span>
+                      <span className="text-muted-foreground">{t('pos.cash_back', 'Cash back')}</span>
                       <span className="font-semibold">{fmtMoney(cashBackAmount, sym)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Remaining</span>
+                      <span className="text-muted-foreground">{t('pos.remaining', 'Remaining')}</span>
                       <span className="font-semibold">{fmtMoney(due, sym)}</span>
                     </div>
                   </div>
                 </div>
               )}
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pt-1">
-                Staff / Owner
+                {t('pos.staff_owner', 'Staff / Owner')}
               </div>
               <StaffSelector
                 value={expensePersonId}
@@ -3969,8 +3969,7 @@ function PaymentMethodGrid({
       </div>
       {online.length === 0 && (
         <p className="text-[10px] leading-tight text-muted-foreground">
-          Only Cash and Credit are available. Create payment accounts (Card, Bank, JazzCash…) in Cash
-          Flow and they appear here automatically.
+          {t('pos.only_cash_credit', 'Only Cash and Credit are available. Create payment accounts (Card, Bank, JazzCash…) in Cash Flow and they appear here automatically.')}
         </p>
       )}
     </div>
@@ -3984,6 +3983,7 @@ function StaffSelector({
   value: string | null;
   onSelect: (id: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const { data: persons = [] } = useQuery({
     queryKey: ["expense_persons"],
     queryFn: async () => {
@@ -4004,7 +4004,7 @@ function StaffSelector({
             : "bg-muted/50 text-foreground hover:bg-muted border border-transparent"
         }`}
       >
-        None
+        {t('pos.none', 'None')}
       </button>
       {persons.map((p: any) => (
         <button
@@ -4041,6 +4041,7 @@ function CashOutDialog({
   activeTab: Tab;
   onComplete: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -4189,7 +4190,7 @@ function CashOutDialog({
           size="sm"
           variant="outline"
           className="h-7 px-2 text-[11px] text-rose-600 border-rose-200 hover:bg-rose-50"
-          title="Give cash to customer (record as debit)"
+          title={t('pos.give_cash_tooltip', 'Give cash to customer (record as debit)')}
           onClick={(e) => {
             if (!activeTab.customer_id) {
               e.preventDefault();
@@ -4198,22 +4199,22 @@ function CashOutDialog({
             }
           }}
         >
-          Cash Out
+          {t('pos.cash_out', 'Cash Out')}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Cash Out to Customer</DialogTitle>
+          <DialogTitle>{t('pos.cash_out_to_customer', 'Cash Out to Customer')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="rounded-md bg-muted/40 p-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Customer:</span>
-              <span className="font-medium">{selectedCustomer?.name || "None"}</span>
+              <span className="text-muted-foreground">{t('pos.customer_colon', 'Customer:')}</span>
+              <span className="font-medium">{selectedCustomer?.name || t('pos.none', 'None')}</span>
             </div>
             {selectedCustomer && (
               <div className="flex justify-between mt-1">
-                <span className="text-muted-foreground">Current Balance:</span>
+                <span className="text-muted-foreground">{t('pos.current_balance', 'Current Balance:')}</span>
                 <span className={cn("font-medium", Number(selectedCustomer.balance) > 0 ? "text-destructive" : "text-success")}>
                   {fmtMoney(selectedCustomer.balance, sym)}
                 </span>
@@ -4222,10 +4223,10 @@ function CashOutDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Source Account (Shop Cash/Bank)</Label>
+            <Label>{t('pos.source_account', 'Source Account (Shop Cash/Bank)')}</Label>
             <Select value={accountId || ""} onValueChange={setAccountId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select account" />
+                <SelectValue placeholder={t('pos.select_account', 'Select account')} />
               </SelectTrigger>
               <SelectContent>
                 {accounts.map((a: any) => (
@@ -4238,7 +4239,7 @@ function CashOutDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Amount to give</Label>
+            <Label>{t('pos.amount_to_give', 'Amount to give')}</Label>
             <Input
               type="number"
               step="0.01"
@@ -4250,17 +4251,17 @@ function CashOutDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Reason / Note</Label>
+            <Label>{t('pos.reason_note', 'Reason / Note')}</Label>
             <Input
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. Personal loan, withdrawal"
+              placeholder={t('pos.reason_note_placeholder', 'e.g. Personal loan, withdrawal')}
             />
           </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
-            Cancel
+            {t('pos.cancel', 'Cancel')}
           </Button>
           <Button
             variant="destructive"
@@ -4268,7 +4269,7 @@ function CashOutDialog({
             disabled={submitting}
           >
             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Complete Cash Out
+            {t('pos.complete_cash_out', 'Complete Cash Out')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -4285,6 +4286,7 @@ function PaymentMethodSelect({
   onChange: (v: string) => void;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const accQ = useQuery({
     queryKey: POS_CASH_ACCOUNTS_QUERY_KEY,
     queryFn: fetchActiveCashAccounts,
@@ -4292,11 +4294,11 @@ function PaymentMethodSelect({
   const accounts = accQ.data ?? [];
   const online = accounts.filter((a: any) => a.type !== "cash");
   const options = [
-    { value: "cash", label: "Cash" },
+    { value: "cash", label: t('pos.cash', 'Cash') },
     ...online.map((a: any) => ({ value: String(a.name), label: String(a.name) })),
-    ...(online.length ? [{ value: "digital_cash_back", label: "Digital + CB" }] : []),
-    { value: "credit", label: "Credit" },
-    { value: "staff", label: "Staff" },
+    ...(online.length ? [{ value: "digital_cash_back", label: t('pos.digital_cb', 'Digital + CB') }] : []),
+    { value: "credit", label: t('pos.credit', 'Credit') },
+    { value: "staff", label: t('pos.staff', 'Staff') },
   ];
   // Keep historical / restored tenders selectable even if that head was removed.
   if (value && !options.some((o) => normalizePaymentMethodValue(o.value) === normalizePaymentMethodValue(value))) {
@@ -4362,6 +4364,7 @@ function PrintPromptDialog({
   onYes: () => void;
   onNo: () => void;
 }) {
+  const { t } = useTranslation();
   const yesRef = useRef<HTMLButtonElement>(null);
   const noRef = useRef<HTMLButtonElement>(null);
   const [focused, setFocused] = useState<"yes" | "no">(defaultAction || "no");
@@ -4423,14 +4426,14 @@ function PrintPromptDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Print receipt?</DialogTitle>
+          <DialogTitle>{t('pos.print_receipt_q', 'Print receipt?')}</DialogTitle>
         </DialogHeader>
         <div className="text-sm text-muted-foreground">
-          Invoice <span className="font-mono">{sale?.invoice_no}</span> saved. Print it now?
+          {t('pos.invoice', 'Invoice')} <span className="font-mono">{sale?.invoice_no}</span> {t('pos.invoice_saved_print', 'saved. Print it now?')}
         </div>
         <DialogFooter className="gap-2">
           <Button ref={noRef} variant={focused === "no" ? "default" : "outline"} onClick={onNo}>
-            No
+            {t('pos.no', 'No')}
           </Button>
           <Button
             ref={yesRef}
@@ -4438,7 +4441,7 @@ function PrintPromptDialog({
             onClick={doPrint}
           >
             <Printer className="h-4 w-4 mr-2" />
-            Yes, print
+            {t('pos.yes_print', 'Yes, print')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -4447,12 +4450,13 @@ function PrintPromptDialog({
 }
 
 function InvoiceDialog({ invoice, settings, onClose }: any) {
+  const { t } = useTranslation();
   if (!invoice) return null;
   return (
     <Dialog open={!!invoice} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Invoice {invoice.invoice_no}</DialogTitle>
+          <DialogTitle>{t('pos.invoice', 'Invoice')} {invoice.invoice_no}</DialogTitle>
         </DialogHeader>
         <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
           <div className="print-area">
@@ -4461,7 +4465,7 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
         </div>
         <DialogFooter className="no-print">
           <Button variant="outline" onClick={onClose}>
-            Close
+            {t('pos.close', 'Close')}
           </Button>
           <Button
             onClick={() => {
@@ -4469,7 +4473,7 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
             }}
           >
             <Printer className="h-4 w-4 mr-2" />
-            Print
+            {t('pos.print', 'Print')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -4492,6 +4496,7 @@ function ReprintDialog({
   reprintAuditEnabled?: boolean;
   onEdit: (s: any) => void;
 }) {
+  const { t } = useTranslation();
   const [q, setQ] = useState("");
   /** How many invoices are loaded. Grows on "Load more" so NO invoice is
    *  permanently hidden behind a fixed cap. */
@@ -4594,14 +4599,14 @@ function ReprintDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Reprint / past invoices</DialogTitle>
+          <DialogTitle>{t('pos.reprint_title', 'Reprint / past invoices')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               autoFocus
-              placeholder="Search by invoice no, customer, or amount (e.g. 250)…"
+              placeholder={t('pos.reprint_search_placeholder', 'Search by invoice no, customer, or amount (e.g. 250)…')}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               className="pl-9 h-10"
@@ -4611,10 +4616,10 @@ function ReprintDialog({
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-xs uppercase tracking-wide sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2">Invoice</th>
-                  <th className="text-left px-3 py-2">Date</th>
-                  <th className="text-left px-3 py-2">Customer</th>
-                  <th className="text-right px-3 py-2">Total</th>
+                  <th className="text-left px-3 py-2">{t('pos.invoice', 'Invoice')}</th>
+                  <th className="text-left px-3 py-2">{t('pos.date', 'Date')}</th>
+                  <th className="text-left px-3 py-2">{t('pos.customer', 'Customer')}</th>
+                  <th className="text-right px-3 py-2">{t('pos.total', 'Total')}</th>
                   <th className="px-2 py-2"></th>
                 </tr>
               </thead>
@@ -4622,14 +4627,14 @@ function ReprintDialog({
                 {isFetching && (
                   <tr>
                     <td colSpan={5} className="text-center py-6 text-muted-foreground">
-                      Loading…
+                      {t('pos.loading', 'Loading…')}
                     </td>
                   </tr>
                 )}
                 {!isFetching && filtered.length === 0 && (
                   <tr>
                     <td colSpan={5} className="text-center py-6 text-muted-foreground">
-                      No invoices match.
+                      {t('pos.no_invoices_match', 'No invoices match.')}
                     </td>
                   </tr>
                 )}
@@ -4639,7 +4644,7 @@ function ReprintDialog({
                     <td className="px-3 py-1.5 text-xs">
                       {fmtDate(s.created_at)}
                     </td>
-                    <td className="px-3 py-1.5">{s.customers?.name ?? s.expense_persons?.name ?? "Walk-in"}</td>
+                    <td className="px-3 py-1.5">{s.customers?.name ?? s.expense_persons?.name ?? t('pos.walk_in', 'Walk-in')}</td>
                     <td className="px-3 py-1.5 text-right font-medium tabular-nums">
                       {fmtMoney(s.total, sym)}
                     </td>
@@ -4651,9 +4656,9 @@ function ReprintDialog({
                           onEdit(s);
                           onOpenChange(false);
                         }}
-                        title="Edit invoice in POS"
+                        title={t('pos.edit_invoice_tooltip', 'Edit invoice in POS')}
                       >
-                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> {t('pos.edit', 'Edit')}
                       </Button>
                       <Button
                         size="sm"
@@ -4672,9 +4677,9 @@ function ReprintDialog({
                           printInvoiceDirect(s, settings);
                           onOpenChange(false);
                         }}
-                        title="Reprint invoice"
+                        title={t('pos.reprint_invoice_tooltip', 'Reprint invoice')}
                       >
-                        <Printer className="h-3.5 w-3.5 mr-1" /> Reprint
+                        <Printer className="h-3.5 w-3.5 mr-1" /> {t('pos.reprint', 'Reprint')}
                       </Button>
                     </td>
                   </tr>
@@ -4687,7 +4692,7 @@ function ReprintDialog({
                         variant="outline"
                         onClick={() => setPageSize((n) => n + 300)}
                       >
-                        Load older invoices
+                        {t('pos.load_older', 'Load older invoices')}
                       </Button>
                     </td>
                   </tr>
@@ -4720,6 +4725,7 @@ function EditableNumCell({
   onCommit: (v: number) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(String(value));
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -4738,7 +4744,7 @@ function EditableNumCell({
         type="button"
         onClick={onActivate}
         className="h-8 w-full px-2 text-right text-sm tabular-nums hover:bg-accent/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        title="Click to edit"
+        title={t('pos.click_to_edit', 'Click to edit')}
       >
         {display}
       </button>
