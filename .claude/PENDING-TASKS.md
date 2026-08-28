@@ -72,6 +72,35 @@ Recommended path (in order of preference):
 Waiting on user to check Lovable dashboard for the transfer option before
 Claude proposes the detailed manual-migration script.
 
+## 3. WhatsApp new-shop notification — waiting on Meta credentials (pending — not started)
+
+Built and deployed (2026-08-28): a DB trigger (`notify_whatsapp_new_shop` on
+`public.tenants`, migration `20260828023500_whatsapp_new_shop_notification.sql`)
+fires on every new shop signup and calls the Meta WhatsApp Cloud API to message
+Tillix's own number (+923096431377) with the new shop's name, phone, city and
+plan. It currently no-ops safely (never blocks registration) because the two
+required secrets aren't set yet.
+
+User needs to get, from developers.facebook.com (WhatsApp product → API Setup):
+1. **Phone Number ID** — numeric ID shown on the API Setup page.
+2. **A permanent access token** — the default token shown there is only valid
+   24h; for a permanent one: Meta Business Suite → Business Settings →
+   System Users → create a system user → generate a token with the
+   `whatsapp_business_messaging` permission.
+
+Once the user has both values, Claude stores them in Supabase Vault as secrets
+named `whatsapp_access_token` / `whatsapp_phone_number_id` (via
+`mcp__Lovable__query_database`, e.g. `select vault.create_secret('<value>',
+'whatsapp_access_token')`) — never in the repo — and the trigger starts
+sending immediately, no code changes needed.
+
+Also flagged to the user: Meta only allows freeform text messages (what this
+trigger currently sends) to a number that messaged the business number within
+the last 24h. For a fully automated, always-on notification, the user should
+create and get a simple message template approved in WhatsApp Manager; Claude
+can then switch the trigger's payload from `type: text` to `type: template`
+once one exists.
+
 ## Also noted (informational, no action needed)
 - Root `.env` is committed to the repo with Supabase URL + anon/publishable key
   only (no service-role/secret key) — not a critical leak, but best practice
