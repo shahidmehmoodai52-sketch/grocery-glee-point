@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import {
@@ -204,25 +205,26 @@ function invalidateAfterImport(qc: ReturnType<typeof useQueryClient>) {
 }
 
 function Page() {
+  const { t } = useTranslation();
   return (
     <div className="p-6 space-y-4">
       <NeedsInternetBanner section="Import" />
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Bulk import &amp; export</h1>
-          <p className="text-sm text-muted-foreground">Excel (.xlsx / .xls) ya CSV files upload karen — ya pora system data Excel me export karen.</p>
+          <h1 className="text-2xl font-semibold">{t('import.page_title', 'Bulk import & export')}</h1>
+          <p className="text-sm text-muted-foreground">{t('import.page_desc', 'Excel (.xlsx / .xls) ya CSV files upload karen — ya pora system data Excel me export karen.')}</p>
         </div>
         <ExportAllButton />
       </div>
 
       <Tabs defaultValue="single">
         <TabsList>
-          <TabsTrigger value="single"><FileSpreadsheet className="h-4 w-4 mr-1" />Merged file (multi-barcode)</TabsTrigger>
-          <TabsTrigger value="smart"><Wand2 className="h-4 w-4 mr-1" />Smart merge (2 files)</TabsTrigger>
-          <TabsTrigger value="products">Products</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-          <TabsTrigger value="history"><History className="h-4 w-4 mr-1" />Uploaded files</TabsTrigger>
+          <TabsTrigger value="single"><FileSpreadsheet className="h-4 w-4 mr-1" />{t('import.tab_single', 'Merged file (multi-barcode)')}</TabsTrigger>
+          <TabsTrigger value="smart"><Wand2 className="h-4 w-4 mr-1" />{t('import.tab_smart', 'Smart merge (2 files)')}</TabsTrigger>
+          <TabsTrigger value="products">{t('import.tab_products', 'Products')}</TabsTrigger>
+          <TabsTrigger value="customers">{t('import.tab_customers', 'Customers')}</TabsTrigger>
+          <TabsTrigger value="suppliers">{t('import.tab_suppliers', 'Suppliers')}</TabsTrigger>
+          <TabsTrigger value="history"><History className="h-4 w-4 mr-1" />{t('import.tab_history', 'Uploaded files')}</TabsTrigger>
         </TabsList>
         <TabsContent value="single" className="mt-4"><SingleMergedFile /></TabsContent>
         <TabsContent value="smart" className="mt-4"><SmartMerge /></TabsContent>
@@ -257,6 +259,7 @@ type BatchRow = {
 };
 
 function ImportHistory({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<BatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -269,11 +272,11 @@ function ImportHistory({ compact = false }: { compact?: boolean }) {
         supabase.from("import_batches").select("*").order("created_at", { ascending: false }).range(from, to) as any,
       );
     } catch (e: any) {
-      toast.error(e?.message ?? "Import history load nahi hui");
+      toast.error(e?.message ?? t('import.history_load_failed', 'Import history load nahi hui'));
     }
     setRows(data);
     setLoading(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -284,14 +287,14 @@ function ImportHistory({ compact = false }: { compact?: boolean }) {
 
   const deleteBatch = async (b: BatchRow) => {
     const totalItems = b.products_count + b.barcodes_count + b.customers_count + b.suppliers_count;
-    const msg = `"${b.filename}" delete karen?\n\nIs file se imported ${totalItems} records (products/barcodes/customers/suppliers) bhi permanently delete ho jain ge. Sales/purchases history rahegi. Continue?`;
+    const msg = t('import.delete_confirm', '"{{filename}}" delete karen?\n\nIs file se imported {{count}} records (products/barcodes/customers/suppliers) bhi permanently delete ho jain ge. Sales/purchases history rahegi. Continue?', { filename: b.filename, count: totalItems });
     if (!confirm(msg)) return;
     setDeletingId(b.id);
     // ON DELETE CASCADE on the FK removes the tagged rows automatically.
     const { error } = await supabase.from("import_batches").delete().eq("id", b.id);
     setDeletingId(null);
     if (error) { toast.error(error.message); return; }
-    toast.success(`"${b.filename}" aur uska imported data delete ho gaya`);
+    toast.success(t('import.delete_success', '"{{filename}}" aur uska imported data delete ho gaya', { filename: b.filename }));
     notifyBatchChanged();
   };
 
@@ -303,49 +306,49 @@ function ImportHistory({ compact = false }: { compact?: boolean }) {
         <div>
           <h3 className="font-medium flex items-center gap-2">
             <History className="h-4 w-4" />
-            Uploaded files
+            {t('import.tab_history', 'Uploaded files')}
             {compact && rows.length > 5 && (
               <span className="text-xs text-muted-foreground font-normal">
-                · latest 5 (see the “Uploaded files” tab for all)
+                {t('import.history_latest5_note', '· latest 5 (see the "Uploaded files" tab for all)')}
               </span>
             )}
           </h3>
           <p className="text-xs text-muted-foreground">
-            Har upload ka record — kisi file ko delete karen to us file se imported data bhi hat jayega.
+            {t('import.history_desc', 'Har upload ka record — kisi file ko delete karen to us file se imported data bhi hat jayega.')}
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={load} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-          Refresh
+          {t('import.refresh_btn', 'Refresh')}
         </Button>
       </div>
 
       {loading && rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+        <p className="text-sm text-muted-foreground py-6 text-center">{t('import.loading', 'Loading…')}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground py-6 text-center">
-          Abhi tak koi file upload nahi ki gayi.
+          {t('import.history_empty', 'Abhi tak koi file upload nahi ki gayi.')}
         </p>
       ) : (
         <div className="max-h-96 overflow-auto border rounded">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>File</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Imported</TableHead>
+                <TableHead>{t('import.th_file', 'File')}</TableHead>
+                <TableHead>{t('import.th_type', 'Type')}</TableHead>
+                <TableHead>{t('import.th_date', 'Date')}</TableHead>
+                <TableHead className="text-right">{t('import.th_imported', 'Imported')}</TableHead>
                 <TableHead className="w-24"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {shown.map((b) => {
                 const parts: string[] = [];
-                if (b.products_count) parts.push(`${b.products_count} products`);
-                if (b.barcodes_count) parts.push(`${b.barcodes_count} barcodes`);
-                if (b.customers_count) parts.push(`${b.customers_count} customers`);
-                if (b.suppliers_count) parts.push(`${b.suppliers_count} suppliers`);
-                if (b.failed_count) parts.push(`${b.failed_count} failed`);
+                if (b.products_count) parts.push(t('import.count_products', '{{count}} products', { count: b.products_count }));
+                if (b.barcodes_count) parts.push(t('import.count_barcodes', '{{count}} barcodes', { count: b.barcodes_count }));
+                if (b.customers_count) parts.push(t('import.count_customers', '{{count}} customers', { count: b.customers_count }));
+                if (b.suppliers_count) parts.push(t('import.count_suppliers', '{{count}} suppliers', { count: b.suppliers_count }));
+                if (b.failed_count) parts.push(t('import.count_failed', '{{count}} failed', { count: b.failed_count }));
                 return (
                   <TableRow key={b.id}>
                     <TableCell className="text-xs">
@@ -365,7 +368,7 @@ function ImportHistory({ compact = false }: { compact?: boolean }) {
                         variant="destructive"
                         onClick={() => deleteBatch(b)}
                         disabled={deletingId === b.id}
-                        title="Delete this file and all data it imported"
+                        title={t('import.delete_btn_title', 'Delete this file and all data it imported')}
                       >
                         {deletingId === b.id
                           ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -597,6 +600,7 @@ function smartAutoMap(headers: string[], rows: Record<string, any>[]): Record<st
 
 
 function SmartMerge() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const fileA = useRef<HTMLInputElement>(null);
   const fileB = useRef<HTMLInputElement>(null);
@@ -621,7 +625,11 @@ function SmartMerge() {
     }
     const payload = { headers: parsed.headers, rows: parsed.rows, name: file.name };
     if (isBarcode) setBarcodeFile(payload); else setStockFile(payload);
-    toast.success(`${file.name} → ${isBarcode ? "Barcode file" : "Stock master"} (${parsed.rows.length} rows)`);
+    toast.success(t('import.smart_file_detected', '{{filename}} → {{type}} ({{count}} rows)', {
+      filename: file.name,
+      type: isBarcode ? t('import.toast_barcode_file', 'Barcode file') : t('import.toast_stock_master', 'Stock master'),
+      count: parsed.rows.length,
+    }));
   };
 
   const stockMap = useMemo(() => stockFile ? autoMap(stockFile.headers) : {}, [stockFile]);
@@ -653,7 +661,7 @@ function SmartMerge() {
   }, [barcodeFile, barcodeMap]);
 
   const runImport = async () => {
-    if (merged.length === 0) return toast.error("Stock master file me koi valid rows nahi");
+    if (merged.length === 0) return toast.error(t('import.smart_no_valid_rows', 'Stock master file me koi valid rows nahi'));
     setBusy(true); setResult({ products: 0, barcodes: 0, failed: 0, errors: [] });
     const errors: string[] = [];
     let ok = 0, failed = 0;
@@ -667,7 +675,7 @@ function SmartMerge() {
     const existingSkus = await existingValues("products", "sku", merged.map((p) => p.sku).filter(Boolean));
     const fresh = merged.filter((p) => !(p.sku && existingSkus.has(p.sku)));
     const skippedExisting = merged.length - fresh.length;
-    if (skippedExisting) errors.push(`${skippedExisting} items pehle se mojood thay (skip kiye gaye).`);
+    if (skippedExisting) errors.push(t('import.skipped_existing', '{{count}} items pehle se mojood thay (skip kiye gaye).', { count: skippedExisting }));
     const withSku = fresh.filter((p) => p.sku).map(tag);
     const noSku = fresh.filter((p) => !p.sku).map(tag);
     for (const bucket of [withSku, noSku]) {
@@ -703,8 +711,8 @@ function SmartMerge() {
 
     setBusy(false);
     setResult({ products: ok, barcodes: bcOk, failed, errors: [...new Set(errors)].slice(0, 5) });
-    if (failed === 0) toast.success(`Imported ${ok} products, ${bcOk} extra barcodes`);
-    else toast.error(`${ok} imported, ${failed} failed`);
+    if (failed === 0) toast.success(t('import.smart_success', 'Imported {{ok}} products, {{barcodes}} extra barcodes', { ok, barcodes: bcOk }));
+    else toast.error(t('import.partial_fail_generic', '{{ok}} imported, {{failed}} failed', { ok, failed }));
   };
 
   return (
@@ -712,15 +720,14 @@ function SmartMerge() {
       <Alert>
         <Wand2 className="h-4 w-4" />
         <AlertDescription className="text-xs">
-          Apni <b>do Excel files</b> upload karen: ek stock/item master (name, rate, stock) aur dosri barcode list (item code + barcode).
-          System dono ko khud detect karega, item code par jodega, aur products + multiple barcodes set kar dega.
-          <b> Existing SKU update ho jata hai</b>, naya add ho jata hai.
+          {t('import.smart_desc_prefix', 'Apni ')}<b>{t('import.smart_desc_bold1', 'do Excel files')}</b>{t('import.smart_desc_mid', ' upload karen: ek stock/item master (name, rate, stock) aur dosri barcode list (item code + barcode). System dono ko khud detect karega, item code par jodega, aur products + multiple barcodes set kar dega. ')}
+          <b>{t('import.smart_desc_bold2', ' Existing SKU update ho jata hai')}</b>{t('import.smart_desc_suffix', ', naya add ho jata hai.')}
         </AlertDescription>
       </Alert>
 
       <div className="grid md:grid-cols-2 gap-4">
         <FileSlot
-          label="File 1 (Stock master)"
+          label={t('import.file1_label', 'File 1 (Stock master)')}
           file={stockFile}
           map={stockMap}
           required={["name"]}
@@ -729,7 +736,7 @@ function SmartMerge() {
           onClear={() => setStockFile(null)}
         />
         <FileSlot
-          label="File 2 (Barcodes)"
+          label={t('import.file2_label', 'File 2 (Barcodes)')}
           file={barcodeFile}
           map={barcodeMap}
           required={["sku","barcode"]}
@@ -743,21 +750,21 @@ function SmartMerge() {
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <h3 className="font-medium">Preview</h3>
+              <h3 className="font-medium">{t('import.preview_heading', 'Preview')}</h3>
               <p className="text-xs text-muted-foreground">
-                {merged.length} products · {extraBarcodes.length} extra barcodes (linked by item code)
+                {t('import.smart_preview_summary', '{{products}} products · {{barcodes}} extra barcodes (linked by item code)', { products: merged.length, barcodes: extraBarcodes.length })}
               </p>
             </div>
             <Button onClick={runImport} disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-              Import everything
+              {t('import.import_everything_btn', 'Import everything')}
             </Button>
           </div>
           <div className="max-h-72 overflow-auto border rounded">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>SKU</TableHead><TableHead>Name</TableHead><TableHead>Barcode</TableHead>
-                <TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Sale</TableHead><TableHead className="text-right">Stock</TableHead>
+                <TableHead>{t('import.th_sku', 'SKU')}</TableHead><TableHead>{t('import.th_name', 'Name')}</TableHead><TableHead>{t('import.th_barcode', 'Barcode')}</TableHead>
+                <TableHead className="text-right">{t('import.th_cost', 'Cost')}</TableHead><TableHead className="text-right">{t('import.th_sale', 'Sale')}</TableHead><TableHead className="text-right">{t('import.th_stock', 'Stock')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {merged.slice(0, 50).map((p, i) => (
@@ -773,7 +780,7 @@ function SmartMerge() {
               </TableBody>
             </Table>
           </div>
-          {merged.length > 50 && <p className="text-xs text-muted-foreground">Showing first 50 of {merged.length}.</p>}
+          {merged.length > 50 && <p className="text-xs text-muted-foreground">{t('import.showing_first_n', 'Showing first {{shown}} of {{total}}.', { shown: 50, total: merged.length })}</p>}
         </Card>
       )}
 
@@ -781,7 +788,7 @@ function SmartMerge() {
         <Alert variant={result.failed > 0 ? "destructive" : "default"}>
           {result.failed === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
           <AlertDescription>
-            <div><b>{result.products}</b> products imported · <b>{result.barcodes}</b> extra barcodes · <b>{result.failed}</b> failed.</div>
+            <div><b>{result.products}</b> {t('import.smart_result_products_imported', 'products imported')} · <b>{result.barcodes}</b> {t('import.smart_result_extra_barcodes', 'extra barcodes')} · <b>{result.failed}</b> {t('import.result_failed_suffix', 'failed.')}</div>
             {result.errors.length > 0 && <ul className="mt-2 text-xs list-disc pl-4">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
           </AlertDescription>
         </Alert>
@@ -799,25 +806,26 @@ function FileSlot({ label, file, map, required, inputRef, onPick, onClear }: {
   onPick: (f: File) => void;
   onClear: () => void;
 }) {
+  const { t } = useTranslation();
   const missing = required.filter((k) => !map[k]);
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-sm">{label}</h3>
         {file ? (
-          <Button size="sm" variant="ghost" onClick={onClear}>Clear</Button>
+          <Button size="sm" variant="ghost" onClick={onClear}>{t('import.clear_btn', 'Clear')}</Button>
         ) : (
           <>
             <input ref={inputRef} type="file" hidden accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && onPick(e.target.files[0])} />
             <Button size="sm" variant="outline" onClick={() => inputRef.current?.click()}>
-              <FileSpreadsheet className="h-4 w-4 mr-1" />Choose file
+              <FileSpreadsheet className="h-4 w-4 mr-1" />{t('import.choose_file_btn', 'Choose file')}
             </Button>
           </>
         )}
       </div>
       {file && (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground truncate">📄 {file.name} · {file.rows.length} rows</p>
+          <p className="text-xs text-muted-foreground truncate">{t('import.file_info_rows', '📄 {{filename}} · {{count}} rows', { filename: file.name, count: file.rows.length })}</p>
           <div className="flex flex-wrap gap-1">
             {Object.entries(map).map(([k, v]) => (
               <Badge key={k} variant="secondary" className="text-[10px]">{k} ← {v}</Badge>
@@ -826,7 +834,7 @@ function FileSlot({ label, file, map, required, inputRef, onPick, onClear }: {
           {missing.length > 0 && (
             <Alert variant="destructive" className="py-2">
               <AlertCircle className="h-3 w-3" />
-              <AlertDescription className="text-xs">Required column not detected: {missing.join(", ")}</AlertDescription>
+              <AlertDescription className="text-xs">{t('import.required_not_detected', 'Required column not detected: {{fields}}', { fields: missing.join(", ") })}</AlertDescription>
             </Alert>
           )}
         </div>
@@ -838,6 +846,7 @@ function FileSlot({ label, file, map, required, inputRef, onPick, onClear }: {
 // ---------------- Single-entity importer (now supports xlsx) ----------------
 
 function Importer({ entity }: { entity: EntityKey }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const schema = SCHEMAS[entity];
   const fileRef = useRef<HTMLInputElement>(null);
@@ -862,7 +871,7 @@ function Importer({ entity }: { entity: EntityKey }) {
         if (hit) auto[f.key] = hit;
       });
       setMapping(auto);
-      toast.success(`Parsed ${data.length} rows`);
+      toast.success(t('import.parsed_rows_simple', 'Parsed {{count}} rows', { count: data.length }));
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -891,7 +900,7 @@ function Importer({ entity }: { entity: EntityKey }) {
   };
 
   const runImport = async () => {
-    if (mapped.length === 0) return toast.error("No rows to import");
+    if (mapped.length === 0) return toast.error(t('import.generic_no_rows', 'No rows to import'));
     setBusy(true); setResult({ ok: 0, failed: 0, errors: [] });
     const errors: string[] = []; let ok = 0, failed = 0;
     const batchId = await createImportBatch(filename || `${entity}-upload`, entity);
@@ -901,7 +910,7 @@ function Importer({ entity }: { entity: EntityKey }) {
       const existingSkus = await existingValues("products", "sku", rows.map((r: any) => r.sku).filter(Boolean));
       const before = rows.length;
       rows = rows.filter((r: any) => !(r.sku && existingSkus.has(r.sku)));
-      if (before - rows.length) errors.push(`${before - rows.length} items pehle se mojood thay (skip kiye gaye).`);
+      if (before - rows.length) errors.push(t('import.skipped_existing', '{{count}} items pehle se mojood thay (skip kiye gaye).', { count: before - rows.length }));
     }
     const res = await insertResilient(entity, rows, {
       onProgress: (o, f) => setResult({ ok: o, failed: f, errors: [...new Set(errors)].slice(0, 6) }),
@@ -918,7 +927,8 @@ function Importer({ entity }: { entity: EntityKey }) {
     notifyBatchChanged();
     invalidateAfterImport(qc);
     setBusy(false);
-    if (failed === 0) toast.success(`Imported ${ok} rows`); else toast.error(`${ok} imported, ${failed} failed`);
+    if (failed === 0) toast.success(t('import.toast_imported_rows', 'Imported {{count}} rows', { count: ok }));
+    else toast.error(t('import.partial_fail_generic', '{{ok}} imported, {{failed}} failed', { ok, failed }));
   };
 
   return (
@@ -926,13 +936,13 @@ function Importer({ entity }: { entity: EntityKey }) {
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="font-medium">Step 1 — Upload file</h3>
-            <p className="text-xs text-muted-foreground">Excel (.xlsx, .xls) ya CSV. First row me headers honi chahiye.</p>
+            <h3 className="font-medium">{t('import.step1_upload_heading', 'Step 1 — Upload file')}</h3>
+            <p className="text-xs text-muted-foreground">{t('import.step1_upload_desc', 'Excel (.xlsx, .xls) ya CSV. First row me headers honi chahiye.')}</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={downloadSample}><FileDown className="h-4 w-4 mr-2" />Sample Excel</Button>
+            <Button variant="outline" onClick={downloadSample}><FileDown className="h-4 w-4 mr-2" />{t('import.sample_excel_btn', 'Sample Excel')}</Button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files?.[0] && parseFile(e.target.files[0])} />
-            <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />{filename ? "Change file" : "Choose file"}</Button>
+            <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />{filename ? t('import.change_file_btn', 'Change file') : t('import.choose_file_btn', 'Choose file')}</Button>
           </div>
         </div>
         {filename && (
@@ -942,7 +952,8 @@ function Importer({ entity }: { entity: EntityKey }) {
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate" title={filename}>{filename}</div>
                 <div className="text-[11px] text-muted-foreground">
-                  {rows.length} rows · {headers.length} columns{mapped.length !== rows.length ? ` · ${mapped.length} ready` : ""}
+                  {t('import.file_meta', '{{rows}} rows · {{cols}} columns', { rows: rows.length, cols: headers.length })}
+                  {mapped.length !== rows.length ? ` · ${t('import.file_meta_ready', '{{count}} ready', { count: mapped.length })}` : ""}
                 </div>
               </div>
             </div>
@@ -954,7 +965,7 @@ function Importer({ entity }: { entity: EntityKey }) {
                 if (fileRef.current) fileRef.current.value = "";
               }}
             >
-              <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> {t('import.remove_btn', 'Remove')}
             </Button>
           </div>
         )}
@@ -962,15 +973,15 @@ function Importer({ entity }: { entity: EntityKey }) {
 
       {headers.length > 0 && (
         <Card className="p-4 space-y-3">
-          <h3 className="font-medium">Step 2 — Map columns</h3>
+          <h3 className="font-medium">{t('import.step2_map_heading', 'Step 2 — Map columns')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {schema.fields.map((f) => (
               <div key={f.key} className="space-y-1">
-                <Label className="text-xs">{f.label} {f.required && <span className="text-destructive">*</span>}</Label>
+                <Label className="text-xs">{t(`import.field_${entity}_${f.key}`, f.label)} {f.required && <span className="text-destructive">*</span>}</Label>
                 <Select value={mapping[f.key] ?? "__none__"} onValueChange={(v) => setMapping({ ...mapping, [f.key]: v === "__none__" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="— skip —" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('import.select_skip_placeholder', '— skip —')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">— skip —</SelectItem>
+                    <SelectItem value="__none__">{t('import.select_skip_placeholder', '— skip —')}</SelectItem>
                     {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -983,21 +994,21 @@ function Importer({ entity }: { entity: EntityKey }) {
       {mapped.length > 0 && (
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium">Step 3 — Preview ({mapped.length} rows)</h3>
+            <h3 className="font-medium">{t('import.step3_preview_heading', 'Step 3 — Preview ({{count}} rows)', { count: mapped.length })}</h3>
             <Button onClick={runImport} disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-              Import {mapped.length} rows
+              {t('import.import_n_rows_btn', 'Import {{count}} rows', { count: mapped.length })}
             </Button>
           </div>
           {entity === "products" && (
             <Alert><AlertDescription className="text-xs">
-              Matching <b>SKU</b> rows update ho jain gi (stock &amp; prices overwrite). Bina SKU ke rows nayi add hongi.
+              {t('import.products_note_prefix', 'Matching ')}<b>SKU</b>{t('import.products_note_suffix', ' rows update ho jain gi (stock & prices overwrite). Bina SKU ke rows nayi add hongi.')}
             </AlertDescription></Alert>
           )}
           <div className="max-h-72 overflow-auto border rounded">
             <Table>
               <TableHeader><TableRow>
-                {schema.fields.filter((f) => mapping[f.key]).map((f) => <TableHead key={f.key}>{f.label}</TableHead>)}
+                {schema.fields.filter((f) => mapping[f.key]).map((f) => <TableHead key={f.key}>{t(`import.field_${entity}_${f.key}`, f.label)}</TableHead>)}
               </TableRow></TableHeader>
               <TableBody>
                 {mapped.slice(0, 50).map((r, i) => (
@@ -1017,7 +1028,7 @@ function Importer({ entity }: { entity: EntityKey }) {
         <Alert variant={result.failed > 0 ? "destructive" : "default"}>
           {result.failed === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
           <AlertDescription>
-            <div><b>{result.ok}</b> imported, <b>{result.failed}</b> failed.</div>
+            <div><b>{result.ok}</b> {t('import.result_imported_word', 'imported,')} <b>{result.failed}</b> {t('import.result_failed_suffix', 'failed.')}</div>
             {result.errors.length > 0 && <ul className="mt-2 text-xs list-disc pl-4">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
           </AlertDescription>
         </Alert>
@@ -1029,6 +1040,7 @@ function Importer({ entity }: { entity: EntityKey }) {
 // ---------------- Full system export to Excel ----------------
 
 function ExportAllButton() {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
 
   const exportAll = async () => {
@@ -1043,16 +1055,16 @@ function ExportAllButton() {
 
       const wb = XLSX.utils.book_new();
       let total = 0;
-      for (const t of tables) {
-        const { data, error } = await supabase.from(t).select("*").limit(50000);
-        if (error) { toast.error(`${t}: ${error.message}`); continue; }
+      for (const tbl of tables) {
+        const { data, error } = await supabase.from(tbl).select("*").limit(50000);
+        if (error) { toast.error(t('import.export_table_error', '{{table}}: {{msg}}', { table: tbl, msg: error.message })); continue; }
         const ws = XLSX.utils.json_to_sheet(data ?? []);
-        XLSX.utils.book_append_sheet(wb, ws, t.slice(0, 31));
+        XLSX.utils.book_append_sheet(wb, ws, tbl.slice(0, 31));
         total += (data ?? []).length;
       }
       const stamp = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, `pos-backup-${stamp}.xlsx`);
-      toast.success(`Exported ${total} rows across ${tables.length} sheets`);
+      toast.success(t('import.export_success', 'Exported {{count}} rows across {{sheets}} sheets', { count: total, sheets: tables.length }));
     } catch (e: any) {
       toast.error(e.message);
     } finally { setBusy(false); }
@@ -1061,7 +1073,7 @@ function ExportAllButton() {
   return (
     <Button onClick={exportAll} disabled={busy} variant="default">
       {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Database className="h-4 w-4 mr-2" />}
-      Export full system (Excel)
+      {t('import.export_btn', 'Export full system (Excel)')}
     </Button>
   );
 }
@@ -1069,6 +1081,7 @@ function ExportAllButton() {
 // ---------------- Single merged file: name/sku + multiple barcodes ----------------
 
 function SingleMergedFile() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<{ headers: string[]; rows: Record<string, any>[]; name: string } | null>(null);
@@ -1080,25 +1093,25 @@ function SingleMergedFile() {
   const autoRanFor = useRef<string | null>(null);
 
   const FIELDS = [
-    { key: "name", label: "Item Name", required: true },
-    { key: "sku", label: "Item Code / SKU" },
-    { key: "barcode", label: "Barcode(s) — comma/space separated ok" },
-    { key: "category", label: "Category" },
-    { key: "unit", label: "Unit" },
-    { key: "cost_price", label: "Purchase Rate" },
-    { key: "sell_price", label: "Sale Rate" },
-    { key: "stock", label: "Stock" },
-    { key: "tax_rate", label: "Tax %" },
+    { key: "name", label: t('import.single_field_name', 'Item Name'), required: true },
+    { key: "sku", label: t('import.single_field_sku', 'Item Code / SKU') },
+    { key: "barcode", label: t('import.single_field_barcode', 'Barcode(s) — comma/space separated ok') },
+    { key: "category", label: t('import.single_field_category', 'Category') },
+    { key: "unit", label: t('import.single_field_unit', 'Unit') },
+    { key: "cost_price", label: t('import.single_field_cost_price', 'Purchase Rate') },
+    { key: "sell_price", label: t('import.single_field_sell_price', 'Sale Rate') },
+    { key: "stock", label: t('import.single_field_stock', 'Stock') },
+    { key: "tax_rate", label: t('import.single_field_tax_rate', 'Tax %') },
   ];
 
   const pickFile = async (f: File) => {
     try {
       const parsed = await parseSpreadsheet(f);
-      if (!parsed.rows.length) return toast.error("File empty ya headers nahi mile");
+      if (!parsed.rows.length) return toast.error(t('import.file_empty_error', 'File empty ya headers nahi mile'));
       setFile({ ...parsed, name: f.name });
       setMapping(smartAutoMap(parsed.headers, parsed.rows));
-      toast.success(`Parsed ${parsed.rows.length} rows from ${f.name}`);
-    } catch (e: any) { toast.error(`Read failed: ${e.message}`); }
+      toast.success(t('import.parsed_rows_success', 'Parsed {{count}} rows from {{filename}}', { count: parsed.rows.length, filename: f.name }));
+    } catch (e: any) { toast.error(t('import.read_failed', 'Read failed: {{msg}}', { msg: e.message })); }
   };
 
   // Group rows by key = sku (preferred) or normalized name+category
@@ -1144,7 +1157,7 @@ function SingleMergedFile() {
   const totalBarcodes = useMemo(() => grouped.reduce((s, g) => s + g.barcodes.length, 0), [grouped]);
 
   const runImport = async () => {
-    if (!grouped.length) return toast.error("Koi valid rows nahi mili");
+    if (!grouped.length) return toast.error(t('import.single_no_valid_rows', 'Koi valid rows nahi mili'));
     setBusy(true); setResult({ products: 0, barcodes: 0, failed: 0, errors: [] });
     const errors: string[] = [];
     let prodOk = 0, prodFail = 0, bcOk = 0;
@@ -1160,7 +1173,7 @@ function SingleMergedFile() {
     );
     const fresh = grouped.filter((g) => !(g.sku && existingSkus.has(g.sku)));
     const skippedExisting = grouped.length - fresh.length;
-    if (skippedExisting) errors.push(`${skippedExisting} items pehle se mojood thay (skip kiye gaye).`);
+    if (skippedExisting) errors.push(t('import.skipped_existing', '{{count}} items pehle se mojood thay (skip kiye gaye).', { count: skippedExisting }));
 
     const withSku = fresh.filter((g) => g.sku);
     const noSku = fresh.filter((g) => !g.sku);
@@ -1240,8 +1253,8 @@ function SingleMergedFile() {
     invalidateAfterImport(qc);
 
     setBusy(false);
-    if (prodFail === 0) toast.success(`Imported ${prodOk} items · ${bcOk} barcodes linked`);
-    else toast.error(`${prodOk} imported, ${prodFail} failed — details neeche dekhen`);
+    if (prodFail === 0) toast.success(t('import.single_success', 'Imported {{items}} items · {{barcodes}} barcodes linked', { items: prodOk, barcodes: bcOk }));
+    else toast.error(t('import.single_partial_fail', '{{ok}} imported, {{failed}} failed — details neeche dekhen', { ok: prodOk, failed: prodFail }));
   };
 
 
@@ -1259,7 +1272,7 @@ function SingleMergedFile() {
   }, [file, mapping, grouped, autoSave]);
 
   const wipeAll = async () => {
-    if (!confirm("Saare imported products aur barcodes delete kar diye jaen ge. Sales/purchases history rahegi. Continue?")) return;
+    if (!confirm(t('import.wipe_confirm', 'Saare imported products aur barcodes delete kar diye jaen ge. Sales/purchases history rahegi. Continue?'))) return;
     setWiping(true);
     try {
       const { error: e1 } = await supabase.from("product_barcodes").delete().not("id", "is", null);
@@ -1270,9 +1283,9 @@ function SingleMergedFile() {
       await supabase.from("import_batches").delete().in("source", ["single_merged", "smart_merge", "products"]);
       notifyBatchChanged();
       invalidateAfterImport(qc);
-      toast.success("Sab imported stock delete ho gaya. Ab dobara file upload karen.");
+      toast.success(t('import.wipe_success', 'Sab imported stock delete ho gaya. Ab dobara file upload karen.'));
     } catch (e: any) {
-      toast.error(e.message ?? "Wipe failed");
+      toast.error(e.message ?? t('import.wipe_failed', 'Wipe failed'));
     } finally { setWiping(false); }
   };
 
@@ -1292,35 +1305,34 @@ function SingleMergedFile() {
       <Alert>
         <FileSpreadsheet className="h-4 w-4" />
         <AlertDescription className="text-xs">
-          <b>Aik hi file</b> upload karen jis me item name, item code aur barcodes hon. Same item ke multiple barcodes ho sakty hain —
-          ya to alag alag rows me (same SKU/Name), ya aik hi cell me comma/space se separated. System khud group kar dega.
-          <b> Existing SKU update hoga, naye add ho jain ge.</b>
+          <b>{t('import.single_desc_bold1', 'Aik hi file')}</b>{t('import.single_desc_mid', ' upload karen jis me item name, item code aur barcodes hon. Same item ke multiple barcodes ho sakty hain — ya to alag alag rows me (same SKU/Name), ya aik hi cell me comma/space se separated. System khud group kar dega. ')}
+          <b>{t('import.single_desc_bold2', ' Existing SKU update hoga, naye add ho jain ge.')}</b>
         </AlertDescription>
       </Alert>
 
       <Card className="p-4 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h3 className="font-medium">Step 1 — Upload file</h3>
-          <p className="text-xs text-muted-foreground">{file ? `${file.name} · ${file.rows.length} rows` : "Excel (.xlsx, .xls) ya CSV"}</p>
+          <h3 className="font-medium">{t('import.step1_upload_heading', 'Step 1 — Upload file')}</h3>
+          <p className="text-xs text-muted-foreground">{file ? `${file.name} · ${t('import.n_rows', '{{count}} rows', { count: file.rows.length })}` : t('import.excel_or_csv', 'Excel (.xlsx, .xls) ya CSV')}</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
             <input type="checkbox" checked={autoSave} onChange={(e) => setAutoSave(e.target.checked)} />
-            Auto-save on upload
+            {t('import.autosave_label', 'Auto-save on upload')}
           </label>
           <Button variant="destructive" size="sm" onClick={wipeAll} disabled={wiping}>
             {wiping ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <AlertCircle className="h-4 w-4 mr-1" />}
-            Wipe imported stock
+            {t('import.wipe_btn', 'Wipe imported stock')}
           </Button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(e) => e.target.files?.[0] && pickFile(e.target.files[0])} />
-          <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />Choose file</Button>
-          {file && <Button variant="outline" onClick={() => { setFile(null); setMapping({}); setResult(null); autoRanFor.current = null; }}>Clear</Button>}
+          <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" />{t('import.choose_file_btn', 'Choose file')}</Button>
+          {file && <Button variant="outline" onClick={() => { setFile(null); setMapping({}); setResult(null); autoRanFor.current = null; }}>{t('import.clear_btn', 'Clear')}</Button>}
         </div>
       </Card>
 
       {file && (
         <Card className="p-4 space-y-3">
-          <h3 className="font-medium">Step 2 — Map columns <span className="text-xs text-muted-foreground font-normal">(smart auto-detect · sample dikha raha hy taake foran verify kar saken)</span></h3>
+          <h3 className="font-medium">{t('import.step2_map_heading', 'Step 2 — Map columns')} <span className="text-xs text-muted-foreground font-normal">{t('import.step2_smart_note', '(smart auto-detect · sample dikha raha hy taake foran verify kar saken)')}</span></h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {FIELDS.map((f) => {
               const src = mapping[f.key];
@@ -1329,18 +1341,18 @@ function SingleMergedFile() {
                 <div key={f.key} className="space-y-1">
                   <Label className="text-xs">
                     {f.label} {f.required && <span className="text-destructive">*</span>}
-                    {src && <Badge variant="secondary" className="ml-2">auto</Badge>}
+                    {src && <Badge variant="secondary" className="ml-2">{t('import.auto_badge', 'auto')}</Badge>}
                   </Label>
                   <Select value={src ?? "__none__"} onValueChange={(v) => setMapping({ ...mapping, [f.key]: v === "__none__" ? "" : v })}>
-                    <SelectTrigger><SelectValue placeholder="— skip —" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('import.select_skip_placeholder', '— skip —')} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">— skip —</SelectItem>
+                      <SelectItem value="__none__">{t('import.select_skip_placeholder', '— skip —')}</SelectItem>
                       {file.headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {src && (
                     <p className="text-[10px] text-muted-foreground truncate">
-                      sample: <span className="font-mono">{sample || "(empty)"}</span>
+                      {t('import.sample_label', 'sample:')} <span className="font-mono">{sample || t('import.sample_empty', '(empty)')}</span>
                     </p>
                   )}
                 </div>
@@ -1354,22 +1366,22 @@ function SingleMergedFile() {
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <h3 className="font-medium">Step 3 — Preview</h3>
+              <h3 className="font-medium">{t('import.single_step3_heading', 'Step 3 — Preview')}</h3>
               <p className="text-xs text-muted-foreground">
-                {grouped.length} unique items · {totalBarcodes} barcodes total
-                {file && ` (from ${file.rows.length} rows — grouped by ${mapping.sku ? "SKU" : "Name"})`}
+                {t('import.preview_summary', '{{items}} unique items · {{barcodes}} barcodes total', { items: grouped.length, barcodes: totalBarcodes })}
+                {file && t('import.preview_summary_suffix', ' (from {{rows}} rows — grouped by {{by}})', { rows: file.rows.length, by: mapping.sku ? 'SKU' : t('import.name_word', 'Name') })}
               </p>
             </div>
             <Button onClick={runImport} disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-              Import {grouped.length} items
+              {t('import.import_n_items_btn', 'Import {{count}} items', { count: grouped.length })}
             </Button>
           </div>
           <div className="max-h-80 overflow-auto border rounded">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>SKU</TableHead><TableHead>Name</TableHead><TableHead>Barcodes</TableHead>
-                <TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Sale</TableHead><TableHead className="text-right">Stock</TableHead>
+                <TableHead>{t('import.th_sku', 'SKU')}</TableHead><TableHead>{t('import.th_name', 'Name')}</TableHead><TableHead>{t('import.th_barcodes', 'Barcodes')}</TableHead>
+                <TableHead className="text-right">{t('import.th_cost', 'Cost')}</TableHead><TableHead className="text-right">{t('import.th_sale', 'Sale')}</TableHead><TableHead className="text-right">{t('import.th_stock', 'Stock')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {grouped.slice(0, 100).map((g, i) => (
@@ -1390,7 +1402,7 @@ function SingleMergedFile() {
               </TableBody>
             </Table>
           </div>
-          {grouped.length > 100 && <p className="text-xs text-muted-foreground">Showing first 100 of {grouped.length}.</p>}
+          {grouped.length > 100 && <p className="text-xs text-muted-foreground">{t('import.showing_first_n', 'Showing first {{shown}} of {{total}}.', { shown: 100, total: grouped.length })}</p>}
         </Card>
       )}
 
@@ -1398,7 +1410,7 @@ function SingleMergedFile() {
         <Alert variant={result.failed > 0 ? "destructive" : "default"}>
           {result.failed === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
           <AlertDescription>
-            <div><b>{result.products}</b> items imported · <b>{result.barcodes}</b> barcodes linked · <b>{result.failed}</b> failed.</div>
+            <div><b>{result.products}</b> {t('import.single_result_items_imported', 'items imported')} · <b>{result.barcodes}</b> {t('import.single_result_barcodes_linked', 'barcodes linked')} · <b>{result.failed}</b> {t('import.result_failed_suffix', 'failed.')}</div>
             {result.errors.length > 0 && <ul className="mt-2 text-xs list-disc pl-4">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
           </AlertDescription>
         </Alert>
