@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Wallet, Users as UsersIcon } from "lucide-react";
+import { Plus, Trash2, Pencil, Wallet, Users as UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -306,6 +306,7 @@ function Page() {
                     <TableCell className="text-xs uppercase text-muted-foreground">{r.method}</TableCell>
                     <TableCell className="text-right font-medium text-destructive">{fmtMoney(r.amount, sym)}</TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button size="icon" variant="ghost" onClick={() => openEditExpense(r)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => remove(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </TableCell>
                   </TableRow>
@@ -364,6 +365,7 @@ function Page() {
                     <TableCell>{p.phone ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.notes ?? "—"}</TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button size="icon" variant="ghost" onClick={() => openEditPerson(p)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button asChild size="sm" variant="ghost"><Link to="/expense-persons/$id" params={{ id: p.id }}>Open ledger</Link></Button>
                     </TableCell>
                   </TableRow>
