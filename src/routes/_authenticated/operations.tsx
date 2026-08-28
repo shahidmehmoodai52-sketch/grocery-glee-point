@@ -226,7 +226,7 @@ function OwnerControlCenter({ settings }: { settings: any }) {
                   <div className="text-sm font-medium truncate">{r.title}</div>
                   <div className="text-xs text-muted-foreground truncate">{r.detail}</div>
                 </div>
-                <Badge variant={r.priority === "high" ? "destructive" : "outline"} className="shrink-0">{t(`operations.priority_${r.priority}`, r.priority)}</Badge>
+                <Badge variant={r.priority === "high" ? "destructive" : "outline"} className="shrink-0">{String(t(`operations.priority_${r.priority}`, r.priority))}</Badge>
               </div>
             ))}
             {!Object.values(recs || {}).some((v: any) => Array.isArray(v) && v.length > 0) && (
@@ -701,10 +701,10 @@ function TasksPanel() {
               <input type="checkbox" checked={task.status === "done"} onChange={(e) => setStatus(task.id, e.target.checked ? "done" : "open")} />
               <div>
                 <div className={`font-medium ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.title}</div>
-                <div className="text-xs text-muted-foreground">{t(`operations.priority_${task.priority}`, task.priority)} · {new Date(task.created_at).toLocaleDateString()}</div>
+                <div className="text-xs text-muted-foreground">{String(t(`operations.priority_${task.priority}`, task.priority))} · {new Date(task.created_at).toLocaleDateString()}</div>
               </div>
             </div>
-            <Badge variant={task.status === "done" ? "secondary" : "outline"}>{t(`operations.task_status_${task.status}`, task.status)}</Badge>
+            <Badge variant={task.status === "done" ? "secondary" : "outline"}>{String(t(`operations.task_status_${task.status}`, task.status))}</Badge>
           </div>
         ))}
         {!data?.length && <div className="text-sm text-muted-foreground">{t('operations.no_tasks', 'No tasks')}</div>}
@@ -766,7 +766,7 @@ function NotesPanel() {
         {(data || []).map((n: any) => (
           <div key={n.id} className="border rounded-lg p-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-              <Badge variant="outline">{t(`operations.category_${n.category}`, n.category)}</Badge>
+              <Badge variant="outline">{String(t(`operations.category_${n.category}`, n.category))}</Badge>
               <span>{new Date(n.created_at).toLocaleString()}</span>
             </div>
             <div className="text-sm whitespace-pre-wrap">{n.note}</div>

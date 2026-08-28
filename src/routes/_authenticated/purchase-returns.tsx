@@ -557,7 +557,7 @@ function Page() {
                 <TableCell>{r.suppliers?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell className="text-right font-bold text-base">{fmtMoney(r.total, sym)}</TableCell>
                 <TableCell className="text-right font-medium text-green-600 dark:text-green-400">{fmtMoney(r.refund_amount, sym)}</TableCell>
-                <TableCell><Badge variant="outline" className="capitalize bg-background">{t(`purchase_returns.method_${r.refund_method}`, r.refund_method)}</Badge></TableCell>
+                <TableCell><Badge variant="outline" className="capitalize bg-background">{String(t(`purchase_returns.method_${r.refund_method}`, r.refund_method))}</Badge></TableCell>
                 <TableCell className="pr-6 text-right">
                   <Button variant="ghost" size="icon" onClick={() => setViewing(r)} className="hover:bg-primary/10 hover:text-primary transition-colors">
                     <Eye className="h-4 w-4" />
