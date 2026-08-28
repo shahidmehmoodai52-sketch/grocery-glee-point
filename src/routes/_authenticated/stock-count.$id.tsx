@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -52,6 +53,7 @@ type Product = {
 };
 
 function StockCountDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams({ from: "/_authenticated/stock-count/$id" });
   const { user } = useAuth();
   const { isAdmin } = usePermissions();
@@ -230,13 +232,13 @@ function StockCountDetailPage() {
     const fallbackProduct = product ?? (productSearchQ.data ?? [])[0] ?? null;
 
     if (!fallbackProduct) {
-      toast.error(`No product matches "${term}"`);
+      toast.error(t('stock_count.no_product_match_toast', 'No product matches "{{term}}"', { term }));
       return;
     }
 
     if (scanMode === "increment") {
       await upsertCount(fallbackProduct, 1, "add");
-      toast.success(`+1 ${fallbackProduct.name}`);
+      toast.success(t('stock_count.plus_one_toast', '+1 {{name}}', { name: fallbackProduct.name }));
       setProductSearch("");
       scanRef.current?.focus();
     } else {
@@ -249,10 +251,10 @@ function StockCountDetailPage() {
   const confirmPending = async () => {
     const product = pendingProduct ?? (pendingBarcode ? await findProductByBarcode(pendingBarcode) : null);
     if (!product) return;
-    if (!Number.isFinite(pendingQty) || pendingQty < 0) return toast.error("Invalid quantity");
+    if (!Number.isFinite(pendingQty) || pendingQty < 0) return toast.error(t('stock_count.invalid_qty_toast', 'Invalid quantity'));
     const finalQty = roundToTillixQty(pendingQty);
     await upsertCount(product, finalQty, "set");
-    toast.success(`Counted ${fmtQty(finalQty)} × ${product.name}`);
+    toast.success(t('stock_count.counted_toast', 'Counted {{qty}} × {{name}}', { qty: fmtQty(finalQty), name: product.name }));
     setPendingBarcode(null);
     setPendingProduct(null);
     setPendingQty(1);
@@ -263,7 +265,7 @@ function StockCountDetailPage() {
   const selectProductFromSearch = async (product: Product) => {
     if (scanMode === "increment") {
       await upsertCount(product, 1, "add");
-      toast.success(`+1 ${product.name}`);
+      toast.success(t('stock_count.plus_one_toast', '+1 {{name}}', { name: product.name }));
     } else {
       setPendingProduct(product);
       setPendingQty(1);
@@ -295,14 +297,14 @@ function StockCountDetailPage() {
       .update({ status: "cancelled", completed_at: new Date().toISOString() })
       .eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("Session cancelled");
+    toast.success(t('stock_count.session_cancelled_toast', 'Session cancelled'));
     qc.invalidateQueries();
   };
 
   const approve = async () => {
     const { error } = await supabase.rpc("approve_stock_count_session" as any, { _session_id: id });
     if (error) return toast.error(error.message);
-    toast.success("Stock count approved — inventory updated");
+    toast.success(t('stock_count.approved_toast', 'Stock count approved — inventory updated'));
     qc.invalidateQueries();
   };
 
@@ -337,13 +339,13 @@ function StockCountDetailPage() {
   const printReport = () => window.print();
 
   if (sessionQ.isLoading) {
-    return <div className="p-6 text-muted-foreground">Loading…</div>;
+    return <div className="p-6 text-muted-foreground">{t('stock_count.loading', 'Loading…')}</div>;
   }
   if (!session) {
     return (
       <div className="p-6">
-        <Link to="/stock-count"><Button variant="ghost"><ArrowLeft className="h-4 w-4 mr-1" /> Back</Button></Link>
-        <p className="mt-4 text-muted-foreground">Session not found.</p>
+        <Link to="/stock-count"><Button variant="ghost"><ArrowLeft className="h-4 w-4 mr-1" /> {t('stock_count.back', 'Back')}</Button></Link>
+        <p className="mt-4 text-muted-foreground">{t('stock_count.session_not_found', 'Session not found.')}</p>
       </div>
     );
   }
@@ -360,7 +362,7 @@ function StockCountDetailPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-2">
         <Link to="/stock-count">
-          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> Sessions</Button>
+          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> {t('stock_count.back_sessions', 'Sessions')}</Button>
         </Link>
       </div>
 
@@ -368,32 +370,32 @@ function StockCountDetailPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold">{session.name}</h1>
-            <Badge variant="outline" className={sm.classes}>{sm.label}</Badge>
+            <Badge variant="outline" className={sm.classes}>{t(`stock_count.status_${session.status}`, sm.label)}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Started {fmtDate(session.started_at)}
-            {session.completed_at ? ` · completed ${fmtDate(session.completed_at)}` : ""}
+            {t('stock_count.started_prefix', 'Started {{date}}', { date: fmtDate(session.started_at) })}
+            {session.completed_at ? t('stock_count.completed_suffix', ' · completed {{date}}', { date: fmtDate(session.completed_at) }) : ""}
           </p>
           {session.notes && <p className="text-sm text-muted-foreground mt-1">{session.notes}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={exportCsv}><FileDown className="h-4 w-4 mr-1" /> CSV</Button>
-          <Button variant="outline" onClick={printReport}>Print</Button>
+          <Button variant="outline" onClick={exportCsv}><FileDown className="h-4 w-4 mr-1" /> {t('stock_count.csv', 'CSV')}</Button>
+          <Button variant="outline" onClick={printReport}>{t('common.print', 'Print')}</Button>
           {!isLocked && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline"><Ban className="h-4 w-4 mr-1" /> Cancel</Button>
+                <Button variant="outline"><Ban className="h-4 w-4 mr-1" /> {t('stock_count.cancel_btn', 'Cancel')}</Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel this session?</AlertDialogTitle>
+                  <AlertDialogTitle>{t('stock_count.cancel_dialog_title', 'Cancel this session?')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    No inventory changes will be applied. This can't be undone.
+                    {t('stock_count.cancel_dialog_desc', "No inventory changes will be applied. This can't be undone.")}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Keep counting</AlertDialogCancel>
-                  <AlertDialogAction onClick={cancelSession}>Cancel session</AlertDialogAction>
+                  <AlertDialogCancel>{t('stock_count.keep_counting', 'Keep counting')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={cancelSession}>{t('stock_count.cancel_session_btn', 'Cancel session')}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -401,19 +403,18 @@ function StockCountDetailPage() {
           {!isLocked && isAdmin && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button><ShieldCheck className="h-4 w-4 mr-1" /> Approve &amp; Apply</Button>
+                <Button><ShieldCheck className="h-4 w-4 mr-1" /> {t('stock_count.approve_apply', 'Approve & Apply')}</Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Approve and apply adjustments?</AlertDialogTitle>
+                  <AlertDialogTitle>{t('stock_count.approve_dialog_title', 'Approve and apply adjustments?')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will update {rows.filter((r) => r.diff !== 0).length} product stock levels
-                    and record inventory movements. Session becomes read-only.
+                    {t('stock_count.approve_dialog_desc', 'This will update {{count}} product stock levels and record inventory movements. Session becomes read-only.', { count: rows.filter((r) => r.diff !== 0).length })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Not yet</AlertDialogCancel>
-                  <AlertDialogAction onClick={approve}>Approve</AlertDialogAction>
+                  <AlertDialogCancel>{t('stock_count.not_yet', 'Not yet')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={approve}>{t('stock_count.approve_btn', 'Approve')}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -424,25 +425,25 @@ function StockCountDetailPage() {
       {/* Variance Report */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="p-3">
-          <div className="text-xs text-muted-foreground flex items-center gap-1"><Equal className="h-3.5 w-3.5" /> Perfect matches</div>
+          <div className="text-xs text-muted-foreground flex items-center gap-1"><Equal className="h-3.5 w-3.5" /> {t('stock_count.metric_perfect_matches', 'Perfect matches')}</div>
           <div className="text-2xl font-semibold mt-1">{metrics.matchCount}</div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingDown className="h-3.5 w-3.5 text-red-600" /> Missing</div>
+          <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingDown className="h-3.5 w-3.5 text-red-600" /> {t('stock_count.metric_missing', 'Missing')}</div>
           <div className="text-2xl font-semibold mt-1 text-red-600">{metrics.missingCount}</div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> Extra</div>
+          <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> {t('stock_count.metric_extra', 'Extra')}</div>
           <div className="text-2xl font-semibold mt-1 text-emerald-600">{metrics.extraCount}</div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-muted-foreground">Total variance value</div>
+          <div className="text-xs text-muted-foreground">{t('stock_count.metric_total_variance', 'Total variance value')}</div>
           <div className={`text-2xl font-semibold mt-1 ${metrics.totalVariance < 0 ? "text-red-600" : metrics.totalVariance > 0 ? "text-emerald-600" : ""}`}>
             {fmtMoney(metrics.totalVariance, sym)}
           </div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-muted-foreground">Largest loss / gain</div>
+          <div className="text-xs text-muted-foreground">{t('stock_count.metric_largest_loss_gain', 'Largest loss / gain')}</div>
           <div className="text-sm font-medium mt-1 truncate">
             {metrics.largestLoss?.p?.name ?? "—"} · <span className="text-red-600">{fmtMoney(metrics.largestLoss?.varianceValue ?? 0, sym)}</span>
           </div>
@@ -457,29 +458,29 @@ function StockCountDetailPage() {
         <Card className="p-3">
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Scan barcode or search product</Label>
+              <Label className="text-xs">{t('stock_count.scan_label', 'Scan barcode or search product')}</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={scanRef}
                   autoFocus
                   className="pl-9"
-                  placeholder="Type product name, SKU, or scan barcode"
+                  placeholder={t('stock_count.scan_placeholder', 'Type product name, SKU, or scan barcode')}
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onScan(); } }}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Press Enter to count the match. Mode: <span className="font-medium">{scanMode === "increment" ? "Increment (+1 per scan)" : "Prompt for quantity"}</span>.
+                {t('stock_count.scan_hint', 'Press Enter to count the match. Mode: {{mode}}.', { mode: scanMode === "increment" ? t('stock_count.mode_increment', 'Increment (+1 per scan)') : t('stock_count.mode_prompt', 'Prompt for quantity') })}
               </p>
             </div>
 
             {productSearch.trim().length >= 2 && (
               <div className="rounded-lg border bg-background/70 p-2 space-y-2 max-h-64 overflow-auto">
-                {productSearchQ.isFetching && <div className="text-xs text-muted-foreground">Searching…</div>}
+                {productSearchQ.isFetching && <div className="text-xs text-muted-foreground">{t('stock_count.searching', 'Searching…')}</div>}
                 {!productSearchQ.isFetching && (productSearchQ.data ?? []).length === 0 && (
-                  <div className="text-xs text-muted-foreground">No matching products</div>
+                  <div className="text-xs text-muted-foreground">{t('stock_count.no_matching_products', 'No matching products')}</div>
                 )}
                 {(productSearchQ.data ?? []).map((product) => (
                   <button
@@ -494,13 +495,13 @@ function StockCountDetailPage() {
                         {product.sku ?? "—"} · {product.barcode ?? "—"}
                       </div>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        {product.unit ? `${product.unit}` : "unit"} · {fmtMoney(product.cost_price ?? 0, sym)}
+                        {product.unit ? `${product.unit}` : t('stock_count.unit_word', 'unit')} · {fmtMoney(product.cost_price ?? 0, sym)}
                       </div>
                     </div>
                     <div className="ml-3 shrink-0 text-right">
-                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Stock</div>
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('stock_count.stock_label', 'Stock')}</div>
                       <div className="font-semibold">{fmtQty(product.stock ?? 0)}</div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">Tap to count</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">{t('stock_count.tap_to_count', 'Tap to count')}</div>
                     </div>
                   </button>
                 ))}
@@ -512,16 +513,16 @@ function StockCountDetailPage() {
             <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
               <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All counted</SelectItem>
-                <SelectItem value="variance">Variance only</SelectItem>
-                <SelectItem value="missing">Missing (short)</SelectItem>
-                <SelectItem value="extra">Extra (over)</SelectItem>
-                <SelectItem value="match">Perfect match</SelectItem>
+                <SelectItem value="all">{t('stock_count.filter_all', 'All counted')}</SelectItem>
+                <SelectItem value="variance">{t('stock_count.filter_variance', 'Variance only')}</SelectItem>
+                <SelectItem value="missing">{t('stock_count.filter_missing', 'Missing (short)')}</SelectItem>
+                <SelectItem value="extra">{t('stock_count.filter_extra', 'Extra (over)')}</SelectItem>
+                <SelectItem value="match">{t('stock_count.filter_match', 'Perfect match')}</SelectItem>
               </SelectContent>
             </Select>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Filter counted list…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input className="pl-9" placeholder={t('stock_count.filter_placeholder', 'Filter counted list…')} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
         </Card>
@@ -530,35 +531,35 @@ function StockCountDetailPage() {
       {/* Items table */}
       <Card className="p-0 overflow-hidden">
         <div className="p-3 border-b flex items-center justify-between">
-          <div className="font-medium">Counted items · {rows.length}</div>
+          <div className="font-medium">{t('stock_count.counted_items', 'Counted items · {{count}}', { count: rows.length })}</div>
         </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>SKU / Barcode</TableHead>
-                <TableHead className="text-right">System</TableHead>
-                <TableHead className="text-right">Actual</TableHead>
-                <TableHead className="text-right">Difference</TableHead>
-                <TableHead className="text-right">Variance value</TableHead>
+                <TableHead>{t('stock_count.th_product', 'Product')}</TableHead>
+                <TableHead>{t('stock_count.th_sku_barcode', 'SKU / Barcode')}</TableHead>
+                <TableHead className="text-right">{t('stock_count.th_system', 'System')}</TableHead>
+                <TableHead className="text-right">{t('stock_count.th_actual', 'Actual')}</TableHead>
+                <TableHead className="text-right">{t('stock_count.th_difference', 'Difference')}</TableHead>
+                <TableHead className="text-right">{t('stock_count.th_variance_value', 'Variance value')}</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {itemsQ.isLoading && (
-                <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">Loading…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">{t('stock_count.loading', 'Loading…')}</TableCell></TableRow>
               )}
               {!itemsQ.isLoading && filteredRows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    {rows.length === 0 ? "Scan a product to start counting." : "No items match this filter."}
+                    {rows.length === 0 ? t('stock_count.scan_prompt', 'Scan a product to start counting.') : t('stock_count.no_filter_match', 'No items match this filter.')}
                   </TableCell>
                 </TableRow>
               )}
               {filteredRows.map(({ it, p, diff, varianceValue }) => (
                 <TableRow key={it.id}>
-                  <TableCell className="font-medium">{p?.name ?? "Unknown product"}</TableCell>
+                  <TableCell className="font-medium">{p?.name ?? t('stock_count.unknown_product', 'Unknown product')}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {p?.sku ?? "—"}{p?.barcode ? ` · ${p.barcode}` : ""}
                   </TableCell>
@@ -604,11 +605,11 @@ function StockCountDetailPage() {
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Enter actual quantity</AlertDialogTitle>
-            <AlertDialogDescription>Barcode: {pendingBarcode}</AlertDialogDescription>
+            <AlertDialogTitle>{t('stock_count.qty_prompt_title', 'Enter actual quantity')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('stock_count.barcode_label', 'Barcode: {{code}}', { code: pendingBarcode })}</AlertDialogDescription>
           </AlertDialogHeader>
           <div>
-            <Label>Actual quantity on shelf</Label>
+            <Label>{t('stock_count.actual_qty_label', 'Actual quantity on shelf')}</Label>
             <Input
               type="number" step="0.001" autoFocus
               value={pendingQty}
@@ -617,8 +618,8 @@ function StockCountDetailPage() {
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPending}>Save count</AlertDialogAction>
+            <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPending}>{t('stock_count.save_count', 'Save count')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

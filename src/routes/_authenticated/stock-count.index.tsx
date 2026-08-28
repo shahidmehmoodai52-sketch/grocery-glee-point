@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ const STATUS_META: Record<string, { label: string; classes: string }> = {
 };
 
 function StockCountListPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -59,7 +61,7 @@ function StockCountListPage() {
   });
 
   const create = async () => {
-    if (!name.trim()) return toast.error("Give the count a name");
+    if (!name.trim()) return toast.error(t('stock_count.name_required_toast', 'Give the count a name'));
     setSaving(true);
     const { data, error } = await supabase
       .from("stock_count_sessions" as any)
@@ -81,27 +83,27 @@ function StockCountListPage() {
   return (
     <div className="p-6 space-y-4">
       <PageHeader
-        title="Stock Count"
-        description="Physical audit sessions — compare system stock against actual shelf count."
+        title={t('stock_count.page_title', 'Stock Count')}
+        description={t('stock_count.page_desc', 'Physical audit sessions — compare system stock against actual shelf count.')}
         icon={<ClipboardCheck className="h-5 w-5" />}
         actions={
           <Button onClick={() => setOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> New count
+            <Plus className="h-4 w-4 mr-2" /> {t('stock_count.new_count', 'New count')}
           </Button>
         }
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <StatCard label="Total sessions" value={String(sessions.length)} icon={ListChecks} tone="primary" />
-        <StatCard label="Approved" value={String(completed.length)} icon={CheckCircle2} tone="success" />
+        <StatCard label={t('stock_count.stat_total_sessions', 'Total sessions')} value={String(sessions.length)} icon={ListChecks} tone="primary" />
+        <StatCard label={t('stock_count.stat_approved', 'Approved')} value={String(completed.length)} icon={CheckCircle2} tone="success" />
         <StatCard
-          label="Last count"
+          label={t('stock_count.stat_last_count', 'Last count')}
           value={lastCompleted ? format(new Date(lastCompleted.completed_at), "PP") : "—"}
           icon={Clock}
           tone="info"
         />
         <StatCard
-          label="Last variance value"
+          label={t('stock_count.stat_last_variance', 'Last variance value')}
           value={lastCompleted?.total_variance_value != null ? fmtMoney(lastCompleted.total_variance_value, sym) : "—"}
           icon={TrendingDown}
           tone="warning"
@@ -112,11 +114,11 @@ function StockCountListPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Started</TableHead>
-              <TableHead>Completed</TableHead>
-              <TableHead className="text-right">Variance value</TableHead>
+              <TableHead>{t('stock_count.th_name', 'Name')}</TableHead>
+              <TableHead>{t('sales.th_status', 'Status')}</TableHead>
+              <TableHead>{t('stock_count.th_started', 'Started')}</TableHead>
+              <TableHead>{t('stock_count.th_completed', 'Completed')}</TableHead>
+              <TableHead className="text-right">{t('stock_count.th_variance_value', 'Variance value')}</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -129,8 +131,8 @@ function StockCountListPage() {
                 <TableCell colSpan={6} className="py-8">
                   <EmptyState
                     icon={ClipboardCheck}
-                    title="No stock counts yet"
-                    description="Start one to audit your shelves."
+                    title={t('stock_count.empty_title', 'No stock counts yet')}
+                    description={t('stock_count.empty_desc', 'Start one to audit your shelves.')}
                   />
                 </TableCell>
               </TableRow>
@@ -140,7 +142,7 @@ function StockCountListPage() {
               return (
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell><Badge variant="outline" className={meta.classes}>{meta.label}</Badge></TableCell>
+                  <TableCell><Badge variant="outline" className={meta.classes}>{t(`stock_count.status_${s.status}`, meta.label)}</Badge></TableCell>
                   <TableCell className="text-muted-foreground">{format(new Date(s.started_at), "PPp")}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {s.completed_at ? format(new Date(s.completed_at), "PPp") : "—"}
@@ -151,7 +153,7 @@ function StockCountListPage() {
                   <TableCell className="text-right">
                     <Link to="/stock-count/$id" params={{ id: s.id }}>
                       <Button variant="ghost" size="sm">
-                        Open <ArrowRight className="h-4 w-4 ml-1" />
+                        {t('stock_count.open_btn', 'Open')} <ArrowRight className="h-4 w-4 ml-1" />
                       </Button>
                     </Link>
                   </TableCell>
@@ -164,20 +166,20 @@ function StockCountListPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Start a stock count</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('stock_count.dialog_title', 'Start a stock count')}</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <div>
-              <Label>Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. October end-of-month count" />
+              <Label>{t('common.name', 'Name')}</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('stock_count.name_placeholder', 'e.g. October end-of-month count')} />
             </div>
             <div>
-              <Label>Notes (optional)</Label>
-              <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Which shelves, who is counting…" />
+              <Label>{t('stock_count.notes_label', 'Notes (optional)')}</Label>
+              <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('stock_count.notes_placeholder', 'Which shelves, who is counting…')} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={create} disabled={saving}>{saving ? "Starting…" : "Start counting"}</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={create} disabled={saving}>{saving ? t('stock_count.starting', 'Starting…') : t('stock_count.start_counting', 'Start counting')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
