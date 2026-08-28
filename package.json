@@ -4,7 +4,11 @@
   "description": "Grocery POS — offline-first SaaS point of sale for grocery stores",
   "author": "Managed by tillix.co support · info@tillix.co",
   "private": true,
-  "sideEffects": false,
+  "sideEffects": [
+    "src/lib/i18n.ts",
+    "src/lib/error-capture.ts",
+    "*.css"
+  ],
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
