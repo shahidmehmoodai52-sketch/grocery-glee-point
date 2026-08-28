@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, memo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Eye, Printer, Undo2, Search, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ const emptyDraft: Draft = {
 };
 
 function Page() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -210,8 +212,8 @@ function Page() {
   const submit = async () => {
     if (processing) return;
     const items = lines.filter((l) => l.name && l.qty > 0);
-    if (!items.length) return toast.error("Add at least one item");
-    if (refund > total + 0.01) return toast.error("Refund cannot exceed total");
+    if (!items.length) return toast.error(t('purchase_returns.add_at_least_one_item', 'Add at least one item'));
+    if (refund > total + 0.01) return toast.error(t('purchase_returns.refund_exceeds_total', 'Refund cannot exceed total'));
     
     setProcessing(true);
     try {
@@ -227,13 +229,13 @@ function Page() {
         },
       });
       if (error) throw error;
-      toast.success("Purchase return recorded, stock removed");
+      toast.success(t('purchase_returns.return_recorded', 'Purchase return recorded, stock removed'));
       reset();
       qc.invalidateQueries({ queryKey: ["purchase-returns"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
     } catch (e: any) {
-      toast.error(e.message || "Failed to process return");
+      toast.error(e.message || t('purchase_returns.failed_to_process', 'Failed to process return'));
     } finally {
       setProcessing(false);
     }
@@ -264,12 +266,12 @@ function Page() {
       >
         <header className="h-14 border-b flex items-center justify-between px-6 bg-muted/40 shrink-0">
           <div className="flex items-center gap-4">
-            <h2 className="font-semibold text-lg">New Purchase Return</h2>
-            <Badge variant="outline" className="bg-background">Draft</Badge>
+            <h2 className="font-semibold text-lg">{t('purchase_returns.new_return_title', 'New Purchase Return')}</h2>
+            <Badge variant="outline" className="bg-background">{t('purchase_returns.draft_badge', 'Draft')}</Badge>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Close Draft</Button>
-            <Button variant="outline" size="sm" onClick={reset} className="text-destructive border-destructive/20 hover:bg-destructive/10">Clear All</Button>
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>{t('purchase_returns.close_draft', 'Close Draft')}</Button>
+            <Button variant="outline" size="sm" onClick={reset} className="text-destructive border-destructive/20 hover:bg-destructive/10">{t('purchase_returns.clear_all', 'Clear All')}</Button>
           </div>
         </header>
 
@@ -281,7 +283,7 @@ function Page() {
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={searchRef}
-                  placeholder="Scan barcode or type product name to add..."
+                  placeholder={t('purchase_returns.search_add_placeholder', 'Scan barcode or type product name to add...')}
                   className="pl-10 h-10"
                   value={entrySearch}
                   onChange={(e) => {
@@ -309,11 +311,11 @@ function Page() {
                       >
                         <div className="flex flex-col">
                           <span className="font-medium">{m.name}</span>
-                          <span className="text-xs text-muted-foreground">{m.sku || m.barcode || "No Code"}</span>
+                          <span className="text-xs text-muted-foreground">{m.sku || m.barcode || t('purchase_returns.no_code', 'No Code')}</span>
                         </div>
                         <div className="text-right">
                           <div className="font-mono text-sm">{fmtMoney(m.cost_price, sym)}</div>
-                          <div className="text-[10px] text-muted-foreground">Stock: {m.stock}</div>
+                          <div className="text-[10px] text-muted-foreground">{t('purchase_returns.stock_label', 'Stock: {{qty}}', { qty: m.stock })}</div>
                         </div>
                       </div>
                     ))}
@@ -321,7 +323,7 @@ function Page() {
                 )}
               </div>
               <Button variant="secondary" onClick={() => addLine()}>
-                <Plus className="h-4 w-4 mr-2" /> Add Ad-hoc Item
+                <Plus className="h-4 w-4 mr-2" /> {t('purchase_returns.add_adhoc_item', 'Add Ad-hoc Item')}
               </Button>
             </div>
 
@@ -329,20 +331,20 @@ function Page() {
               <Table>
                 <TableHeader className="bg-muted/30 sticky top-0 z-10">
                   <TableRow>
-                    <TableHead className="w-12 text-center">#</TableHead>
-                    <TableHead>Item Details</TableHead>
-                    <TableHead className="w-32 text-center">Qty</TableHead>
-                    <TableHead className="w-32 text-right">Cost ({sym})</TableHead>
-                    <TableHead className="w-32 text-right">Total ({sym})</TableHead>
+                    <TableHead className="w-12 text-center">{t('purchase_returns.th_num', '#')}</TableHead>
+                    <TableHead>{t('purchase_returns.th_item_details', 'Item Details')}</TableHead>
+                    <TableHead className="w-32 text-center">{t('purchase_returns.th_qty', 'Qty')}</TableHead>
+                    <TableHead className="w-32 text-right">{t('purchase_returns.th_cost_sym', 'Cost ({{sym}})', { sym })}</TableHead>
+                    <TableHead className="w-32 text-right">{t('purchase_returns.th_total_sym', 'Total ({{sym}})', { sym })}</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lines.map((l, i) => (
-                    <MemoizedRow 
-                      key={i} 
-                      index={i} 
-                      line={l} 
+                    <MemoizedRow
+                      key={i}
+                      index={i}
+                      line={l}
                       onUpdate={(patch) => setLine(i, patch)}
                       onRemove={() => setLines(lines.filter((_, idx) => idx !== i))}
                       sym={sym}
@@ -353,8 +355,8 @@ function Page() {
                       <TableCell colSpan={6} className="h-64 text-center">
                         <div className="flex flex-col items-center justify-center text-muted-foreground">
                           <Undo2 className="h-12 w-12 mb-2 opacity-20" />
-                          <p>Return cart is empty.</p>
-                          <p className="text-sm">Search for products or pick a purchase to start.</p>
+                          <p>{t('purchase_returns.cart_empty', 'Return cart is empty.')}</p>
+                          <p className="text-sm">{t('purchase_returns.cart_empty_sub', 'Search for products or pick a purchase to start.')}</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -365,11 +367,11 @@ function Page() {
 
             <footer className="h-12 border-t px-6 flex items-center justify-between text-sm bg-muted/20 shrink-0">
               <div className="flex items-center gap-6">
-                <span>Items: <span className="font-bold">{lines.length}</span></span>
-                <span>Total Qty: <span className="font-bold">{lines.reduce((a, b) => a + b.qty, 0)}</span></span>
+                <span>{t('purchase_returns.items_label', 'Items:')} <span className="font-bold">{lines.length}</span></span>
+                <span>{t('purchase_returns.total_qty_label', 'Total Qty:')} <span className="font-bold">{lines.reduce((a, b) => a + b.qty, 0)}</span></span>
               </div>
               <div className="text-muted-foreground italic">
-                Tip: Press <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">Esc</kbd> to close picker.
+                {t('purchase_returns.tip_prefix', 'Tip: Press')} <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">Esc</kbd> {t('purchase_returns.tip_suffix', 'to close picker.')}
               </div>
             </footer>
           </div>
@@ -378,22 +380,22 @@ function Page() {
           <div className="w-full md:w-[350px] border-t md:border-t-0 md:border-l flex flex-col shrink-0 bg-muted/10">
             <div className="p-4 space-y-4 border-b bg-background">
               <div className="space-y-2">
-                <Label>Original Purchase</Label>
+                <Label>{t('purchase_returns.original_purchase', 'Original Purchase')}</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search invoice #..." 
-                    className="pl-8" 
+                  <Input
+                    placeholder={t('purchase_returns.search_invoice_placeholder', 'Search invoice #...')}
+                    className="pl-8"
                     value={purchaseSearch}
                     onChange={(e) => setPurchaseSearch(e.target.value)}
                   />
                 </div>
                 <Select value={purchaseId} onValueChange={setPurchaseId}>
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Pick a purchase" />
+                    <SelectValue placeholder={t('purchase_returns.pick_purchase_placeholder', 'Pick a purchase')} />
                   </SelectTrigger>
                   <SelectContent className="max-h-[60vh] overflow-y-auto">
-                    <SelectItem value="none">— Manual Entry —</SelectItem>
+                    <SelectItem value="none">{t('purchase_returns.manual_entry', '— Manual Entry —')}</SelectItem>
                     {purchases.map((p: any) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.invoice_no} ({fmtMoney(p.total, sym)})
@@ -404,13 +406,13 @@ function Page() {
               </div>
 
               <div className="space-y-2">
-                <Label>Supplier</Label>
+                <Label>{t('purchase_returns.th_supplier', 'Supplier')}</Label>
                 <Select value={supplier} onValueChange={setSupplier}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select supplier" />
+                    <SelectValue placeholder={t('purchase_returns.select_supplier_placeholder', 'Select supplier')} />
                   </SelectTrigger>
                   <SelectContent className="max-h-[60vh] overflow-y-auto">
-                    <SelectItem value="none">— Walk-in —</SelectItem>
+                    <SelectItem value="none">{t('purchase_returns.walk_in_option', '— Walk-in —')}</SelectItem>
                     {suppliers.map((s: any) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                     ))}
@@ -421,63 +423,63 @@ function Page() {
 
             <div className="flex-1 flex flex-col min-h-0">
               <div className="p-4 bg-muted/20 border-b flex items-center justify-between shrink-0">
-                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Return Summary</h3>
-                <div className="text-xs text-muted-foreground">{lines.length} items</div>
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">{t('purchase_returns.return_summary', 'Return Summary')}</h3>
+                <div className="text-xs text-muted-foreground">{t('purchase_returns.items_suffix', '{{count}} items', { count: lines.length })}</div>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 <div className="space-y-3">
                   <Card className="p-3 space-y-3 shadow-none border-dashed">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="text-muted-foreground">{t('purchase_returns.subtotal', 'Subtotal')}</span>
                       <span>{fmtMoney(subtotal, sym)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4">
-                      <span className="text-sm text-muted-foreground">Tax</span>
-                      <Input 
-                        type="number" 
-                        className="h-8 w-24 text-right" 
-                        value={tax || ""} 
-                        onChange={(e) => setTax(Number(e.target.value))} 
+                      <span className="text-sm text-muted-foreground">{t('purchase_returns.tax', 'Tax')}</span>
+                      <Input
+                        type="number"
+                        className="h-8 w-24 text-right"
+                        value={tax || ""}
+                        onChange={(e) => setTax(Number(e.target.value))}
                       />
                     </div>
                     <div className="pt-2 border-t flex justify-between font-bold text-lg text-primary">
-                      <span>Total</span>
+                      <span>{t('sales.th_total', 'Total')}</span>
                       <span>{fmtMoney(total, sym)}</span>
                     </div>
                   </Card>
 
                   <div className="space-y-2 pt-2">
-                    <Label>Refund Received</Label>
-                    <Input 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={refund || ""} 
-                      onChange={(e) => setRefund(Number(e.target.value))} 
+                    <Label>{t('purchase_returns.refund_received', 'Refund Received')}</Label>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={refund || ""}
+                      onChange={(e) => setRefund(Number(e.target.value))}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Refund Method</Label>
+                    <Label>{t('purchase_returns.refund_method', 'Refund Method')}</Label>
                     <Select value={method} onValueChange={setMethod}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="transfer">Transfer</SelectItem>
-                        <SelectItem value="account">Cash Account</SelectItem>
-                        <SelectItem value="credit">Supplier Credit</SelectItem>
+                        <SelectItem value="cash">{t('purchase_returns.method_cash', 'Cash')}</SelectItem>
+                        <SelectItem value="transfer">{t('purchase_returns.method_transfer', 'Transfer')}</SelectItem>
+                        <SelectItem value="account">{t('purchase_returns.method_account', 'Cash Account')}</SelectItem>
+                        <SelectItem value="credit">{t('purchase_returns.method_credit', 'Supplier Credit')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {method === "account" && (
                     <div className="space-y-2">
-                      <Label>Account</Label>
-                      <Select 
-                        value={draft.paySource} 
+                      <Label>{t('purchase_returns.account_label', 'Account')}</Label>
+                      <Select
+                        value={draft.paySource}
                         onValueChange={(v) => setDraft(d => ({ ...d, paySource: v }))}
                       >
-                        <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('purchase_returns.select_account_placeholder', 'Select account')} /></SelectTrigger>
                         <SelectContent>
                           {cashAccounts.map((a: any) => (
                             <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
@@ -488,11 +490,11 @@ function Page() {
                   )}
 
                   <div className="space-y-2">
-                    <Label>Note</Label>
-                    <Input 
-                      placeholder="Reason for return..." 
-                      value={note} 
-                      onChange={(e) => setNote(e.target.value)} 
+                    <Label>{t('common.note', 'Note')}</Label>
+                    <Input
+                      placeholder={t('purchase_returns.reason_placeholder', 'Reason for return...')}
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
                     />
                   </div>
                 </div>
@@ -500,12 +502,12 @@ function Page() {
             </div>
 
             <div className="p-4 border-t bg-background">
-              <Button 
-                className="w-full h-12 text-lg font-bold" 
+              <Button
+                className="w-full h-12 text-lg font-bold"
                 onClick={submit}
                 disabled={processing || lines.length === 0}
               >
-                {processing ? "Processing..." : "Process Return"}
+                {processing ? t('purchase_returns.processing', 'Processing...') : t('purchase_returns.process_return', 'Process Return')}
                 {!processing && <Undo2 className="ml-2 h-5 w-5" />}
               </Button>
             </div>
@@ -519,11 +521,11 @@ function Page() {
     <div className="p-6 space-y-4 max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Purchase Returns</h1>
-          <p className="text-muted-foreground">Manage and track inventory sent back to suppliers</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('purchase_returns.title', 'Purchase Returns')}</h1>
+          <p className="text-muted-foreground">{t('purchase_returns.subtitle', 'Manage and track inventory sent back to suppliers')}</p>
         </div>
         <Button size="lg" onClick={() => setOpen(true)} className="shadow-lg hover:shadow-xl transition-all">
-          <Plus className="h-5 w-5 mr-2" />New Return
+          <Plus className="h-5 w-5 mr-2" />{t('purchase_returns.new_return', 'New Return')}
         </Button>
       </div>
 
@@ -531,20 +533,20 @@ function Page() {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="pl-6">Return #</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Refund</TableHead>
-              <TableHead>Method</TableHead>
-              <TableHead className="pr-6 text-right">Actions</TableHead>
+              <TableHead className="pl-6">{t('purchase_returns.th_return_no', 'Return #')}</TableHead>
+              <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+              <TableHead>{t('purchase_returns.th_supplier', 'Supplier')}</TableHead>
+              <TableHead className="text-right">{t('sales.th_total', 'Total')}</TableHead>
+              <TableHead className="text-right">{t('sales.th_refund', 'Refund')}</TableHead>
+              <TableHead>{t('sales.th_method', 'Method')}</TableHead>
+              <TableHead className="pr-6 text-right">{t('customers.th_actions', 'Actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {returns.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
-                  No purchase returns recorded yet.
+                  {t('purchase_returns.no_returns_yet', 'No purchase returns recorded yet.')}
                 </TableCell>
               </TableRow>
             )}
@@ -555,7 +557,7 @@ function Page() {
                 <TableCell>{r.suppliers?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell className="text-right font-bold text-base">{fmtMoney(r.total, sym)}</TableCell>
                 <TableCell className="text-right font-medium text-green-600 dark:text-green-400">{fmtMoney(r.refund_amount, sym)}</TableCell>
-                <TableCell><Badge variant="outline" className="capitalize bg-background">{r.refund_method}</Badge></TableCell>
+                <TableCell><Badge variant="outline" className="capitalize bg-background">{t(`purchase_returns.method_${r.refund_method}`, r.refund_method)}</Badge></TableCell>
                 <TableCell className="pr-6 text-right">
                   <Button variant="ghost" size="icon" onClick={() => setViewing(r)} className="hover:bg-primary/10 hover:text-primary transition-colors">
                     <Eye className="h-4 w-4" />
@@ -576,7 +578,7 @@ function Page() {
           <DialogHeader className="p-6 border-b bg-muted/20">
             <DialogTitle className="flex items-center gap-2">
               <Undo2 className="h-5 w-5 text-primary" />
-              Return {viewing?.return_no}
+              {t('sales.return_title', 'Return {{no}}', { no: viewing?.return_no })}
             </DialogTitle>
           </DialogHeader>
           {viewing && (
@@ -596,9 +598,9 @@ function Page() {
             </div>
           )}
           <DialogFooter className="p-4 border-t bg-muted/20 gap-2 no-print flex-row">
-            <Button variant="outline" className="flex-1" onClick={() => setViewing(null)}>Close</Button>
+            <Button variant="outline" className="flex-1" onClick={() => setViewing(null)}>{t('common.close', 'Close')}</Button>
             <Button className="flex-1" onClick={() => printReceipt()}>
-              <Printer className="h-4 w-4 mr-2" />Print Receipt
+              <Printer className="h-4 w-4 mr-2" />{t('purchase_returns.print_receipt', 'Print Receipt')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -620,6 +622,7 @@ const MemoizedRow = memo(function Row({
   onRemove: () => void;
   sym: string;
 }) {
+  const { t } = useTranslation();
   return (
     <TableRow className="group border-b">
       <TableCell className="text-center text-muted-foreground font-mono text-xs">{index + 1}</TableCell>
@@ -628,14 +631,14 @@ const MemoizedRow = memo(function Row({
           {line.product_id ? (
             <>
               <span className="font-semibold text-sm leading-none">{line.name}</span>
-              <span className="text-[10px] text-muted-foreground font-mono">{line.barcode || line.sku || "Custom Item"}</span>
+              <span className="text-[10px] text-muted-foreground font-mono">{line.barcode || line.sku || t('purchase_returns.custom_item', 'Custom Item')}</span>
             </>
           ) : (
-            <Input 
-              value={line.name} 
-              onChange={(e) => onUpdate({ name: e.target.value })} 
-              className="h-8 text-sm" 
-              placeholder="Item name..."
+            <Input
+              value={line.name}
+              onChange={(e) => onUpdate({ name: e.target.value })}
+              className="h-8 text-sm"
+              placeholder={t('purchase_returns.item_name_placeholder', 'Item name...')}
               autoFocus
             />
           )}
