@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -105,6 +106,7 @@ const ABC_META: Record<string, string> = {
 };
 
 function IntelligencePage() {
+  const { t } = useTranslation();
   const { data: settings } = useSettings();
   const { isAdmin, can } = usePermissions();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -151,34 +153,34 @@ function IntelligencePage() {
 
   return (
     <div className="p-6 space-y-4">
-      <NeedsInternetBanner section="Intelligence" />
+      <NeedsInternetBanner section={t('intelligence.page_title', 'Inventory Intelligence')} />
       <PageHeader
-        title="Inventory Intelligence"
-        description="ABC classification, velocity, reorder suggestions & smart alerts. Updates automatically from sales."
+        title={t('intelligence.page_title', 'Inventory Intelligence')}
+        description={t('intelligence.page_desc', 'ABC classification, velocity, reorder suggestions & smart alerts. Updates automatically from sales.')}
         icon={<Brain className="h-5 w-5" />}
       />
 
 
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-          <StatCard label="Inventory health" value={`${Math.round(stats.avgHealth)}%`} tone={stats.avgHealth > 70 ? "green" : stats.avgHealth > 40 ? "amber" : "red"} />
-          <StatCard label="Inventory value" value={fmtMoney(stats.totalValue, sym)} tone="blue" />
-          <StatCard label="Dead stock value" value={fmtMoney(stats.deadValue, sym)} tone="red" />
-          <StatCard label="Overstock value" value={fmtMoney(stats.overstockValue, sym)} tone="amber" />
-          <StatCard label="A products" value={String(stats.abcCount.A)} tone="green" />
-          <StatCard label="B products" value={String(stats.abcCount.B)} tone="amber" />
-          <StatCard label="Fast movers" value={String(stats.velCount.fast || 0)} tone="green" />
-          <StatCard label="Suggested PO" value={`${stats.suggestedCount} · ${fmtMoney(stats.suggestedCost, sym)}`} tone="blue" />
+          <StatCard label={t('intelligence.stat_inventory_health', 'Inventory health')} value={`${Math.round(stats.avgHealth)}%`} tone={stats.avgHealth > 70 ? "green" : stats.avgHealth > 40 ? "amber" : "red"} />
+          <StatCard label={t('intelligence.stat_inventory_value', 'Inventory value')} value={fmtMoney(stats.totalValue, sym)} tone="blue" />
+          <StatCard label={t('intelligence.stat_dead_stock_value', 'Dead stock value')} value={fmtMoney(stats.deadValue, sym)} tone="red" />
+          <StatCard label={t('intelligence.stat_overstock_value', 'Overstock value')} value={fmtMoney(stats.overstockValue, sym)} tone="amber" />
+          <StatCard label={t('intelligence.stat_a_products', 'A products')} value={String(stats.abcCount.A)} tone="green" />
+          <StatCard label={t('intelligence.stat_b_products', 'B products')} value={String(stats.abcCount.B)} tone="amber" />
+          <StatCard label={t('intelligence.stat_fast_movers', 'Fast movers')} value={String(stats.velCount.fast || 0)} tone="green" />
+          <StatCard label={t('intelligence.stat_suggested_po', 'Suggested PO')} value={`${stats.suggestedCount} · ${fmtMoney(stats.suggestedCost, sym)}`} tone="blue" />
         </div>
       )}
 
       <Tabs defaultValue="alerts">
         <TabsList>
-          <TabsTrigger value="alerts">Smart alerts</TabsTrigger>
-          <TabsTrigger value="reorder">Reorder</TabsTrigger>
-          <TabsTrigger value="abc">ABC</TabsTrigger>
-          <TabsTrigger value="velocity">Velocity</TabsTrigger>
-          <TabsTrigger value="suggestions">Purchase suggestions</TabsTrigger>
+          <TabsTrigger value="alerts">{t('intelligence.tab_alerts', 'Smart alerts')}</TabsTrigger>
+          <TabsTrigger value="reorder">{t('intelligence.tab_reorder', 'Reorder')}</TabsTrigger>
+          <TabsTrigger value="abc">{t('intelligence.tab_abc', 'ABC')}</TabsTrigger>
+          <TabsTrigger value="velocity">{t('intelligence.tab_velocity', 'Velocity')}</TabsTrigger>
+          <TabsTrigger value="suggestions">{t('intelligence.tab_suggestions', 'Purchase suggestions')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="alerts" className="mt-4">
@@ -218,6 +220,7 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone: 
 
 // ------------- ALERTS -------------
 function AlertsTab({ rows, sym, stats }: { rows: Intel[]; sym: string; stats: any }) {
+  const { t } = useTranslation();
   const [type, setType] = useState<string>("all");
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -236,32 +239,32 @@ function AlertsTab({ rows, sym, stats }: { rows: Intel[]; sym: string; stats: an
     <Card>
       <div className="p-3 border-b flex gap-2 flex-wrap">
         {[
-          { k: "all", l: `All (${stats ? Object.values(stats.alerts).reduce((a: any, b: any) => a + b, 0) : 0})` },
-          { k: "out", l: `Out ${stats?.alerts.out ?? 0}` },
-          { k: "low", l: `Low ${stats?.alerts.low ?? 0}` },
-          { k: "overstock", l: `Overstock ${stats?.alerts.overstock ?? 0}` },
-          { k: "dead", l: `Dead ${stats?.alerts.dead ?? 0}` },
-          { k: "near_expiry", l: `Near expiry ${stats?.alerts.near_expiry ?? 0}` },
-          { k: "spike", l: `Spike ${stats?.alerts.spike ?? 0}` },
-          { k: "drop", l: `Drop ${stats?.alerts.drop ?? 0}` },
-        ].map((t) => (
-          <Button key={t.k} variant={type === t.k ? "default" : "outline"} size="sm" onClick={() => setType(t.k)}>{t.l}</Button>
+          { k: "all", l: t('intelligence.filter_all', 'All ({{count}})', { count: stats ? Object.values(stats.alerts).reduce((a: any, b: any) => a + b, 0) : 0 }) },
+          { k: "out", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_out', 'Out'), count: stats?.alerts.out ?? 0 }) },
+          { k: "low", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_low', 'Low'), count: stats?.alerts.low ?? 0 }) },
+          { k: "overstock", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_overstock', 'Overstock'), count: stats?.alerts.overstock ?? 0 }) },
+          { k: "dead", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_dead', 'Dead'), count: stats?.alerts.dead ?? 0 }) },
+          { k: "near_expiry", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_near_expiry', 'Near expiry'), count: stats?.alerts.near_expiry ?? 0 }) },
+          { k: "spike", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_spike', 'Spike'), count: stats?.alerts.spike ?? 0 }) },
+          { k: "drop", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_drop', 'Drop'), count: stats?.alerts.drop ?? 0 }) },
+        ].map((f) => (
+          <Button key={f.k} variant={type === f.k ? "default" : "outline"} size="sm" onClick={() => setType(f.k)}>{f.l}</Button>
         ))}
       </div>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Product</TableHead>
-            <TableHead>Alerts</TableHead>
-            <TableHead className="text-right">Stock</TableHead>
-            <TableHead className="text-right">Days left</TableHead>
-            <TableHead className="text-right">30d sales</TableHead>
-            <TableHead className="text-right">Suggested qty</TableHead>
-            <TableHead className="text-right">Health</TableHead>
+            <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+            <TableHead>{t('intelligence.th_alerts', 'Alerts')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_stock', 'Stock')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_days_left', 'Days left')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_30d_sales', '30d sales')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_suggested_qty', 'Suggested qty')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_health', 'Health')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="p-6 text-center text-muted-foreground">No alerts. Inventory is healthy.</TableCell></TableRow>}
+          {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="p-6 text-center text-muted-foreground">{t('intelligence.no_alerts', 'No alerts. Inventory is healthy.')}</TableCell></TableRow>}
           {filtered.slice(0, 500).map((r) => (
             <TableRow key={r.product_id}>
               <TableCell>
@@ -272,13 +275,13 @@ function AlertsTab({ rows, sym, stats }: { rows: Intel[]; sym: string; stats: an
               </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">
-                  {r.is_out_of_stock && <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/30">Out</Badge>}
-                  {r.is_low_stock && <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30">Low</Badge>}
-                  {r.is_overstock && <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30">Overstock</Badge>}
-                  {r.is_dead_stock && <Badge variant="outline" className="bg-slate-500/15 text-slate-600 border-slate-500/30">Dead</Badge>}
-                  {r.is_near_expiry && <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/30">Near expiry</Badge>}
-                  {r.is_sales_spike && <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30">Spike</Badge>}
-                  {r.is_sales_drop && <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/30">Drop</Badge>}
+                  {r.is_out_of_stock && <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/30">{t('intelligence.alert_out', 'Out')}</Badge>}
+                  {r.is_low_stock && <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30">{t('intelligence.alert_low', 'Low')}</Badge>}
+                  {r.is_overstock && <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30">{t('intelligence.alert_overstock', 'Overstock')}</Badge>}
+                  {r.is_dead_stock && <Badge variant="outline" className="bg-slate-500/15 text-slate-600 border-slate-500/30">{t('intelligence.alert_dead', 'Dead')}</Badge>}
+                  {r.is_near_expiry && <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/30">{t('intelligence.alert_near_expiry', 'Near expiry')}</Badge>}
+                  {r.is_sales_spike && <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30">{t('intelligence.alert_spike', 'Spike')}</Badge>}
+                  {r.is_sales_drop && <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/30">{t('intelligence.alert_drop', 'Drop')}</Badge>}
                 </div>
               </TableCell>
               <TableCell className="text-right">{fmtQty(r.stock)} {r.unit ?? ""}</TableCell>
@@ -300,6 +303,7 @@ function AlertsTab({ rows, sym, stats }: { rows: Intel[]; sym: string; stats: an
 
 // ------------- REORDER TAB (edit min/max/safety/lead time/preferred supplier) -------------
 function ReorderTab({ rows, sym, canWrite }: { rows: Intel[]; sym: string; canWrite: boolean }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [edit, setEdit] = useState<Intel | null>(null);
   const filtered = useMemo(() => {
@@ -311,19 +315,19 @@ function ReorderTab({ rows, sym, canWrite }: { rows: Intel[]; sym: string; canWr
   return (
     <Card>
       <div className="p-3 border-b flex items-center gap-2">
-        <Input placeholder="Search product…" className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <span className="text-xs text-muted-foreground ml-auto">Showing {filtered.length} of {rows.length}</span>
+        <Input placeholder={t('intelligence.search_product_placeholder', 'Search product…')} className="max-w-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <span className="text-xs text-muted-foreground ml-auto">{t('intelligence.showing_of', 'Showing {{count}} of {{total}}', { count: filtered.length, total: rows.length })}</span>
       </div>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Product</TableHead>
-            <TableHead className="text-right">Stock</TableHead>
-            <TableHead className="text-right">Min</TableHead>
-            <TableHead className="text-right">Max</TableHead>
-            <TableHead className="text-right">Safety</TableHead>
-            <TableHead className="text-right">Lead time</TableHead>
-            <TableHead className="text-right">Suggested</TableHead>
+            <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_stock', 'Stock')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_min', 'Min')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_max', 'Max')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_safety', 'Safety')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_lead_time', 'Lead time')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_suggested', 'Suggested')}</TableHead>
             {canWrite && <TableHead />}
           </TableRow>
         </TableHeader>
@@ -342,7 +346,7 @@ function ReorderTab({ rows, sym, canWrite }: { rows: Intel[]; sym: string; canWr
               <TableCell className="text-right font-semibold">{r.suggested_qty > 0 ? fmtQty(r.suggested_qty) : "—"}</TableCell>
               {canWrite && (
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => setEdit(r)}>Edit</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setEdit(r)}>{t('intelligence.edit_btn', 'Edit')}</Button>
                 </TableCell>
               )}
             </TableRow>
@@ -357,6 +361,7 @@ function ReorderTab({ rows, sym, canWrite }: { rows: Intel[]; sym: string; canWr
 }
 
 function ReorderEditDialog({ product, onClose }: { product: Intel; onClose: () => void }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [minStock, setMinStock] = useState(String(product.min_stock ?? ""));
   const [maxStock, setMaxStock] = useState(String(product.max_stock ?? ""));
@@ -387,37 +392,37 @@ function ReorderEditDialog({ product, onClose }: { product: Intel; onClose: () =
     }).eq("id", product.product_id);
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Reorder settings saved");
+    toast.success(t('intelligence.toast_reorder_saved', 'Reorder settings saved'));
     qc.invalidateQueries({ queryKey: ["product-intel"] });
     onClose();
   };
 
   return (
     <DialogContent>
-      <DialogHeader><DialogTitle>Reorder settings · {product.name}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{t('intelligence.dialog_title', 'Reorder settings · {{name}}', { name: product.name })}</DialogTitle></DialogHeader>
       <div className="grid grid-cols-2 gap-3">
-        <div><Label className="text-xs">Min stock</Label><Input type="number" value={minStock} onChange={(e) => setMinStock(e.target.value)} /></div>
-        <div><Label className="text-xs">Max stock</Label><Input type="number" value={maxStock} onChange={(e) => setMaxStock(e.target.value)} /></div>
-        <div><Label className="text-xs">Safety stock</Label><Input type="number" value={safety} onChange={(e) => setSafety(e.target.value)} /></div>
-        <div><Label className="text-xs">Lead time (days)</Label><Input type="number" value={lead} onChange={(e) => setLead(e.target.value)} /></div>
-        <div className="col-span-2"><Label className="text-xs">Fixed reorder qty (optional, overrides auto)</Label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
+        <div><Label className="text-xs">{t('intelligence.field_min_stock', 'Min stock')}</Label><Input type="number" value={minStock} onChange={(e) => setMinStock(e.target.value)} /></div>
+        <div><Label className="text-xs">{t('intelligence.field_max_stock', 'Max stock')}</Label><Input type="number" value={maxStock} onChange={(e) => setMaxStock(e.target.value)} /></div>
+        <div><Label className="text-xs">{t('intelligence.field_safety_stock', 'Safety stock')}</Label><Input type="number" value={safety} onChange={(e) => setSafety(e.target.value)} /></div>
+        <div><Label className="text-xs">{t('intelligence.field_lead_time', 'Lead time (days)')}</Label><Input type="number" value={lead} onChange={(e) => setLead(e.target.value)} /></div>
+        <div className="col-span-2"><Label className="text-xs">{t('intelligence.field_fixed_reorder', 'Fixed reorder qty (optional, overrides auto)')}</Label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
         <div className="col-span-2">
-          <Label className="text-xs">Preferred supplier</Label>
+          <Label className="text-xs">{t('intelligence.field_preferred_supplier', 'Preferred supplier')}</Label>
           <Select value={supplierId || "none"} onValueChange={(v) => setSupplierId(v === "none" ? "" : v)}>
-            <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t('intelligence.select_supplier_placeholder', 'Select supplier')} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="none">{t('intelligence.none_option', 'None')}</SelectItem>
               {(suppliersQ.data ?? []).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       </div>
       <div className="text-xs text-muted-foreground">
-        Auto suggestion = (avg daily × lead time) + safety − current stock. Avg daily last 30d: {product.avg_daily.toFixed(2)} {product.unit ?? ""}/d.
+        {t('intelligence.auto_suggestion_note', 'Auto suggestion = (avg daily × lead time) + safety − current stock. Avg daily last 30d: {{avg}} {{unit}}/d.', { avg: product.avg_daily.toFixed(2), unit: product.unit ?? "" })}
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button onClick={save} disabled={saving}>Save</Button>
+        <Button variant="outline" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
+        <Button onClick={save} disabled={saving}>{t('common.save', 'Save')}</Button>
       </DialogFooter>
     </DialogContent>
   );
@@ -425,6 +430,7 @@ function ReorderEditDialog({ product, onClose }: { product: Intel; onClose: () =
 
 // ------------- ABC -------------
 function AbcTab({ rows, sym }: { rows: Intel[]; sym: string }) {
+  const { t } = useTranslation();
   const [cls, setCls] = useState<string>("all");
   const buckets = useMemo(() => {
     const g = { A: [] as Intel[], B: [] as Intel[], C: [] as Intel[] };
@@ -442,12 +448,12 @@ function AbcTab({ rows, sym }: { rows: Intel[]; sym: string }) {
         {(["A", "B", "C"] as const).map((c) => (
           <Card key={c} className="p-3">
             <div className="flex items-center justify-between">
-              <Badge variant="outline" className={ABC_META[c]}>Class {c}</Badge>
-              <span className="text-xs text-muted-foreground">{buckets[c].length} products</span>
+              <Badge variant="outline" className={ABC_META[c]}>{t('intelligence.class_label', 'Class {{letter}}', { letter: c })}</Badge>
+              <span className="text-xs text-muted-foreground">{t('intelligence.products_count', '{{count}} products', { count: buckets[c].length })}</span>
             </div>
             <div className="mt-2 text-lg font-semibold">{fmtMoney(revByClass[c], sym)}</div>
             <div className="text-xs text-muted-foreground">
-              {totalRev > 0 ? `${((revByClass[c] / totalRev) * 100).toFixed(1)}% of revenue` : "—"}
+              {totalRev > 0 ? t('intelligence.pct_of_revenue', '{{pct}}% of revenue', { pct: ((revByClass[c] / totalRev) * 100).toFixed(1) }) : "—"}
             </div>
           </Card>
         ))}
@@ -455,18 +461,18 @@ function AbcTab({ rows, sym }: { rows: Intel[]; sym: string }) {
       <Card>
         <div className="p-3 border-b flex gap-2">
           {(["all", "A", "B", "C"] as const).map((k) => (
-            <Button key={k} size="sm" variant={cls === k ? "default" : "outline"} onClick={() => setCls(k)}>{k === "all" ? "All" : `Class ${k}`}</Button>
+            <Button key={k} size="sm" variant={cls === k ? "default" : "outline"} onClick={() => setCls(k)}>{k === "all" ? t('intelligence.all_btn', 'All') : t('intelligence.class_label', 'Class {{letter}}', { letter: k })}</Button>
           ))}
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Class</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead className="text-right">Revenue 90d</TableHead>
-              <TableHead className="text-right">Profit 90d</TableHead>
-              <TableHead className="text-right">Sold 90d</TableHead>
-              <TableHead>Velocity</TableHead>
+              <TableHead>{t('intelligence.th_class', 'Class')}</TableHead>
+              <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+              <TableHead className="text-right">{t('intelligence.th_revenue_90d', 'Revenue 90d')}</TableHead>
+              <TableHead className="text-right">{t('intelligence.th_profit_90d', 'Profit 90d')}</TableHead>
+              <TableHead className="text-right">{t('intelligence.th_sold_90d', 'Sold 90d')}</TableHead>
+              <TableHead>{t('intelligence.th_velocity', 'Velocity')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -484,7 +490,7 @@ function AbcTab({ rows, sym }: { rows: Intel[]; sym: string }) {
                   <TableCell className="text-right">{fmtMoney(r.profit_90d, sym)}</TableCell>
                   <TableCell className="text-right">{fmtQty(r.sales_qty_90d)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={vm.classes}><Icon className="h-3 w-3 mr-1" />{vm.label}</Badge>
+                    <Badge variant="outline" className={vm.classes}><Icon className="h-3 w-3 mr-1" />{t(`intelligence.velocity_${r.velocity_class}`, vm.label)}</Badge>
                   </TableCell>
                 </TableRow>
               );
@@ -498,6 +504,7 @@ function AbcTab({ rows, sym }: { rows: Intel[]; sym: string }) {
 
 // ------------- VELOCITY -------------
 function VelocityTab({ rows, sym }: { rows: Intel[]; sym: string }) {
+  const { t } = useTranslation();
   const [v, setV] = useState<string>("all");
   const filtered = v === "all" ? rows : rows.filter((r) => r.velocity_class === v);
   return (
@@ -505,22 +512,22 @@ function VelocityTab({ rows, sym }: { rows: Intel[]; sym: string }) {
       <div className="p-3 border-b flex gap-2 flex-wrap">
         {["all", "fast", "normal", "slow", "sleeping", "dead"].map((k) => (
           <Button key={k} size="sm" variant={v === k ? "default" : "outline"} onClick={() => setV(k)}>
-            {k === "all" ? "All" : VELOCITY_META[k]?.label ?? k}
+            {k === "all" ? t('intelligence.all_btn', 'All') : t(`intelligence.velocity_${k}`, VELOCITY_META[k]?.label ?? k)}
           </Button>
         ))}
       </div>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Product</TableHead>
-            <TableHead>Velocity</TableHead>
-            <TableHead className="text-right">Avg/day</TableHead>
-            <TableHead className="text-right">Avg/week</TableHead>
-            <TableHead className="text-right">Avg/month</TableHead>
-            <TableHead className="text-right">Stock</TableHead>
-            <TableHead className="text-right">Days left</TableHead>
-            <TableHead className="text-right">Turnover</TableHead>
-            <TableHead>Last sale</TableHead>
+            <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+            <TableHead>{t('intelligence.th_velocity', 'Velocity')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_avg_day', 'Avg/day')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_avg_week', 'Avg/week')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_avg_month', 'Avg/month')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_stock', 'Stock')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_days_left', 'Days left')}</TableHead>
+            <TableHead className="text-right">{t('intelligence.th_turnover', 'Turnover')}</TableHead>
+            <TableHead>{t('intelligence.th_last_sale', 'Last sale')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -533,7 +540,7 @@ function VelocityTab({ rows, sym }: { rows: Intel[]; sym: string }) {
                   <div className="font-medium">{r.name}</div>
                   <div className="text-xs text-muted-foreground">{r.sku ?? "—"}</div>
                 </TableCell>
-                <TableCell><Badge variant="outline" className={vm.classes}><Icon className="h-3 w-3 mr-1" />{vm.label}</Badge></TableCell>
+                <TableCell><Badge variant="outline" className={vm.classes}><Icon className="h-3 w-3 mr-1" />{t(`intelligence.velocity_${r.velocity_class}`, vm.label)}</Badge></TableCell>
                 <TableCell className="text-right">{r.avg_daily.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{r.avg_weekly.toFixed(1)}</TableCell>
                 <TableCell className="text-right">{fmtQty(r.avg_monthly)}</TableCell>
@@ -569,6 +576,7 @@ type Suggestion = {
 };
 
 function SuggestionsTab({ sym }: { sym: string }) {
+  const { t } = useTranslation();
   const q = useQuery({
     queryKey: ["purchase-suggestions"],
     queryFn: async () => {
@@ -586,7 +594,7 @@ function SuggestionsTab({ sym }: { sym: string }) {
     const g = new Map<string, { name: string; items: Suggestion[]; total: number }>();
     for (const r of q.data ?? []) {
       const key = r.supplier_id ?? "__none__";
-      const bucket = g.get(key) ?? { name: r.supplier_name ?? "No preferred supplier", items: [], total: 0 };
+      const bucket: { name: string; items: Suggestion[]; total: number } = g.get(key) ?? { name: r.supplier_name ?? t('intelligence.no_preferred_supplier', 'No preferred supplier'), items: [], total: 0 };
       bucket.items.push(r);
       bucket.total += r.suggested_cost || 0;
       g.set(key, bucket);
@@ -615,13 +623,13 @@ function SuggestionsTab({ sym }: { sym: string }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          {grouped.length} supplier{grouped.length === 1 ? "" : "s"} · {(q.data?.length ?? 0)} items to reorder
+          {t('intelligence.supplier_count', '{{count}} supplier(s)', { count: grouped.length })} · {t('intelligence.items_to_reorder', '{{count}} items to reorder', { count: q.data?.length ?? 0 })}
         </div>
-        <Button variant="outline" size="sm" onClick={exportCsv}><FileDown className="h-4 w-4 mr-1" /> Export CSV</Button>
+        <Button variant="outline" size="sm" onClick={exportCsv}><FileDown className="h-4 w-4 mr-1" /> {t('cash_flow.export_csv', 'Export CSV')}</Button>
       </div>
       {grouped.length === 0 && (
         <Card className="p-6 text-center text-muted-foreground">
-          Nothing to reorder — every product is at healthy stock levels.
+          {t('intelligence.nothing_to_reorder', 'Nothing to reorder — every product is at healthy stock levels.')}
         </Card>
       )}
       {grouped.map(([key, g]) => (
@@ -630,20 +638,20 @@ function SuggestionsTab({ sym }: { sym: string }) {
             <div className="flex items-center gap-2">
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               <div className="font-medium">{g.name}</div>
-              <Badge variant="outline">{g.items.length} items</Badge>
+              <Badge variant="outline">{t('intelligence.items_badge', '{{count}} items', { count: g.items.length })}</Badge>
             </div>
             <div className="text-sm font-semibold">{fmtMoney(g.total, sym)}</div>
           </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Stock</TableHead>
-                <TableHead className="text-right">Avg/day</TableHead>
-                <TableHead className="text-right">Days left</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead className="text-right">Suggested</TableHead>
-                <TableHead className="text-right">Est. cost</TableHead>
+                <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+                <TableHead className="text-right">{t('intelligence.th_stock', 'Stock')}</TableHead>
+                <TableHead className="text-right">{t('intelligence.th_avg_day', 'Avg/day')}</TableHead>
+                <TableHead className="text-right">{t('intelligence.th_days_left', 'Days left')}</TableHead>
+                <TableHead>{t('intelligence.th_class', 'Class')}</TableHead>
+                <TableHead className="text-right">{t('intelligence.th_suggested', 'Suggested')}</TableHead>
+                <TableHead className="text-right">{t('intelligence.th_est_cost', 'Est. cost')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
