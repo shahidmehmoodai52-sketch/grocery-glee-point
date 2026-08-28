@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -60,6 +61,7 @@ function diffDays(a: Date, b: Date) {
 }
 
 function Page() {
+  const { t } = useTranslation();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
 
@@ -342,13 +344,13 @@ function Page() {
   return (
     <div className="p-6 space-y-6">
       <PageHeader
-        title="Dashboard"
+        title={t('common.dashboard', 'Dashboard')}
         description={`${rangeLabel} · ${new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`}
         icon={<TrendingUp className="h-5 w-5" />}
         actions={
           <>
-            <Button asChild><Link to="/pos"><ShoppingCart className="h-4 w-4 mr-2" />Open POS</Link></Button>
-            <Button asChild variant="outline"><Link to="/reports"><Receipt className="h-4 w-4 mr-2" />Reports</Link></Button>
+            <Button asChild><Link to="/pos"><ShoppingCart className="h-4 w-4 mr-2" />{t('dashboard.open_pos', 'Open POS')}</Link></Button>
+            <Button asChild variant="outline"><Link to="/reports"><Receipt className="h-4 w-4 mr-2" />{t('common.reports', 'Reports')}</Link></Button>
           </>
         }
       />
@@ -357,13 +359,13 @@ function Page() {
       <div className="flex flex-wrap items-center gap-2">
         <Select value={preset} onValueChange={(v) => applyPreset(v as DatePreset)}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select period" />
+            <SelectValue placeholder={t('dashboard.select_period', 'Select period')} />
           </SelectTrigger>
           <SelectContent>
             {PRESETS.map((p) => (
               <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
             ))}
-            {preset === "custom" && <SelectItem value="custom">Custom</SelectItem>}
+            {preset === "custom" && <SelectItem value="custom">{t('dashboard.custom', 'Custom')}</SelectItem>}
           </SelectContent>
         </Select>
 
@@ -392,42 +394,42 @@ function Page() {
           </PopoverContent>
         </Popover>
 
-        <Button variant="ghost" size="sm" onClick={() => applyPreset("today")}>Reset to Today</Button>
+        <Button variant="ghost" size="sm" onClick={() => applyPreset("today")}>{t('dashboard.reset_today', 'Reset to Today')}</Button>
       </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Kpi onClick={() => setDetailKey("net")}
-          icon={TrendingUp} label="Revenue" value={fmtMoney(netRevenue, sym)}
-          delta={dNet} sub={`${stats?.sales_count || 0} invoices · after returns`} tone="primary"
+          icon={TrendingUp} label={t('dashboard.kpi_revenue', 'Revenue')} value={fmtMoney(netRevenue, sym)}
+          delta={dNet} sub={t('dashboard.kpi_revenue_sub', '{{count}} invoices · after returns', { count: stats?.sales_count || 0 })} tone="primary"
         />
         <Kpi onClick={() => setDetailKey("revenue")}
-          icon={Receipt} label="Gross sales" value={fmtMoney(revenue, sym)}
-          delta={dRevenue} sub="Before returns" tone="info"
+          icon={Receipt} label={t('dashboard.kpi_gross_sales', 'Gross sales')} value={fmtMoney(revenue, sym)}
+          delta={dRevenue} sub={t('dashboard.kpi_before_returns', 'Before returns')} tone="info"
         />
         <Kpi onClick={() => setDetailKey("credit")}
-          icon={CreditCard} label="Credit sales" value={fmtMoney(creditSales, sym)}
-          sub="Unpaid portion" tone="warning"
+          icon={CreditCard} label={t('dashboard.kpi_credit_sales', 'Credit sales')} value={fmtMoney(creditSales, sym)}
+          sub={t('dashboard.kpi_unpaid_portion', 'Unpaid portion')} tone="warning"
         />
         <Kpi onClick={() => setDetailKey("returns")}
-          icon={Undo2} label="Returns" value={`- ${fmtMoney(returnsTotal, sym)}`}
-          delta={dReturns} deltaInverse sub={`${saleReturns.length} refund${saleReturns.length === 1 ? "" : "s"}`} tone="warning"
+          icon={Undo2} label={t('dashboard.kpi_returns', 'Returns')} value={`- ${fmtMoney(returnsTotal, sym)}`}
+          delta={dReturns} deltaInverse sub={t('dashboard.kpi_refunds_sub', '{{count}} refunds', { count: saleReturns.length })} tone="warning"
         />
         <Kpi onClick={() => setDetailKey("grossProfit")}
-          icon={PiggyBank} label="Gross profit" value={fmtMoney(grossProfit, sym)}
-          delta={dGrossProfit} sub="Revenue − cost" tone="success"
+          icon={PiggyBank} label={t('dashboard.kpi_gross_profit', 'Gross profit')} value={fmtMoney(grossProfit, sym)}
+          delta={dGrossProfit} sub={t('dashboard.kpi_revenue_minus_cost', 'Revenue − cost')} tone="success"
         />
         <Kpi onClick={() => setDetailKey("profit")}
-          icon={Wallet} label="Net profit" value={fmtMoney(profit, sym)}
-          delta={dProfit} sub="After tax, returns & expenses" tone="success"
+          icon={Wallet} label={t('dashboard.kpi_net_profit', 'Net profit')} value={fmtMoney(profit, sym)}
+          delta={dProfit} sub={t('dashboard.kpi_after_tax_returns_expenses', 'After tax, returns & expenses')} tone="success"
         />
         <Kpi onClick={() => setDetailKey("purch")}
-          icon={TrendingDown} label="Purchases" value={fmtMoney(purchTotal, sym)}
-          delta={dPurch} deltaInverse sub={`${purchases.length} entries`} tone="warning"
+          icon={TrendingDown} label={t('dashboard.kpi_purchases', 'Purchases')} value={fmtMoney(purchTotal, sym)}
+          delta={dPurch} deltaInverse sub={t('dashboard.kpi_entries_sub', '{{count}} entries', { count: purchases.length })} tone="warning"
         />
         <Kpi onClick={() => setDetailKey("inventory")}
-          icon={Package} label="Inventory value" value={fmtMoney(inventoryValue, sym)}
-          sub={`${products.length} active SKUs`} tone="info"
+          icon={Package} label={t('dashboard.kpi_inventory_value', 'Inventory value')} value={fmtMoney(inventoryValue, sym)}
+          sub={t('dashboard.kpi_active_skus_sub', '{{count}} active SKUs', { count: products.length })} tone="info"
         />
       </div>
 
@@ -437,13 +439,13 @@ function Page() {
         <Card className="p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-semibold">Revenue & profit</h2>
+              <h2 className="font-semibold">{t('dashboard.chart_revenue_profit', 'Revenue & profit')}</h2>
               <p className="text-xs text-muted-foreground">{rangeLabel}</p>
             </div>
             <div className="flex gap-3 text-xs text-muted-foreground">
-              <Legend2 color="var(--chart-1)" label="Sales" />
-              <Legend2 color="var(--chart-2)" label="Profit" />
-              <Legend2 color="var(--chart-3)" label="Returns" />
+              <Legend2 color="var(--chart-1)" label={t('common.sales', 'Sales')} />
+              <Legend2 color="var(--chart-2)" label={t('dashboard.legend_profit', 'Profit')} />
+              <Legend2 color="var(--chart-3)" label={t('dashboard.legend_returns', 'Returns')} />
             </div>
           </div>
           <div className="h-64">
@@ -478,11 +480,11 @@ function Page() {
         </Card>
 
         <Card className="p-5">
-          <h2 className="font-semibold">Payment mix</h2>
-          <p className="text-xs text-muted-foreground mb-2">By revenue · {rangeLabel}</p>
+          <h2 className="font-semibold">{t('dashboard.chart_payment_mix', 'Payment mix')}</h2>
+          <p className="text-xs text-muted-foreground mb-2">{t('dashboard.by_revenue', 'By revenue')} · {rangeLabel}</p>
           <div className="h-64">
             {methodMix.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No data</div>
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">{t('dashboard.no_data', 'No data')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -508,13 +510,13 @@ function Page() {
         <Card className="p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-semibold">Top selling items</h2>
+              <h2 className="font-semibold">{t('dashboard.chart_top_selling', 'Top selling items')}</h2>
               <p className="text-xs text-muted-foreground">{rangeLabel}</p>
             </div>
           </div>
           <div className="h-64">
             {topItems.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No sales yet</div>
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">{t('dashboard.no_sales_yet', 'No sales yet')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topItems} layout="vertical" margin={{ left: 8 }}>
@@ -540,20 +542,20 @@ function Page() {
             <div>
               <h2 className="font-semibold flex items-center gap-1.5">
                 <AlertTriangle className="h-4 w-4 text-warning" />
-                Low stock
+                {t('dashboard.low_stock', 'Low stock')}
               </h2>
-              <p className="text-xs text-muted-foreground">≤ 5 units in hand</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.low_stock_sub', '≤ 5 units in hand')}</p>
             </div>
-            <Button asChild size="sm" variant="ghost"><Link to="/products">View all</Link></Button>
+            <Button asChild size="sm" variant="ghost"><Link to="/products">{t('dashboard.view_all', 'View all')}</Link></Button>
           </div>
           <div className="space-y-2">
             {lowStock.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-6 text-center">Stock looks healthy ✓</div>
+              <div className="text-sm text-muted-foreground py-6 text-center">{t('dashboard.stock_healthy', 'Stock looks healthy ✓')}</div>
             ) : lowStock.map((p: any) => (
               <div key={p.id} className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0">
                 <div className="text-sm truncate pr-2">{p.name}</div>
                 <StatusBadge tone={Number(p.stock) === 0 ? "danger" : "warning"}>
-                  {Number(p.stock)} left
+                  {t('dashboard.units_left', '{{count}} left', { count: Number(p.stock) })}
                 </StatusBadge>
               </div>
             ))}
@@ -563,11 +565,11 @@ function Page() {
 
       {/* Period summary footer */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Mini onClick={() => setDetailKey("revenue")} label={`Revenue · ${rangeLabel}`} value={fmtMoney(revenue, sym)} icon={TrendingUp} />
-        <Mini onClick={() => setDetailKey("net")} label="Net revenue" value={fmtMoney(netRevenue, sym)} icon={TrendingUp} accent />
-        <Mini onClick={() => setDetailKey("profit")} label="Net profit" value={fmtMoney(profit, sym)} icon={Wallet} accent />
-        <Mini onClick={() => setDetailKey("purch")} label="Purchases" value={fmtMoney(purchTotal, sym)} icon={TrendingDown} />
-        <Mini onClick={() => setDetailKey("invoices")} label="Invoices" value={String(sales.length)} icon={Users} />
+        <Mini onClick={() => setDetailKey("revenue")} label={`${t('dashboard.kpi_revenue', 'Revenue')} · ${rangeLabel}`} value={fmtMoney(revenue, sym)} icon={TrendingUp} />
+        <Mini onClick={() => setDetailKey("net")} label={t('dashboard.footer_net_revenue', 'Net revenue')} value={fmtMoney(netRevenue, sym)} icon={TrendingUp} accent />
+        <Mini onClick={() => setDetailKey("profit")} label={t('dashboard.kpi_net_profit', 'Net profit')} value={fmtMoney(profit, sym)} icon={Wallet} accent />
+        <Mini onClick={() => setDetailKey("purch")} label={t('dashboard.kpi_purchases', 'Purchases')} value={fmtMoney(purchTotal, sym)} icon={TrendingDown} />
+        <Mini onClick={() => setDetailKey("invoices")} label={t('dashboard.footer_invoices', 'Invoices')} value={String(sales.length)} icon={Users} />
       </div>
 
       <Dialog open={!!detailKey} onOpenChange={(o) => !o && setDetailKey(null)}>
@@ -603,6 +605,7 @@ function Page() {
 function Kpi({
   icon: Icon, label, value, delta, deltaInverse, sub, tone, onClick,
 }: { icon: any; label: string; value: string; delta?: number; deltaInverse?: boolean; sub?: string; tone: string; onClick?: () => void }) {
+  const { t } = useTranslation();
   const ring: Record<string, string> = {
     primary: "from-primary/15 to-primary/0 text-primary",
     success: "from-success/15 to-success/0 text-success",
@@ -648,7 +651,7 @@ function Kpi({
           <span className="text-[11px] text-muted-foreground truncate text-right">{sub}</span>
         </div>
         {hasDelta && (
-          <div className="text-[10px] text-muted-foreground mt-1">vs previous period</div>
+          <div className="text-[10px] text-muted-foreground mt-1">{t('dashboard.vs_previous_period', 'vs previous period')}</div>
         )}
       </div>
     </Card>
