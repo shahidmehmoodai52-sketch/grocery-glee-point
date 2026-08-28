@@ -146,7 +146,7 @@ function Page() {
                 <TableCell>{r.expense_date}</TableCell>
                 <TableCell><Badge variant="secondary" className="capitalize">{categoryLabel(r.category)}</Badge></TableCell>
                 <TableCell className="max-w-[360px] truncate">{r.description ?? "—"}</TableCell>
-                <TableCell className="text-xs uppercase text-muted-foreground">{t(`expenses.method_${r.method}`, r.method)}</TableCell>
+                <TableCell className="text-xs uppercase text-muted-foreground">{String(t(`expenses.method_${r.method}`, r.method))}</TableCell>
                 <TableCell className="text-right font-medium text-destructive">{fmtMoney(r.amount, sym)}</TableCell>
                 <TableCell className="text-right">
                   {r.sale_id ? (

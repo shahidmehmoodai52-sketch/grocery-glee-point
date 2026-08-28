@@ -242,7 +242,7 @@ function ProductsPage() {
     <div className="p-6 space-y-4">
       <PageHeader
         title={t('common.products', 'Products')}
-        description={t('products.items_in_catalog', '{{count}} items in catalog', { count: (counts?.total ?? total).toLocaleString() })}
+        description={t('products.items_in_catalog', '{{count}} items in catalog', { count: Number(counts?.total ?? total) })}
         icon={<Package className="h-5 w-5" />}
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
