@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -21,6 +22,8 @@ import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 export const Route = createFileRoute("/_authenticated/users")({ component: Page });
 
 function Page() {
+  const { t } = useTranslation();
+  const permLabel = (key: string) => t(`users.perm_${key.replace(/-/g, "_")}`, ALL_PERMS.find((p) => p.key === key)?.label ?? key);
   const qc = useQueryClient();
   const list = useServerFn(listStaff);
   const create = useServerFn(createStaff);
@@ -58,31 +61,31 @@ function Page() {
 
   const createMut = useMutation({
     mutationFn: () => create({ data: { name, email, password: pwd, role, perms } }),
-    onSuccess: () => { toast.success("Staff created"); setNewOpen(false); setName(""); setEmail(""); setPwd(""); setPermsState([]); setRole("cashier"); refresh(); },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onSuccess: () => { toast.success(t('users.staff_created', 'Staff created')); setNewOpen(false); setName(""); setEmail(""); setPwd(""); setPermsState([]); setRole("cashier"); refresh(); },
+    onError: (e: any) => toast.error(e?.message ?? t('common.failed', 'Failed')),
   });
 
   return (
     <div className="p-6 space-y-4">
-      <NeedsInternetBanner section="Users" />
+      <NeedsInternetBanner section={t('common.users', 'Users')} />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2"><Shield className="h-6 w-6" /> Staff & access</h1>
-          <p className="text-sm text-muted-foreground">Owner controls who signs in, with their own password, and exactly which sections each cashier can open.</p>
+          <h1 className="text-2xl font-semibold flex items-center gap-2"><Shield className="h-6 w-6" /> {t('users.heading', 'Staff & access')}</h1>
+          <p className="text-sm text-muted-foreground">{t('users.subtitle', 'Owner controls who signs in, with their own password, and exactly which sections each cashier can open.')}</p>
         </div>
         <Dialog open={newOpen} onOpenChange={setNewOpen}>
-          <DialogTrigger asChild><Button><UserPlus className="h-4 w-4 mr-2" />Add staff</Button></DialogTrigger>
+          <DialogTrigger asChild><Button><UserPlus className="h-4 w-4 mr-2" />{t('users.add_staff', 'Add staff')}</Button></DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Create staff account</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('users.create_staff_title', 'Create staff account')}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ahmed Khan" /></div>
-              <div><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cashier@store.com" /></div>
-              <div><Label>Password</Label><Input type="text" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="min 6 chars" /></div>
+              <div><Label>{t('common.name', 'Name')}</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('users.name_placeholder', 'e.g. Ahmed Khan')} /></div>
+              <div><Label>{t('common.email', 'Email')}</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('users.email_placeholder', 'cashier@store.com')} /></div>
+              <div><Label>{t('common.password', 'Password')}</Label><Input type="text" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={t('users.password_placeholder', 'min 6 chars')} /></div>
               <div>
-                <Label>Role</Label>
+                <Label>{t('expenses.th_role', 'Role')}</Label>
                 <div className="flex gap-2 mt-1">
-                  <Button type="button" variant={role === "cashier" ? "default" : "outline"} size="sm" onClick={() => setRole("cashier")}>Cashier / Staff</Button>
-                  <Button type="button" variant={role === "admin" ? "default" : "outline"} size="sm" onClick={() => setRole("admin")}>Owner (Admin)</Button>
+                  <Button type="button" variant={role === "cashier" ? "default" : "outline"} size="sm" onClick={() => setRole("cashier")}>{t('users.role_cashier_staff', 'Cashier / Staff')}</Button>
+                  <Button type="button" variant={role === "admin" ? "default" : "outline"} size="sm" onClick={() => setRole("admin")}>{t('users.role_owner_admin', 'Owner (Admin)')}</Button>
                 </div>
               </div>
               {role === "cashier" && (() => {
@@ -92,16 +95,16 @@ function Page() {
                 return (
                   <div>
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm">Allowed sections (POS & Sales always allowed)</Label>
+                      <Label className="text-sm">{t('users.allowed_sections_note', 'Allowed sections (POS & Sales always allowed)')}</Label>
                       <Button type="button" variant="outline" size="sm" onClick={toggleAll}>
-                        {allOn ? "Clear all" : "Access all"}
+                        {allOn ? t('users.clear_all', 'Clear all') : t('users.access_all', 'Access all')}
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-2 p-3 rounded border max-h-64 overflow-auto">
                       {selectable.map((p) => (
                         <label key={p.key} className="flex items-center gap-2 text-sm">
                           <Checkbox checked={perms.includes(p.key)} onCheckedChange={() => togglePerm(p.key)} />
-                          {p.label}
+                          {permLabel(p.key)}
                         </label>
                       ))}
                     </div>
@@ -110,8 +113,8 @@ function Page() {
               })()}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setNewOpen(false)}>Cancel</Button>
-              <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !name.trim()}>{createMut.isPending ? "Creating…" : "Create"}</Button>
+              <Button variant="outline" onClick={() => setNewOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+              <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !name.trim()}>{createMut.isPending ? t('users.creating', 'Creating…') : t('users.create', 'Create')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -120,11 +123,11 @@ function Page() {
       <Card className="p-3">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Active devices</TableHead><TableHead>Allowed sections</TableHead><TableHead className="text-right">Actions</TableHead>
+            <TableHead>{t('common.name', 'Name')}</TableHead><TableHead>{t('common.email', 'Email')}</TableHead><TableHead>{t('expenses.th_role', 'Role')}</TableHead><TableHead>{t('users.th_active_devices', 'Active devices')}</TableHead><TableHead>{t('users.th_allowed_sections', 'Allowed sections')}</TableHead><TableHead className="text-right">{t('customers.th_actions', 'Actions')}</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>}
-            {users.map((u: any) => <UserRow key={u.id} u={u} activeCount={activeSessions[u.id] ?? 0} reset={reset} del={del} refresh={refresh} />)}
+            {isLoading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('pos.loading', 'Loading…')}</TableCell></TableRow>}
+            {users.map((u: any) => <UserRow key={u.id} u={u} activeCount={activeSessions[u.id] ?? 0} reset={reset} del={del} refresh={refresh} permLabel={permLabel} />)}
           </TableBody>
         </Table>
       </Card>
@@ -132,7 +135,8 @@ function Page() {
   );
 }
 
-function UserRow({ u, activeCount, reset, del, refresh }: any) {
+function UserRow({ u, activeCount, reset, del, refresh, permLabel }: any) {
+  const { t } = useTranslation();
   const [editOpen, setEditOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
@@ -143,55 +147,55 @@ function UserRow({ u, activeCount, reset, del, refresh }: any) {
 
   const saveMut = useMutation({
     mutationFn: () => setPermsFn({ data: { user_id: u.id, role, perms, name } }),
-    onSuccess: () => { toast.success("Access updated"); setEditOpen(false); refresh(); },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onSuccess: () => { toast.success(t('users.access_updated', 'Access updated')); setEditOpen(false); refresh(); },
+    onError: (e: any) => toast.error(e?.message ?? t('common.failed', 'Failed')),
   });
   const resetMut = useMutation({
     mutationFn: () => reset({ data: { user_id: u.id, password: newPwd } }),
-    onSuccess: () => { toast.success("Password reset"); setResetOpen(false); setNewPwd(""); },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onSuccess: () => { toast.success(t('users.password_reset', 'Password reset')); setResetOpen(false); setNewPwd(""); },
+    onError: (e: any) => toast.error(e?.message ?? t('common.failed', 'Failed')),
   });
   const delMut = useMutation({
     mutationFn: () => del({ data: { user_id: u.id } }),
-    onSuccess: () => { toast.success("Removed"); refresh(); },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onSuccess: () => { toast.success(t('users.removed', 'Removed')); refresh(); },
+    onError: (e: any) => toast.error(e?.message ?? t('common.failed', 'Failed')),
   });
 
   const toggle = (k: string) => setPerms((p) => p.includes(k) ? p.filter((x) => x !== k) : [...p, k]);
 
   return (
     <TableRow>
-      <TableCell className="font-medium">{u.name || <span className="text-muted-foreground italic">Unnamed</span>}</TableCell>
+      <TableCell className="font-medium">{u.name || <span className="text-muted-foreground italic">{t('users.unnamed', 'Unnamed')}</span>}</TableCell>
       <TableCell className="text-muted-foreground">{u.email}</TableCell>
-      <TableCell><Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge></TableCell>
+      <TableCell><Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role === "admin" ? t('users.role_admin', 'Admin') : t('users.role_cashier', 'Cashier')}</Badge></TableCell>
       <TableCell>
         <Badge variant={activeCount > 0 ? "default" : "outline"} className="gap-1">
           <Monitor className="h-3 w-3" />
-          {activeCount} {activeCount === 1 ? "device" : "devices"}
+          {activeCount} {activeCount === 1 ? t('users.device_singular', 'device') : t('users.device_plural', 'devices')}
         </Badge>
       </TableCell>
       <TableCell className="max-w-md">
-        {u.role === "admin" ? <span className="text-xs text-muted-foreground">Full access</span> : (
+        {u.role === "admin" ? <span className="text-xs text-muted-foreground">{t('users.full_access', 'Full access')}</span> : (
           <div className="flex flex-wrap gap-1">
             <Badge variant="outline" className="text-[10px]">pos</Badge>
             <Badge variant="outline" className="text-[10px]">sales</Badge>
-            {u.perms.map((p: string) => <Badge key={p} variant="outline" className="text-[10px]">{p}</Badge>)}
-            {u.perms.length === 0 && <span className="text-xs text-muted-foreground">No extras</span>}
+            {u.perms.map((p: string) => <Badge key={p} variant="outline" className="text-[10px]">{permLabel(p)}</Badge>)}
+            {u.perms.length === 0 && <span className="text-xs text-muted-foreground">{t('users.no_extras', 'No extras')}</span>}
           </div>
         )}
       </TableCell>
       <TableCell className="text-right space-x-1">
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogTrigger asChild><Button size="sm" variant="outline"><Shield className="h-3.5 w-3.5 mr-1" />Access</Button></DialogTrigger>
+          <DialogTrigger asChild><Button size="sm" variant="outline"><Shield className="h-3.5 w-3.5 mr-1" />{t('users.access_btn', 'Access')}</Button></DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Edit access — {u.email}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('users.edit_access_title', 'Edit access — {{email}}', { email: u.email })}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ahmed Khan" /></div>
+              <div><Label>{t('common.name', 'Name')}</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('users.name_placeholder', 'e.g. Ahmed Khan')} /></div>
               <div>
-                <Label>Role</Label>
+                <Label>{t('expenses.th_role', 'Role')}</Label>
                 <div className="flex gap-2 mt-1">
-                  <Button type="button" variant={role === "cashier" ? "default" : "outline"} size="sm" onClick={() => setRole("cashier")}>Cashier</Button>
-                  <Button type="button" variant={role === "admin" ? "default" : "outline"} size="sm" onClick={() => setRole("admin")}>Admin</Button>
+                  <Button type="button" variant={role === "cashier" ? "default" : "outline"} size="sm" onClick={() => setRole("cashier")}>{t('users.role_cashier', 'Cashier')}</Button>
+                  <Button type="button" variant={role === "admin" ? "default" : "outline"} size="sm" onClick={() => setRole("admin")}>{t('users.role_admin', 'Admin')}</Button>
                 </div>
               </div>
               {role === "cashier" && (() => {
@@ -201,16 +205,16 @@ function UserRow({ u, activeCount, reset, del, refresh }: any) {
                 return (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm">Allowed sections</Label>
+                      <Label className="text-sm">{t('users.allowed_sections_label', 'Allowed sections')}</Label>
                       <Button type="button" variant="outline" size="sm" onClick={toggleAll}>
-                        {allOn ? "Clear all" : "Access all"}
+                        {allOn ? t('users.clear_all', 'Clear all') : t('users.access_all', 'Access all')}
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 gap-2 p-3 rounded border max-h-64 overflow-auto">
                       {selectable.map((p) => (
                         <label key={p.key} className="flex items-center gap-2 text-sm">
                           <Checkbox checked={perms.includes(p.key)} onCheckedChange={() => toggle(p.key)} />
-                          {p.label}
+                          {permLabel(p.key)}
                         </label>
                       ))}
                     </div>
@@ -219,25 +223,25 @@ function UserRow({ u, activeCount, reset, del, refresh }: any) {
               })()}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-              <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !name.trim()}><Save className="h-4 w-4 mr-1" />Save</Button>
+              <Button variant="outline" onClick={() => setEditOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+              <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !name.trim()}><Save className="h-4 w-4 mr-1" />{t('common.save', 'Save')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-          <DialogTrigger asChild><Button size="sm" variant="outline"><KeyRound className="h-3.5 w-3.5 mr-1" />Password</Button></DialogTrigger>
+          <DialogTrigger asChild><Button size="sm" variant="outline"><KeyRound className="h-3.5 w-3.5 mr-1" />{t('users.password_btn', 'Password')}</Button></DialogTrigger>
           <DialogContent className="max-w-sm">
-            <DialogHeader><DialogTitle>Set new password</DialogTitle></DialogHeader>
-            <Input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} placeholder="min 6 chars" />
+            <DialogHeader><DialogTitle>{t('users.password_dialog_title', 'Set new password')}</DialogTitle></DialogHeader>
+            <Input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} placeholder={t('users.password_placeholder', 'min 6 chars')} />
             <DialogFooter>
-              <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
-              <Button onClick={() => resetMut.mutate()} disabled={resetMut.isPending || newPwd.length < 6}>Update</Button>
+              <Button variant="outline" onClick={() => setResetOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+              <Button onClick={() => resetMut.mutate()} disabled={resetMut.isPending || newPwd.length < 6}>{t('users.update', 'Update')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        <Button size="sm" variant="destructive" onClick={() => { if (confirm(`Delete ${u.email}?`)) delMut.mutate(); }}>
+        <Button size="sm" variant="destructive" onClick={() => { if (confirm(t('users.delete_confirm', 'Delete {{email}}?', { email: u.email }))) delMut.mutate(); }}>
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </TableCell>

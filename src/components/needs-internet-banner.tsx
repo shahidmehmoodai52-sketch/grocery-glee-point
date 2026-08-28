@@ -3,6 +3,7 @@
 // Silently hides when the browser is online.
 
 import { WifiOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useOfflineStatus } from "@/lib/offline/status";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function NeedsInternetBanner({ section, className }: Props) {
+  const { t } = useTranslation();
   const { online } = useOfflineStatus();
   if (online) return null;
 
@@ -26,10 +28,10 @@ export function NeedsInternetBanner({ section, className }: Props) {
     >
       <WifiOff className="h-4 w-4 mt-0.5 shrink-0" />
       <div className="leading-snug">
-        <div className="font-medium">You're offline</div>
+        <div className="font-medium">{t('common.offline_title', "You're offline")}</div>
         <div className="text-xs opacity-90">
-          {section ? `${section} needs internet to load.` : "This section needs internet to load."}
-          {" "}Billing, product lookup and past invoices still work in POS.
+          {section ? t('common.offline_section_needs_internet', '{{section}} needs internet to load.', { section }) : t('common.offline_generic_needs_internet', 'This section needs internet to load.')}
+          {" "}{t('common.offline_billing_note', 'Billing, product lookup and past invoices still work in POS.')}
         </div>
       </div>
     </div>
