@@ -250,7 +250,7 @@ function AuthPage() {
         return; 
       }
 
-      toast.success("Shop registered! Awaiting admin approval — limited access until approved.");
+      toast.success("Shop registered! Your 7-day free trial has started — full access, no approval needed.");
       await goToApp();
     } catch (err: any) {
       showErr(err?.message ?? "Registration failed");

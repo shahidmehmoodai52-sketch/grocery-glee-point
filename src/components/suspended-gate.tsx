@@ -99,7 +99,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
     } as any);
     setBusy(false);
     if (error) { toast.error(error.message ?? "Could not register shop."); return; }
-    toast.success("Shop registered. Awaiting admin approval.");
+    toast.success("Shop registered! Your 7-day free trial has started.");
     onDone();
   };
 
@@ -112,7 +112,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
           </div>
           <h1 className="text-xl font-semibold">Register your shop</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Please enter shop details to continue. Access is limited until the developer approves your shop.
+            Please enter shop details to continue. You'll get full access right away with a 7-day free trial.
           </p>
         </div>
         <form className="space-y-4" onSubmit={submit}>

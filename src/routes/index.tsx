@@ -460,7 +460,7 @@ function LandingPage() {
 
               <ul className="mt-6 grid grid-cols-2 gap-2 text-sm text-slate-600 sm:max-w-md">
                 {[t('landing.why.b1'), t('landing.why.b2'), t('landing.why.b3'), t('landing.why.b4')].map(x => (
-                  <li key={x} className="flex items-center gap-2"><Check className="h-4 w-4 text-tx-green" /> {x}</li>
+                  <li key={x} className="flex items-center gap-2"><Check className="h-4 w-4 shrink-0 text-tx-green" /> <span className="min-w-0">{x}</span></li>
                 ))}
               </ul>
             </div>
@@ -524,7 +524,7 @@ function LandingPage() {
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-tx-green-light text-tx-green-dark">
                   <Icon className="h-5 w-5" />
                 </div>
-                <span className="text-sm font-semibold text-tx-navy">{name}</span>
+                <span className="min-w-0 text-sm font-semibold text-tx-navy">{name}</span>
               </div>
             ))}
           </div>
@@ -871,7 +871,7 @@ function LandingPage() {
                 aria-label={`Follow Tillix on ${label}`}
                 className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-tx-green/40 hover:shadow-lg hover:shadow-emerald-900/5"
               >
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-white ring-1 ring-slate-200 transition group-hover:scale-105 group-hover:ring-slate-300">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white ring-1 ring-slate-200 transition group-hover:scale-105 group-hover:ring-slate-300">
                   <Icon className="h-6 w-6" />
                 </span>
                 <span className="min-w-0">
@@ -972,7 +972,7 @@ function LandingPage() {
                 <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${m.gradient}`} />
                 <div className="flex items-center gap-4">
                   <div
-                    className={`grid h-14 w-14 place-items-center rounded-xl bg-gradient-to-br ${m.gradient} text-lg font-bold text-white shadow-md ring-4 ring-white`}
+                    className={`grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${m.gradient} text-lg font-bold text-white shadow-md ring-4 ring-white`}
                   >
                     {m.initials}
                   </div>
