@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Printer, TrendingUp, TrendingDown, Wallet, Eye, CalendarIcon, Package, Search, ArrowUpDown, CreditCard } from "lucide-react";
 import { format } from "date-fns";
@@ -39,6 +40,7 @@ function SupplierWiseReport({
   onDrill: (drill: any) => void;
   search: string;
 }) {
+  const { t } = useTranslation();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"qty" | "revenue">("revenue");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -84,7 +86,7 @@ function SupplierWiseReport({
       for (const it of (s.sale_items as any[]) ?? []) {
         const prod = pMap.get(it.product_id);
         const sid = prod?.preferred_supplier_id || "unassigned";
-        const sName = suppliers.find((x) => x.id === sid)?.name || (sid === "unassigned" ? "Unassigned" : "Unknown");
+        const sName = suppliers.find((x) => x.id === sid)?.name || (sid === "unassigned" ? t('reports.unassigned_supplier', 'Unassigned') : t('reports.unknown_supplier', 'Unknown'));
 
         if (!sMap.has(sid)) {
           sMap.set(sid, { id: sid, name: sName, qty: 0, revenue: 0, invoices: new Set(), products: new Map() });
@@ -160,26 +162,26 @@ function SupplierWiseReport({
       <Card className="p-4 bg-muted/20">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex-1 min-w-[200px]">
-            <Label className="text-xs mb-1 block">Filter by Company / Supplier</Label>
+            <Label className="text-xs mb-1 block">{t('reports.filter_by_supplier', 'Filter by Company / Supplier')}</Label>
             <select
               className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               value={selectedSupplierId}
               onChange={(e) => setSelectedSupplierId(e.target.value)}
             >
-              <option value="all">Choose a company…</option>
+              <option value="all">{t('reports.choose_company', 'Choose a company…')}</option>
               {Array.from(stats.values())
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.products.size} items)</option>
+                  <option key={s.id} value={s.id}>{s.name} {t('reports.option_items_suffix', '({{count}} items)', { count: s.products.size })}</option>
                 ))}
             </select>
           </div>
           {selectedData && (
             <div className="flex gap-4">
-              <StatMini label="Products Sold" value={selectedData.products.size} />
-              <StatMini label="Total Qty" value={selectedData.qty} />
-              <StatMini label="Invoices" value={selectedData.invoices.size} />
-              <StatMini label="Total Sales" value={fmtMoney(selectedData.revenue, currencySymbol)} tone="success" />
+              <StatMini label={t('reports.stat_products_sold', 'Products Sold')} value={selectedData.products.size} />
+              <StatMini label={t('reports.stat_total_qty', 'Total Qty')} value={selectedData.qty} />
+              <StatMini label={t('reports.stat_invoices', 'Invoices')} value={selectedData.invoices.size} />
+              <StatMini label={t('reports.stat_total_sales', 'Total Sales')} value={fmtMoney(selectedData.revenue, currencySymbol)} tone="success" />
             </div>
           )}
         </div>
@@ -189,7 +191,7 @@ function SupplierWiseReport({
         <Card className="p-12 text-center text-muted-foreground border-dashed">
           <div className="flex flex-col items-center gap-2">
             <Package className="h-10 w-10 opacity-20" />
-            <p>Select a company to view the sales breakdown</p>
+            <p>{t('reports.select_company_prompt', 'Select a company to view the sales breakdown')}</p>
           </div>
         </Card>
       ) : (
@@ -197,23 +199,23 @@ function SupplierWiseReport({
           <div className="lg:col-span-2 space-y-4">
             <Card className="p-3">
               <div className="flex items-center justify-between mb-3 px-1">
-                <h3 className="font-semibold text-sm">Product-wise Breakdown</h3>
-                <div className="text-xs text-muted-foreground">Sorted by {sortBy === "qty" ? "Quantity" : "Sale Amount"}</div>
+                <h3 className="font-semibold text-sm">{t('reports.product_breakdown_heading', 'Product-wise Breakdown')}</h3>
+                <div className="text-xs text-muted-foreground">{t('reports.sorted_by', 'Sorted by {{field}}', { field: sortBy === "qty" ? t('reports.sort_field_qty', 'Quantity') : t('reports.sort_field_revenue', 'Sale Amount') })}</div>
               </div>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Category</TableHead>
+                    <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+                    <TableHead>{t('reports.th_category', 'Category')}</TableHead>
                     <TableHead className="text-right">
                       <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("qty")}>
-                        Qty Sold
+                        {t('reports.th_qty_sold', 'Qty sold')}
                         <ArrowUpDown className={`h-3 w-3 ${sortBy === "qty" ? "opacity-100" : "opacity-30"}`} />
                       </button>
                     </TableHead>
                     <TableHead className="text-right">
                       <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("revenue")}>
-                        Total Sale
+                        {t('reports.th_total_sale', 'Total Sale')}
                         <ArrowUpDown className={`h-3 w-3 ${sortBy === "revenue" ? "opacity-100" : "opacity-30"}`} />
                       </button>
                     </TableHead>
@@ -221,23 +223,23 @@ function SupplierWiseReport({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {productList.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">No products found</TableCell></TableRow>}
+                  {productList.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">{t('reports.no_products_found', 'No products found')}</TableCell></TableRow>}
                   {productList.map((p) => (
                     <TableRow
                       key={p.id}
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => onDrill({
                         title: p.name,
-                        note: `${p.category} · Qty ${p.qty} · Current Stock ${p.stock} · Total Sales ${fmtMoney(p.revenue, currencySymbol)}`,
-                        cols: ["Field", "Value"],
+                        note: t('reports.product_drill_note', '{{category}} · Qty {{qty}} · Current Stock {{stock}} · Total Sales {{total}}', { category: p.category, qty: p.qty, stock: p.stock, total: fmtMoney(p.revenue, currencySymbol) }),
+                        cols: [t('reports.field_col', 'Field'), t('reports.value_col', 'Value')],
                         rows: [
-                          ["Category", p.category],
-                          ["Quantity Sold", p.qty],
-                          ["Total Sale Amount", fmtMoney(p.revenue, currencySymbol)],
-                          ["Average Sale Price", fmtMoney(p.qty > 0 ? p.revenue / p.qty : 0, currencySymbol)],
-                          ["Number of Invoices", p.invoices.size],
-                          ["Current Stock", p.stock],
-                          ["Stock Value (Cost)", fmtMoney(p.stock * p.cost, currencySymbol)],
+                          [t('reports.th_category', 'Category'), p.category],
+                          [t('reports.field_qty_sold', 'Quantity Sold'), p.qty],
+                          [t('reports.field_total_sale_amount', 'Total Sale Amount'), fmtMoney(p.revenue, currencySymbol)],
+                          [t('reports.field_avg_sale_price', 'Average Sale Price'), fmtMoney(p.qty > 0 ? p.revenue / p.qty : 0, currencySymbol)],
+                          [t('reports.field_num_invoices', 'Number of Invoices'), p.invoices.size],
+                          [t('reports.field_current_stock', 'Current Stock'), p.stock],
+                          [t('reports.field_stock_value', 'Stock Value (Cost)'), fmtMoney(p.stock * p.cost, currencySymbol)],
                         ],
                       })}
                     >
@@ -259,7 +261,7 @@ function SupplierWiseReport({
             <Card className="p-4">
               <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-success" />
-                Top Selling Products
+                {t('reports.top_selling_heading', 'Top Selling Products')}
               </h3>
               <div className="space-y-4">
                 {productList.slice(0, 5).map((p, idx) => (
@@ -269,7 +271,7 @@ function SupplierWiseReport({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{p.name}</div>
-                      <div className="text-[10px] text-muted-foreground">{p.qty} sold · {((p.revenue / selectedData.revenue) * 100).toFixed(1)}% of total</div>
+                      <div className="text-[10px] text-muted-foreground">{t('reports.sold_of_total', '{{qty}} sold · {{pct}}% of total', { qty: p.qty, pct: ((p.revenue / selectedData.revenue) * 100).toFixed(1) })}</div>
                     </div>
                     <div className="text-sm font-semibold">{fmtMoney(p.revenue, currencySymbol)}</div>
                   </div>
@@ -278,12 +280,12 @@ function SupplierWiseReport({
             </Card>
 
             <Card className="p-4">
-              <h3 className="font-semibold text-sm mb-4">Summary</h3>
+              <h3 className="font-semibold text-sm mb-4">{t('reports.summary_heading', 'Summary')}</h3>
               <div className="space-y-3">
-                <SummaryRow label="Supplier Sales" value={fmtMoney(selectedData.revenue, currencySymbol)} />
-                <SummaryRow label="Total Invoices" value={selectedData.invoices.size} />
-                <SummaryRow label="Items Sold" value={selectedData.qty} />
-                <SummaryRow label="Avg. Order Value" value={fmtMoney(selectedData.invoices.size > 0 ? selectedData.revenue / selectedData.invoices.size : 0, currencySymbol)} />
+                <SummaryRow label={t('reports.summary_supplier_sales', 'Supplier Sales')} value={fmtMoney(selectedData.revenue, currencySymbol)} />
+                <SummaryRow label={t('reports.summary_total_invoices', 'Total Invoices')} value={selectedData.invoices.size} />
+                <SummaryRow label={t('reports.summary_items_sold', 'Items Sold')} value={selectedData.qty} />
+                <SummaryRow label={t('reports.summary_avg_order_value', 'Avg. Order Value')} value={fmtMoney(selectedData.invoices.size > 0 ? selectedData.revenue / selectedData.invoices.size : 0, currencySymbol)} />
               </div>
             </Card>
           </div>
@@ -348,6 +350,7 @@ const toISO = (d: Date) => {
 };
 
 function Page() {
+  const { t } = useTranslation();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   // Default range = shop's first ever transaction → today (never hide history).
@@ -388,7 +391,7 @@ function Page() {
     setToDate(t ? new Date(t) : undefined);
   };
 
-  const presetLabel = preset === "custom" ? "Custom range" : (PRESETS.find(p => p.key === preset)?.label ?? "Today");
+  const presetLabel = preset === "custom" ? t('dashboard.custom_range', 'Custom range') : (PRESETS.find(p => p.key === preset)?.label ?? t('dashboard.today', 'Today'));
 
   const range = {
     // Correct PKT range: Start of fromDate at 00:00:00, End of toDate at 23:59:59.999
@@ -603,18 +606,18 @@ function Page() {
 
   // ---- drill-down helpers (every report row is clickable)
   const openInvoices = (title: string, list: any[], note?: string) =>
-    setDrill({ title, note: note ?? `${list.length} invoice(s) shown`, invoices: list });
+    setDrill({ title, note: note ?? t('reports.invoices_shown_note', '{{count}} invoice(s) shown', { count: list.length }), invoices: list });
 
 
   const openReturns = (title: string) =>
     setDrill({
       title,
-      note: `${saleReturnsPaged.count} return${saleReturnsPaged.count === 1 ? "" : "s"}`,
-      cols: ["Return #", "Date", "Customer", "Subtotal", "Refund", "Total"],
+      note: t('reports.returns_note', '{{count}} return(s)', { count: saleReturnsPaged.count }),
+      cols: [t('sales.th_return_no', 'Return #'), t('sales.th_date', 'Date'), t('sales.th_customer', 'Customer'), t('reports.th_subtotal', 'Subtotal'), t('sales.th_refund', 'Refund'), t('sales.th_total', 'Total')],
       rows: (saleReturns as any[]).map((r) => [
         r.return_no ?? "—",
         new Date(r.created_at).toLocaleString(),
-        r.customers?.name ?? "Walk-in",
+        r.customers?.name ?? t('common.walk_in', 'Walk-in'),
         fmtMoney(Number(r.subtotal ?? 0), sym),
         fmtMoney(Number(r.refund_amount ?? 0), sym),
         fmtMoney(Number(r.total ?? 0), sym),
@@ -623,17 +626,17 @@ function Page() {
 
   const openExpenses = () =>
     setDrill({
-      title: "Operating expenses",
-      note: `${expensesPaged.count} entr${expensesPaged.count === 1 ? "y" : "ies"} · ${fmtMoney(expensesPeriod, sym)}`,
-      cols: ["Date", "Category", "Amount"],
+      title: t('reports.expenses_drill_title', 'Operating expenses'),
+      note: t('reports.expenses_note', '{{count}} {{entryLabel}} · {{amount}}', { count: expensesPaged.count, entryLabel: expensesPaged.count === 1 ? t('reports.entry_singular', 'entry') : t('reports.entry_plural', 'entries'), amount: fmtMoney(expensesPeriod, sym) }),
+      cols: [t('sales.th_date', 'Date'), t('reports.th_category', 'Category'), t('common.amount', 'Amount')],
       rows: (expenses as any[]).map((e) => [e.expense_date, e.category ?? "—", fmtMoney(Number(e.amount), sym)]),
     });
 
   const openPurchases = () =>
     setDrill({
-      title: "Purchases (period)",
-      note: `${purchasesPaged.count} purchase${purchasesPaged.count === 1 ? "" : "s"} · ${fmtMoney(totalPurchases, sym)}`,
-      cols: ["Date", "Subtotal", "Tax", "Total", "Paid"],
+      title: t('reports.purchases_drill_title', 'Purchases (period)'),
+      note: t('reports.purchases_note', '{{count}} purchase(s) · {{amount}}', { count: purchasesPaged.count, amount: fmtMoney(totalPurchases, sym) }),
+      cols: [t('sales.th_date', 'Date'), t('reports.th_subtotal', 'Subtotal'), t('reports.th_tax', 'Tax'), t('sales.th_total', 'Total'), t('sales.th_paid', 'Paid')],
       rows: (allPurchases as any[]).map((p) => [
         new Date(p.created_at).toLocaleString(),
         fmtMoney(Number(p.subtotal ?? 0), sym),
@@ -749,17 +752,17 @@ function Page() {
 
   return (
     <div className="p-6 space-y-4">
-      <NeedsInternetBanner section="Reports" />
+      <NeedsInternetBanner section={t('reports.title', 'Reports')} />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Reports</h1>
+          <h1 className="text-2xl font-semibold">{t('reports.title', 'Reports')}</h1>
           <p className="text-sm text-muted-foreground">
-            Sales, profit, invoice &amp; product breakdowns · {presetLabel}
+            {t('reports.subtitle', 'Sales, profit, invoice & product breakdowns')} · {presetLabel}
           </p>
         </div>
         <div className="flex items-center gap-2 no-print">
-          {salesLoading && <Badge variant="outline" className="animate-pulse">Loading...</Badge>}
-          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+          {salesLoading && <Badge variant="outline" className="animate-pulse">{t('reports.loading', 'Loading...')}</Badge>}
+          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> {t('common.print', 'Print')}</Button>
         </div>
       </div>
 
@@ -784,7 +787,7 @@ function Page() {
               <CalendarIcon className="h-4 w-4" />
               {fromDate && toDate
                 ? `${format(fromDate, "dd MMM")} - ${format(toDate, "dd MMM")}`
-                : "Custom range"}
+                : t('dashboard.custom_range', 'Custom range')}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
@@ -806,30 +809,30 @@ function Page() {
 
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Stat icon={TrendingUp} label="Revenue" value={fmtMoney(revenue, sym)} tone="primary" />
-        <Stat icon={TrendingDown} label="Cost of goods" value={fmtMoney(cogs, sym)} tone="destructive" />
-        <Stat icon={Wallet} label="Gross profit" value={fmtMoney(grossProfit, sym)} tone="success" />
-        <Stat icon={CreditCard} label="Credit sales" value={fmtMoney(creditOut, sym)} tone="warning" onClick={() => {
+        <Stat icon={TrendingUp} label={t('reports.stat_revenue', 'Revenue')} value={fmtMoney(revenue, sym)} tone="primary" />
+        <Stat icon={TrendingDown} label={t('reports.stat_cost_of_goods', 'Cost of goods')} value={fmtMoney(cogs, sym)} tone="destructive" />
+        <Stat icon={Wallet} label={t('reports.stat_gross_profit', 'Gross profit')} value={fmtMoney(grossProfit, sym)} tone="success" />
+        <Stat icon={CreditCard} label={t('reports.stat_credit_sales', 'Credit sales')} value={fmtMoney(creditOut, sym)} tone="warning" onClick={() => {
           setTab("invoice");
           setSearch("status:credit");
         }} />
-        <Stat icon={TrendingDown} label="Expenses (period)" value={fmtMoney(expensesPeriod, sym)} tone="warning" />
+        <Stat icon={TrendingDown} label={t('reports.stat_expenses_period', 'Expenses (period)')} value={fmtMoney(expensesPeriod, sym)} tone="warning" />
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <div className="flex items-center justify-between gap-2 flex-wrap no-print">
           <TabsList>
-            <TabsTrigger value="pnl">P&amp;L</TabsTrigger>
-            <TabsTrigger value="sales">Sale report</TabsTrigger>
-            <TabsTrigger value="profit">Sale &amp; profit</TabsTrigger>
-            <TabsTrigger value="invoice">Invoice-wise</TabsTrigger>
-            <TabsTrigger value="product">Product-wise</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="supplier">Supplier Wise</TabsTrigger>
+            <TabsTrigger value="pnl">{t('reports.tab_pnl', 'P&L')}</TabsTrigger>
+            <TabsTrigger value="sales">{t('reports.tab_sales', 'Sale report')}</TabsTrigger>
+            <TabsTrigger value="profit">{t('reports.tab_profit', 'Sale & profit')}</TabsTrigger>
+            <TabsTrigger value="invoice">{t('reports.tab_invoice', 'Invoice-wise')}</TabsTrigger>
+            <TabsTrigger value="product">{t('reports.tab_product', 'Product-wise')}</TabsTrigger>
+            <TabsTrigger value="payments">{t('reports.tab_payments', 'Payments')}</TabsTrigger>
+            <TabsTrigger value="supplier">{t('reports.tab_supplier', 'Supplier Wise')}</TabsTrigger>
           </TabsList>
           {(tab === "invoice" || tab === "product" || tab === "supplier") && (
             <Input
-              placeholder={tab === "product" ? "Search product name…" : tab === "supplier" ? "Search supplier or product…" : "Search invoice, customer, amount…"}
+              placeholder={tab === "product" ? t('reports.search_product_placeholder', 'Search product name…') : tab === "supplier" ? t('reports.search_supplier_placeholder', 'Search supplier or product…') : t('reports.search_invoice_placeholder', 'Search invoice, customer, amount…')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 max-w-xs"
@@ -839,33 +842,33 @@ function Page() {
 
         <TabsContent value="pnl">
           <Card className="p-5">
-            <h2 className="font-semibold mb-3">Profit &amp; Loss Statement</h2>
+            <h2 className="font-semibold mb-3">{t('reports.pnl_heading', 'Profit & Loss Statement')}</h2>
             <Table>
               <TableBody>
-                <Row label="Gross sales (before returns)" value={fmtMoney(grossRevenue, sym)} muted onClick={() => openInvoices("Gross sales (before returns)", allSales as any[])} />
-                <Row label="Sale returns" value={`(${fmtMoney(returnsSubtotal, sym)})`} muted onClick={() => openReturns("Sale returns")} />
-                <Row label="Sales (net of returns & discount)" value={fmtMoney(netOfReturns, sym)} onClick={() => openInvoices("Sales (net of returns & discount)", allSales as any[])} />
-                <Row label="Cost of goods sold" value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices("Cost of goods sold", allSales as any[])} />
-                <Row label="Gross profit" value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices("Gross profit", allSales as any[])} />
-                <Row label="Sale returns (loss)" value={`(${fmtMoney(returnsTotal, sym)})`} onClick={() => openReturns("Sale returns")} />
-                <Row label="Operating expenses" value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
-                <Row label="Tax collected" value={`(${fmtMoney(taxCollected, sym)})`} onClick={() => openInvoices("Tax collected", (allSales as any[]).filter((s) => Number(s.tax) > 0))} />
+                <Row label={t('reports.row_gross_sales', 'Gross sales (before returns)')} value={fmtMoney(grossRevenue, sym)} muted onClick={() => openInvoices(t('reports.row_gross_sales', 'Gross sales (before returns)'), allSales as any[])} />
+                <Row label={t('reports.row_sale_returns', 'Sale returns')} value={`(${fmtMoney(returnsSubtotal, sym)})`} muted onClick={() => openReturns(t('reports.row_sale_returns', 'Sale returns'))} />
+                <Row label={t('reports.row_net_of_returns', 'Sales (net of returns & discount)')} value={fmtMoney(netOfReturns, sym)} onClick={() => openInvoices(t('reports.row_net_of_returns', 'Sales (net of returns & discount)'), allSales as any[])} />
+                <Row label={t('reports.row_cogs', 'Cost of goods sold')} value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices(t('reports.row_cogs', 'Cost of goods sold'), allSales as any[])} />
+                <Row label={t('reports.row_gross_profit', 'Gross profit')} value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices(t('reports.row_gross_profit', 'Gross profit'), allSales as any[])} />
+                <Row label={t('reports.row_sale_returns_loss', 'Sale returns (loss)')} value={`(${fmtMoney(returnsTotal, sym)})`} onClick={() => openReturns(t('reports.row_sale_returns', 'Sale returns'))} />
+                <Row label={t('reports.row_operating_expenses', 'Operating expenses')} value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
+                <Row label={t('reports.row_tax_collected', 'Tax collected')} value={`(${fmtMoney(taxCollected, sym)})`} onClick={() => openInvoices(t('reports.row_tax_collected', 'Tax collected'), (allSales as any[]).filter((s) => Number(s.tax) > 0))} />
                 {discountTotal > 0 && (
-                  <Row label="Customer discounts" value={`(${fmtMoney(discountTotal, sym)})`} muted />
+                  <Row label={t('reports.row_customer_discounts', 'Customer discounts')} value={`(${fmtMoney(discountTotal, sym)})`} muted />
                 )}
-                <Row label="Credit sales (period)" value={fmtMoney(creditOut, sym)} muted onClick={() => {
+                <Row label={t('reports.row_credit_sales_period', 'Credit sales (period)')} value={fmtMoney(creditOut, sym)} muted onClick={() => {
                   setTab("invoice");
                   setSearch("status:credit");
                 }} />
-                <Row label="Total purchases (period)" value={fmtMoney(totalPurchases, sym)} muted onClick={openPurchases} />
+                <Row label={t('reports.row_total_purchases_period', 'Total purchases (period)')} value={fmtMoney(totalPurchases, sym)} muted onClick={openPurchases} />
                 {incentiveTotal > 0 && (
-                  <Row label="Supplier incentives" value={`+${fmtMoney(incentiveTotal, sym)}`} onClick={openPurchases} />
+                  <Row label={t('reports.row_supplier_incentives', 'Supplier incentives')} value={`+${fmtMoney(incentiveTotal, sym)}`} onClick={openPurchases} />
                 )}
-                <Row label="Net profit" value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices("Net profit basis · all invoices", allSales as any[])} />
+                <Row label={t('reports.row_net_profit', 'Net profit')} value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices(t('reports.drill_net_profit_title', 'Net profit basis · all invoices'), allSales as any[])} />
 
               </TableBody>
             </Table>
-            <div className="text-xs text-muted-foreground mt-3">{from} → {to} · {salesPaged.count} sales, {purchasesPaged.count} purchases, {expensesPaged.count} expenses</div>
+            <div className="text-xs text-muted-foreground mt-3">{t('reports.pnl_footer', '{{from}} → {{to}} · {{sales}} sales, {{purchases}} purchases, {{expenses}} expenses', { from, to, sales: salesPaged.count, purchases: purchasesPaged.count, expenses: expensesPaged.count })}</div>
           </Card>
         </TabsContent>
 
@@ -873,17 +876,17 @@ function Page() {
           <Card className="p-3">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Date</TableHead><TableHead className="text-right">Invoices</TableHead>
-                <TableHead className="text-right">Items qty</TableHead><TableHead className="text-right">Revenue</TableHead>
-                <TableHead className="text-right">Tax</TableHead><TableHead className="text-right">Total</TableHead>
+                <TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead className="text-right">{t('reports.th_invoices', 'Invoices')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_items_qty', 'Items qty')}</TableHead><TableHead className="text-right">{t('reports.th_revenue', 'Revenue')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_tax', 'Tax')}</TableHead><TableHead className="text-right">{t('sales.th_total', 'Total')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {dailySales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No sales</TableCell></TableRow>}
+                {dailySales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('reports.no_sales', 'No sales')}</TableCell></TableRow>}
                 {dailySales.map((d) => (
                   <TableRow
                     key={d.date}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openInvoices(`Sales on ${d.date}`, (allSales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                    onClick={() => openInvoices(t('reports.drill_sales_on', 'Sales on {{date}}', { date: d.date }), (allSales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
                   >
                     <TableCell>{d.date}</TableCell>
                     <TableCell className="text-right">{d.invoices}</TableCell>
@@ -895,7 +898,7 @@ function Page() {
                 ))}
                 {dailySales.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total</TableCell>
+                    <TableCell>{t('reports.total_label', 'Total')}</TableCell>
                     <TableCell className="text-right">{dailySales.reduce((a, b) => a + b.invoices, 0)}</TableCell>
                     <TableCell className="text-right">{dailySales.reduce((a, b) => a + b.qty, 0)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(revenue, sym)}</TableCell>
@@ -912,12 +915,12 @@ function Page() {
           <Card className="p-3">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Date</TableHead><TableHead className="text-right">Invoices</TableHead>
-                <TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Cost</TableHead>
-                <TableHead className="text-right">Profit</TableHead><TableHead className="text-right">Margin %</TableHead>
+                <TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead className="text-right">{t('reports.th_invoices', 'Invoices')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_revenue', 'Revenue')}</TableHead><TableHead className="text-right">{t('reports.th_cost', 'Cost')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_profit', 'Profit')}</TableHead><TableHead className="text-right">{t('reports.th_margin', 'Margin %')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {dailySales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
+                {dailySales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('reports.no_data', 'No data')}</TableCell></TableRow>}
                 {dailySales.map((d) => {
                   const cost = d.revenue - d.profit;
                   const margin = d.revenue ? (d.profit / d.revenue) * 100 : 0;
@@ -925,7 +928,7 @@ function Page() {
                     <TableRow
                       key={d.date}
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => openInvoices(`Sales & profit on ${d.date}`, (allSales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                      onClick={() => openInvoices(t('reports.drill_sales_profit_on', 'Sales & profit on {{date}}', { date: d.date }), (allSales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
                     >
                       <TableCell>{d.date}</TableCell>
                       <TableCell className="text-right">{d.invoices}</TableCell>
@@ -938,7 +941,7 @@ function Page() {
                 })}
                 {dailySales.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total</TableCell>
+                    <TableCell>{t('reports.total_label', 'Total')}</TableCell>
                     <TableCell className="text-right">{dailySales.reduce((a, b) => a + b.invoices, 0)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(revenue, sym)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(cogs, sym)}</TableCell>
@@ -955,13 +958,13 @@ function Page() {
           <Card className="p-3">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
-                <TableHead>Method</TableHead><TableHead className="text-right">Items</TableHead>
-                <TableHead className="text-right">Total</TableHead><TableHead className="text-right">Profit</TableHead>
-                <TableHead>Status</TableHead><TableHead></TableHead>
+                <TableHead>{t('sales.th_invoice', 'Invoice')}</TableHead><TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead>{t('sales.th_customer', 'Customer')}</TableHead>
+                <TableHead>{t('sales.th_method', 'Method')}</TableHead><TableHead className="text-right">{t('reports.th_items', 'Items')}</TableHead>
+                <TableHead className="text-right">{t('sales.th_total', 'Total')}</TableHead><TableHead className="text-right">{t('reports.th_profit', 'Profit')}</TableHead>
+                <TableHead>{t('sales.th_status', 'Status')}</TableHead><TableHead></TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {filteredInvoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {filteredInvoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">{t('reports.no_invoices', 'No invoices')}</TableCell></TableRow>}
                 {filteredInvoices.map((s: any) => {
                   const profit = (Number(s.subtotal || 0) - Number(s.discount || 0)) - Number(s.cost_total || 0);
                   const qty = (s.sale_items as any[] ?? []).reduce((a: number, i: any) => a + Number(i.qty || 0), 0);
@@ -971,9 +974,9 @@ function Page() {
                       className="cursor-pointer hover:bg-muted/50"
 
                       onClick={() => setDrill({
-                        title: `Invoice ${s.invoice_no}`,
-                        note: `${new Date(s.created_at).toLocaleString()} · ${s.customers?.name ?? "Walk-in"} · ${displayPaymentMethod(s.payment_method)} · Total ${fmtMoney(Number(s.total), sym)} · Paid ${fmtMoney(Number(s.paid), sym)}`,
-                        cols: ["Item", "Qty", "Price", "Line total"],
+                        title: t('reports.invoice_drill_title', 'Invoice {{invoice}}', { invoice: s.invoice_no }),
+                        note: t('reports.invoice_drill_note', '{{date}} · {{customer}} · {{method}} · Total {{total}} · Paid {{paid}}', { date: new Date(s.created_at).toLocaleString(), customer: s.customers?.name ?? t('common.walk_in', 'Walk-in'), method: displayPaymentMethod(s.payment_method), total: fmtMoney(Number(s.total), sym), paid: fmtMoney(Number(s.paid), sym) }),
+                        cols: [t('reports.th_item', 'Item'), t('reports.th_qty', 'Qty'), t('reports.th_price', 'Price'), t('reports.th_line_total', 'Line total')],
                         rows: (s.sale_items as any[] ?? []).map((i: any) => [
                           i.name,
                           Number(i.qty || 0),
@@ -984,19 +987,19 @@ function Page() {
                     >
                       <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
                       <TableCell className="text-sm">{new Date(s.created_at).toLocaleString()}</TableCell>
-                      <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
+                      <TableCell>{s.customers?.name ?? t('common.walk_in', 'Walk-in')}</TableCell>
                       <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
                       <TableCell className="text-right">{qty}</TableCell>
                       <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
                       <TableCell className="text-right text-success">{fmtMoney(profit, sym)}</TableCell>
-                      <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
+                      <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{t(`sales.status_${s.status}`, s.status)}</Badge></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}><Button asChild variant="ghost" size="icon"><Link to="/sales"><Eye className="h-4 w-4" /></Link></Button></TableCell>
                     </TableRow>
                   );
                 })}
                 {filteredInvoices.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={5}>Total ({filteredInvoices.length} invoices{q && ` of ${sales.length}`})</TableCell>
+                    <TableCell colSpan={5}>{q ? t('reports.total_invoices_of_label', 'Total ({{count}} invoices of {{total}})', { count: filteredInvoices.length, total: sales.length }) : t('reports.total_invoices_label', 'Total ({{count}} invoices)', { count: filteredInvoices.length })}</TableCell>
                     <TableCell className="text-right">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + Number(b.total), 0), sym)}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(filteredInvoices.reduce((a, b: any) => a + ((Number(b.subtotal) - Number(b.discount)) - Number(b.cost_total)), 0), sym)}</TableCell>
                     <TableCell colSpan={2} />
@@ -1006,10 +1009,10 @@ function Page() {
              </Table>
              {salesPaged.count > PAGE_SIZE && (
                <div className="p-4 flex items-center justify-between border-t text-sm">
-                 <div className="text-muted-foreground">Showing {salesPage * PAGE_SIZE + 1} to {Math.min((salesPage + 1) * PAGE_SIZE, salesPaged.count)} of {salesPaged.count} invoices</div>
+                 <div className="text-muted-foreground">{t('reports.showing_invoices', 'Showing {{from}} to {{to}} of {{total}} invoices', { from: salesPage * PAGE_SIZE + 1, to: Math.min((salesPage + 1) * PAGE_SIZE, salesPaged.count), total: salesPaged.count })}</div>
                  <div className="flex gap-2">
-                   <Button variant="outline" size="sm" onClick={() => setSalesPage(p => Math.max(0, p - 1))} disabled={salesPage === 0}>Previous</Button>
-                   <Button variant="outline" size="sm" onClick={() => setSalesPage(p => p + 1)} disabled={(salesPage + 1) * PAGE_SIZE >= salesPaged.count}>Next</Button>
+                   <Button variant="outline" size="sm" onClick={() => setSalesPage(p => Math.max(0, p - 1))} disabled={salesPage === 0}>{t('reports.previous', 'Previous')}</Button>
+                   <Button variant="outline" size="sm" onClick={() => setSalesPage(p => p + 1)} disabled={(salesPage + 1) * PAGE_SIZE >= salesPaged.count}>{t('reports.next', 'Next')}</Button>
                  </div>
                </div>
              )}
@@ -1020,15 +1023,15 @@ function Page() {
           <Card className="p-3">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Qty sold</TableHead>
-                <TableHead className="text-right">Revenue</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
-                <TableHead className="text-right">Profit</TableHead>
-                <TableHead className="text-right">Margin %</TableHead>
+                <TableHead>{t('reports.th_product', 'Product')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_qty_sold', 'Qty sold')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_revenue', 'Revenue')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_cost', 'Cost')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_profit', 'Profit')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_margin', 'Margin %')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {filteredProducts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>}
+                {filteredProducts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('reports.no_data', 'No data')}</TableCell></TableRow>}
                 {filteredProducts.map((p, i) => {
                   const margin = p.revenue ? (p.profit / p.revenue) * 100 : 0;
                   return (
@@ -1043,7 +1046,7 @@ function Page() {
                             rows.push([
                               s.invoice_no,
                               new Date(s.created_at).toLocaleString(),
-                              s.customers?.name ?? "Walk-in",
+                              s.customers?.name ?? t('common.walk_in', 'Walk-in'),
                               Number(it.qty),
                               fmtMoney(Number(it.line_total), sym),
                             ]);
@@ -1051,8 +1054,8 @@ function Page() {
                         }
                         setDrill({
                           title: p.name,
-                          note: `${rows.length} invoice line${rows.length === 1 ? "" : "s"} · Qty ${p.qty} · Revenue ${fmtMoney(p.revenue, sym)}`,
-                          cols: ["Invoice", "Date", "Customer", "Qty", "Amount"],
+                          note: t('reports.product_line_drill_note', '{{count}} invoice line(s) · Qty {{qty}} · Revenue {{revenue}}', { count: rows.length, qty: p.qty, revenue: fmtMoney(p.revenue, sym) }),
+                          cols: [t('sales.th_invoice', 'Invoice'), t('sales.th_date', 'Date'), t('sales.th_customer', 'Customer'), t('reports.th_qty', 'Qty'), t('common.amount', 'Amount')],
                           rows,
                         });
                       }}
@@ -1068,7 +1071,7 @@ function Page() {
                 })}
                 {filteredProducts.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total ({filteredProducts.length} items{q && ` of ${productSales.length}`})</TableCell>
+                    <TableCell>{q ? t('reports.total_items_of_label', 'Total ({{count}} items of {{total}})', { count: filteredProducts.length, total: productSales.length }) : t('reports.total_items_label', 'Total ({{count}} items)', { count: filteredProducts.length })}</TableCell>
                     <TableCell className="text-right">{filteredProducts.reduce((a, b) => a + b.qty, 0)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(filteredProducts.reduce((a, b) => a + b.revenue, 0), sym)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(filteredProducts.reduce((a, b) => a + b.cost, 0), sym)}</TableCell>
@@ -1085,15 +1088,15 @@ function Page() {
           <Card className="p-3">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Payment method</TableHead>
-                <TableHead className="text-right">Invoices</TableHead>
-                <TableHead className="text-right">Total billed</TableHead>
-                <TableHead className="text-right">Received</TableHead>
-                <TableHead className="text-right">Outstanding</TableHead>
-                <TableHead className="text-right">Share %</TableHead>
+                <TableHead>{t('reports.th_payment_method', 'Payment method')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_invoices', 'Invoices')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_total_billed', 'Total billed')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_received', 'Received')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_outstanding', 'Outstanding')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_share', 'Share %')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {paymentBreakdown.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No payments</TableCell></TableRow>}
+                {paymentBreakdown.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('reports.no_payments', 'No payments')}</TableCell></TableRow>}
                 {paymentBreakdown.map((p) => {
                   const totalPaid = paymentBreakdown.reduce((a, b) => a + b.paid, 0);
                   const share = totalPaid ? (p.paid / totalPaid) * 100 : 0;
@@ -1102,9 +1105,9 @@ function Page() {
                       key={p.method}
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => openInvoices(
-                        `Payments · ${p.method}`,
+                        t('reports.drill_payments_title', 'Payments · {{method}}', { method: p.method }),
                         (allSales as any[]).filter((s) => parsePaymentSplit(s.payment_method, Number(s.paid)).some((x) => (x.method || "unknown") === p.method)),
-                        `${p.invoices} invoice${p.invoices === 1 ? "" : "s"} · Received ${fmtMoney(p.paid, sym)}`,
+                        t('reports.drill_payments_note', '{{count}} invoice(s) · Received {{amount}}', { count: p.invoices, amount: fmtMoney(p.paid, sym) }),
                       )}
                     >
                       <TableCell className="capitalize font-medium">{p.method}</TableCell>
@@ -1118,7 +1121,7 @@ function Page() {
                 })}
                 {paymentBreakdown.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total</TableCell>
+                    <TableCell>{t('reports.total_label', 'Total')}</TableCell>
                     <TableCell className="text-right">{paymentBreakdown.reduce((a, b) => a + b.invoices, 0)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(paymentBreakdown.reduce((a, b) => a + b.total, 0), sym)}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(paymentBreakdown.reduce((a, b) => a + b.paid, 0), sym)}</TableCell>
@@ -1132,19 +1135,19 @@ function Page() {
 
           <Card className="p-3 mt-4">
             <div className="mb-2">
-              <div className="text-sm font-semibold">Money flow by payment channel</div>
-              <div className="text-xs text-muted-foreground">Tracks each channel (cash, card, JazzCash, EasyPaisa…) — money received via sales & customer payments vs money paid out to suppliers.</div>
+              <div className="text-sm font-semibold">{t('reports.money_flow_heading', 'Money flow by payment channel')}</div>
+              <div className="text-xs text-muted-foreground">{t('reports.money_flow_desc', 'Tracks each channel (cash, card, JazzCash, EasyPaisa…) — money received via sales & customer payments vs money paid out to suppliers.')}</div>
             </div>
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Channel</TableHead>
-                <TableHead className="text-right">In · Sales</TableHead>
-                <TableHead className="text-right">In · Customer payments</TableHead>
-                <TableHead className="text-right">Out · Supplier payments</TableHead>
-                <TableHead className="text-right">Net (In − Out)</TableHead>
+                <TableHead>{t('reports.th_channel', 'Channel')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_in_sales', 'In · Sales')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_in_customer', 'In · Customer payments')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_out_supplier', 'Out · Supplier payments')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_net', 'Net (In − Out)')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {methodFlow.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No activity</TableCell></TableRow>}
+                {methodFlow.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">{t('reports.no_activity', 'No activity')}</TableCell></TableRow>}
                 {methodFlow.map((m) => (
                   <TableRow
                     key={m.method}
@@ -1154,23 +1157,23 @@ function Page() {
                       for (const s of allSales as any[]) {
                         for (const split of parsePaymentSplit(s.payment_method, Number(s.paid))) {
                           if ((split.method || "unknown").toLowerCase() !== m.method) continue;
-                          rows.push([new Date(s.created_at).toLocaleString(), "In · Sale", s.invoice_no, s.customers?.name ?? "Walk-in", fmtMoney(Number(split.amount), sym)]);
+                          rows.push([new Date(s.created_at).toLocaleString(), t('reports.in_sale_type', 'In · Sale'), s.invoice_no, s.customers?.name ?? t('common.walk_in', 'Walk-in'), fmtMoney(Number(split.amount), sym)]);
                         }
                       }
                       for (const p of partyPayments as any[]) {
                         if ((p.method || "unknown").toLowerCase() !== m.method) continue;
                         rows.push([
                           new Date(p.created_at).toLocaleString(),
-                          p.party_type === "customer" ? "In · Customer payment" : "Out · Supplier payment",
+                          p.party_type === "customer" ? t('reports.in_customer_payment_type', 'In · Customer payment') : t('reports.out_supplier_payment_type', 'Out · Supplier payment'),
                           p.note || "—",
                           p.customers?.name ?? p.suppliers?.name ?? "—",
                           `${p.party_type === "customer" ? "+" : "−"}${fmtMoney(Number(p.amount), sym)}`,
                         ]);
                       }
                       setDrill({
-                        title: `Channel · ${m.method}`,
-                        note: `${rows.length} entr${rows.length === 1 ? "y" : "ies"} · Net ${fmtMoney(m.net, sym)}`,
-                        cols: ["Date", "Type", "Reference", "Party", "Amount"],
+                        title: t('reports.channel_drill_title', 'Channel · {{method}}', { method: m.method }),
+                        note: t('reports.channel_drill_note', '{{count}} entries · Net {{net}}', { count: rows.length, net: fmtMoney(m.net, sym) }),
+                        cols: [t('sales.th_date', 'Date'), t('reports.th_type', 'Type'), t('reports.th_reference', 'Reference'), t('reports.th_party', 'Party'), t('common.amount', 'Amount')],
                         rows,
                       });
                     }}
@@ -1184,7 +1187,7 @@ function Page() {
                 ))}
                 {methodFlow.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total</TableCell>
+                    <TableCell>{t('reports.total_label', 'Total')}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(methodFlow.reduce((a, b) => a + b.in_sales, 0), sym)}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(methodFlow.reduce((a, b) => a + b.in_customer, 0), sym)}</TableCell>
                     <TableCell className="text-right text-destructive">{fmtMoney(methodFlow.reduce((a, b) => a + b.out_supplier, 0), sym)}</TableCell>
@@ -1196,39 +1199,39 @@ function Page() {
           </Card>
 
           <Card className="p-3 mt-4">
-            <div className="mb-2 text-sm font-semibold">Party payment log</div>
+            <div className="mb-2 text-sm font-semibold">{t('reports.party_log_heading', 'Party payment log')}</div>
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Direction</TableHead>
-                <TableHead>Party</TableHead>
-                <TableHead>Channel</TableHead>
-                <TableHead>Note</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+                <TableHead>{t('reports.th_direction', 'Direction')}</TableHead>
+                <TableHead>{t('reports.th_party', 'Party')}</TableHead>
+                <TableHead>{t('reports.th_channel', 'Channel')}</TableHead>
+                <TableHead>{t('reports.th_note', 'Note')}</TableHead>
+                <TableHead className="text-right">{t('common.amount', 'Amount')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {(partyPayments as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No party payments</TableCell></TableRow>}
+                {(partyPayments as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('reports.no_party_payments', 'No party payments')}</TableCell></TableRow>}
                 {(partyPayments as any[]).map((p) => (
                   <TableRow
                     key={p.id}
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => setDrill({
-                      title: `${p.party_type === "customer" ? "Customer payment" : "Supplier payment"} · ${p.customers?.name ?? p.suppliers?.name ?? "—"}`,
+                      title: `${p.party_type === "customer" ? t('reports.customer_payment_title', 'Customer payment') : t('reports.supplier_payment_title', 'Supplier payment')} · ${p.customers?.name ?? p.suppliers?.name ?? "—"}`,
                       note: new Date(p.created_at).toLocaleString(),
-                      cols: ["Field", "Value"],
+                      cols: [t('reports.field_col', 'Field'), t('reports.value_col', 'Value')],
                       rows: [
-                        ["Direction", p.party_type === "customer" ? "In · from customer" : "Out · to supplier"],
-                        ["Channel", p.method || "—"],
-                        ["Note", p.note || "—"],
-                        ["Amount", fmtMoney(Number(p.amount), sym)],
+                        [t('reports.th_direction', 'Direction'), p.party_type === "customer" ? t('reports.direction_in', 'In · from customer') : t('reports.direction_out', 'Out · to supplier')],
+                        [t('reports.th_channel', 'Channel'), p.method || "—"],
+                        [t('reports.th_note', 'Note'), p.note || "—"],
+                        [t('common.amount', 'Amount'), fmtMoney(Number(p.amount), sym)],
                       ],
                     })}
                   >
                     <TableCell className="whitespace-nowrap text-xs">{new Date(p.created_at).toLocaleString()}</TableCell>
                     <TableCell>
                       {p.party_type === "customer"
-                        ? <span className="text-success font-medium">In · from customer</span>
-                        : <span className="text-destructive font-medium">Out · to supplier</span>}
+                        ? <span className="text-success font-medium">{t('reports.direction_in', 'In · from customer')}</span>
+                        : <span className="text-destructive font-medium">{t('reports.direction_out', 'Out · to supplier')}</span>}
                     </TableCell>
                     <TableCell>{p.customers?.name ?? p.suppliers?.name ?? "—"}</TableCell>
                     <TableCell className="capitalize">{p.method || "—"}</TableCell>
@@ -1262,26 +1265,26 @@ function Page() {
           {drill?.invoices && (
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead>
-                <TableHead>Method</TableHead><TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
+                <TableHead>{t('sales.th_invoice', 'Invoice')}</TableHead><TableHead>{t('sales.th_date', 'Date')}</TableHead><TableHead>{t('sales.th_customer', 'Customer')}</TableHead>
+                <TableHead>{t('sales.th_method', 'Method')}</TableHead><TableHead className="text-right">{t('sales.th_total', 'Total')}</TableHead>
+                <TableHead className="text-right">{t('sales.th_paid', 'Paid')}</TableHead><TableHead>{t('sales.th_status', 'Status')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {drill.invoices.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
+                {drill.invoices.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{t('reports.no_invoices', 'No invoices')}</TableCell></TableRow>}
                 {drill.invoices.map((s: any) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
                     <TableCell className="text-sm whitespace-nowrap">{new Date(s.created_at).toLocaleString()}</TableCell>
-                    <TableCell>{s.customers?.name ?? "Walk-in"}</TableCell>
+                    <TableCell>{s.customers?.name ?? t('common.walk_in', 'Walk-in')}</TableCell>
                     <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
                     <TableCell className="text-right font-medium">{fmtMoney(Number(s.total), sym)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(Number(s.paid), sym)}</TableCell>
-                    <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{s.status}</Badge></TableCell>
+                    <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{t(`sales.status_${s.status}`, s.status)}</Badge></TableCell>
                   </TableRow>
                 ))}
                 {drill.invoices.length > 0 && (
                   <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={4}>Total ({drill.invoices.length})</TableCell>
+                    <TableCell colSpan={4}>{t('reports.drill_total_label', 'Total ({{count}})', { count: drill.invoices.length })}</TableCell>
                     <TableCell className="text-right">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.total), 0), sym)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(drill.invoices.reduce((a: number, b: any) => a + Number(b.paid), 0), sym)}</TableCell>
                     <TableCell />
@@ -1296,7 +1299,7 @@ function Page() {
                 {drill.cols.map((c, i) => <TableHead key={c} className={i === 0 ? "" : "text-right"}>{c}</TableHead>)}
               </TableRow></TableHeader>
               <TableBody>
-                {drill.rows.length === 0 && <TableRow><TableCell colSpan={drill.cols.length} className="text-center text-muted-foreground py-6">No records</TableCell></TableRow>}
+                {drill.rows.length === 0 && <TableRow><TableCell colSpan={drill.cols.length} className="text-center text-muted-foreground py-6">{t('reports.no_records', 'No records')}</TableCell></TableRow>}
                 {drill.rows.map((r, ri) => (
                   <TableRow key={ri}>
                     {r.map((c, ci) => <TableCell key={ci} className={ci === 0 ? "" : "text-right"}>{c}</TableCell>)}
