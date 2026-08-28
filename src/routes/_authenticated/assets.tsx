@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Box, Wallet, Layers, Package, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,7 @@ const emptyAsset = {
 };
 
 function Page() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -171,7 +173,7 @@ function Page() {
   };
 
   const saveAsset = async () => {
-    if (!form.name.trim()) { toast.error("Name is required"); return; }
+    if (!form.name.trim()) { toast.error(t('cash_flow.toast_name_required', 'Name is required')); return; }
     const payload: any = {
       ...form,
       category_id: form.category_id || null,
@@ -190,35 +192,35 @@ function Page() {
       err = error;
     }
     if (err) { toast.error(err.message); return; }
-    toast.success(editingId ? "Asset updated" : "Asset added");
+    toast.success(editingId ? t('assets.toast_asset_updated', 'Asset updated') : t('assets.toast_asset_added', 'Asset added'));
     setAssetOpen(false);
     qc.invalidateQueries({ queryKey: ["assets"] });
   };
 
   const removeAsset = async (id: string) => {
-    if (!confirm("Delete this asset?")) return;
+    if (!confirm(t('assets.confirm_delete_asset', 'Delete this asset?'))) return;
     const { error } = await supabase.from("assets").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Deleted");
+    toast.success(t('cash_flow.toast_deleted', 'Deleted'));
     qc.invalidateQueries({ queryKey: ["assets"] });
   };
 
   const saveCategory = async () => {
-    if (!cat.name.trim()) { toast.error("Category name required"); return; }
+    if (!cat.name.trim()) { toast.error(t('assets.toast_category_name_required', 'Category name required')); return; }
     const { error } = await supabase.from("asset_categories").insert({
       name: cat.name.trim(),
       icon: cat.icon || null,
       notes: cat.notes || null,
     });
     if (error) { toast.error(error.message); return; }
-    toast.success("Category added");
+    toast.success(t('assets.toast_category_added', 'Category added'));
     setCat({ name: "", icon: "", notes: "" });
     setCatOpen(false);
     qc.invalidateQueries({ queryKey: ["asset_categories"] });
   };
 
   const removeCategory = async (id: string) => {
-    if (!confirm("Delete this category? Assets will remain but become uncategorised.")) return;
+    if (!confirm(t('assets.confirm_delete_category', 'Delete this category? Assets will remain but become uncategorised.'))) return;
     const { error } = await supabase.from("asset_categories").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["asset_categories"] });
@@ -230,7 +232,7 @@ function Page() {
     const map = new Map<string, { name: string; count: number; worth: number }>();
     for (const a of assetsQ.data ?? []) {
       const key = a.category_id ?? "__uncat";
-      const name = a.asset_categories?.name ?? "Uncategorised";
+      const name = a.asset_categories?.name ?? t('assets.uncategorised', 'Uncategorised');
       const cur = map.get(key) ?? { name, count: 0, worth: 0 };
       cur.count += Number(a.quantity || 1);
       cur.worth += Number(a.current_value) * Number(a.quantity || 1);
@@ -243,35 +245,35 @@ function Page() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Shop Assets</h1>
+          <h1 className="text-2xl font-semibold">{t('assets.page_title', 'Shop Assets')}</h1>
           <p className="text-sm text-muted-foreground">
-            Track shelves, AC, fridge, solar and every fixed item that makes up your shop's worth.
+            {t('assets.page_desc', "Track shelves, AC, fridge, solar and every fixed item that makes up your shop's worth.")}
           </p>
         </div>
         {isAdmin && (
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setCatOpen(true)}>
-              <Layers className="h-4 w-4 mr-2" /> New category
+              <Layers className="h-4 w-4 mr-2" /> {t('assets.new_category', 'New category')}
             </Button>
             <Button onClick={openNew}>
-              <Plus className="h-4 w-4 mr-2" /> New asset
+              <Plus className="h-4 w-4 mr-2" /> {t('assets.new_asset', 'New asset')}
             </Button>
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat icon={Box} label="Total assets" value={String(totals.count)} sub={`${totals.entries} entries`} />
-        <Stat icon={Wallet} label="Asset worth (current)" value={fmtMoney(totals.current, sym)} sub={`Bought at ${fmtMoney(totals.purchase, sym)}`} />
-        <Stat icon={Package} label="Stock worth" value={fmtMoney(stockQ.data?.worth ?? 0, sym)} sub={`${stockQ.data?.count ?? 0} products`} />
-        <Stat icon={Wallet} label="Shop worth (total)" value={fmtMoney(shopWorth, sym)} sub="Assets + stock" tone="accent" />
+        <Stat icon={Box} label={t('assets.stat_total_assets', 'Total assets')} value={String(totals.count)} sub={t('assets.stat_total_assets_sub', '{{count}} entries', { count: totals.entries })} />
+        <Stat icon={Wallet} label={t('assets.stat_asset_worth', 'Asset worth (current)')} value={fmtMoney(totals.current, sym)} sub={t('assets.stat_asset_worth_sub', 'Bought at {{amount}}', { amount: fmtMoney(totals.purchase, sym) })} />
+        <Stat icon={Package} label={t('assets.stat_stock_worth', 'Stock worth')} value={fmtMoney(stockQ.data?.worth ?? 0, sym)} sub={t('assets.stat_stock_worth_sub', '{{count}} products', { count: stockQ.data?.count ?? 0 })} />
+        <Stat icon={Wallet} label={t('assets.stat_shop_worth', 'Shop worth (total)')} value={fmtMoney(shopWorth, sym)} sub={t('assets.stat_shop_worth_sub', 'Assets + stock')} tone="accent" />
       </div>
 
       <Tabs defaultValue="list">
         <TabsList>
-          <TabsTrigger value="list">All assets</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="summary">By category</TabsTrigger>
+          <TabsTrigger value="list">{t('assets.tab_all_assets', 'All assets')}</TabsTrigger>
+          <TabsTrigger value="categories">{t('assets.tab_categories', 'Categories')}</TabsTrigger>
+          <TabsTrigger value="summary">{t('assets.tab_summary', 'By category')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="list">
@@ -281,7 +283,7 @@ function Page() {
                 <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-8"
-                  placeholder="Search name, brand, model, serial, location…"
+                  placeholder={t('assets.search_placeholder', 'Search name, brand, model, serial, location…')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -289,7 +291,7 @@ function Page() {
               <Select value={filterCat} onValueChange={setFilterCat}>
                 <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
+                  <SelectItem value="all">{t('assets.all_categories', 'All categories')}</SelectItem>
                   {(catsQ.data ?? []).map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
@@ -301,14 +303,14 @@ function Page() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Model / Serial</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Purchase</TableHead>
-                    <TableHead className="text-right">Current value</TableHead>
-                    <TableHead>Condition</TableHead>
-                    <TableHead>Location</TableHead>
+                    <TableHead>{t('assets.th_asset', 'Asset')}</TableHead>
+                    <TableHead>{t('reports.th_category', 'Category')}</TableHead>
+                    <TableHead>{t('assets.th_model_serial', 'Model / Serial')}</TableHead>
+                    <TableHead className="text-right">{t('reports.th_qty', 'Qty')}</TableHead>
+                    <TableHead className="text-right">{t('assets.th_purchase', 'Purchase')}</TableHead>
+                    <TableHead className="text-right">{t('assets.th_current_value', 'Current value')}</TableHead>
+                    <TableHead>{t('assets.th_condition', 'Condition')}</TableHead>
+                    <TableHead>{t('assets.th_location', 'Location')}</TableHead>
                     <TableHead className="w-24"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -316,7 +318,7 @@ function Page() {
                   {filtered.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                        No assets yet. Click "New asset" to add your first item.
+                        {t('assets.no_assets', 'No assets yet. Click "New asset" to add your first item.')}
                       </TableCell>
                     </TableRow>
                   )}
@@ -333,12 +335,12 @@ function Page() {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">{a.model_number || "—"}</div>
-                        {a.serial_number && <div className="text-xs text-muted-foreground">SN: {a.serial_number}</div>}
+                        {a.serial_number && <div className="text-xs text-muted-foreground">{t('assets.sn_prefix', 'SN: {{serial}}', { serial: a.serial_number })}</div>}
                       </TableCell>
                       <TableCell className="text-right">{fmtQty(a.quantity)}</TableCell>
                       <TableCell className="text-right">{fmtMoney(Number(a.purchase_price) * Number(a.quantity || 1), sym)}</TableCell>
                       <TableCell className="text-right font-medium">{fmtMoney(Number(a.current_value) * Number(a.quantity || 1), sym)}</TableCell>
-                      <TableCell><Badge variant="outline">{a.condition}</Badge></TableCell>
+                      <TableCell><Badge variant="outline">{t(`assets.condition_${a.condition}`, a.condition)}</Badge></TableCell>
                       <TableCell className="text-sm">{a.location || "—"}</TableCell>
                       <TableCell>
                         {isAdmin && (
@@ -365,9 +367,9 @@ function Page() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Items</TableHead>
+                  <TableHead>{t('common.name', 'Name')}</TableHead>
+                  <TableHead>{t('cash_flow.notes_label', 'Notes')}</TableHead>
+                  <TableHead className="text-right">{t('assets.th_items', 'Items')}</TableHead>
                   <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -375,7 +377,7 @@ function Page() {
                 {(catsQ.data ?? []).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                      No categories yet. Add "Fridge", "AC", "Shelves", "Solar" etc.
+                      {t('assets.no_categories', 'No categories yet. Add "Fridge", "AC", "Shelves", "Solar" etc.')}
                     </TableCell>
                   </TableRow>
                 )}
@@ -406,14 +408,14 @@ function Page() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Items</TableHead>
-                  <TableHead className="text-right">Current worth</TableHead>
+                  <TableHead>{t('reports.th_category', 'Category')}</TableHead>
+                  <TableHead className="text-right">{t('assets.th_items', 'Items')}</TableHead>
+                  <TableHead className="text-right">{t('assets.th_current_worth', 'Current worth')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {byCategory.length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">Nothing to summarise yet.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">{t('assets.nothing_to_summarise', 'Nothing to summarise yet.')}</TableCell></TableRow>
                 )}
                 {byCategory.map((r) => (
                   <TableRow key={r.name}>
@@ -424,7 +426,7 @@ function Page() {
                 ))}
                 {byCategory.length > 0 && (
                   <TableRow>
-                    <TableCell className="font-semibold">Total</TableCell>
+                    <TableCell className="font-semibold">{t('reports.total_label', 'Total')}</TableCell>
                     <TableCell className="text-right font-semibold">{fmtQty(totals.count)}</TableCell>
                     <TableCell className="text-right font-semibold">{fmtMoney(totals.current, sym)}</TableCell>
                   </TableRow>
@@ -439,48 +441,48 @@ function Page() {
       <Dialog open={assetOpen} onOpenChange={setAssetOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Edit asset" : "New asset"}</DialogTitle>
+            <DialogTitle>{editingId ? t('assets.edit_asset', 'Edit asset') : t('assets.new_asset', 'New asset')}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Field label="Name *">
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Front display fridge" />
+            <Field label={t('assets.field_name_required', 'Name *')}>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t('assets.name_placeholder', 'e.g. Front display fridge')} />
             </Field>
-            <Field label="Category">
+            <Field label={t('assets.field_category', 'Category')}>
               <Select value={form.category_id || "__none"} onValueChange={(v) => setForm({ ...form, category_id: v === "__none" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="Uncategorised" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('assets.uncategorised', 'Uncategorised')} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none">Uncategorised</SelectItem>
+                  <SelectItem value="__none">{t('assets.uncategorised', 'Uncategorised')}</SelectItem>
                   {(catsQ.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Brand"><Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></Field>
-            <Field label="Model number"><Input value={form.model_number} onChange={(e) => setForm({ ...form, model_number: e.target.value })} /></Field>
-            <Field label="Serial number"><Input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} /></Field>
-            <Field label="Quantity"><Input type="number" min={1} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></Field>
-            <Field label="Purchase price (per unit)"><Input type="number" min={0} step="0.01" value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })} /></Field>
-            <Field label="Current value (per unit)"><Input type="number" min={0} step="0.01" value={form.current_value} onChange={(e) => setForm({ ...form, current_value: e.target.value })} placeholder="Defaults to purchase price" /></Field>
-            <Field label="Purchase date"><Input type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} /></Field>
-            <Field label="Warranty expiry"><Input type="date" value={form.warranty_expiry} onChange={(e) => setForm({ ...form, warranty_expiry: e.target.value })} /></Field>
-            <Field label="Condition">
+            <Field label={t('assets.field_brand', 'Brand')}><Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></Field>
+            <Field label={t('assets.field_model_number', 'Model number')}><Input value={form.model_number} onChange={(e) => setForm({ ...form, model_number: e.target.value })} /></Field>
+            <Field label={t('assets.field_serial_number', 'Serial number')}><Input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} /></Field>
+            <Field label={t('assets.field_quantity', 'Quantity')}><Input type="number" min={1} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></Field>
+            <Field label={t('assets.field_purchase_price', 'Purchase price (per unit)')}><Input type="number" min={0} step="0.01" value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })} /></Field>
+            <Field label={t('assets.field_current_value', 'Current value (per unit)')}><Input type="number" min={0} step="0.01" value={form.current_value} onChange={(e) => setForm({ ...form, current_value: e.target.value })} placeholder={t('assets.current_value_placeholder', 'Defaults to purchase price')} /></Field>
+            <Field label={t('assets.field_purchase_date', 'Purchase date')}><Input type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} /></Field>
+            <Field label={t('assets.field_warranty_expiry', 'Warranty expiry')}><Input type="date" value={form.warranty_expiry} onChange={(e) => setForm({ ...form, warranty_expiry: e.target.value })} /></Field>
+            <Field label={t('assets.th_condition', 'Condition')}>
               <Select value={form.condition} onValueChange={(v) => setForm({ ...form, condition: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CONDITIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {CONDITIONS.map((c) => <SelectItem key={c} value={c}>{t(`assets.condition_${c}`, c)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Location"><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Storefront" /></Field>
-            <Field label="Supplier"><Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} /></Field>
-            <Field label="Image URL"><Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} /></Field>
+            <Field label={t('assets.field_location', 'Location')}><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder={t('assets.location_placeholder', 'e.g. Storefront')} /></Field>
+            <Field label={t('assets.field_supplier', 'Supplier')}><Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} /></Field>
+            <Field label={t('assets.field_image_url', 'Image URL')}><Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} /></Field>
             <div className="md:col-span-2">
-              <Label className="text-xs">Notes</Label>
+              <Label className="text-xs">{t('cash_flow.notes_label', 'Notes')}</Label>
               <Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssetOpen(false)}>Cancel</Button>
-            <Button onClick={saveAsset}>{editingId ? "Update" : "Save asset"}</Button>
+            <Button variant="outline" onClick={() => setAssetOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveAsset}>{editingId ? t('assets.update_btn', 'Update') : t('assets.save_asset_btn', 'Save asset')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -488,14 +490,14 @@ function Page() {
       {/* Category dialog */}
       <Dialog open={catOpen} onOpenChange={setCatOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New asset category</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('assets.new_category_title', 'New asset category')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Field label="Name *"><Input value={cat.name} onChange={(e) => setCat({ ...cat, name: e.target.value })} placeholder="Fridge, AC, Shelves, Solar…" /></Field>
-            <Field label="Notes"><Input value={cat.notes} onChange={(e) => setCat({ ...cat, notes: e.target.value })} /></Field>
+            <Field label={t('assets.field_name_required', 'Name *')}><Input value={cat.name} onChange={(e) => setCat({ ...cat, name: e.target.value })} placeholder={t('assets.category_name_placeholder', 'Fridge, AC, Shelves, Solar…')} /></Field>
+            <Field label={t('cash_flow.notes_label', 'Notes')}><Input value={cat.notes} onChange={(e) => setCat({ ...cat, notes: e.target.value })} /></Field>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCatOpen(false)}>Cancel</Button>
-            <Button onClick={saveCategory}>Save</Button>
+            <Button variant="outline" onClick={() => setCatOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveCategory}>{t('common.save', 'Save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
