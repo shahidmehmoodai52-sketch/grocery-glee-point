@@ -344,7 +344,7 @@ function Page() {
         p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
       });
       if (error) throw error;
-      return (data ?? []) as { account_id: string | null; total_in: number; total_out: number; entry_count: number }[];
+      return (data ?? []) as { account_id: string | null; total_in: number; total_out: number; entry_count: number; prior_in: number; prior_out: number }[];
     },
   });
 
@@ -385,11 +385,14 @@ function Page() {
 
 
   const balances = useMemo(() => {
-    const map = new Map<string, { inSum: number; outSum: number }>();
-    for (const a of accounts) map.set(a.id, { inSum: 0, outSum: 0 });
+    const map = new Map<string, { inSum: number; outSum: number; priorIn: number; priorOut: number }>();
+    for (const a of accounts) map.set(a.id, { inSum: 0, outSum: 0, priorIn: 0, priorOut: 0 });
     for (const row of accountTotalsRaw ?? []) {
       if (!row.account_id) continue;
-      map.set(row.account_id, { inSum: Number(row.total_in || 0), outSum: Number(row.total_out || 0) });
+      map.set(row.account_id, {
+        inSum: Number(row.total_in || 0), outSum: Number(row.total_out || 0),
+        priorIn: Number(row.prior_in || 0), priorOut: Number(row.prior_out || 0),
+      });
     }
     return map;
   }, [accounts, accountTotalsRaw]);
@@ -619,10 +622,13 @@ function Page() {
   const fmt = (n: number) => fmtMoney(n, sym);
 
   const reportRows = useMemo(() => {
-    // Per-account totals for the WHOLE selected period (server aggregate, not the current page)
+    // Per-account totals for the WHOLE selected period (server aggregate, not the current page).
+    // opening_balance is a static, one-time value — roll it forward through
+    // every transaction that happened before the selected period so it
+    // reflects the account's real balance as of the period start.
     return allAccounts.map((a) => {
-      const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
-      const opening = Number(a.opening_balance);
+      const b = balances.get(a.id) ?? { inSum: 0, outSum: 0, priorIn: 0, priorOut: 0 };
+      const opening = Number(a.opening_balance) + b.priorIn - b.priorOut;
       const currentBalance = opening + b.inSum - b.outSum;
       return { acc: a, inSum: b.inSum, outSum: b.outSum, net: b.inSum - b.outSum, currentBalance };
     });
@@ -747,8 +753,12 @@ function Page() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {allAccounts.map((a) => {
                 const Icon = iconFor(a.type);
-                const b = balances.get(a.id) ?? { inSum: 0, outSum: 0 };
-                const bal = Number(a.opening_balance) + b.inSum - b.outSum;
+                const b = balances.get(a.id) ?? { inSum: 0, outSum: 0, priorIn: 0, priorOut: 0 };
+                // opening_balance is a static, one-time value — roll it forward through
+                // every transaction before the selected period so "Today" etc. don't
+                // ignore everything that happened since the account was created.
+                const opening = Number(a.opening_balance) + b.priorIn - b.priorOut;
+                const bal = opening + b.inSum - b.outSum;
                 const auto = isAutoAcc(a.id);
                 return (
                   <Card
@@ -772,7 +782,7 @@ function Page() {
                     </div>
                     <div className="mt-3 text-2xl font-bold">{fmt(bal)}</div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      <span>{t('cash_flow.opening_prefix', 'Opening {{amount}}', { amount: fmt(Number(a.opening_balance)) })}</span>
+                      <span>{t('cash_flow.opening_prefix', 'Opening {{amount}}', { amount: fmt(opening) })}</span>
                       <span className="text-emerald-600">{t('cash_flow.in_prefix', 'In {{amount}}', { amount: fmt(b.inSum) })}</span>
                       <span className="text-rose-600">{t('cash_flow.out_prefix', 'Out {{amount}}', { amount: fmt(b.outSum) })}</span>
                     </div>
