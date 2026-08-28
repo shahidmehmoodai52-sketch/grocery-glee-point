@@ -159,7 +159,7 @@ const BrandWhatsapp = ({ className = "" }: { className?: string }) => (
     <path fill="#25D366" d="M12.037 21.996a9.97 9.97 0 0 1-5.105-1.397l-.366-.219-3.792 1.002.998-3.766-.234-.374a9.957 9.957 0 0 1-1.534-5.25c0-5.52 4.49-10.01 10.01-10.01 2.673 0 5.187 1.042 7.075 2.932 1.888 1.89 2.928 4.403 2.926 7.077 0 5.52-4.49 10.01-10.01 10.01h-.002Zm5.535-7.859c-.303-.153-1.795-.886-2.072-.988-.278-.102-.48-.153-.683.153-.203.305-.785.988-.962 1.191-.177.203-.355.23-.658.077a8.312 8.312 0 0 1-2.44-1.506 9.177 9.177 0 0 1-1.688-2.103c-.177-.305-.02-.47.133-.62.138-.135.305-.355.456-.533.152-.178.203-.305.305-.508.102-.203.05-.381-.025-.533-.076-.153-.683-1.65-.937-2.261-.247-.597-.497-.516-.683-.526l-.58-.01c-.203 0-.533.076-.812.381-.278.305-1.062 1.041-1.062 2.54 0 1.5 1.088 2.946 1.24 3.149.153.203 2.143 3.272 5.19 4.588.726.313 1.291.5 1.734.64.73.232 1.393.199 1.918.12.585-.087 1.795-.736 2.048-1.448.254-.71.254-1.321.177-1.448-.076-.127-.278-.203-.581-.355Z"/>
   </svg>
 );
-const SITE_URL = "https://grocery-glee-point.lovable.app";
+const SITE_URL = "https://tillix.co";
 const LOGO_URL = "/tillix-logo.jpeg?v=2";
 const OG_LOGO_URL = `${SITE_URL}${LOGO_URL}`;
 
@@ -202,7 +202,6 @@ export const Route = createFileRoute("/")({
           description:
             "Tillix is a cloud-based Point of Sale (POS) and retail management platform for grocery stores, supermarkets, retail shops, pharmacies, restaurants, wholesalers and multi-store businesses.",
           offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-          aggregateRating: { "@type": "AggregateRating", ratingValue: "4.9", ratingCount: "128" },
           url: SITE_URL,
           image: `${OG_LOGO_URL}`,
         }),

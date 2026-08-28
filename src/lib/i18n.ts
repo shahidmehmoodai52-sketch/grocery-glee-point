@@ -34,11 +34,20 @@ const resources = {
   no: { translation: noTranslation },
 };
 
-i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
+// LanguageDetector reads navigator/document/localStorage, none of which exist
+// during server-side rendering. Chaining it in unconditionally leaves i18next
+// stuck "not initialized" on the server, so every t() call there returns the
+// raw key (e.g. "landing.hero.title") instead of real text — exactly what a
+// crawler or a first-paint SSR snapshot sees. Only use it in the browser; the
+// server always renders the deterministic fallback language.
+let chain = i18n.use(initReactI18next);
+if (typeof window !== 'undefined') {
+  chain = chain.use(LanguageDetector);
+}
+
+chain.init({
     resources,
+    lng: typeof window === 'undefined' ? 'en' : undefined,
     fallbackLng: 'en',
     supportedLngs: ['en', 'ur', 'ar', 'es', 'de', 'no'],
     debug: false,
