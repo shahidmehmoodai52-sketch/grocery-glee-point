@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Eye, Printer, Undo2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -100,6 +101,14 @@ async function enrichSaleRow(row: any) {
 }
 
 function Page() {
+  const { t } = useTranslation();
+  const refundMethodLabel = (m: string) =>
+    m === "cash" ? t('purchase_returns.method_cash', 'Cash')
+      : m === "card" ? t('sale_returns.method_card', 'Card')
+      : m === "transfer" ? t('purchase_returns.method_transfer', 'Transfer')
+      : m === "credit" ? t('sale_returns.method_credit', 'Store credit')
+      : m === "staff" ? t('sale_returns.expense_ledger_badge', 'Expense ledger')
+      : m;
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
@@ -319,7 +328,7 @@ function Page() {
       ];
     });
     setProductSearch("");
-    toast.success(`${p.name} added`);
+    toast.success(t('sale_returns.product_added_toast', '{{name}} added', { name: p.name }));
   };
 
   const reset = () => {
@@ -339,17 +348,17 @@ function Page() {
 
   const submit = async () => {
     const picked = items.filter((l) => l.selected && l.name && l.qty > 0);
-    if (!picked.length) return toast.error("Select at least one item to return");
+    if (!picked.length) return toast.error(t('sale_returns.select_at_least_one_item', 'Select at least one item to return'));
     for (const l of picked) {
       if (l.max != null && l.qty > l.max) {
-        return toast.error(`${l.name}: return qty ${l.qty} exceeds sold qty ${l.max}`);
+        return toast.error(t('sale_returns.qty_exceeds_sold', '{{name}}: return qty {{qty}} exceeds sold qty {{max}}', { name: l.name, qty: l.qty, max: l.max }));
       }
     }
     if (partyType === "staff" && !selectedSale?.expense_person_id) {
-      return toast.error("Pick the staff member's purchase invoice to return");
+      return toast.error(t('sale_returns.pick_staff_invoice', "Pick the staff member's purchase invoice to return"));
     }
     if (partyType === "customer" && refund > total + 0.001) {
-      return toast.error("Refund cannot exceed total");
+      return toast.error(t('purchase_returns.refund_exceeds_total', 'Refund cannot exceed total'));
     }
     let offline = false;
     let localRet: any = null;
@@ -379,12 +388,12 @@ function Page() {
       offline = res.offline;
       localRet = res.ret;
     } catch (e: any) {
-      return toast.error(e?.message ?? "Could not record return");
+      return toast.error(e?.message ?? t('sale_returns.could_not_record_return', 'Could not record return'));
     }
     toast.success(
       offline
-        ? "Return saved offline — will sync automatically"
-        : "Sale return recorded, stock restored",
+        ? t('sale_returns.return_saved_offline', 'Return saved offline — will sync automatically')
+        : t('sale_returns.return_recorded', 'Sale return recorded, stock restored'),
     );
     reset();
     // Offline the cloud row doesn't exist yet — open the local record so the
@@ -405,25 +414,25 @@ function Page() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Sale Returns</h1>
-          <p className="text-sm text-muted-foreground">Refund customers and restore stock</p>
+          <h1 className="text-2xl font-semibold">{t('sale_returns.title', 'Sale Returns')}</h1>
+          <p className="text-sm text-muted-foreground">{t('sale_returns.subtitle', 'Refund customers and restore stock')}</p>
         </div>
         <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              New return
+              {t('sale_returns.new_return', 'New return')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>New sale return</DialogTitle>
+              <DialogTitle>{t('sale_returns.dialog_title', 'New sale return')}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               {/* Step 1: pick invoice */}
               <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <Label>Return for</Label>
+                  <Label>{t('sale_returns.return_for_label', 'Return for')}</Label>
                   <div className="flex gap-2 mt-1">
                     <Button
                       type="button"
@@ -434,7 +443,7 @@ function Page() {
                         setSaleId("none");
                       }}
                     >
-                      Walking customer
+                      {t('sale_returns.walking_customer', 'Walking customer')}
                     </Button>
                     <Button
                       type="button"
@@ -445,26 +454,24 @@ function Page() {
                         setSaleId("none");
                       }}
                     >
-                      Staff
+                      {t('expenses.role_staff', 'Staff')}
                     </Button>
                   </div>
                   {partyType === "staff" && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Pick the staff member's own purchase invoice below — no cash is paid
-                      out, the return instead reduces what that invoice added to their
-                      expense ledger.
+                      {t('sale_returns.staff_note', "Pick the staff member's own purchase invoice below — no cash is paid out, the return instead reduces what that invoice added to their expense ledger.")}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <Label>Search invoice</Label>
+                  <Label>{t('sale_returns.search_invoice_label', 'Search invoice')}</Label>
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       value={invoiceSearch}
                       onChange={(e) => setInvoiceSearch(e.target.value)}
-                      placeholder="Invoice #, name, amount…"
+                      placeholder={t('sale_returns.search_invoice_placeholder2', 'Invoice #, name, amount…')}
                       className="pl-8"
                     />
                   </div>
@@ -475,7 +482,7 @@ function Page() {
                         onClick={() => setSaleId("none")}
                         className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent ${saleId === "none" ? "bg-accent" : ""}`}
                       >
-                        — Ad-hoc return (no invoice) —
+                        {t('sale_returns.adhoc_no_invoice', '— Ad-hoc return (no invoice) —')}
                       </button>
                     )}
                     {filteredSales.slice(0, 50).map((s: any) => (
@@ -487,7 +494,7 @@ function Page() {
                       >
                         <span className="font-mono">{s.invoice_no}</span>
                         <span className="text-muted-foreground truncate mx-2">
-                          {s.customers?.name ?? s.expense_persons?.name ?? "Walk-in"}
+                          {s.customers?.name ?? s.expense_persons?.name ?? t('common.walk_in', 'Walk-in')}
                         </span>
                         <span>{fmtMoney(s.total, sym)}</span>
                       </button>
@@ -495,8 +502,8 @@ function Page() {
                     {filteredSales.length === 0 && (
                       <div className="text-center text-xs text-muted-foreground py-3">
                         {partyType === "staff"
-                          ? "No staff purchase invoices found"
-                          : "No invoices found"}
+                          ? t('sale_returns.no_staff_invoices', 'No staff purchase invoices found')
+                          : t('sale_returns.no_invoices_found', 'No invoices found')}
                       </div>
                     )}
                   </div>
@@ -504,22 +511,22 @@ function Page() {
 
                 {selectedSale && (
                   <div className="text-xs bg-muted/40 rounded p-2">
-                    Invoice <span className="font-mono">{selectedSale.invoice_no}</span> ·{" "}
-                    {new Date(selectedSale.created_at).toLocaleString()} · Total{" "}
+                    {t('sales.th_invoice', 'Invoice')} <span className="font-mono">{selectedSale.invoice_no}</span> ·{" "}
+                    {new Date(selectedSale.created_at).toLocaleString()} · {t('sales.th_total', 'Total')}{" "}
                     {fmtMoney(selectedSale.total, sym)} ·{" "}
-                    {selectedSale.customers?.name ?? selectedSale.expense_persons?.name ?? "Walk-in"}
+                    {selectedSale.customers?.name ?? selectedSale.expense_persons?.name ?? t('common.walk_in', 'Walk-in')}
                   </div>
                 )}
 
                 {partyType === "customer" && saleId === "none" && (
                   <div>
-                    <Label>Customer</Label>
+                    <Label>{t('pos.customer', 'Customer')}</Label>
                     <Select value={customer} onValueChange={setCustomer}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Walk-in" />
+                        <SelectValue placeholder={t('common.walk_in', 'Walk-in')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">— Walk-in —</SelectItem>
+                        <SelectItem value="none">{t('purchase_returns.walk_in_option', '— Walk-in —')}</SelectItem>
                         {customers.map((c: any) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
@@ -533,7 +540,7 @@ function Page() {
 
               {/* Step 2: search a product and add it item-wise */}
               <div>
-                <Label>Search item to return</Label>
+                <Label>{t('sale_returns.search_item_label', 'Search item to return')}</Label>
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -545,7 +552,7 @@ function Page() {
                         addProduct(productResults[0]);
                       }
                     }}
-                    placeholder="Item name, code or barcode…"
+                    placeholder={t('sale_returns.item_search_placeholder', 'Item name, code or barcode…')}
                     className="pl-8"
                   />
                 </div>
@@ -567,7 +574,7 @@ function Page() {
                     ))}
                     {productResults.length === 0 && (
                       <div className="text-center text-xs text-muted-foreground py-3">
-                        No items found
+                        {t('sale_returns.no_items_found', 'No items found')}
                       </div>
                     )}
                   </div>
@@ -580,10 +587,10 @@ function Page() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="w-28">Return qty</TableHead>
-                      <TableHead className="w-28">Price</TableHead>
-                      <TableHead className="text-right w-28">Line total</TableHead>
+                      <TableHead>{t('customers.th_item', 'Item')}</TableHead>
+                      <TableHead className="w-28">{t('sale_returns.th_return_qty', 'Return qty')}</TableHead>
+                      <TableHead className="w-28">{t('products.price_label', 'Price')}</TableHead>
+                      <TableHead className="text-right w-28">{t('sale_returns.th_line_total', 'Line total')}</TableHead>
                       <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -595,8 +602,8 @@ function Page() {
                           className="text-center text-muted-foreground py-4 text-sm"
                         >
                           {saleId === "none"
-                            ? "Add items below"
-                            : "Pick an invoice to load its items"}
+                            ? t('sale_returns.add_items_below', 'Add items below')
+                            : t('sale_returns.pick_invoice_to_load', 'Pick an invoice to load its items')}
                         </TableCell>
                       </TableRow>
                     )}
@@ -612,14 +619,14 @@ function Page() {
                           {l.max != null ? (
                             <div>
                               <div className="text-sm">{l.name}</div>
-                              <div className="text-xs text-muted-foreground">sold: {l.max}</div>
+                              <div className="text-xs text-muted-foreground">{t('sale_returns.sold_label', 'sold: {{qty}}', { qty: l.max })}</div>
                             </div>
                           ) : (
                             <Input
                               value={l.name}
                               onChange={(e) => setItem(i, { name: e.target.value })}
                               className="h-8"
-                              placeholder="Item name"
+                              placeholder={t('sale_returns.item_name_placeholder', 'Item name')}
                             />
                           )}
                         </TableCell>
@@ -664,14 +671,14 @@ function Page() {
                 <div className="p-2">
                   <Button variant="outline" size="sm" onClick={addAdhoc}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
-                    Add ad-hoc item
+                    {t('sale_returns.add_adhoc_item', 'Add ad-hoc item')}
                   </Button>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <Label>Tax</Label>
+                  <Label>{t('purchase_returns.tax', 'Tax')}</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -680,10 +687,10 @@ function Page() {
                   />
                 </div>
                 <div>
-                  <Label>Refund</Label>
+                  <Label>{t('sales.th_refund', 'Refund')}</Label>
                   {partyType === "staff" ? (
                     <div className="h-9 flex items-center text-sm text-muted-foreground">
-                      {fmtMoney(0, sym)} (expense ledger)
+                      {fmtMoney(0, sym)} {t('sale_returns.expense_ledger_suffix', '(expense ledger)')}
                     </div>
                   ) : (
                     <Input
@@ -695,10 +702,10 @@ function Page() {
                   )}
                 </div>
                 <div>
-                  <Label>Method</Label>
+                  <Label>{t('sales.th_method', 'Method')}</Label>
                   {partyType === "staff" ? (
                     <div className="h-9 flex items-center">
-                      <Badge variant="outline">Expense ledger</Badge>
+                      <Badge variant="outline">{t('sale_returns.expense_ledger_badge', 'Expense ledger')}</Badge>
                     </div>
                   ) : (
                     <Select value={method} onValueChange={setMethod}>
@@ -706,33 +713,33 @@ function Page() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="transfer">Transfer</SelectItem>
-                        <SelectItem value="credit">Store credit</SelectItem>
+                        <SelectItem value="cash">{t('purchase_returns.method_cash', 'Cash')}</SelectItem>
+                        <SelectItem value="card">{t('sale_returns.method_card', 'Card')}</SelectItem>
+                        <SelectItem value="transfer">{t('purchase_returns.method_transfer', 'Transfer')}</SelectItem>
+                        <SelectItem value="credit">{t('sale_returns.method_credit', 'Store credit')}</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
                 </div>
                 <div className="flex flex-col justify-end">
                   <div className="text-sm text-muted-foreground">
-                    {partyType === "staff" ? "Reduces expense ledger by" : "Total"}
+                    {partyType === "staff" ? t('sale_returns.reduces_expense_by', 'Reduces expense ledger by') : t('sales.th_total', 'Total')}
                   </div>
                   <div className="text-2xl font-semibold text-primary">{fmtMoney(total, sym)}</div>
                 </div>
               </div>
               <div>
-                <Label>Note</Label>
+                <Label>{t('common.note', 'Note')}</Label>
                 <Input value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={reset}>
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button onClick={submit}>
                 <Undo2 className="h-4 w-4 mr-2" />
-                Process return
+                {t('sale_returns.process_return', 'Process return')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -743,12 +750,12 @@ function Page() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Return #</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Refund</TableHead>
-              <TableHead>Method</TableHead>
+              <TableHead>{t('purchase_returns.th_return_no', 'Return #')}</TableHead>
+              <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+              <TableHead>{t('sales.th_customer', 'Customer')}</TableHead>
+              <TableHead className="text-right">{t('sales.th_total', 'Total')}</TableHead>
+              <TableHead className="text-right">{t('sales.th_refund', 'Refund')}</TableHead>
+              <TableHead>{t('sales.th_method', 'Method')}</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -756,7 +763,7 @@ function Page() {
             {returns.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
-                  No returns yet
+                  {t('sale_returns.no_returns_yet', 'No returns yet')}
                 </TableCell>
               </TableRow>
             )}
@@ -767,18 +774,18 @@ function Page() {
                 <TableCell>
                   {r.party_type === "staff" ? (
                     <span className="inline-flex items-center gap-1">
-                      <Badge variant="secondary" className="text-[10px]">Staff</Badge>
+                      <Badge variant="secondary" className="text-[10px]">{t('expenses.role_staff', 'Staff')}</Badge>
                       {r.expense_persons?.name ?? "—"}
                     </span>
                   ) : (
-                    r.customers?.name ?? "Walk-in"
+                    r.customers?.name ?? t('common.walk_in', 'Walk-in')
                   )}
                 </TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(r.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(r.refund_amount, sym)}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className="capitalize">
-                    {r.refund_method}
+                    {refundMethodLabel(r.refund_method)}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -795,7 +802,7 @@ function Page() {
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Return {viewing?.return_no}</DialogTitle>
+            <DialogTitle>{t('sales.return_title', 'Return {{no}}', { no: viewing?.return_no })}</DialogTitle>
           </DialogHeader>
           {viewing && (
             <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
@@ -811,7 +818,7 @@ function Page() {
           <DialogFooter className="no-print">
             <Button onClick={() => printReceipt()}>
               <Printer className="h-4 w-4 mr-2" />
-              Print
+              {t('common.print', 'Print')}
             </Button>
           </DialogFooter>
         </DialogContent>
