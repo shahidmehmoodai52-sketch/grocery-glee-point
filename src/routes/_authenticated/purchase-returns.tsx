@@ -273,9 +273,9 @@ function Page() {
           </div>
         </header>
 
-        <main className="flex-1 flex min-h-0">
+        <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
           {/* Left: Return Cart */}
-          <div className="flex-1 flex flex-col bg-background border-r">
+          <div className="flex-1 flex flex-col bg-background border-r min-h-[50vh] md:min-h-0">
             <div className="p-4 border-b flex items-center gap-4">
               <div className="relative flex-1 max-w-xl">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -374,8 +374,8 @@ function Page() {
             </footer>
           </div>
 
-          {/* Right: Search & Summary */}
-          <div className="w-[350px] border-l flex flex-col shrink-0 bg-muted/10">
+          {/* Right: Search & Summary (full-width below the cart on mobile) */}
+          <div className="w-full md:w-[350px] border-t md:border-t-0 md:border-l flex flex-col shrink-0 bg-muted/10">
             <div className="p-4 space-y-4 border-b bg-background">
               <div className="space-y-2">
                 <Label>Original Purchase</Label>

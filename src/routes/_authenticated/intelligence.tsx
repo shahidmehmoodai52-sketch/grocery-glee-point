@@ -438,7 +438,7 @@ function AbcTab({ rows, sym }: { rows: Intel[]; sym: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {(["A", "B", "C"] as const).map((c) => (
           <Card key={c} className="p-3">
             <div className="flex items-center justify-between">

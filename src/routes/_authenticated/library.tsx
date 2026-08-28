@@ -437,7 +437,7 @@ function ImportButton({ item, onDone, showSell = true, showCost = true }: { item
           The name, barcode, category, and unit come from the shared library. Set your own price and stock — these stay
           private to your shop.
         </p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {showCost && (
             <div>
               <Label>Cost</Label>

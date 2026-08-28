@@ -864,8 +864,8 @@ function Page() {
             {/* Top bar: compact scan/search + manual add */}
             <div className="px-6 py-2 border-b bg-muted/30 shrink-0">
               <Label className="text-xs">Item code, barcode, or product name</Label>
-              <div className="flex items-start gap-2">
-                <div className="relative flex-1 max-w-2xl">
+              <div className="flex flex-wrap items-start gap-2">
+                <div className="relative min-w-[220px] flex-1 max-w-2xl">
                   <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                   <Input
                     ref={searchRef}
@@ -921,7 +921,7 @@ function Page() {
                 <Button type="button" variant="outline" className="h-9 mt-0 shrink-0" onClick={() => openNewProduct("")}>
                   <Plus className="h-4 w-4 mr-1" /> New item
                 </Button>
-                <div className="w-[240px] shrink-0">
+                <div className="w-full sm:w-[240px] shrink-0">
                   <select
                     value={supplier}
                     onChange={(e) => { setSupplier(e.target.value); focusSearch(); }}
@@ -931,7 +931,7 @@ function Page() {
                     {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-                <div className="w-[180px] shrink-0">
+                <div className="w-full sm:w-[180px] shrink-0">
                   <Label className="text-xs">Purchase date</Label>
                   <Input
                     type="date"
@@ -944,10 +944,10 @@ function Page() {
             </div>
 
 
-            {/* Body: items table on left, totals side panel on right */}
-            <div className="flex-1 min-h-0 flex overflow-hidden">
+            {/* Body: items table on left, totals side panel on right (stacked on mobile) */}
+            <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
               {/* Items area */}
-              <div className="flex-1 min-w-0 flex flex-col px-6 py-2 overflow-hidden">
+              <div className="flex-1 min-w-0 flex flex-col px-6 py-2 md:overflow-hidden">
                 <div className="flex items-center justify-between mb-1 shrink-0">
                   <div className="text-sm">
                     <span className="font-semibold">{lines.length}</span>
@@ -1153,8 +1153,8 @@ function Page() {
                 </div>
               </div>
 
-              {/* Side panel — totals & extras */}
-              <aside className="w-[260px] shrink-0 border-l bg-muted/20 flex flex-col overflow-y-auto">
+              {/* Side panel — totals & extras (full-width below the items list on mobile) */}
+              <aside className="w-full md:w-[260px] shrink-0 border-t md:border-t-0 md:border-l bg-muted/20 flex flex-col md:overflow-y-auto">
                 <div className="px-4 py-3 border-b">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
                   <div className="text-2xl font-bold text-primary leading-tight">{fmtMoney(total, sym)}</div>
