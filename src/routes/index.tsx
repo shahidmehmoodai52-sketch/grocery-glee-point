@@ -378,7 +378,7 @@ function LandingPage() {
 
           <div className="flex items-center gap-2">
             <LanguageSelect className="mr-1" />
-            <div className="hidden sm:block">
+            <div className="hidden md:block">
               <CurrencySelect
                 value={cur.code}
                 onChange={(code) => setCur(code)}
@@ -388,7 +388,7 @@ function LandingPage() {
             </div>
             <Link
               to="/auth"
-              className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-tx-navy hover:bg-slate-100 sm:inline-flex"
+              className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-tx-navy hover:bg-slate-100 md:inline-flex"
             >
               {t('landing.nav.login')}
             </Link>
@@ -458,7 +458,7 @@ function LandingPage() {
                 </Link>
               </div>
 
-              <ul className="mt-6 grid grid-cols-2 gap-2 text-sm text-slate-600 sm:max-w-md">
+              <ul className="mt-6 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-2 sm:max-w-md">
                 {[t('landing.why.b1'), t('landing.why.b2'), t('landing.why.b3'), t('landing.why.b4')].map(x => (
                   <li key={x} className="flex items-center gap-2"><Check className="h-4 w-4 shrink-0 text-tx-green" /> <span className="min-w-0">{x}</span></li>
                 ))}
@@ -481,9 +481,9 @@ function LandingPage() {
                     { l: t('landing.hero.card_bills', "Bills"), v: "142" },
                     { l: t('landing.hero.card_profit', "Profit"), v: formatPrice(981, cur) },
                   ].map((k) => (
-                    <div key={k.l} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                      <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{k.l}</div>
-                      <div className="mt-1 text-lg font-extrabold text-tx-navy">{k.v}</div>
+                    <div key={k.l} className="min-w-0 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                      <div className="truncate text-[11px] font-medium uppercase tracking-wider text-slate-500">{k.l}</div>
+                      <div className="truncate text-base font-extrabold text-tx-navy sm:text-lg" title={k.v}>{k.v}</div>
                     </div>
                   ))}
                 </div>
@@ -681,11 +681,11 @@ function LandingPage() {
                     { l: t('landing.why.new_cust'), v: "31", d: "+9 vs last week" },
                   ].map(k => (
                     <div key={k.l} className="rounded-xl border border-slate-100 p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-slate-500">{k.l}</span>
-                        <span className="text-[11px] font-semibold text-tx-green-dark">{k.d}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-xs font-medium text-slate-500">{k.l}</span>
+                        <span className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-tx-green-dark">{k.d}</span>
                       </div>
-                      <div className="mt-1 text-lg font-extrabold text-tx-navy">{k.v}</div>
+                      <div className="mt-1 truncate text-lg font-extrabold text-tx-navy">{k.v}</div>
                     </div>
                   ))}
                 </div>
@@ -911,7 +911,7 @@ function LandingPage() {
                     type="button"
                     onClick={() => setOpenFaq(open ? null : i)}
                     aria-expanded={open}
-                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-start"
                   >
                     <span className="text-sm font-semibold text-tx-navy sm:text-base">{t(f.q)}</span>
                     <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition ${open ? "rotate-180 text-tx-green" : ""}`} />
