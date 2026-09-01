@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -32,6 +32,22 @@ import { resetTenantOwnerPassword } from "@/lib/admin.functions";
 import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
 
 export const Route = createFileRoute("/admin_/shops/$id")({
+  // This route uses the `admin_` escape-hatch naming, so it does NOT inherit
+  // /admin's own beforeLoad guard. Match that same server-side check here for
+  // consistency (am_i_admin_staff, not the page's own super-admin-only
+  // content gate below) so an unauthenticated or non-admin request never even
+  // renders a loading flash before the client-side redirect kicks in.
+  beforeLoad: async ({ location }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw redirect({ to: "/admin-login", search: { next: location.pathname } });
+    }
+    const { data: isAdmin } = await supabase.rpc("am_i_admin_staff");
+    if (!isAdmin) {
+      await supabase.auth.signOut();
+      throw redirect({ to: "/admin-login" });
+    }
+  },
   component: ShopDetailPage,
 });
 

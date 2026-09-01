@@ -67,7 +67,6 @@ import {
 } from "@/lib/admin-staff.functions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserCog, BookOpen } from "lucide-react";
-import { fetchAll } from "@/lib/supabase-page";
 import { Toaster } from "@/components/ui/sonner";
 import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
 
@@ -518,15 +517,29 @@ function TenantsTab() {
 
   const { has } = useAdminAccess();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "suspended" | "archived">("all");
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [archiveDialog, setArchiveDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Debounce search so we don't hit the DB on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
+  // Reset to the first page whenever the search or status filter changes.
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, filter]);
 
-  const { data: tenants = [], isLoading } = useQuery({
+  // Unbounded, shared with Dashboard/Errors tab under the same query key —
+  // used only for the totals cards, which need true global counts.
+  const { data: allTenants = [] } = useQuery({
     queryKey: ["admin-tenants"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_tenants");
@@ -535,29 +548,35 @@ function TenantsTab() {
     },
   });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return tenants.filter((t) => {
-      if (filter !== "all" && t.status !== filter) return false;
-      if (!q) return true;
-      return (
-        t.name.toLowerCase().includes(q) ||
-        (t.owner_email ?? "").toLowerCase().includes(q) ||
-        (t.owner_name ?? "").toLowerCase().includes(q) ||
-        (t.slug ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [tenants, search, filter]);
-
   const totals = useMemo(() => {
     return {
-      total: tenants.length,
-      active: tenants.filter((t) => t.status === "active").length,
-      pending: tenants.filter((t) => t.status === "pending").length,
-      suspended: tenants.filter((t) => t.status === "suspended").length,
-      revenue: tenants.reduce((a, t) => a + Number(t.sales_total || 0), 0),
+      total: allTenants.length,
+      active: allTenants.filter((t) => t.status === "active").length,
+      pending: allTenants.filter((t) => t.status === "pending").length,
+      suspended: allTenants.filter((t) => t.status === "suspended").length,
+      revenue: allTenants.reduce((a, t) => a + Number(t.sales_total || 0), 0),
     };
-  }, [tenants]);
+  }, [allTenants]);
+
+  // Real server-side search/filter/pagination for the table itself.
+  const { data: page_, isLoading } = useQuery({
+    queryKey: ["admin-tenants-page", debouncedSearch, filter, page],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_tenants", {
+        _search: debouncedSearch || undefined,
+        _status: filter === "all" ? undefined : filter,
+        _limit: pageSize,
+        _offset: page * pageSize,
+      });
+      if (error) throw error;
+      const rows = (data as (TenantRow & { total_count: number })[]) ?? [];
+      return { rows, total: rows[0]?.total_count ?? 0 };
+    },
+  });
+  const filtered = page_?.rows ?? [];
+  const totalFiltered = page_?.total ?? 0;
+  const pageStart = totalFiltered === 0 ? 0 : page * pageSize + 1;
+  const pageEnd = Math.min((page + 1) * pageSize, totalFiltered);
 
   const setStatus = async (id: string, status: string, reason?: string) => {
     const { error } = await supabase.rpc("admin_set_tenant_status", {
@@ -566,6 +585,7 @@ function TenantsTab() {
     if (error) return toast.error(error.message);
     toast.success(`Tenant ${status}`);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
     qc.invalidateQueries({ queryKey: ["admin-tenant-detail", id] });
   };
 
@@ -588,15 +608,17 @@ function TenantsTab() {
     try {
       let done = false;
       while (!done) {
-        const { data, error } = await supabase.rpc("admin_delete_tenant", { 
-          _tenant_id: id, 
-          _confirm: name 
+        const { data, error } = await supabase.rpc("admin_delete_tenant", {
+          _tenant_id: id,
+          _confirm: name,
+          _reason: reason,
         });
         if (error) throw error;
         done = Boolean(data && typeof data === "object" && "done" in data && data.done);
       }
       toast.success(`Deleted "${name}"`);
       qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+      qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -724,6 +746,37 @@ function TenantsTab() {
             ))}
           </TableBody>
         </Table>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2 border-t border-border/40 mt-2">
+          <div className="text-xs text-muted-foreground font-medium">
+            Showing <span className="text-foreground">{pageStart}</span> to{" "}
+            <span className="text-foreground">{pageEnd}</span> of{" "}
+            <span className="text-foreground">{totalFiltered}</span> shops
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              Previous
+            </Button>
+            <div className="text-xs font-bold px-3 py-1 bg-muted rounded-md border border-border/40">
+              Page {page + 1} of {Math.max(1, Math.ceil(totalFiltered / pageSize))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={pageEnd >= totalFiltered}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
 
       <TypedConfirmDialog
@@ -755,6 +808,7 @@ function TenantsTab() {
         description={`This will permanently delete "${deleteDialog.name}" and ALL its data (products, sales, customers, expenses, staff). This action is irreversible.`}
         confirmText={deleteDialog.name}
         confirmLabel="Delete Everything"
+        requireReason
         destructive
         isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
@@ -787,6 +841,7 @@ function ExpiryCell({ tenantId, expiresAt }: { tenantId: string; expiresAt: stri
     toast.success("Expiry updated");
     setOpen(false);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
   };
 
   return (
@@ -1214,7 +1269,8 @@ function SecurityTab() {
       const { data, error } = await supabase
         .from("security_blocklist")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(500);
       if (error) throw error;
       return (data as BlocklistRow[]) ?? [];
     },
@@ -1619,34 +1675,53 @@ function LibraryTab() {
   const canManage = isSuperAdmin || has("library.manage");
   const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["admin-library", status],
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, status]);
+
+  const { data: libraryPage, isLoading } = useQuery({
+    queryKey: ["admin-library", status, debouncedSearch, page],
     queryFn: async () => {
-      const data = await fetchAll<LibraryRow>((from: number, to: number) => {
-        let q = supabase
-          .from("global_products")
-          .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at")
-          .order("created_at", { ascending: false });
-        if (status !== "all") q = q.eq("status", status);
-        return q.range(from, to) as any;
-      });
-      return data ?? [];
+      let q = supabase
+        .from("global_products")
+        .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at", { count: "exact" })
+        .order("created_at", { ascending: false });
+      if (status !== "all") q = q.eq("status", status);
+      if (debouncedSearch) {
+        const s = debouncedSearch.replace(/[%,]/g, "");
+        q = q.or(`name.ilike.%${s}%,barcode.ilike.%${s}%,item_code.ilike.%${s}%,category.ilike.%${s}%`);
+      }
+      const { data, error, count } = await q.range(page * pageSize, page * pageSize + pageSize - 1);
+      if (error) throw error;
+      return { rows: (data as LibraryRow[]) ?? [], total: count ?? 0 };
     },
   });
+  const filtered = libraryPage?.rows ?? [];
+  const totalFiltered = libraryPage?.total ?? 0;
+  const pageStart = totalFiltered === 0 ? 0 : page * pageSize + 1;
+  const pageEnd = Math.min((page + 1) * pageSize, totalFiltered);
 
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter(
-      (r) =>
-        r.name.toLowerCase().includes(s) ||
-        (r.barcode ?? "").toLowerCase().includes(s) ||
-        (r.item_code ?? "").toLowerCase().includes(s) ||
-        (r.category ?? "").toLowerCase().includes(s),
-    );
-  }, [rows, search]);
+  const { data: pendingCount = 0 } = useQuery({
+    queryKey: ["admin-library-pending-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("global_products")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
 
   const setRowStatus = async (id: string, next: "approved" | "rejected") => {
     const { error } = await supabase
@@ -1656,6 +1731,7 @@ function LibraryTab() {
     if (error) return toast.error(error.message);
     toast.success(next === "approved" ? "Item approved — fanned out to shops" : "Item rejected");
     qc.invalidateQueries({ queryKey: ["admin-library"] });
+    qc.invalidateQueries({ queryKey: ["admin-library-pending-count"] });
   };
 
   const remove = async (_reason: string) => {
@@ -1664,9 +1740,8 @@ function LibraryTab() {
     if (error) { toast.error(error.message); return; }
     toast.success("Deleted");
     qc.invalidateQueries({ queryKey: ["admin-library"] });
+    qc.invalidateQueries({ queryKey: ["admin-library-pending-count"] });
   };
-
-  const pendingCount = rows.filter((r) => r.status === "pending").length;
 
   return (
     <div className="space-y-3">
@@ -1761,6 +1836,37 @@ function LibraryTab() {
             ))}
           </TableBody>
         </Table>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2 border-t border-border/40 mt-2">
+          <div className="text-xs text-muted-foreground font-medium">
+            Showing <span className="text-foreground">{pageStart}</span> to{" "}
+            <span className="text-foreground">{pageEnd}</span> of{" "}
+            <span className="text-foreground">{totalFiltered}</span> items
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              Previous
+            </Button>
+            <div className="text-xs font-bold px-3 py-1 bg-muted rounded-md border border-border/40">
+              Page {page + 1} of {Math.max(1, Math.ceil(totalFiltered / pageSize))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={pageEnd >= totalFiltered}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
 
       <TypedConfirmDialog
