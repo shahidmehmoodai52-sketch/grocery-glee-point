@@ -104,6 +104,7 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     toast.success(`Shop ${status}`);
     qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
   };
 
   const suspend = async (reason: string) => {
@@ -130,6 +131,7 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     }
     toast.success(`Deleted "${expected}"`);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
     navigate({ to: "/admin", replace: true });
   };
 
