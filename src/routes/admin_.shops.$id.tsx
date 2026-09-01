@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { fmtMoney } from "@/lib/format";
 import { resetTenantOwnerPassword } from "@/lib/admin.functions";
+import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
 
 export const Route = createFileRoute("/admin_/shops/$id")({
   component: ShopDetailPage,
@@ -67,6 +68,8 @@ type TenantDetail = {
 function ShopDetail({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [suspendOpen, setSuspendOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
@@ -87,26 +90,21 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
   };
 
-  const suspend = async () => {
-    const reason = window.prompt(`Suspend "${data?.tenant.name}"? Reason:`) ?? "";
-    if (!reason) return;
+  const suspend = async (reason: string) => {
     await setStatus("suspended", reason);
   };
 
-  const removeShop = async () => {
+  const removeShop = async (reason: string) => {
     if (!data) return;
     const expected = data.tenant.name.trim();
-    const typed = window.prompt(
-      `PERMANENTLY delete this shop and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone.\n\nType exactly:  ${expected}`,
-    );
-    if (typed === null) return;
-    if (typed.trim().toLowerCase() !== expected.toLowerCase()) {
-      return toast.error(`Confirmation did not match. Expected: "${expected}"`);
-    }
     let done = false;
     while (!done) {
-      const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: expected });
-      if (error) return toast.error(error.message);
+      const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", {
+        _tenant_id: tenantId,
+        _confirm: expected,
+        _reason: reason,
+      });
+      if (error) { toast.error(error.message); return; }
       done = Boolean(
         deletionResult
         && typeof deletionResult === "object"
@@ -158,7 +156,7 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
             </Button>
           )}
           {t.status === "active" && (
-            <Button variant="outline" onClick={suspend}>
+            <Button variant="outline" onClick={() => setSuspendOpen(true)}>
               <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
             </Button>
           )}
@@ -178,11 +176,34 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
             <Library className="h-4 w-4 mr-1" />
             {t.library_approved ? "Revoke Library" : "Grant Library"}
           </Button>
-          <Button variant="destructive" size="icon" onClick={removeShop} title="Delete shop">
+          <Button variant="destructive" size="icon" onClick={() => setDeleteOpen(true)} title="Delete shop">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      <TypedConfirmDialog
+        open={suspendOpen}
+        onOpenChange={setSuspendOpen}
+        title="Suspend shop"
+        description={`Suspend "${t.name}"? The shop's staff will be locked out until it's reactivated.`}
+        requireReason
+        destructive
+        confirmLabel="Suspend"
+        onConfirm={suspend}
+      />
+
+      <TypedConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete shop permanently"
+        description={`PERMANENTLY delete "${t.name}" and ALL its data (products, sales, customers, expenses, staff)? This cannot be undone.`}
+        confirmText={t.name}
+        requireReason
+        destructive
+        confirmLabel="Delete permanently"
+        onConfirm={removeShop}
+      />
 
       <Tabs defaultValue="overview">
         <TabsList>
