@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1932,6 +1932,7 @@ export type Database = {
           account_id: string | null
           created_at: string
           id: string
+          incentive_amount: number
           invoice_no: string
           note: string | null
           paid: number
@@ -1948,6 +1949,7 @@ export type Database = {
           account_id?: string | null
           created_at?: string
           id?: string
+          incentive_amount?: number
           invoice_no?: string
           note?: string | null
           paid?: number
@@ -1964,6 +1966,7 @@ export type Database = {
           account_id?: string | null
           created_at?: string
           id?: string
+          incentive_amount?: number
           invoice_no?: string
           note?: string | null
           paid?: number
@@ -2200,8 +2203,10 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: string | null
+          expense_person_id: string | null
           id: string
           note: string | null
+          party_type: string
           refund_amount: number
           refund_method: string
           return_no: string
@@ -2215,8 +2220,10 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_id?: string | null
+          expense_person_id?: string | null
           id?: string
           note?: string | null
+          party_type?: string
           refund_amount?: number
           refund_method?: string
           return_no?: string
@@ -2230,8 +2237,10 @@ export type Database = {
         Update: {
           created_at?: string
           customer_id?: string | null
+          expense_person_id?: string | null
           id?: string
           note?: string | null
+          party_type?: string
           refund_amount?: number
           refund_method?: string
           return_no?: string
@@ -2248,6 +2257,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_returns_expense_person_id_fkey"
+            columns: ["expense_person_id"]
+            isOneToOne: false
+            referencedRelation: "expense_persons"
             referencedColumns: ["id"]
           },
           {
@@ -3270,6 +3286,7 @@ export type Database = {
       tenant_members: {
         Row: {
           created_at: string
+          display_name: string | null
           id: string
           invited_by: string | null
           role: Database["public"]["Enums"]["tenant_role"]
@@ -3279,6 +3296,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          display_name?: string | null
           id?: string
           invited_by?: string | null
           role?: Database["public"]["Enums"]["tenant_role"]
@@ -3288,6 +3306,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          display_name?: string | null
           id?: string
           invited_by?: string | null
           role?: Database["public"]["Enums"]["tenant_role"]
@@ -4128,6 +4147,7 @@ export type Database = {
           current_balance: number
           email: string
           id: string
+          incentive_total: number
           name: string
           opening_balance: number
           phone: string
@@ -4333,6 +4353,7 @@ export type Database = {
       }
       my_tenant_expires_at: { Args: never; Returns: string }
       my_tenant_status: { Args: never; Returns: string }
+      my_trial_info: { Args: never; Returns: Json }
       next_purchase_invoice_no: { Args: never; Returns: string }
       next_purchase_return_no: { Args: never; Returns: string }
       next_sale_invoice_no: { Args: never; Returns: string }

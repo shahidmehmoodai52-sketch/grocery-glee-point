@@ -239,7 +239,7 @@ function AlertsTab({ rows, sym, stats }: { rows: Intel[]; sym: string; stats: an
     <Card>
       <div className="p-3 border-b flex gap-2 flex-wrap">
         {[
-          { k: "all", l: t('intelligence.filter_all', 'All ({{count}})', { count: stats ? Object.values(stats.alerts).reduce((a: any, b: any) => a + b, 0) : 0 }) },
+          { k: "all", l: t('intelligence.filter_all', 'All ({{count}})', { count: stats ? Number(Object.values(stats.alerts).reduce((a: any, b: any) => Number(a) + Number(b), 0)) : 0 }) },
           { k: "out", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_out', 'Out'), count: stats?.alerts.out ?? 0 }) },
           { k: "low", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_low', 'Low'), count: stats?.alerts.low ?? 0 }) },
           { k: "overstock", l: t('intelligence.filter_count', '{{label}} {{count}}', { label: t('intelligence.alert_overstock', 'Overstock'), count: stats?.alerts.overstock ?? 0 }) },
