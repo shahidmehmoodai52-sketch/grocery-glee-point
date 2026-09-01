@@ -341,6 +341,22 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
     },
   });
 
+  const { data: flags } = useQuery({
+    queryKey: ["tenant-library-flags", tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("library_show_sell_price, library_show_cost_price")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (error) throw error;
+      return {
+        showSell: data?.library_show_sell_price ?? true,
+        showCost: data?.library_show_cost_price ?? true,
+      };
+    },
+  });
+
   const allowedSet = useMemo(() => new Set(allowed), [allowed]);
   const restricted = allowed.length > 0;
 
@@ -397,22 +413,6 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
       </Card>
     );
   }
-
-  const { data: flags } = useQuery({
-    queryKey: ["tenant-library-flags", tenantId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tenants")
-        .select("library_show_sell_price, library_show_cost_price")
-        .eq("id", tenantId)
-        .maybeSingle();
-      if (error) throw error;
-      return {
-        showSell: data?.library_show_sell_price ?? true,
-        showCost: data?.library_show_cost_price ?? true,
-      };
-    },
-  });
 
   const summary = restricted
     ? `${allowed.length} categor${allowed.length === 1 ? "y" : "ies"} selected`
