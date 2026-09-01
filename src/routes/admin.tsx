@@ -20,7 +20,7 @@ import {
   AlertTriangle,
   Plus,
   Check,
-  Wand2,
+  RotateCcw,
   Trash2,
   CalendarClock,
   Printer,
@@ -381,6 +381,15 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
     },
   });
 
+  const { data: errorCount = 0 } = useQuery({
+    queryKey: ["admin-errors-count"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_recent_errors", { _limit: 100 });
+      if (error) throw error;
+      return ((data as any[]) ?? []).length;
+    },
+  });
+
   const totals = useMemo(() => {
     return {
       total: tenants.length,
@@ -414,10 +423,11 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
           tone={summary?.critical_24h ? "danger" : "default"} 
           onClick={() => setActiveTab("security")}
         />
-        <StatCard 
-          label="System errors" 
-          value="Check" 
-          icon={Bug} 
+        <StatCard
+          label="System errors"
+          value={errorCount}
+          icon={Bug}
+          tone={errorCount ? "danger" : "default"}
           onClick={() => setActiveTab("errors")}
         />
         <StatCard 
@@ -905,31 +915,36 @@ type ErrorRow = {
 };
 
 /**
- * Best-effort auto-remediation for known error categories.
- * Returns a short human-readable note describing what was tried.
- * Real code-level bugs still need a code fix — this handles the recoverable ones.
+ * Attempts one known, real recovery action for sync/offline-queue errors
+ * (re-running the offline sync queue) and reports whether it actually ran.
+ * Every other category is a categorization only, not a fix — this never
+ * claims to have "auto-fixed" a real code bug, and only the sync branch is
+ * ever auto-resolved; everything else is left for the admin to confirm.
  */
-async function autoRemediate(row: ErrorRow): Promise<string> {
+async function autoRemediate(row: ErrorRow): Promise<{ note: string; autoResolved: boolean }> {
   const type = (row.error_type ?? "").toLowerCase();
   try {
     if (type.includes("sync") || type.includes("offline") || type.includes("queue")) {
       const mod = await import("@/lib/offline/sync");
       const fn = (mod as any).syncNow ?? (mod as any).runSync ?? (mod as any).default;
-      if (typeof fn === "function") { await fn(); return "Re-ran offline sync queue"; }
-      return "Marked resolved (no sync runner available)";
+      if (typeof fn === "function") {
+        await fn();
+        return { note: "Re-ran offline sync queue", autoResolved: true };
+      }
+      return { note: "No sync runner available — needs manual review", autoResolved: false };
     }
     if (type.includes("cache") || type.includes("stale") || type.includes("query")) {
-      return "Cleared stale query cache";
+      return { note: "Likely a stale client cache — reload should clear it", autoResolved: false };
     }
     if (type.includes("render") || type.includes("react") || type.includes("hydration")) {
-      return "Cleared boundary — user should reload the affected page";
+      return { note: "Rendering error — user should reload the affected page", autoResolved: false };
     }
     if (type.includes("network") || type.includes("fetch") || type.includes("timeout")) {
-      return "Transient network error — safe to dismiss";
+      return { note: "Looks like a transient network error", autoResolved: false };
     }
-    return "Marked as resolved (no automatic fix available for this type)";
+    return { note: "No known automatic recovery for this error type", autoResolved: false };
   } catch (e: any) {
-    return `Auto-fix attempt failed: ${e?.message ?? "unknown"} — marked resolved anyway`;
+    return { note: `Recovery attempt failed: ${e?.message ?? "unknown"}`, autoResolved: false };
   }
 }
 
@@ -937,6 +952,8 @@ function ErrorsTab() {
   const qc = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [retryAllOpen, setRetryAllOpen] = useState(false);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-errors"],
@@ -986,9 +1003,14 @@ function ErrorsTab() {
     invalidate();
   };
 
-  const autoFixOne = async (row: ErrorRow) => {
+  const retryOne = async (row: ErrorRow) => {
     setBusyId(row.id);
-    const note = await autoRemediate(row);
+    const { note, autoResolved } = await autoRemediate(row);
+    if (!autoResolved) {
+      setBusyId(null);
+      toast.info(note, { description: "Not resolved automatically — review and resolve manually if this is safe to dismiss." });
+      return;
+    }
     const { error } = await supabase.rpc("admin_resolve_error", { _id: row.id, _note: note });
     setBusyId(null);
     if (error) return toast.error(error.message);
@@ -997,8 +1019,6 @@ function ErrorsTab() {
   };
 
   const clearAll = async () => {
-    if (!rows.length) return;
-    if (!confirm(`Mark all ${rows.length} errors as resolved?`)) return;
     setBulkBusy(true);
     const { data, error } = await supabase.rpc("admin_resolve_errors_bulk", {
       _note: "Bulk cleared by developer",
@@ -1009,18 +1029,18 @@ function ErrorsTab() {
     invalidate();
   };
 
-  const autoFixAll = async () => {
-    if (!rows.length) return;
-    if (!confirm(`Attempt auto-fix on all ${rows.length} errors? Unrecoverable ones will just be marked resolved.`)) return;
+  const retryAll = async () => {
     setBulkBusy(true);
-    let ok = 0;
+    let retried = 0;
+    let skipped = 0;
     for (const r of rows) {
-      const note = await autoRemediate(r);
+      const { note, autoResolved } = await autoRemediate(r);
+      if (!autoResolved) { skipped++; continue; }
       const { error } = await supabase.rpc("admin_resolve_error", { _id: r.id, _note: note });
-      if (!error) ok++;
+      if (!error) retried++;
     }
     setBulkBusy(false);
-    toast.success(`Auto-fixed ${ok} of ${rows.length}`);
+    toast.success(`Retried and resolved ${retried} of ${rows.length}${skipped ? ` — ${skipped} need manual review` : ""}`);
     invalidate();
   };
 
@@ -1033,10 +1053,10 @@ function ErrorsTab() {
             <div className="font-medium text-sm">Affected shops</div>
             <span className="text-xs text-muted-foreground">Which shop has which issue count</span>
             <div className="ml-auto flex gap-2">
-              <Button size="sm" variant="outline" onClick={autoFixAll} disabled={bulkBusy}>
-                <Wand2 className="h-4 w-4 mr-1" /> Auto-fix all
+              <Button size="sm" variant="outline" onClick={() => setRetryAllOpen(true)} disabled={bulkBusy || !rows.length}>
+                <RotateCcw className="h-4 w-4 mr-1" /> Retry all
               </Button>
-              <Button size="sm" variant="outline" onClick={clearAll} disabled={bulkBusy}>
+              <Button size="sm" variant="outline" onClick={() => setClearAllOpen(true)} disabled={bulkBusy || !rows.length}>
                 <Check className="h-4 w-4 mr-1" /> Clear all
               </Button>
             </div>
@@ -1098,8 +1118,8 @@ function ErrorsTab() {
                   <TableCell className="text-muted-foreground text-xs">{e.page_or_module ?? "—"}</TableCell>
                   <TableCell className="text-right whitespace-nowrap">
                     <div className="inline-flex gap-1">
-                      <Button size="sm" variant="outline" onClick={() => autoFixOne(e)} disabled={busy} title="Attempt auto-fix and mark resolved">
-                        <Wand2 className="h-4 w-4 mr-1" /> Auto-fix
+                      <Button size="sm" variant="outline" onClick={() => retryOne(e)} disabled={busy} title="Retry known recovery action, resolve only if it actually succeeds">
+                        <RotateCcw className="h-4 w-4 mr-1" /> Retry & resolve
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => resolveOne(e)} disabled={busy} title="Mark as resolved">
                         <Check className="h-4 w-4" />
@@ -1112,6 +1132,24 @@ function ErrorsTab() {
           </TableBody>
         </Table>
       </Card>
+
+      <TypedConfirmDialog
+        open={clearAllOpen}
+        onOpenChange={setClearAllOpen}
+        title="Resolve all errors"
+        description={`Mark all ${rows.length} unresolved errors as resolved? This does not fix anything — it only clears them from this list.`}
+        confirmLabel="Resolve all"
+        onConfirm={async () => { await clearAll(); }}
+      />
+
+      <TypedConfirmDialog
+        open={retryAllOpen}
+        onOpenChange={setRetryAllOpen}
+        title="Retry all errors"
+        description={`Attempt the known recovery action for each of the ${rows.length} unresolved errors. Only ones that actually recover will be marked resolved — the rest are left for manual review.`}
+        confirmLabel="Retry all"
+        onConfirm={async () => { await retryAll(); }}
+      />
     </div>
 
   );
@@ -1581,6 +1619,7 @@ function LibraryTab() {
   const canManage = isSuperAdmin || has("library.manage");
   const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-library", status],
@@ -1619,10 +1658,10 @@ function LibraryTab() {
     qc.invalidateQueries({ queryKey: ["admin-library"] });
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}" from the global library?`)) return;
-    const { error } = await supabase.from("global_products").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+  const remove = async (_reason: string) => {
+    if (!deleteTarget) return;
+    const { error } = await supabase.from("global_products").delete().eq("id", deleteTarget.id);
+    if (error) { toast.error(error.message); return; }
     toast.success("Deleted");
     qc.invalidateQueries({ queryKey: ["admin-library"] });
   };
@@ -1712,7 +1751,7 @@ function LibraryTab() {
                           <Ban className="h-4 w-4 mr-1 text-destructive" /> Reject
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" title="Delete permanently" onClick={() => remove(r.id, r.name)}>
+                      <Button size="icon" variant="ghost" title="Delete permanently" onClick={() => setDeleteTarget({ id: r.id, name: r.name })}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -1723,6 +1762,18 @@ function LibraryTab() {
           </TableBody>
         </Table>
       </Card>
+
+      <TypedConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete library item"
+        description={`Delete "${deleteTarget?.name}" from the global library? This removes it for every shop that hasn't already imported it.`}
+        confirmText={deleteTarget?.name}
+        requireReason
+        destructive
+        confirmLabel="Delete"
+        onConfirm={remove}
+      />
     </div>
   );
 }
@@ -1751,13 +1802,14 @@ function AdminStaffTab() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminStaffRow | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<AdminStaffRow | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-staff"] });
 
-  const removeStaff = async (u: AdminStaffRow) => {
-    if (!confirm(`Remove admin access for ${u.email}?`)) return;
+  const removeStaff = async (_reason: string) => {
+    if (!removeTarget) return;
     try {
-      await remove({ data: { user_id: u.user_id } });
+      await remove({ data: { user_id: removeTarget.user_id } });
       toast.success("Removed");
       invalidate();
     } catch (e: any) {
@@ -1811,7 +1863,7 @@ function AdminStaffTab() {
                 <TableCell className="text-right">
                   <div className="inline-flex gap-1">
                     <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>Edit</Button>
-                    <Button size="icon" variant="ghost" title="Remove" onClick={() => removeStaff(u)}>
+                    <Button size="icon" variant="ghost" title="Remove" onClick={() => setRemoveTarget(u)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -1821,6 +1873,17 @@ function AdminStaffTab() {
           </TableBody>
         </Table>
       </Card>
+
+      <TypedConfirmDialog
+        open={!!removeTarget}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}
+        title="Remove admin access"
+        description={`Remove admin panel access for ${removeTarget?.email}? They will immediately lose all admin permissions.`}
+        requireReason
+        destructive
+        confirmLabel="Remove access"
+        onConfirm={removeStaff}
+      />
 
       <AdminStaffDialog
         open={addOpen}
