@@ -3836,11 +3836,15 @@ export type Database = {
         Returns: string
       }
       admin_clear_security_events: {
-        Args: { _older_than_days?: number; _severity?: string }
+        Args: {
+          _older_than_days?: number
+          _reason?: string
+          _severity?: string
+        }
         Returns: number
       }
       admin_delete_tenant: {
-        Args: { _confirm: string; _tenant_id: string }
+        Args: { _confirm: string; _reason?: string; _tenant_id: string }
         Returns: Json
       }
       admin_has_perm: {
@@ -3870,7 +3874,12 @@ export type Database = {
         }
       }
       admin_list_tenants: {
-        Args: never
+        Args: {
+          _limit?: number
+          _offset?: number
+          _search?: string
+          _status?: string
+        }
         Returns: {
           created_at: string
           id: string
@@ -3887,6 +3896,7 @@ export type Database = {
           status: string
           subscription_expires_at: string
           subscription_status: string
+          total_count: number
         }[]
       }
       admin_recent_errors: {

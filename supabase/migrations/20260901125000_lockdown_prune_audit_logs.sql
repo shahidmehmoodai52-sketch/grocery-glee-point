@@ -1,0 +1,23 @@
+-- CRITICAL: prune_audit_logs(_days integer DEFAULT 180) is a SECURITY
+-- DEFINER function with no internal authorization check at all, and was
+-- granted EXECUTE to anon (unauthenticated) and authenticated. Confirmed
+-- live on production: any unauthenticated caller could POST
+-- /rest/v1/rpc/prune_audit_logs with _days=0 and permanently delete the
+-- entire cross-tenant audit_logs table in one request. This function is
+-- only ever invoked by a pg_cron job ("prune-audit-logs", daily 03:15,
+-- `SELECT public.prune_audit_logs(30);`), which runs as postgres and does
+-- not need a client-facing grant at all -- it has zero legitimate
+-- client-facing use case (confirmed: no reference anywhere in src/ outside
+-- the auto-generated types.ts). The fix is a pure grant lockdown, not an
+-- internal admin_has_perm/is_super_admin check: adding one would risk
+-- breaking the cron job itself, since a cron-triggered call has no JWT
+-- context and auth.uid() would resolve to NULL.
+--
+-- This was already applied as an emergency live patch directly against
+-- production and the migration-target project ahead of this migration
+-- being written, given the severity (unauthenticated, cross-tenant,
+-- irreversible mass deletion of audit history). This file makes that fix
+-- a tracked, reproducible part of history instead of another untracked
+-- live-only change.
+
+REVOKE ALL ON FUNCTION public.prune_audit_logs(integer) FROM public, anon, authenticated;
