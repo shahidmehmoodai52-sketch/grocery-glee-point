@@ -28,6 +28,22 @@ function isNetworkError(e: any): boolean {
   );
 }
 
+/** A stale/expired access token (e.g. the tab was backgrounded long enough
+ *  that Supabase's own refresh timer missed its window) surfaces as an auth
+ *  error, not a network error — but it must be handled the same way here:
+ *  never lose the cashier's sale, queue it for sync instead. __root.tsx
+ *  proactively refreshes the session on focus/reconnect to keep this rare,
+ *  but this is the backstop for the case where that hasn't caught up yet. */
+function isAuthExpiredError(e: any): boolean {
+  const code = String((e as any)?.code ?? "").toUpperCase();
+  if (code === "PGRST301") return true;
+  const msg = String(e?.message ?? e ?? "").toLowerCase();
+  if (!msg) return false;
+  return /jwt expired|invalid jwt|jwt.*invalid|pgrst301|token is expired|session.*expired|refresh_token_not_found/.test(
+    msg,
+  );
+}
+
 
 /** Try cloud, warm local cache on success. On network failure (offline / fetch throw),
  *  fall back to local cache. On other errors, rethrow so the UI shows them. */
@@ -202,9 +218,11 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload, met
       }
       return { sale, offline: false };
     } catch (e: any) {
-      // Network died mid-request → fall through to the offline path
-      // so the cashier never loses a sale.
-      if (!enabled || !isNetworkError(e)) throw e;
+      // Network died mid-request, or the access token had silently expired
+      // (backgrounded tab) → fall through to the offline path so the
+      // cashier never loses a sale. A queued sale retries automatically
+      // once the connection/session is good again.
+      if (!enabled || !(isNetworkError(e) || isAuthExpiredError(e))) throw e;
     }
   }
 

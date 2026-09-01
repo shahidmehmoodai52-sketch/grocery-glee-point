@@ -18,6 +18,7 @@ import { installChunkRecovery } from "../lib/chunk-recovery";
 
 import { useEnterAsClick } from "../hooks/use-enter-as-click";
 import { useSessionHeartbeat } from "../hooks/use-session-heartbeat";
+import { supabase } from "../integrations/supabase/client";
 
 function NotFoundComponent() {
   return (
@@ -195,6 +196,16 @@ function RootComponent() {
         // Reconnect can fire several `online` events (Wi-Fi flap, VPN, captive
         // portal). Debounce so only one sync pass runs, and never sooner than
         // 10s after the previous reconnect-triggered pass.
+        // A backgrounded/suspended tab can miss the Supabase client's internal
+        // refresh timer, leaving the access token silently expired — the next
+        // request then fails with "JWT expired" instead of just working (this
+        // hit a real shop while saving an invoice). Force a refresh whenever
+        // the app regains focus or the network comes back, so the token is
+        // never stale by the time the cashier's next action fires.
+        const refreshSessionIfNeeded = () => {
+          void supabase.auth.refreshSession().catch(() => {/* no session yet, or already fresh — ignore */});
+        };
+
         let offlineSince: number | null = null;
         const debouncedReconnectSync = debounceAsync(() => trigger("reconnect"), 2500, 10_000);
         const onOnline = () => {
@@ -202,6 +213,7 @@ function RootComponent() {
             logPerf("reconnected", { offlineForMs: Math.round(nowMs() - offlineSince) });
             offlineSince = null;
           }
+          refreshSessionIfNeeded();
           debouncedReconnectSync();
         };
         const onOffline = () => { offlineSince = nowMs(); };
@@ -212,7 +224,11 @@ function RootComponent() {
 
         // Returning to the tab (or app resume on desktop) is also a good moment
         // to drain the queue — some platforms never fire an `online` event.
-        const onVisible = () => { if (document.visibilityState === "visible") debouncedReconnectSync(); };
+        const onVisible = () => {
+          if (document.visibilityState !== "visible") return;
+          refreshSessionIfNeeded();
+          debouncedReconnectSync();
+        };
         document.addEventListener("visibilitychange", onVisible);
 
         cleanup = () => {
