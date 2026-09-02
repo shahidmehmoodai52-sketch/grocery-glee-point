@@ -3986,6 +3986,7 @@ export type Database = {
         Args: { _session_id: string }
         Returns: undefined
       }
+      admin_error_observability: { Args: never; Returns: Json }
       admin_export_tenant_data: {
         Args: {
           _category: string
@@ -4129,6 +4130,10 @@ export type Database = {
       }
       admin_tenant_detail: { Args: { _tenant_id: string }; Returns: Json }
       admin_unblock_identifier: { Args: { _id: string }; Returns: undefined }
+      admin_unresolve_error: {
+        Args: { _id: string; _note?: string }
+        Returns: undefined
+      }
       am_i_admin_staff: { Args: never; Returns: boolean }
       am_i_super_admin: { Args: never; Returns: boolean }
       approve_shift: { Args: { _shift_id: string }; Returns: string }

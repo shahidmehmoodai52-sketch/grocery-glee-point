@@ -1465,12 +1465,45 @@ type ErrorRow = {
   created_at: string;
 };
 
+interface ErrorObservability {
+  trend: { today: number; last_7d: number; previous_7d: number };
+  top_recurring: {
+    error_type: string; page_or_module: string | null; count: number; unresolved_count: number;
+    affected_shops: number; first_seen: string; last_seen: string; sample_message: string;
+  }[];
+  recently_resolved: {
+    id: string; tenant_id: string | null; error_type: string; error_message: string;
+    page_or_module: string | null; resolved_at: string; resolved_by: string | null; resolution_note: string | null;
+  }[];
+}
+
 function ErrorsTab() {
   const qc = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const [retryAllOpen, setRetryAllOpen] = useState(false);
+  const [showResolved, setShowResolved] = useState(false);
+
+  const { data: observability } = useQuery({
+    queryKey: ["admin-error-observability"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_error_observability");
+      if (error) throw error;
+      return data as unknown as ErrorObservability;
+    },
+  });
+
+  const unresolveOne = async (id: string) => {
+    setBusyId(id);
+    const { error } = await supabase.rpc("admin_unresolve_error", { _id: id });
+    setBusyId(null);
+    if (error) return toast.error(error.message);
+    toast.success("Error reopened");
+    qc.invalidateQueries({ queryKey: ["admin-errors"] });
+    qc.invalidateQueries({ queryKey: ["admin-errors-count"] });
+    qc.invalidateQueries({ queryKey: ["admin-error-observability"] });
+  };
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-errors"],
@@ -1563,6 +1596,80 @@ function ErrorsTab() {
 
   return (
     <div className="space-y-3">
+      {observability && (
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Errors today" value={observability.trend.today} icon={AlertTriangle} />
+          <StatCard label="Last 7 days" value={observability.trend.last_7d} icon={AlertTriangle}
+            delta={observability.trend.previous_7d > 0
+              ? ((observability.trend.last_7d - observability.trend.previous_7d) / observability.trend.previous_7d) * 100
+              : undefined}
+            sub={`${observability.trend.previous_7d} in the previous 7 days`} />
+          <StatCard label="Recurring groups (30d)" value={observability.top_recurring.length} icon={Bug} />
+        </div>
+      )}
+
+      {observability && observability.top_recurring.length > 0 && (
+        <Card className="p-3">
+          <div className="font-medium text-sm mb-2">Top recurring errors (last 30 days)</div>
+          <p className="text-xs text-muted-foreground mb-2">Grouped by error type + where it happened, so repeats don't look like separate problems.</p>
+          <div className="space-y-1.5">
+            {observability.top_recurring.map((g) => (
+              <div key={`${g.error_type}-${g.page_or_module}`} className="text-xs p-2 rounded border flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium">{g.error_type} <span className="text-muted-foreground font-normal">· {g.page_or_module ?? "—"}</span></div>
+                  <div className="text-muted-foreground truncate max-w-md" title={g.sample_message}>{g.sample_message}</div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-muted-foreground">{g.affected_shops} shop{g.affected_shops === 1 ? "" : "s"}</span>
+                  {g.unresolved_count > 0 && <StatusBadge tone="danger">{g.unresolved_count} open</StatusBadge>}
+                  <StatusBadge tone="neutral">{g.count}x</StatusBadge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant={!showResolved ? "default" : "outline"} onClick={() => setShowResolved(false)}>Unresolved</Button>
+        <Button size="sm" variant={showResolved ? "default" : "outline"} onClick={() => setShowResolved(true)}>Recently resolved</Button>
+      </div>
+
+      {showResolved ? (
+        <Card className="p-3">
+          {!observability || observability.recently_resolved.length === 0 ? (
+            <EmptyState icon={Check} title="Nothing resolved yet" description="Resolved errors will show up here." />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Resolved</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>Note</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {observability.recently_resolved.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(e.resolved_at).toLocaleString()}</TableCell>
+                    <TableCell><StatusBadge tone="neutral">{e.error_type}</StatusBadge></TableCell>
+                    <TableCell className="max-w-md truncate" title={e.error_message}>{e.error_message}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-xs truncate">{e.resolution_note ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => unresolveOne(e.id)} disabled={busyId === e.id}>
+                        Unresolve
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      ) : (
+      <>
       {byShop.length > 0 && (
         <Card className="p-3">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -1649,6 +1756,8 @@ function ErrorsTab() {
           </TableBody>
         </Table>
       </Card>
+      </>
+      )}
 
       <TypedConfirmDialog
         open={clearAllOpen}
