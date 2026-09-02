@@ -29,12 +29,15 @@ import {
   TrendingUp,
   Wallet,
   LayoutDashboard,
+  HeartPulse,
+  RefreshCw,
+  Flag,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -132,6 +135,9 @@ type TenantRow = {
   subscription_expires_at: string | null;
   created_at: string;
   last_activity_at: string | null;
+  last_login_at: string | null;
+  plan_max_users: number | null;
+  plan_max_products: number | null;
 };
 
 type SecuritySummary = {
@@ -240,6 +246,9 @@ function AdminPanelPage() {
               <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             )}
           </TabsTrigger>
+          <TabsTrigger value="health"><HeartPulse className="h-4 w-4 mr-1" />Health</TabsTrigger>
+          <TabsTrigger value="billing"><Wallet className="h-4 w-4 mr-1" />Billing</TabsTrigger>
+          <TabsTrigger value="flags"><Flag className="h-4 w-4 mr-1" />Feature Flags</TabsTrigger>
         </TabsList>
          <TabsContent value="dashboard" className="mt-3"><DashboardTab setActiveTab={setActiveTab} /></TabsContent>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
@@ -250,8 +259,390 @@ function AdminPanelPage() {
         )}
         <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
+        <TabsContent value="health" className="mt-3"><HealthTab /></TabsContent>
+        <TabsContent value="billing" className="mt-3"><BillingTab /></TabsContent>
+        <TabsContent value="flags" className="mt-3"><FeatureFlagsTab /></TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+interface HealthCheck {
+  name: string;
+  status: "healthy" | "warning" | "critical";
+  detail: string;
+  checked_at: string;
+}
+interface PlatformHealth {
+  overall: "healthy" | "warning" | "critical";
+  checks: HealthCheck[];
+  generated_at: string;
+}
+
+const healthTone: Record<string, "success" | "warning" | "danger"> = {
+  healthy: "success",
+  warning: "warning",
+  critical: "danger",
+};
+
+function HealthTab() {
+  const queryClient = useQueryClient();
+  const { data: health, isFetching, isLoading, dataUpdatedAt } = useQuery({
+    queryKey: ["admin-platform-health"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_platform_health");
+      if (error) throw error;
+      return data as unknown as PlatformHealth;
+    },
+  });
+
+  if (isLoading) return <TableSkeleton rows={5} columns={2} />;
+  if (!health) return <EmptyState icon={HeartPulse} title="Health unavailable" description="Could not load platform health." />;
+
+  const overallTone = healthTone[health.overall] ?? "neutral";
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <span className={`grid h-10 w-10 place-items-center rounded-full ${
+            overallTone === "success" ? "bg-success/10 text-success" :
+            overallTone === "warning" ? "bg-warning/15 text-warning-foreground" :
+            "bg-destructive/10 text-destructive"
+          }`}>
+            <HeartPulse className="h-5 w-5" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold capitalize">{health.overall}</span>
+              <StatusBadge status={health.overall} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Last refreshed {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : "—"}
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isFetching}
+          onClick={() => queryClient.invalidateQueries({ queryKey: ["admin-platform-health"] })}
+        >
+          <RefreshCw className={`h-4 w-4 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
+          Refresh Health
+        </Button>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {health.checks.map((check) => (
+          <Card key={check.name} className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm">{check.name}</span>
+              <StatusBadge status={check.status} />
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{check.detail}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Checked {new Date(check.checked_at).toLocaleTimeString()}
+            </p>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface BillingSummary {
+  total_active: number;
+  expiring_7d: number;
+  expiring_30d: number;
+  expired: number;
+  status_distribution: { status: string; count: number }[];
+  plan_distribution: { plan_id: string; plan_name: string; active_count: number; price_monthly: number }[];
+  projected_mrr: number;
+  expiring_queue: {
+    tenant_id: string; tenant_name: string; plan_name: string | null;
+    expires_at: string; days_remaining: number; owner_email: string | null; status: string;
+  }[];
+  generated_at: string;
+}
+
+function BillingTab() {
+  const navigate = useNavigate();
+  const { data: billing, isLoading } = useQuery({
+    queryKey: ["admin-billing-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_billing_summary");
+      if (error) throw error;
+      return data as unknown as BillingSummary;
+    },
+  });
+
+  if (isLoading) return <TableSkeleton rows={5} columns={4} />;
+  if (!billing) return <EmptyState icon={Wallet} title="Billing unavailable" description="Could not load billing summary." />;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <StatCard label="Active subscriptions" value={billing.total_active} icon={CheckCircle2} />
+        <StatCard label="Expiring in 7 days" value={billing.expiring_7d} icon={CalendarClock} tone={billing.expiring_7d > 0 ? "warning" : "default"} />
+        <StatCard label="Expiring in 30 days" value={billing.expiring_30d} icon={CalendarClock} />
+        <StatCard label="Expired (still active)" value={billing.expired} icon={AlertTriangle} tone={billing.expired > 0 ? "danger" : "default"} />
+        <StatCard label="Projected MRR" value={fmtMoney(billing.projected_mrr, "")} icon={Wallet} sub="From assigned plan prices, not collected revenue" />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card className="p-4">
+          <div className="font-medium mb-3">Plan distribution</div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Plan</TableHead>
+                <TableHead>Price/mo</TableHead>
+                <TableHead className="text-right">Active subs</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {billing.plan_distribution.map((p) => (
+                <TableRow key={p.plan_id}>
+                  <TableCell>{p.plan_name}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{fmtMoney(p.price_monthly, "")}</TableCell>
+                  <TableCell className="text-right font-medium">{p.active_count}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+
+        <Card className="p-4">
+          <div className="font-medium mb-3">Status distribution</div>
+          {billing.status_distribution.length === 0 ? (
+            <EmptyState icon={Wallet} title="No subscriptions yet" description="No tenant has a billing subscription assigned." />
+          ) : (
+            <div className="space-y-2">
+              {billing.status_distribution.map((s) => (
+                <div key={s.status} className="flex items-center justify-between text-sm p-2 rounded border">
+                  <StatusBadge status={s.status} />
+                  <span className="font-medium">{s.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <Card className="p-4">
+        <div className="font-medium mb-3">Expiring / overdue queue (next 30 days)</div>
+        {billing.expiring_queue.length === 0 ? (
+          <EmptyState icon={CheckCircle2} title="Nothing expiring soon" description="No active subscription expires within 30 days." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Shop</TableHead>
+                <TableHead>Plan</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Expires</TableHead>
+                <TableHead className="text-right">Days remaining</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {billing.expiring_queue.map((q) => (
+                <TableRow
+                  key={q.tenant_id}
+                  className="cursor-pointer"
+                  onClick={() => navigate({ to: "/admin/shops/$id", params: { id: q.tenant_id } })}
+                >
+                  <TableCell className="font-medium text-primary">{q.tenant_name}</TableCell>
+                  <TableCell className="text-xs">{q.plan_name ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{q.owner_email ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{new Date(q.expires_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-right">
+                    <StatusBadge tone={q.days_remaining < 0 ? "danger" : q.days_remaining <= 7 ? "warning" : "neutral"}>
+                      {q.days_remaining < 0 ? `${Math.abs(q.days_remaining)}d overdue` : `${q.days_remaining}d left`}
+                    </StatusBadge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+interface FeatureFlagRow {
+  key: string;
+  label: string;
+  description: string | null;
+  default_enabled: boolean;
+  plan_states: { plan_name: string; enabled: boolean }[];
+  tenant_overrides: { tenant_id: string; tenant_name: string; enabled: boolean; updated_at: string }[];
+}
+
+function FeatureFlagsTab() {
+  const qc = useQueryClient();
+  const [overrideFor, setOverrideFor] = useState<FeatureFlagRow | null>(null);
+
+  const { data: flags = [], isLoading } = useQuery({
+    queryKey: ["admin-feature-flags"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_feature_flags");
+      if (error) throw error;
+      return (data as unknown as FeatureFlagRow[]) ?? [];
+    },
+  });
+
+  const clearOverride = async (tenantId: string, flagKey: string) => {
+    const { error } = await supabase.rpc("admin_clear_tenant_feature_override", { _tenant_id: tenantId, _flag_key: flagKey });
+    if (error) return toast.error(error.message);
+    toast.success("Override removed");
+    qc.invalidateQueries({ queryKey: ["admin-feature-flags"] });
+  };
+
+  if (isLoading) return <TableSkeleton rows={5} columns={3} />;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground max-w-2xl">
+        Global default and plan-level state come from each plan's own configuration. A tenant override always wins over its plan, which wins over the global default.
+      </p>
+      {flags.length === 0 ? (
+        <EmptyState icon={Flag} title="No feature flags" description="No flags are registered yet." />
+      ) : (
+        <div className="space-y-3">
+          {flags.map((f) => (
+            <Card key={f.key} className="p-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <div className="font-medium flex items-center gap-2">
+                    {f.label}
+                    <StatusBadge tone={f.default_enabled ? "success" : "neutral"}>
+                      Default {f.default_enabled ? "on" : "off"}
+                    </StatusBadge>
+                  </div>
+                  {f.description && <p className="text-xs text-muted-foreground mt-0.5">{f.description}</p>}
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setOverrideFor(f)}>
+                  <Plus className="h-4 w-4 mr-1" /> Tenant override
+                </Button>
+              </div>
+
+              {f.plan_states.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {f.plan_states.map((p) => (
+                    <span key={p.plan_name} className="text-[11px] px-2 py-0.5 rounded-full border">
+                      {p.plan_name}: {p.enabled ? "on" : "off"}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {f.tenant_overrides.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {f.tenant_overrides.map((o) => (
+                    <div key={o.tenant_id} className="flex items-center justify-between text-xs p-2 rounded border">
+                      <span>{o.tenant_name}</span>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge tone={o.enabled ? "success" : "danger"}>{o.enabled ? "Enabled" : "Disabled"}</StatusBadge>
+                        <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => clearOverride(o.tenant_id, f.key)}>
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <TenantOverrideDialog flag={overrideFor} onClose={() => setOverrideFor(null)} />
+    </div>
+  );
+}
+
+function TenantOverrideDialog({ flag, onClose }: { flag: FeatureFlagRow | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [selectedTenant, setSelectedTenant] = useState<{ id: string; name: string } | null>(null);
+  const [enabled, setEnabled] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: results = [] } = useQuery({
+    queryKey: ["admin-tenant-search", debounced],
+    enabled: debounced.length >= 2,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("tenants").select("id,name").ilike("name", `%${debounced}%`).limit(10);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const save = async () => {
+    if (!flag || !selectedTenant) return;
+    setSaving(true);
+    const { error } = await supabase.rpc("admin_set_tenant_feature_override", {
+      _tenant_id: selectedTenant.id, _flag_key: flag.key, _enabled: enabled,
+    });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Override saved for ${selectedTenant.name}`);
+    qc.invalidateQueries({ queryKey: ["admin-feature-flags"] });
+    setSelectedTenant(null);
+    setSearch("");
+    onClose();
+  };
+
+  return (
+    <Dialog open={!!flag} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Tenant override — {flag?.label}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Shop</Label>
+            {selectedTenant ? (
+              <div className="flex items-center justify-between rounded border p-2 text-sm">
+                {selectedTenant.name}
+                <Button size="sm" variant="ghost" onClick={() => setSelectedTenant(null)}>Change</Button>
+              </div>
+            ) : (
+              <>
+                <Input placeholder="Search shop by name..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                {results.length > 0 && (
+                  <div className="border rounded divide-y">
+                    {results.map((r) => (
+                      <button
+                        key={r.id}
+                        className="w-full text-left text-sm p-2 hover:bg-muted"
+                        onClick={() => setSelectedTenant(r)}
+                      >
+                        {r.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <Label className="flex items-center justify-between gap-3 rounded border p-2 text-sm">
+            <span>Enabled for this shop</span>
+            <Switch checked={enabled} onCheckedChange={setEnabled} />
+          </Label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={!selectedTenant || saving}>{saving ? "Saving..." : "Save override"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -596,9 +987,25 @@ function tenantHealthWarning(t: TenantRow): string | null {
   if (t.subscription_expires_at && new Date(t.subscription_expires_at).getTime() < Date.now()) {
     return "Subscription expired";
   }
+  if (t.plan_max_products != null && t.product_count > t.plan_max_products) {
+    return `Over product limit (${t.product_count}/${t.plan_max_products})`;
+  }
+  if (t.plan_max_users != null && t.member_count > t.plan_max_users) {
+    return `Over seat limit (${t.member_count}/${t.plan_max_users})`;
+  }
   if (t.status === "active" && t.last_activity_at) {
     const daysSince = (Date.now() - new Date(t.last_activity_at).getTime()) / 86_400_000;
     if (daysSince >= 30) return `No activity in ${Math.floor(daysSince)} days`;
+  }
+  if (t.subscription_expires_at) {
+    const daysLeft = (new Date(t.subscription_expires_at).getTime() - Date.now()) / 86_400_000;
+    if (daysLeft >= 0 && daysLeft <= 7) return `Expiring in ${Math.ceil(daysLeft)}d`;
+  }
+  if (t.plan_max_products != null && t.product_count >= t.plan_max_products * 0.9) {
+    return `Near product limit (${t.product_count}/${t.plan_max_products})`;
+  }
+  if (t.plan_max_users != null && t.member_count >= t.plan_max_users * 0.9) {
+    return `Near seat limit (${t.member_count}/${t.plan_max_users})`;
   }
   return null;
 }
@@ -805,11 +1212,24 @@ function TenantsTab() {
                   <ExpiryCell tenantId={t.id} expiresAt={t.subscription_expires_at} />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                  {t.last_activity_at ? new Date(t.last_activity_at).toLocaleDateString() : "—"}
+                  <div>{t.last_activity_at ? new Date(t.last_activity_at).toLocaleDateString() : "—"}</div>
+                  <div className="text-[10px]">Login: {t.last_login_at ? new Date(t.last_login_at).toLocaleDateString() : "—"}</div>
                 </TableCell>
 
-                <TableCell className="text-right text-sm">{t.member_count}</TableCell>
-                <TableCell className="text-right text-sm">{t.product_count}</TableCell>
+                <TableCell className="text-right text-sm">
+                  {t.plan_max_users != null ? (
+                    <span className={t.member_count > t.plan_max_users ? "text-destructive font-medium" : ""}>
+                      {t.member_count}/{t.plan_max_users}
+                    </span>
+                  ) : t.member_count}
+                </TableCell>
+                <TableCell className="text-right text-sm">
+                  {t.plan_max_products != null ? (
+                    <span className={t.product_count > t.plan_max_products ? "text-destructive font-medium" : ""}>
+                      {t.product_count}/{t.plan_max_products}
+                    </span>
+                  ) : t.product_count}
+                </TableCell>
                 <TableCell className="text-right text-sm">
                   <div className="font-medium">{t.sales_count}</div>
                   <div className="text-[11px] text-muted-foreground">{fmtMoney(t.sales_total)}</div>
@@ -1077,12 +1497,45 @@ type ErrorRow = {
   created_at: string;
 };
 
+interface ErrorObservability {
+  trend: { today: number; last_7d: number; previous_7d: number };
+  top_recurring: {
+    error_type: string; page_or_module: string | null; count: number; unresolved_count: number;
+    affected_shops: number; first_seen: string; last_seen: string; sample_message: string;
+  }[];
+  recently_resolved: {
+    id: string; tenant_id: string | null; error_type: string; error_message: string;
+    page_or_module: string | null; resolved_at: string; resolved_by: string | null; resolution_note: string | null;
+  }[];
+}
+
 function ErrorsTab() {
   const qc = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const [retryAllOpen, setRetryAllOpen] = useState(false);
+  const [showResolved, setShowResolved] = useState(false);
+
+  const { data: observability } = useQuery({
+    queryKey: ["admin-error-observability"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_error_observability");
+      if (error) throw error;
+      return data as unknown as ErrorObservability;
+    },
+  });
+
+  const unresolveOne = async (id: string) => {
+    setBusyId(id);
+    const { error } = await supabase.rpc("admin_unresolve_error", { _id: id });
+    setBusyId(null);
+    if (error) return toast.error(error.message);
+    toast.success("Error reopened");
+    qc.invalidateQueries({ queryKey: ["admin-errors"] });
+    qc.invalidateQueries({ queryKey: ["admin-errors-count"] });
+    qc.invalidateQueries({ queryKey: ["admin-error-observability"] });
+  };
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-errors"],
@@ -1175,6 +1628,80 @@ function ErrorsTab() {
 
   return (
     <div className="space-y-3">
+      {observability && (
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Errors today" value={observability.trend.today} icon={AlertTriangle} />
+          <StatCard label="Last 7 days" value={observability.trend.last_7d} icon={AlertTriangle}
+            delta={observability.trend.previous_7d > 0
+              ? ((observability.trend.last_7d - observability.trend.previous_7d) / observability.trend.previous_7d) * 100
+              : undefined}
+            sub={`${observability.trend.previous_7d} in the previous 7 days`} />
+          <StatCard label="Recurring groups (30d)" value={observability.top_recurring.length} icon={Bug} />
+        </div>
+      )}
+
+      {observability && observability.top_recurring.length > 0 && (
+        <Card className="p-3">
+          <div className="font-medium text-sm mb-2">Top recurring errors (last 30 days)</div>
+          <p className="text-xs text-muted-foreground mb-2">Grouped by error type + where it happened, so repeats don't look like separate problems.</p>
+          <div className="space-y-1.5">
+            {observability.top_recurring.map((g) => (
+              <div key={`${g.error_type}-${g.page_or_module}`} className="text-xs p-2 rounded border flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium">{g.error_type} <span className="text-muted-foreground font-normal">· {g.page_or_module ?? "—"}</span></div>
+                  <div className="text-muted-foreground truncate max-w-md" title={g.sample_message}>{g.sample_message}</div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-muted-foreground">{g.affected_shops} shop{g.affected_shops === 1 ? "" : "s"}</span>
+                  {g.unresolved_count > 0 && <StatusBadge tone="danger">{g.unresolved_count} open</StatusBadge>}
+                  <StatusBadge tone="neutral">{g.count}x</StatusBadge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant={!showResolved ? "default" : "outline"} onClick={() => setShowResolved(false)}>Unresolved</Button>
+        <Button size="sm" variant={showResolved ? "default" : "outline"} onClick={() => setShowResolved(true)}>Recently resolved</Button>
+      </div>
+
+      {showResolved ? (
+        <Card className="p-3">
+          {!observability || observability.recently_resolved.length === 0 ? (
+            <EmptyState icon={Check} title="Nothing resolved yet" description="Resolved errors will show up here." />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Resolved</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>Note</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {observability.recently_resolved.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(e.resolved_at).toLocaleString()}</TableCell>
+                    <TableCell><StatusBadge tone="neutral">{e.error_type}</StatusBadge></TableCell>
+                    <TableCell className="max-w-md truncate" title={e.error_message}>{e.error_message}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-xs truncate">{e.resolution_note ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => unresolveOne(e.id)} disabled={busyId === e.id}>
+                        Unresolve
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      ) : (
+      <>
       {byShop.length > 0 && (
         <Card className="p-3">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -1261,6 +1788,8 @@ function ErrorsTab() {
           </TableBody>
         </Table>
       </Card>
+      </>
+      )}
 
       <TypedConfirmDialog
         open={clearAllOpen}
@@ -1306,9 +1835,23 @@ type BlocklistRow = {
   created_at: string;
 };
 
+type SupportSessionRow = {
+  id: string;
+  admin_id: string;
+  tenant_id: string;
+  tenant_name: string | null;
+  reason: string;
+  started_at: string;
+  expires_at: string;
+  ended_at: string | null;
+  ended_reason: string | null;
+  is_active: boolean;
+};
+
 
 function SecurityTab() {
   const qc = useQueryClient();
+  const { isSuperAdmin } = useAdminAccess();
   const [severity, setSeverity] = useState<"all" | "info" | "warning" | "critical">("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [debouncedEventType, setDebouncedEventType] = useState("");
@@ -1339,6 +1882,27 @@ function SecurityTab() {
     queryFn: async () => ((await list()) as AdminStaffRow[]) ?? [],
   });
   const adminEmailMap = useMemo(() => new Map(adminStaff.map((s) => [s.user_id, s.email])), [adminStaff]);
+
+  const { data: supportSessions = [] } = useQuery({
+    queryKey: ["admin-support-sessions-active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("admin_support_sessions_view")
+        .select("*")
+        .eq("is_active", true)
+        .order("started_at", { ascending: false });
+      if (error) throw error;
+      return (data as unknown as SupportSessionRow[]) ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+
+  const endSupportSession = async (id: string) => {
+    const { error } = await supabase.rpc("admin_end_support_session", { _session_id: id });
+    if (error) return toast.error(error.message);
+    toast.success("Support session ended");
+    qc.invalidateQueries({ queryKey: ["admin-support-sessions-active"] });
+  };
 
   const { data: summary } = useQuery({
     queryKey: ["admin-security-summary"],
@@ -1541,6 +2105,38 @@ function SecurityTab() {
             ))}
           </TableBody>
         </Table>
+        </Card>
+
+        <Card className="p-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Eye className="h-4 w-4" />
+            <div className="font-medium">Active support sessions</div>
+            <span className="text-xs text-muted-foreground">Read-only "View Shop" sessions currently open</span>
+          </div>
+          {supportSessions.length === 0 ? (
+            <EmptyState icon={Eye} title="No active sessions" description="No admin is currently in Support View for any shop." />
+          ) : (
+            <div className="space-y-2">
+              {supportSessions.map((s) => (
+                <div key={s.id} className="text-xs p-2 rounded border flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{s.tenant_name ?? s.tenant_id}</div>
+                    <div className="text-muted-foreground truncate">
+                      {adminEmailMap.get(s.admin_id) ?? s.admin_id.slice(0, 8)} · "{s.reason}"
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Started {new Date(s.started_at).toLocaleTimeString()} · Expires {new Date(s.expires_at).toLocaleTimeString()}
+                    </div>
+                  </div>
+                  {isSuperAdmin && (
+                    <Button size="sm" variant="outline" onClick={() => endSupportSession(s.id)}>
+                      End
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
 
