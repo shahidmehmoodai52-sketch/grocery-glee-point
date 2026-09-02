@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
   KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2,
-  Calendar, Search, Filter, Eye,
+  Calendar, Search, Filter, Eye, Download,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
@@ -87,6 +88,7 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
@@ -182,6 +184,9 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
           <Button variant="outline" onClick={() => setSupportOpen(true)}>
             <Eye className="h-4 w-4 mr-1" /> View Shop (Support)
           </Button>
+          <Button variant="outline" onClick={() => setExportOpen(true)}>
+            <Download className="h-4 w-4 mr-1" /> Export Data
+          </Button>
           {t.status !== "active" && (
             <Button onClick={() => setStatus("active")}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> {t.status === "pending" ? "Approve" : "Activate"}
@@ -247,6 +252,8 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
         onConfirm={removeShop}
       />
 
+      <ExportDataDialog open={exportOpen} onOpenChange={setExportOpen} tenantId={tenantId} tenantName={t.name} />
+
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview"><ShieldCheck className="h-4 w-4 mr-1" />Overview</TabsTrigger>
@@ -273,6 +280,135 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+const EXPORT_CATEGORIES = [
+  { key: "customers", label: "Customers" },
+  { key: "suppliers", label: "Suppliers" },
+  { key: "products", label: "Products" },
+  { key: "sales", label: "Sales" },
+  { key: "purchases", label: "Purchases" },
+  { key: "expenses", label: "Expenses" },
+] as const;
+
+function toCsv(rows: Record<string, unknown>[]): string {
+  if (rows.length === 0) return "";
+  const columns = Object.keys(rows[0]);
+  const lines = [columns.join(",")];
+  for (const row of rows) {
+    lines.push(columns.map((c) => `"${String(row[c] ?? "").replace(/"/g, '""')}"`).join(","));
+  }
+  return lines.join("\n");
+}
+
+function downloadFile(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function ExportDataDialog({
+  open, onOpenChange, tenantId, tenantName,
+}: { open: boolean; onOpenChange: (v: boolean) => void; tenantId: string; tenantName: string }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [format, setFormat] = useState<"csv" | "json">("csv");
+  const [exporting, setExporting] = useState(false);
+  const [progress, setProgress] = useState("");
+
+  const toggle = (key: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const runExport = async () => {
+    const categories = Array.from(selected);
+    if (categories.length === 0) return toast.error("Select at least one category");
+    setExporting(true);
+    try {
+      for (const category of categories) {
+        setProgress(`Fetching ${category}...`);
+        const rows: Record<string, unknown>[] = [];
+        let offset = 0;
+        let hasMore = true;
+        let pages = 0;
+        while (hasMore && pages < 50) {
+          const { data, error } = await supabase.rpc("admin_export_tenant_data", {
+            _tenant_id: tenantId, _category: category, _limit: 1000, _offset: offset,
+          });
+          if (error) throw error;
+          const page = data as unknown as { rows: Record<string, unknown>[]; has_more: boolean };
+          rows.push(...page.rows);
+          hasMore = page.has_more;
+          offset += 1000;
+          pages += 1;
+          setProgress(`Fetching ${category}... ${rows.length} rows`);
+        }
+        const safeName = tenantName.replace(/[^a-z0-9]+/gi, "_");
+        if (format === "csv") {
+          downloadFile(toCsv(rows), `${safeName}-${category}.csv`, "text/csv");
+        } else {
+          downloadFile(JSON.stringify(rows, null, 2), `${safeName}-${category}.json`, "application/json");
+        }
+      }
+      const { error: logError } = await supabase.rpc("admin_log_tenant_export", {
+        _tenant_id: tenantId, _categories: categories,
+      });
+      if (logError) toast.error(`Export downloaded but audit log failed: ${logError.message}`);
+      else toast.success(`Exported ${categories.length} categor${categories.length === 1 ? "y" : "ies"}`);
+      onOpenChange(false);
+      setSelected(new Set());
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+      setProgress("");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !exporting && onOpenChange(v)}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Export "{tenantName}" data</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Only this shop's own data is exported. No passwords, tokens, or credentials are included. This export is recorded in the admin audit trail.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {EXPORT_CATEGORIES.map((c) => (
+              <label key={c.key} className="flex items-center gap-2 text-sm rounded border p-2 cursor-pointer">
+                <Checkbox checked={selected.has(c.key)} onCheckedChange={() => toggle(c.key)} />
+                {c.label}
+              </label>
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Format</Label>
+            <Select value={format} onValueChange={(v) => setFormat(v as "csv" | "json")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="csv">CSV (one file per category)</SelectItem>
+                <SelectItem value="json">JSON (one file per category)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {exporting && <p className="text-xs text-muted-foreground">{progress}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={exporting}>Cancel</Button>
+          <Button onClick={runExport} disabled={exporting || selected.size === 0}>
+            <Download className="h-4 w-4 mr-1" /> {exporting ? "Exporting..." : "Export"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

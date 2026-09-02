@@ -3916,6 +3916,15 @@ export type Database = {
         Args: { _session_id: string }
         Returns: undefined
       }
+      admin_export_tenant_data: {
+        Args: {
+          _category: string
+          _limit?: number
+          _offset?: number
+          _tenant_id: string
+        }
+        Returns: Json
+      }
       admin_has_perm: {
         Args: { _perm: string; _user_id: string }
         Returns: boolean
@@ -3968,6 +3977,10 @@ export type Database = {
           subscription_status: string
           total_count: number
         }[]
+      }
+      admin_log_tenant_export: {
+        Args: { _categories: string[]; _tenant_id: string }
+        Returns: undefined
       }
       admin_platform_health: { Args: never; Returns: Json }
       admin_recent_errors: {
