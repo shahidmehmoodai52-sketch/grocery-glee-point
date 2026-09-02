@@ -2438,6 +2438,11 @@ function POSPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
+                  // Any scan/keystroke reaching this background field while a dialog
+                  // (e.g. the "add new product" popup) is open belongs to that dialog,
+                  // not to a new search/scan here — a stray scan must never silently
+                  // reopen or replace the popup that's already in progress.
+                  if (document.querySelector('[role="dialog"][data-state="open"]')) return;
                   if (e.key === "Escape") {
                     setSearch("");
                     setCartCursor(-1);
@@ -3508,14 +3513,26 @@ function POSPage() {
                 value={quickAdd.name}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, name: e.target.value }))}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (quickAdd.name.trim()) {
-                      saveQuickAdd();
-                    } else {
-                      toast.error("Please enter item name");
-                    }
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  const val = quickAdd.name.trim();
+                  if (!val) {
+                    toast.error("Please enter item name");
+                    return;
                   }
+                  // A barcode scanner always ends a scan with Enter. If the cashier
+                  // scans the NEXT item while this "add new product" popup is still
+                  // open (e.g. focus drifted onto this field), those digits used to
+                  // save a bogus product named after the scanned barcode. Recognize a
+                  // scanned-looking value — same check openQuickAdd() already uses to
+                  // tell a scan from a typed name — and refuse to save it as a name.
+                  const looksLikeBarcode = /^[0-9A-Za-z\-]{4,}$/.test(val) && /\d/.test(val);
+                  if (looksLikeBarcode) {
+                    setQuickAdd((q) => ({ ...q, name: "" }));
+                    toast.error("That looks like a scanned barcode, not an item name. Finish or cancel this item before scanning the next one.");
+                    return;
+                  }
+                  saveQuickAdd();
                 }}
                 className={!quickAdd.name.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
               />
