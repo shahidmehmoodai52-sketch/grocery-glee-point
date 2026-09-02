@@ -24,6 +24,8 @@ import {
   Building2,
   Smartphone,
   Wallet,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -43,6 +45,14 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -436,6 +446,83 @@ async function searchProductsOnline(q: string) {
   ].forEach(p => merged.set(p.id, p));
 
   return Array.from(merged.values());
+}
+
+/** Searchable customer picker — same Command+Popover combobox pattern already used
+ * for supplier-style pickers elsewhere in the app, so cashiers can type a name or
+ * phone number instead of scrolling a plain dropdown once the customer list grows. */
+function CustomerCombobox({
+  customers,
+  value,
+  onSelect,
+  sym,
+}: {
+  customers: { id: string; name: string; balance: number | null; phone: string | null }[];
+  value: string | null;
+  onSelect: (id: string | null) => void;
+  sym: string;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const selected = value ? (customers.find((c) => c.id === value) ?? null) : null;
+  const walkInLabel = t('pos.walk_in_customer', 'Walk-in customer');
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-9 flex-1 justify-between font-normal"
+        >
+          <span className="truncate">
+            {selected
+              ? `${selected.name}${Number(selected.balance) > 0 ? ` · owes ${fmtMoney(selected.balance, sym)}` : ""}`
+              : walkInLabel}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command filter={(itemValue, search) => (itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
+          <CommandInput placeholder="Search customer or phone…" />
+          <CommandList>
+            <CommandEmpty>No customer found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="walk-in customer"
+                onSelect={() => {
+                  onSelect(null);
+                  setOpen(false);
+                }}
+              >
+                <Check className={cn("mr-2 h-4 w-4", !value ? "opacity-100" : "opacity-0")} />
+                {walkInLabel}
+              </CommandItem>
+              {customers.map((c) => (
+                <CommandItem
+                  key={c.id}
+                  value={`${c.name} ${c.phone ?? ""}`}
+                  onSelect={() => {
+                    onSelect(c.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === c.id ? "opacity-100" : "opacity-0")} />
+                  <span className="truncate flex-1">{c.name}</span>
+                  {Number(c.balance) > 0 && (
+                    <span className="ml-2 shrink-0 text-xs text-muted-foreground">owes {fmtMoney(c.balance, sym)}</span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function POSPage() {
@@ -2931,31 +3018,21 @@ function POSPage() {
                 )}
               </div>
               <div className="flex items-center gap-1.5 mt-1">
-                <Select
-                  value={tab.customer_id ?? "walkin"}
-                  onValueChange={(v) => {
-                    const isWalkin = v === "walkin";
+                <CustomerCombobox
+                  customers={customers}
+                  value={tab.customer_id}
+                  sym={sym}
+                  onSelect={(id) => {
+                    const isWalkin = id === null;
                     setTab({
-                      customer_id: isWalkin ? null : v,
+                      customer_id: id,
                       payment_method: isWalkin ? "cash" : "credit",
                       expense_person_id: null,
                     });
                     if (!isWalkin) setShowStaff(false);
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
-                >
-                  <SelectTrigger className="h-9 flex-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="walkin">{t('pos.walk_in_customer', 'Walk-in customer')}</SelectItem>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name} {Number(c.balance) > 0 ? `· owes ${fmtMoney(c.balance, sym)}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
                 <Button
                   type="button"
                   size="sm"
