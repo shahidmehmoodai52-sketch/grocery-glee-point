@@ -21,8 +21,17 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
     enabled: !!user?.id && online,
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("my_tenant_status");
-      if (error) return null;
+      let { data, error } = await supabase.rpc("my_tenant_status");
+      if (error) {
+        // A stale/about-to-expire access token is a known cause of a spurious
+        // failure here (same class of bug already fixed for the sale-save path
+        // in __root.tsx) — refresh once and retry before giving up, so a shop
+        // owner with a perfectly real shop is never dropped into "Register
+        // your shop" just because their token needed a refresh.
+        await supabase.auth.refreshSession().catch(() => {});
+        ({ data, error } = await supabase.rpc("my_tenant_status"));
+        if (error) throw error;
+      }
       return (data as string | null) ?? null;
     },
   });
@@ -30,8 +39,18 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
   // Super-admins always pass through so they can un-suspend from the panel.
   if (isSuperAdmin) return <>{children}</>;
 
+  // Staff sign in with a synthetic username@shop-<slug>.local address (see
+  // internalEmail() in shop-admin.server.ts) — they never register a shop of
+  // their own. If one of these lands with no tenant membership (e.g. an
+  // owner's "add staff" request that created the login but failed to link it
+  // to the shop before this fix), showing the "Register your shop" form would
+  // let them create an unrelated phantom shop instead of surfacing the real
+  // problem.
+  const isStaffLogin = !!user?.email && /@shop-.+\.local$/i.test(user.email);
+
   // Signed in but has NO shop yet (e.g. Google sign-up path) → force shop setup.
   if (online && user && status === null) {
+    if (isStaffLogin) return <StaffAccountBlocked />;
     return <ShopSetup onDone={() => refetch()} />;
   }
 
@@ -75,6 +94,32 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
 
 
   return <>{children}</>;
+}
+
+function StaffAccountBlocked() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md rounded-lg border border-destructive/40 bg-destructive/5 p-8 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertOctagon className="h-6 w-6" />
+        </div>
+        <h1 className="mt-4 text-xl font-semibold">Account not linked to a shop</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          This staff login isn't linked to a shop yet. Please ask your shop owner to remove this staff account and add it again from Staff Management.
+        </p>
+        <Button
+          className="mt-6"
+          variant="outline"
+          onClick={async () => {
+            await supabase.auth.signOut();
+            window.location.href = "/auth";
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" /> Sign out
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 function ShopSetup({ onDone }: { onDone: () => void }) {

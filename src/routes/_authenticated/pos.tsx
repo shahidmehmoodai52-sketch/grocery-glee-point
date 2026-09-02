@@ -69,7 +69,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty, fmtDate } from "@/lib/format";
-import { roundToTillixQty } from "@/lib/quantity-rounding";
 import {
   deriveDigitalCashBackSummary,
   normalizePaymentAllocations,
@@ -1162,7 +1161,7 @@ function POSPage() {
       items[exIdx] = {
         ...items[exIdx],
         code: items[exIdx].code || nextCode,
-        qty: roundToTillixQty(Number(items[exIdx].qty) + 1),
+        qty: Number(items[exIdx].qty) + 1,
       };
       idx = exIdx;
     } else {
@@ -1194,7 +1193,12 @@ function POSPage() {
       if (i !== idx) return it;
       const next = { ...it, ...patch };
       if ("qty" in patch) {
-        next.qty = roundToTillixQty(Number(patch.qty));
+        // Cashiers weigh loose/bulk items (sugar, rice, etc.) and need to enter
+        // the exact reading — 0.75kg, 0.1kg, whatever the scale shows — not
+        // have it silently snapped to the nearest half/whole unit. Only clamp
+        // to 3 decimal places (matches the qty field's step="0.001") to avoid
+        // floating-point noise, e.g. 0.1 + 0.2 rendering as 0.30000000000000004.
+        next.qty = Math.round(Number(patch.qty) * 1000) / 1000;
       }
       const gross = Number(next.qty) * Number(next.price);
       if ("disc" in patch) {
@@ -2355,6 +2359,17 @@ function POSPage() {
         return;
 
       if (e.key.length === 1) {
+        // A digit/decimal-point typed with an empty search box and a cart row
+        // selected (clicking anywhere on the row sets cartCursor, not just the
+        // small qty button) almost certainly means "change this row's
+        // quantity" — the same intent Enter already opens the qty editor for.
+        // Without this, those keystrokes silently went into the search bar
+        // instead, so the qty cell never changed no matter what was typed.
+        if (!search && /[0-9.]/.test(e.key) && cartCursor >= 0 && cartCursor < tab.items.length) {
+          e.preventDefault();
+          setEditing({ idx: cartCursor, field: "qty" });
+          return;
+        }
         e.preventDefault();
         searchRef.current?.focus();
         setSearch((s) => `${s}${e.key}`);
@@ -2525,6 +2540,11 @@ function POSPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
+                  // Any scan/keystroke reaching this background field while a dialog
+                  // (e.g. the "add new product" popup) is open belongs to that dialog,
+                  // not to a new search/scan here — a stray scan must never silently
+                  // reopen or replace the popup that's already in progress.
+                  if (document.querySelector('[role="dialog"][data-state="open"]')) return;
                   if (e.key === "Escape") {
                     setSearch("");
                     setCartCursor(-1);
@@ -3585,14 +3605,26 @@ function POSPage() {
                 value={quickAdd.name}
                 onChange={(e) => setQuickAdd((q) => ({ ...q, name: e.target.value }))}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (quickAdd.name.trim()) {
-                      saveQuickAdd();
-                    } else {
-                      toast.error("Please enter item name");
-                    }
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  const val = quickAdd.name.trim();
+                  if (!val) {
+                    toast.error("Please enter item name");
+                    return;
                   }
+                  // A barcode scanner always ends a scan with Enter. If the cashier
+                  // scans the NEXT item while this "add new product" popup is still
+                  // open (e.g. focus drifted onto this field), those digits used to
+                  // save a bogus product named after the scanned barcode. Recognize a
+                  // scanned-looking value — same check openQuickAdd() already uses to
+                  // tell a scan from a typed name — and refuse to save it as a name.
+                  const looksLikeBarcode = /^[0-9A-Za-z\-]{4,}$/.test(val) && /\d/.test(val);
+                  if (looksLikeBarcode) {
+                    setQuickAdd((q) => ({ ...q, name: "" }));
+                    toast.error("That looks like a scanned barcode, not an item name. Finish or cancel this item before scanning the next one.");
+                    return;
+                  }
+                  saveQuickAdd();
                 }}
                 className={!quickAdd.name.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
               />
@@ -4836,16 +4868,12 @@ function EditableNumCell({
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
-        const n = Number(draft);
-        const final = display.includes("qty") || display.includes("Qty") || String(display).match(/^\d+(\.\d+)?$/) && step === "0.001" ? roundToTillixQty(n) : n;
-        onCommit(final);
+        onCommit(Number(draft));
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          const n = Number(draft);
-          const final = display.includes("qty") || display.includes("Qty") || String(display).match(/^\d+(\.\d+)?$/) && step === "0.001" ? roundToTillixQty(n) : n;
-          onCommit(final);
+          onCommit(Number(draft));
         } else if (e.key === "Escape") {
           e.preventDefault();
           onCancel();

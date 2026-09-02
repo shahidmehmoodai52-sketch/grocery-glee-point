@@ -42,6 +42,7 @@ import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]
 import { Route as AuthenticatedSuppliersIndexRouteImport } from './routes/_authenticated/suppliers.index'
 import { Route as AuthenticatedStockCountIndexRouteImport } from './routes/_authenticated/stock-count.index'
 import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authenticated/customers.index'
+import { Route as AdminSupportSessionIdRouteImport } from './routes/admin_.support.$sessionId'
 import { Route as AdminShopsIdRouteImport } from './routes/admin_.shops.$id'
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers.$id'
 import { Route as AuthenticatedStockCountIdRouteImport } from './routes/_authenticated/stock-count.$id'
@@ -223,6 +224,11 @@ const AuthenticatedCustomersIndexRoute =
     path: '/customers/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AdminSupportSessionIdRoute = AdminSupportSessionIdRouteImport.update({
+  id: '/admin_/support/$sessionId',
+  path: '/admin/support/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminShopsIdRoute = AdminShopsIdRouteImport.update({
   id: '/admin_/shops/$id',
   path: '/admin/shops/$id',
@@ -307,6 +313,7 @@ export interface FileRoutesByFullPath {
   '/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/admin/shops/$id': typeof AdminShopsIdRoute
+  '/admin/support/$sessionId': typeof AdminSupportSessionIdRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/suppliers/': typeof AuthenticatedSuppliersIndexRoute
@@ -349,6 +356,7 @@ export interface FileRoutesByTo {
   '/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/admin/shops/$id': typeof AdminShopsIdRoute
+  '/admin/support/$sessionId': typeof AdminSupportSessionIdRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/stock-count': typeof AuthenticatedStockCountIndexRoute
   '/suppliers': typeof AuthenticatedSuppliersIndexRoute
@@ -393,6 +401,7 @@ export interface FileRoutesById {
   '/_authenticated/stock-count/$id': typeof AuthenticatedStockCountIdRoute
   '/_authenticated/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/admin_/shops/$id': typeof AdminShopsIdRoute
+  '/admin_/support/$sessionId': typeof AdminSupportSessionIdRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/_authenticated/suppliers/': typeof AuthenticatedSuppliersIndexRoute
@@ -437,6 +446,7 @@ export interface FileRouteTypes {
     | '/stock-count/$id'
     | '/suppliers/$id'
     | '/admin/shops/$id'
+    | '/admin/support/$sessionId'
     | '/customers/'
     | '/stock-count/'
     | '/suppliers/'
@@ -479,6 +489,7 @@ export interface FileRouteTypes {
     | '/stock-count/$id'
     | '/suppliers/$id'
     | '/admin/shops/$id'
+    | '/admin/support/$sessionId'
     | '/customers'
     | '/stock-count'
     | '/suppliers'
@@ -522,6 +533,7 @@ export interface FileRouteTypes {
     | '/_authenticated/stock-count/$id'
     | '/_authenticated/suppliers/$id'
     | '/admin_/shops/$id'
+    | '/admin_/support/$sessionId'
     | '/_authenticated/customers/'
     | '/_authenticated/stock-count/'
     | '/_authenticated/suppliers/'
@@ -540,6 +552,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   AdminShopsIdRoute: typeof AdminShopsIdRoute
+  AdminSupportSessionIdRoute: typeof AdminSupportSessionIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -775,6 +788,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/admin_/support/$sessionId': {
+      id: '/admin_/support/$sessionId'
+      path: '/admin/support/$sessionId'
+      fullPath: '/admin/support/$sessionId'
+      preLoaderRoute: typeof AdminSupportSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/shops/$id': {
       id: '/admin_/shops/$id'
       path: '/admin/shops/$id'
@@ -926,6 +946,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   AdminShopsIdRoute: AdminShopsIdRoute,
+  AdminSupportSessionIdRoute: AdminSupportSessionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

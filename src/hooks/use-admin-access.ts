@@ -3,13 +3,60 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 
 export const ADMIN_PERMS = [
-  { key: "shops.view", label: "View shops, errors & security" },
-  { key: "shops.approve", label: "Approve / activate shops" },
-  { key: "shops.suspend", label: "Suspend / archive shops" },
-  { key: "shops.set_expiry", label: "Set shop expiry date" },
-  { key: "shops.reset_password", label: "Reset shop owner password" },
-  { key: "shops.delete", label: "Delete shops (destructive)" },
-  { key: "library.manage", label: "Manage global product library (approve, edit, remove)" },
+  {
+    key: "shops.view",
+    label: "View shops, errors & security",
+    description: "See the Tenants list, shop details, system errors, and security event logs. Read-only — required for every other shop permission to be useful.",
+    group: "Shop management",
+  },
+  {
+    key: "shops.approve",
+    label: "Approve / activate shops",
+    description: "Move a pending shop to active, or reactivate a suspended one.",
+    group: "Shop management",
+  },
+  {
+    key: "shops.suspend",
+    label: "Suspend / archive shops",
+    description: "Block a shop's staff from signing in, or archive it. Reversible.",
+    group: "Shop management",
+  },
+  {
+    key: "shops.set_expiry",
+    label: "Set shop expiry date",
+    description: "Change a shop's subscription expiry date.",
+    group: "Shop management",
+  },
+  {
+    key: "shops.reset_password",
+    label: "Reset shop owner password",
+    description: "Set a new password for a shop owner who's locked out.",
+    group: "Shop management",
+  },
+  {
+    key: "shops.delete",
+    label: "Delete shops (destructive)",
+    description: "Permanently delete a shop and all its data. Cannot be undone — grant only to fully trusted staff.",
+    group: "Shop management",
+  },
+  {
+    key: "shops.manage",
+    label: "Change shop plan & feature overrides",
+    description: "Assign a shop's plan and set per-shop feature flag overrides. Does not include deletion or password resets.",
+    group: "Shop management",
+  },
+  {
+    key: "errors.manage",
+    label: "Resolve / reopen system errors",
+    description: "Retry, resolve, bulk-resolve, or reopen (unresolve) entries in the Errors tab. Viewing errors only needs 'shops.view'.",
+    group: "Shop management",
+  },
+  {
+    key: "library.manage",
+    label: "Manage global product library",
+    description: "Approve, edit, or remove items in the shared product library that all shops can import from.",
+    group: "Global library",
+  },
 ] as const;
 
 export function useAdminAccess() {

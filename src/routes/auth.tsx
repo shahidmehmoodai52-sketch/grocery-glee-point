@@ -264,6 +264,16 @@ function AuthPage() {
     setFieldErrors({});
   };
 
+  // Owner and Staff sign-in share formError/fieldErrors — without clearing
+  // them here, an error from one tab stayed visible after switching to the
+  // other tab, even though nothing was submitted there.
+  const switchSigninAs = (v: "owner" | "staff") => {
+    setSigninAs(v);
+    setFormError(null);
+    setFieldErrors({});
+    setForgotOpen(false);
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
       <Toaster richColors position="top-right" />
@@ -284,7 +294,7 @@ function AuthPage() {
           <p className="text-sm text-muted-foreground mt-1">Sign in or register your shop</p>
         </div>
 
-        <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setFormError(null); resetRegister(); }}>
+        <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setFormError(null); setForgotOpen(false); resetRegister(); }}>
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="signin">Sign in</TabsTrigger>
             <TabsTrigger value="signup">Register new shop</TabsTrigger>
@@ -293,9 +303,9 @@ function AuthPage() {
           {/* ---------- SIGN IN ---------- */}
           <TabsContent value="signin" className="mt-6 space-y-4">
             <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
-              <button type="button" onClick={() => setSigninAs("owner")}
+              <button type="button" onClick={() => switchSigninAs("owner")}
                 className={`py-1.5 rounded ${signinAs === "owner" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}>Owner</button>
-              <button type="button" onClick={() => setSigninAs("staff")}
+              <button type="button" onClick={() => switchSigninAs("staff")}
                 className={`py-1.5 rounded ${signinAs === "staff" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}>Shop staff</button>
             </div>
 
