@@ -107,13 +107,27 @@ export const createShopStaff = createServerFn({ method: "POST" })
       throw new Error(`Username "${username}" already exists in this shop`);
     }
 
-    const { error: finalizeError } = await context.supabase.rpc("shop_owner_finalize_staff", {
+    const finalizeArgs = {
       _staff_user_id: uid,
       _username: username,
       _role: data.role,
       _perms: data.role === "cashier" ? data.perms : [],
-    });
-    if (finalizeError) throw new Error(finalizeError.message);
+    };
+    let { error: finalizeError } = await context.supabase.rpc("shop_owner_finalize_staff", finalizeArgs);
+    if (finalizeError) {
+      // The staff auth account above was just created for real and can log in
+      // on its own — if this second step (linking it to the shop) never
+      // completes, that login would be stuck with no shop forever. Retry once
+      // before giving up, since a transient failure here (e.g. the owner's
+      // own token expiring mid-request) is the same class of bug already
+      // handled elsewhere in this app.
+      ({ error: finalizeError } = await context.supabase.rpc("shop_owner_finalize_staff", finalizeArgs));
+    }
+    if (finalizeError) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.auth.admin.deleteUser(uid).catch(() => {});
+      throw new Error(finalizeError.message);
+    }
 
     return { id: uid, username };
   });
