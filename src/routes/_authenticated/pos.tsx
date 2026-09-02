@@ -2268,6 +2268,17 @@ function POSPage() {
         return;
 
       if (e.key.length === 1) {
+        // A digit/decimal-point typed with an empty search box and a cart row
+        // selected (clicking anywhere on the row sets cartCursor, not just the
+        // small qty button) almost certainly means "change this row's
+        // quantity" — the same intent Enter already opens the qty editor for.
+        // Without this, those keystrokes silently went into the search bar
+        // instead, so the qty cell never changed no matter what was typed.
+        if (!search && /[0-9.]/.test(e.key) && cartCursor >= 0 && cartCursor < tab.items.length) {
+          e.preventDefault();
+          setEditing({ idx: cartCursor, field: "qty" });
+          return;
+        }
         e.preventDefault();
         searchRef.current?.focus();
         setSearch((s) => `${s}${e.key}`);
@@ -4777,14 +4788,19 @@ function EditableNumCell({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
         const n = Number(draft);
-        const final = display.includes("qty") || display.includes("Qty") || String(display).match(/^\d+(\.\d+)?$/) && step === "0.001" ? roundToTillixQty(n) : n;
+        // Only the qty column uses step="0.001" (price/discount use "0.01") —
+        // that alone reliably identifies it, unlike the old check which
+        // pattern-matched the formatted display text and silently broke for
+        // any qty >= 1000 (comma-grouped by toLocaleString, so it no longer
+        // matched a plain-digits regex and skipped the rounding rule).
+        const final = step === "0.001" ? roundToTillixQty(n) : n;
         onCommit(final);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
           const n = Number(draft);
-          const final = display.includes("qty") || display.includes("Qty") || String(display).match(/^\d+(\.\d+)?$/) && step === "0.001" ? roundToTillixQty(n) : n;
+          const final = step === "0.001" ? roundToTillixQty(n) : n;
           onCommit(final);
         } else if (e.key === "Escape") {
           e.preventDefault();
