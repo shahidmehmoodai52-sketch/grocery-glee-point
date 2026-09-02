@@ -850,6 +850,52 @@ function PlanTab({ detail, tenantId }: { detail: TenantDetail; tenantId: string 
   );
 }
 
+function TenantSecurityCard({ tenantId }: { tenantId: string }) {
+  // Tenant-scoped read of the same security_events table the Security tab
+  // uses, filtered to this tenant only — reuses the existing RLS policy
+  // (super-admin-only SELECT), no new RPC, and the explicit tenant_id
+  // filter means this can never surface another tenant's events.
+  const { data: events = [], isLoading } = useQuery({
+    queryKey: ["admin-tenant-security-events", tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("security_events")
+        .select("id, event_type, severity, ip_address, email, path, created_at")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  return (
+    <Card className="p-3">
+      <div className="text-sm font-medium mb-2 flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Security events (last 20)</div>
+      {isLoading ? (
+        <TableSkeleton rows={3} columns={3} />
+      ) : events.length === 0 ? (
+        <EmptyState icon={ShieldCheck} title="Clean" description="No security events recorded for this shop." />
+      ) : (
+        <div className="space-y-1.5">
+          {events.map((e) => (
+            <div key={e.id} className="text-xs p-2 rounded border flex items-center justify-between gap-2">
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="font-medium">{e.event_type}</span>
+                <span className="text-muted-foreground truncate">{e.ip_address || e.email || "—"}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <StatusBadge tone={e.severity === "critical" ? "danger" : e.severity === "warning" ? "warning" : "neutral"}>{e.severity}</StatusBadge>
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function ActivityTab({ tenantId }: { tenantId: string }) {
   const { data: audit = [], isLoading } = useQuery({
     queryKey: ["admin-tenant-audit", tenantId],
@@ -863,6 +909,8 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
   if (isLoading) return <TableSkeleton rows={6} columns={4} />;
 
   return (
+    <div className="space-y-3">
+    <TenantSecurityCard tenantId={tenantId} />
     <Card className="p-3">
       <div className="text-sm font-medium mb-2 flex items-center gap-1"><ScrollText className="h-4 w-4" /> Recent activity (last 100)</div>
       {audit.length === 0 ? (
@@ -901,6 +949,7 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
         </Table>
       )}
     </Card>
+    </div>
   );
 }
 

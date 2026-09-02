@@ -131,6 +131,7 @@ type TenantRow = {
   subscription_status: string | null;
   subscription_expires_at: string | null;
   created_at: string;
+  last_activity_at: string | null;
 };
 
 type SecuritySummary = {
@@ -391,36 +392,72 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
   });
 
   const totals = useMemo(() => {
+    const now = Date.now();
+    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
     return {
       total: tenants.length,
       active: tenants.filter((t) => t.status === "active").length,
       pending: tenants.filter((t) => t.status === "pending").length,
       suspended: tenants.filter((t) => t.status === "suspended").length,
+      // "Expired" = an active/pending tenant whose subscription end date has
+      // already passed — derived entirely from subscription_expires_at,
+      // already returned by admin_list_tenants, no new data source.
+      expired: tenants.filter(
+        (t) => t.status !== "archived" && t.subscription_expires_at && new Date(t.subscription_expires_at).getTime() < now,
+      ).length,
       revenue: tenants.reduce((a, t) => a + Number(t.sales_total || 0), 0),
+      products: tenants.reduce((a, t) => a + Number(t.product_count || 0), 0),
+      orders: tenants.reduce((a, t) => a + Number(t.sales_count || 0), 0),
+      newThisWeek: tenants.filter((t) => new Date(t.created_at).getTime() >= weekAgo).length,
     };
   }, [tenants]);
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard 
-          label="Total shops" 
-          value={totals.total} 
-          icon={Store} 
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="Total shops"
+          value={totals.total}
+          icon={Store}
+          sub={totals.newThisWeek > 0 ? `+${totals.newThisWeek} this week` : undefined}
           onClick={() => setActiveTab("tenants")}
         />
-        <StatCard 
-          label="Active" 
-          value={totals.active} 
-          icon={CheckCircle2} 
-          tone="success" 
+        <StatCard
+          label="Active"
+          value={totals.active}
+          icon={CheckCircle2}
+          tone="success"
           onClick={() => setActiveTab("tenants")}
         />
-        <StatCard 
-          label="Security alerts" 
-          value={summary?.critical_24h ?? 0} 
-          icon={ShieldAlert} 
-          tone={summary?.critical_24h ? "danger" : "default"} 
+        <StatCard
+          label="Suspended"
+          value={totals.suspended}
+          icon={Ban}
+          tone={totals.suspended ? "warning" : "default"}
+          onClick={() => setActiveTab("tenants")}
+        />
+        <StatCard
+          label="Expired"
+          value={totals.expired}
+          icon={CalendarClock}
+          tone={totals.expired ? "danger" : "default"}
+          onClick={() => setActiveTab("tenants")}
+        />
+        <StatCard
+          label="Total products"
+          value={totals.products.toLocaleString()}
+          icon={Package}
+        />
+        <StatCard
+          label="Total sales/orders"
+          value={totals.orders.toLocaleString()}
+          icon={ShoppingCart}
+        />
+        <StatCard
+          label="Security alerts"
+          value={summary?.critical_24h ?? 0}
+          icon={ShieldAlert}
+          tone={summary?.critical_24h ? "danger" : "default"}
           onClick={() => setActiveTab("security")}
         />
         <StatCard
@@ -430,15 +467,11 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
           tone={errorCount ? "danger" : "default"}
           onClick={() => setActiveTab("errors")}
         />
-        <StatCard 
-          label="Total Revenue" 
-          value={fmtMoney(totals.revenue, "")} 
-          icon={Wallet} 
-          tone="primary"
-        />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <StatCard label="Total Revenue" value={fmtMoney(totals.revenue, "")} icon={Wallet} tone="primary" />
+
+      <div className="grid lg:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium flex items-center gap-2">
@@ -478,7 +511,48 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
           </div>
           <SecurityEventsMiniList />
         </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              Recent Admin Activity
+            </h3>
+          </div>
+          <RecentActivityMiniList />
+        </Card>
       </div>
+    </div>
+  );
+}
+
+function RecentActivityMiniList() {
+  const { data: rows = [] } = useQuery({
+    queryKey: ["admin-audit-logs", "mini"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("admin_action_log_view")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data as unknown as AdminActionLog[]) ?? [];
+    },
+  });
+
+  if (rows.length === 0) return <EmptyState icon={Activity} title="No activity yet" description="Admin actions will show up here." />;
+
+  return (
+    <div className="space-y-2">
+      {rows.map((l) => (
+        <div key={l.id} className="text-xs p-2 rounded border flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="font-medium uppercase text-[10px] tracking-wide">{l.action}</span>
+            <span className="text-muted-foreground truncate">{l.tenant_name ?? l.entity_type ?? "—"}</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -510,6 +584,23 @@ function SecurityEventsMiniList() {
       ))}
     </div>
   );
+}
+
+/**
+ * A short, human-readable warning when a tenant looks inactive or
+ * problematic, derived entirely from data admin_list_tenants already
+ * returns — no separate query, no invented metric.
+ */
+function tenantHealthWarning(t: TenantRow): string | null {
+  if (t.status === "archived") return null;
+  if (t.subscription_expires_at && new Date(t.subscription_expires_at).getTime() < Date.now()) {
+    return "Subscription expired";
+  }
+  if (t.status === "active" && t.last_activity_at) {
+    const daysSince = (Date.now() - new Date(t.last_activity_at).getTime()) / 86_400_000;
+    if (daysSince >= 30) return `No activity in ${Math.floor(daysSince)} days`;
+  }
+  return null;
 }
 
 function TenantsTab() {
@@ -671,6 +762,7 @@ function TenantsTab() {
               <TableHead>Status</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Expiry</TableHead>
+              <TableHead>Last activity</TableHead>
               <TableHead className="text-right">Users</TableHead>
               <TableHead className="text-right">Products</TableHead>
               <TableHead className="text-right">Sales</TableHead>
@@ -679,14 +771,16 @@ function TenantsTab() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={9} className="py-4"><TableSkeleton rows={5} columns={8} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="py-4"><TableSkeleton rows={5} columns={9} /></TableCell></TableRow>
             )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={9} className="py-8">
+              <TableRow><TableCell colSpan={10} className="py-8">
                 <EmptyState title="No shops found" description="Try a different search or filter" icon={Store} />
               </TableCell></TableRow>
             )}
-            {filtered.map((t) => (
+            {filtered.map((t) => {
+              const health = tenantHealthWarning(t);
+              return (
               <TableRow key={t.id} className="group cursor-pointer" onClick={() => navigate({ to: "/admin/shops/$id", params: { id: t.id } })}>
                 <TableCell>
                   <div className="font-medium">{t.name}</div>
@@ -696,10 +790,22 @@ function TenantsTab() {
                   <div className="text-sm">{t.owner_name || "—"}</div>
                   <div className="text-[11px] text-muted-foreground">{t.owner_email || "—"}</div>
                 </TableCell>
-                <TableCell><StatusBadge status={t.status} /></TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1.5">
+                    <StatusBadge status={t.status} />
+                    {health && (
+                      <span title={health}>
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell><span className="capitalize text-sm">{t.plan || "—"}</span></TableCell>
                 <TableCell>
                   <ExpiryCell tenantId={t.id} expiresAt={t.subscription_expires_at} />
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                  {t.last_activity_at ? new Date(t.last_activity_at).toLocaleDateString() : "—"}
                 </TableCell>
 
                 <TableCell className="text-right text-sm">{t.member_count}</TableCell>
@@ -744,7 +850,8 @@ function TenantsTab() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
 
@@ -1203,9 +1310,35 @@ type BlocklistRow = {
 function SecurityTab() {
   const qc = useQueryClient();
   const [severity, setSeverity] = useState<"all" | "info" | "warning" | "critical">("all");
+  const [eventTypeFilter, setEventTypeFilter] = useState("");
+  const [debouncedEventType, setDebouncedEventType] = useState("");
+  const [eventsFrom, setEventsFrom] = useState("");
+  const [eventsTo, setEventsTo] = useState("");
   const [blockOpen, setBlockOpen] = useState(false);
   const [clearDialog, setClearDialog] = useState<{ open: boolean; severity?: "info" | "warning" | "critical"; olderDays?: number }>({ open: false });
 
+  const [auditActor, setAuditActor] = useState("all");
+  const [auditAction, setAuditAction] = useState("");
+  const [debouncedAuditAction, setDebouncedAuditAction] = useState("");
+  const [auditFrom, setAuditFrom] = useState("");
+  const [auditTo, setAuditTo] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedEventType(eventTypeFilter.trim()), 300);
+    return () => clearTimeout(t);
+  }, [eventTypeFilter]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedAuditAction(auditAction.trim()), 300);
+    return () => clearTimeout(t);
+  }, [auditAction]);
+
+  const list = useServerFn(listAdminStaff);
+  const { data: adminStaff = [] } = useQuery({
+    queryKey: ["admin-staff"],
+    queryFn: async () => ((await list()) as AdminStaffRow[]) ?? [],
+  });
+  const adminEmailMap = useMemo(() => new Map(adminStaff.map((s) => [s.user_id, s.email])), [adminStaff]);
 
   const { data: summary } = useQuery({
     queryKey: ["admin-security-summary"],
@@ -1217,13 +1350,19 @@ function SecurityTab() {
     refetchInterval: 30_000,
   });
 
+  // Direct read of security_events (it already has its own super-admin-only
+  // RLS SELECT policy, same authorization as the admin_list_security_events
+  // RPC) so event-type and date-range filters can be applied server-side
+  // without needing a new RPC signature.
   const { data: events = [], isLoading: eventsLoading } = useQuery({
-    queryKey: ["admin-security-events", severity],
+    queryKey: ["admin-security-events", severity, debouncedEventType, eventsFrom, eventsTo],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_list_security_events", {
-        _limit: 200,
-        _severity: severity === "all" ? undefined : severity,
-      });
+      let q = supabase.from("security_events").select("*").order("created_at", { ascending: false }).limit(200);
+      if (severity !== "all") q = q.eq("severity", severity);
+      if (debouncedEventType) q = q.ilike("event_type", `%${debouncedEventType}%`);
+      if (eventsFrom) q = q.gte("created_at", new Date(eventsFrom + "T00:00:00").toISOString());
+      if (eventsTo) q = q.lte("created_at", new Date(eventsTo + "T23:59:59").toISOString());
+      const { data, error } = await q;
       if (error) throw error;
       return (data as SecurityEvent[]) ?? [];
     },
@@ -1244,13 +1383,14 @@ function SecurityTab() {
   });
 
   const { data: auditLogs = [], isLoading: auditLoading } = useQuery({
-    queryKey: ["admin-audit-logs"],
+    queryKey: ["admin-audit-logs", auditActor, debouncedAuditAction, auditFrom, auditTo],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_action_log_view")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
+      let q = supabase.from("admin_action_log_view").select("*").order("created_at", { ascending: false }).limit(100);
+      if (auditActor !== "all") q = q.eq("actor_id", auditActor);
+      if (debouncedAuditAction) q = q.ilike("action", `%${debouncedAuditAction}%`);
+      if (auditFrom) q = q.gte("created_at", new Date(auditFrom + "T00:00:00").toISOString());
+      if (auditTo) q = q.lte("created_at", new Date(auditTo + "T23:59:59").toISOString());
+      const { data, error } = await q;
       if (error) throw error;
       return (data as unknown as AdminActionLog[]) ?? [];
     },
@@ -1275,6 +1415,7 @@ function SecurityTab() {
     const { data, error } = await supabase.rpc("admin_clear_security_events", {
       _severity: severity ?? undefined,
       _older_than_days: olderDays ?? undefined,
+      _reason: reason,
     });
     if (error) {
       toast.error(error.message);
@@ -1283,6 +1424,7 @@ function SecurityTab() {
     toast.success(`Cleared ${data ?? 0} events`);
     qc.invalidateQueries({ queryKey: ["admin-security-events"] });
     qc.invalidateQueries({ queryKey: ["admin-security-summary"] });
+    qc.invalidateQueries({ queryKey: ["admin-audit-logs"] });
   };
 
 
@@ -1425,6 +1567,28 @@ function SecurityTab() {
             </Button>
           </div>
         </div>
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by event type…"
+              value={eventTypeFilter}
+              onChange={(e) => setEventTypeFilter(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
+            <Input type="date" value={eventsFrom} onChange={(e) => setEventsFrom(e.target.value)} className="h-9 w-auto" />
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
+            <Input type="date" value={eventsTo} onChange={(e) => setEventsTo(e.target.value)} className="h-9 w-auto" />
+            {(eventTypeFilter || eventsFrom || eventsTo) && (
+              <Button size="sm" variant="ghost" onClick={() => { setEventTypeFilter(""); setEventsFrom(""); setEventsTo(""); }}>
+                Clear filters
+              </Button>
+            )}
+          </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -1475,7 +1639,7 @@ function SecurityTab() {
       </Card>
 
       <Card className="p-3">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
             <div className="font-medium">Admin audit trail</div>
@@ -1484,6 +1648,32 @@ function SecurityTab() {
           <Button size="sm" variant="outline" onClick={() => qc.invalidateQueries({ queryKey: ["admin-audit-logs"] })}>
             Refresh
           </Button>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+          <Select value={auditActor} onValueChange={setAuditActor}>
+            <SelectTrigger className="h-9 w-full sm:w-56"><SelectValue placeholder="All admins" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All admins</SelectItem>
+              {adminStaff.map((s) => (
+                <SelectItem key={s.user_id} value={s.user_id}>{s.email}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by action…"
+              value={auditAction}
+              onChange={(e) => setAuditAction(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
+            <Input type="date" value={auditFrom} onChange={(e) => setAuditFrom(e.target.value)} className="h-9 w-auto" />
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
+            <Input type="date" value={auditTo} onChange={(e) => setAuditTo(e.target.value)} className="h-9 w-auto" />
+          </div>
         </div>
         <Table>
           <TableHeader>
@@ -1508,7 +1698,11 @@ function SecurityTab() {
             {auditLogs.map((l) => (
               <TableRow key={l.id}>
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</TableCell>
-                <TableCell className="text-xs font-mono">{l.actor_id?.slice(0, 8) ?? "System"}</TableCell>
+                <TableCell className="text-xs">
+                  {l.actor_id
+                    ? (adminEmailMap.get(l.actor_id) ?? <span className="font-mono">{l.actor_id.slice(0, 8)}</span>)
+                    : "System"}
+                </TableCell>
                 <TableCell><StatusBadge tone="neutral" className="uppercase text-[10px]">{l.action}</StatusBadge></TableCell>
                 <TableCell className="text-xs">
                   {l.tenant_name ? (
@@ -1552,6 +1746,7 @@ function SecurityTab() {
           clearDialog.olderDays ? " older than " + clearDialog.olderDays + " days" : ""
         }? This will remove them from the log permanently.`}
         confirmLabel="Clear Log"
+        requireReason
         destructive
         onConfirm={handleConfirmClear}
       />
@@ -1928,7 +2123,9 @@ function AdminStaffTab() {
                   <div className="flex flex-wrap gap-1">
                     {u.perms.length === 0 && <span className="text-xs text-muted-foreground">No permissions</span>}
                     {u.perms.map((p) => (
-                      <span key={p} className="text-[10px] rounded bg-muted px-1.5 py-0.5">{p}</span>
+                      <span key={p} className="text-[10px] rounded bg-muted px-1.5 py-0.5" title={p}>
+                        {ADMIN_PERMS.find((ap) => ap.key === p)?.label ?? p}
+                      </span>
                     ))}
                   </div>
                 </TableCell>
@@ -2054,19 +2251,31 @@ function AdminStaffDialog({
           </div>
           <div>
             <Label className="text-xs">Permissions</Label>
-            <div className="space-y-1.5 mt-1 rounded-md border p-2">
-              {ADMIN_PERMS.map((p) => (
-                <label key={p.key} className="flex items-start gap-2 text-sm cursor-pointer">
-                  <Checkbox
-                    checked={perms.has(p.key)}
-                    onCheckedChange={() => toggle(p.key)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <div className="font-medium">{p.label}</div>
-                    <div className="text-[10px] text-muted-foreground font-mono">{p.key}</div>
+            <div className="space-y-3 mt-1 rounded-md border p-2 max-h-80 overflow-y-auto">
+              {Object.entries(
+                ADMIN_PERMS.reduce<Record<string, typeof ADMIN_PERMS[number][]>>((acc, p) => {
+                  (acc[p.group] ??= []).push(p);
+                  return acc;
+                }, {}),
+              ).map(([group, perms_]) => (
+                <div key={group}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{group}</div>
+                  <div className="space-y-1.5">
+                    {perms_.map((p) => (
+                      <label key={p.key} className="flex items-start gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={perms.has(p.key)}
+                          onCheckedChange={() => toggle(p.key)}
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <div className="font-medium">{p.label}</div>
+                          <div className="text-xs text-muted-foreground">{p.description}</div>
+                        </div>
+                      </label>
+                    ))}
                   </div>
-                </label>
+                </div>
               ))}
             </div>
           </div>
