@@ -3883,6 +3883,7 @@ export type Database = {
         Returns: {
           created_at: string
           id: string
+          last_activity_at: string
           member_count: number
           name: string
           owner_email: string
