@@ -301,7 +301,7 @@ export type Database = {
           old_data: Json | null
           record_id: string | null
           table_name: string
-          tenant_id: string
+          tenant_id: string | null
           user_id: string | null
         }
         Insert: {
@@ -312,7 +312,7 @@ export type Database = {
           old_data?: Json | null
           record_id?: string | null
           table_name: string
-          tenant_id: string
+          tenant_id?: string | null
           user_id?: string | null
         }
         Update: {
@@ -323,7 +323,7 @@ export type Database = {
           old_data?: Json | null
           record_id?: string | null
           table_name?: string
-          tenant_id?: string
+          tenant_id?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -3900,6 +3900,7 @@ export type Database = {
           total_count: number
         }[]
       }
+      admin_platform_health: { Args: never; Returns: Json }
       admin_recent_errors: {
         Args: { _limit?: number }
         Returns: {
@@ -3955,7 +3956,7 @@ export type Database = {
           old_data: Json | null
           record_id: string | null
           table_name: string
-          tenant_id: string
+          tenant_id: string | null
           user_id: string | null
         }[]
         SetofOptions: {
@@ -4080,6 +4081,8 @@ export type Database = {
         Returns: {
           account_id: string
           entry_count: number
+          prior_in: number
+          prior_out: number
           total_in: number
           total_out: number
         }[]

@@ -29,6 +29,8 @@ import {
   TrendingUp,
   Wallet,
   LayoutDashboard,
+  HeartPulse,
+  RefreshCw,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -240,6 +242,7 @@ function AdminPanelPage() {
               <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             )}
           </TabsTrigger>
+          <TabsTrigger value="health"><HeartPulse className="h-4 w-4 mr-1" />Health</TabsTrigger>
         </TabsList>
          <TabsContent value="dashboard" className="mt-3"><DashboardTab setActiveTab={setActiveTab} /></TabsContent>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
@@ -250,7 +253,92 @@ function AdminPanelPage() {
         )}
         <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
+        <TabsContent value="health" className="mt-3"><HealthTab /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+interface HealthCheck {
+  name: string;
+  status: "healthy" | "warning" | "critical";
+  detail: string;
+  checked_at: string;
+}
+interface PlatformHealth {
+  overall: "healthy" | "warning" | "critical";
+  checks: HealthCheck[];
+  generated_at: string;
+}
+
+const healthTone: Record<string, "success" | "warning" | "danger"> = {
+  healthy: "success",
+  warning: "warning",
+  critical: "danger",
+};
+
+function HealthTab() {
+  const queryClient = useQueryClient();
+  const { data: health, isFetching, isLoading, dataUpdatedAt } = useQuery({
+    queryKey: ["admin-platform-health"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_platform_health");
+      if (error) throw error;
+      return data as unknown as PlatformHealth;
+    },
+  });
+
+  if (isLoading) return <TableSkeleton rows={5} columns={2} />;
+  if (!health) return <EmptyState icon={HeartPulse} title="Health unavailable" description="Could not load platform health." />;
+
+  const overallTone = healthTone[health.overall] ?? "neutral";
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <span className={`grid h-10 w-10 place-items-center rounded-full ${
+            overallTone === "success" ? "bg-success/10 text-success" :
+            overallTone === "warning" ? "bg-warning/15 text-warning-foreground" :
+            "bg-destructive/10 text-destructive"
+          }`}>
+            <HeartPulse className="h-5 w-5" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold capitalize">{health.overall}</span>
+              <StatusBadge status={health.overall} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Last refreshed {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : "—"}
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isFetching}
+          onClick={() => queryClient.invalidateQueries({ queryKey: ["admin-platform-health"] })}
+        >
+          <RefreshCw className={`h-4 w-4 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
+          Refresh Health
+        </Button>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {health.checks.map((check) => (
+          <Card key={check.name} className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm">{check.name}</span>
+              <StatusBadge status={check.status} />
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{check.detail}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Checked {new Date(check.checked_at).toLocaleTimeString()}
+            </p>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
