@@ -35,10 +35,11 @@ const EXTRACTION_SCHEMA = {
 } as const;
 
 /**
- * Server-side AI extraction of a supplier purchase bill photo into strict
- * structured JSON. Never returns invented values — the model is instructed
- * to use null for anything it cannot confidently read. This function only
- * extracts; it never touches products/suppliers/purchases.
+ * Server-side AI extraction of a supplier purchase bill — one or more
+ * photos/pages of the SAME bill — into strict structured JSON. Never
+ * returns invented values — the model is instructed to use null for
+ * anything it cannot confidently read. This function only extracts; it
+ * never touches products/suppliers/purchases.
  */
 export const extractPurchaseBill = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -62,15 +63,24 @@ export const extractPurchaseBill = createServerFn({ method: "POST" })
             role: "system",
             content:
               "You extract structured data from photos of supplier purchase bills/invoices for a retail shop. " +
-              "Read every line item. If a field is blurry, missing, or you are not confident, return null for " +
-              "that field rather than guessing. Numbers must be plain numbers (no currency symbols). Handle " +
-              "rotated or skewed photos and handwritten values as best you can, but never invent a value.",
+              "You may be given more than one image — in that case they are multiple pages/photos of the SAME " +
+              "single bill, in order; combine them into one extraction (e.g. sum line items across pages) " +
+              "rather than treating them as separate bills. Read every line item. If a field is blurry, " +
+              "missing, or you are not confident, return null for that field rather than guessing. Numbers " +
+              "must be plain numbers (no currency symbols). Handle rotated or skewed photos and handwritten " +
+              "values as best you can, but never invent a value.",
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Extract this purchase bill into the extract_purchase_bill function." },
-              { type: "image_url", image_url: { url: data.image } },
+              {
+                type: "text",
+                text:
+                  data.images.length > 1
+                    ? `Extract this purchase bill (${data.images.length} pages, in order) into the extract_purchase_bill function.`
+                    : "Extract this purchase bill into the extract_purchase_bill function.",
+              },
+              ...data.images.map((image) => ({ type: "image_url" as const, image_url: { url: image } })),
             ],
           },
         ],
