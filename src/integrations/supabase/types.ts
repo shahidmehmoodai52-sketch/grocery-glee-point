@@ -806,6 +806,30 @@ export type Database = {
           },
         ]
       }
+      feature_flags: {
+        Row: {
+          created_at: string
+          default_enabled: boolean
+          description: string | null
+          key: string
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          default_enabled?: boolean
+          description?: string | null
+          key: string
+          label: string
+        }
+        Update: {
+          created_at?: string
+          default_enabled?: boolean
+          description?: string | null
+          key?: string
+          label?: string
+        }
+        Relationships: []
+      }
       global_products: {
         Row: {
           barcode: string | null
@@ -3248,6 +3272,48 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_feature_overrides: {
+        Row: {
+          enabled: boolean
+          flag_key: string
+          id: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          enabled: boolean
+          flag_key: string
+          id?: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          flag_key?: string
+          id?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_feature_overrides_flag_key_fkey"
+            columns: ["flag_key"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "tenant_feature_overrides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_invitations: {
         Row: {
           accepted_at: string | null
@@ -3908,6 +3974,10 @@ export type Database = {
         }
         Returns: number
       }
+      admin_clear_tenant_feature_override: {
+        Args: { _flag_key: string; _tenant_id: string }
+        Returns: undefined
+      }
       admin_delete_tenant: {
         Args: { _confirm: string; _reason?: string; _tenant_id: string }
         Returns: Json
@@ -3929,6 +3999,7 @@ export type Database = {
         Args: { _perm: string; _user_id: string }
         Returns: boolean
       }
+      admin_list_feature_flags: { Args: never; Returns: Json }
       admin_list_security_events: {
         Args: { _limit?: number; _severity?: string }
         Returns: {
@@ -4007,6 +4078,10 @@ export type Database = {
       admin_security_summary: { Args: never; Returns: Json }
       admin_set_tenant_expiry: {
         Args: { _expires_at: string; _tenant_id: string }
+        Returns: undefined
+      }
+      admin_set_tenant_feature_override: {
+        Args: { _enabled: boolean; _flag_key: string; _tenant_id: string }
         Returns: undefined
       }
       admin_set_tenant_plan:
@@ -4553,6 +4628,10 @@ export type Database = {
       resolve_cash_account: {
         Args: { p_method: string; p_tenant_id: string }
         Returns: string
+      }
+      resolve_feature_flag: {
+        Args: { _flag_key: string; _tenant_id: string }
+        Returns: boolean
       }
       resolve_payment_bucket: { Args: { p_method: string }; Returns: string }
       resume_bill: { Args: { _id: string }; Returns: Json }

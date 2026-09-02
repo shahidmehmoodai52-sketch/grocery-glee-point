@@ -31,12 +31,13 @@ import {
   LayoutDashboard,
   HeartPulse,
   RefreshCw,
+  Flag,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -244,6 +245,7 @@ function AdminPanelPage() {
           </TabsTrigger>
           <TabsTrigger value="health"><HeartPulse className="h-4 w-4 mr-1" />Health</TabsTrigger>
           <TabsTrigger value="billing"><Wallet className="h-4 w-4 mr-1" />Billing</TabsTrigger>
+          <TabsTrigger value="flags"><Flag className="h-4 w-4 mr-1" />Feature Flags</TabsTrigger>
         </TabsList>
          <TabsContent value="dashboard" className="mt-3"><DashboardTab setActiveTab={setActiveTab} /></TabsContent>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
@@ -256,6 +258,7 @@ function AdminPanelPage() {
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
         <TabsContent value="health" className="mt-3"><HealthTab /></TabsContent>
         <TabsContent value="billing" className="mt-3"><BillingTab /></TabsContent>
+        <TabsContent value="flags" className="mt-3"><FeatureFlagsTab /></TabsContent>
       </Tabs>
     </div>
   );
@@ -462,6 +465,181 @@ function BillingTab() {
         )}
       </Card>
     </div>
+  );
+}
+
+interface FeatureFlagRow {
+  key: string;
+  label: string;
+  description: string | null;
+  default_enabled: boolean;
+  plan_states: { plan_name: string; enabled: boolean }[];
+  tenant_overrides: { tenant_id: string; tenant_name: string; enabled: boolean; updated_at: string }[];
+}
+
+function FeatureFlagsTab() {
+  const qc = useQueryClient();
+  const [overrideFor, setOverrideFor] = useState<FeatureFlagRow | null>(null);
+
+  const { data: flags = [], isLoading } = useQuery({
+    queryKey: ["admin-feature-flags"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_feature_flags");
+      if (error) throw error;
+      return (data as unknown as FeatureFlagRow[]) ?? [];
+    },
+  });
+
+  const clearOverride = async (tenantId: string, flagKey: string) => {
+    const { error } = await supabase.rpc("admin_clear_tenant_feature_override", { _tenant_id: tenantId, _flag_key: flagKey });
+    if (error) return toast.error(error.message);
+    toast.success("Override removed");
+    qc.invalidateQueries({ queryKey: ["admin-feature-flags"] });
+  };
+
+  if (isLoading) return <TableSkeleton rows={5} columns={3} />;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground max-w-2xl">
+        Global default and plan-level state come from each plan's own configuration. A tenant override always wins over its plan, which wins over the global default.
+      </p>
+      {flags.length === 0 ? (
+        <EmptyState icon={Flag} title="No feature flags" description="No flags are registered yet." />
+      ) : (
+        <div className="space-y-3">
+          {flags.map((f) => (
+            <Card key={f.key} className="p-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <div className="font-medium flex items-center gap-2">
+                    {f.label}
+                    <StatusBadge tone={f.default_enabled ? "success" : "neutral"}>
+                      Default {f.default_enabled ? "on" : "off"}
+                    </StatusBadge>
+                  </div>
+                  {f.description && <p className="text-xs text-muted-foreground mt-0.5">{f.description}</p>}
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setOverrideFor(f)}>
+                  <Plus className="h-4 w-4 mr-1" /> Tenant override
+                </Button>
+              </div>
+
+              {f.plan_states.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {f.plan_states.map((p) => (
+                    <span key={p.plan_name} className="text-[11px] px-2 py-0.5 rounded-full border">
+                      {p.plan_name}: {p.enabled ? "on" : "off"}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {f.tenant_overrides.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {f.tenant_overrides.map((o) => (
+                    <div key={o.tenant_id} className="flex items-center justify-between text-xs p-2 rounded border">
+                      <span>{o.tenant_name}</span>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge tone={o.enabled ? "success" : "danger"}>{o.enabled ? "Enabled" : "Disabled"}</StatusBadge>
+                        <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => clearOverride(o.tenant_id, f.key)}>
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <TenantOverrideDialog flag={overrideFor} onClose={() => setOverrideFor(null)} />
+    </div>
+  );
+}
+
+function TenantOverrideDialog({ flag, onClose }: { flag: FeatureFlagRow | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [selectedTenant, setSelectedTenant] = useState<{ id: string; name: string } | null>(null);
+  const [enabled, setEnabled] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: results = [] } = useQuery({
+    queryKey: ["admin-tenant-search", debounced],
+    enabled: debounced.length >= 2,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("tenants").select("id,name").ilike("name", `%${debounced}%`).limit(10);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const save = async () => {
+    if (!flag || !selectedTenant) return;
+    setSaving(true);
+    const { error } = await supabase.rpc("admin_set_tenant_feature_override", {
+      _tenant_id: selectedTenant.id, _flag_key: flag.key, _enabled: enabled,
+    });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Override saved for ${selectedTenant.name}`);
+    qc.invalidateQueries({ queryKey: ["admin-feature-flags"] });
+    setSelectedTenant(null);
+    setSearch("");
+    onClose();
+  };
+
+  return (
+    <Dialog open={!!flag} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Tenant override — {flag?.label}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Shop</Label>
+            {selectedTenant ? (
+              <div className="flex items-center justify-between rounded border p-2 text-sm">
+                {selectedTenant.name}
+                <Button size="sm" variant="ghost" onClick={() => setSelectedTenant(null)}>Change</Button>
+              </div>
+            ) : (
+              <>
+                <Input placeholder="Search shop by name..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                {results.length > 0 && (
+                  <div className="border rounded divide-y">
+                    {results.map((r) => (
+                      <button
+                        key={r.id}
+                        className="w-full text-left text-sm p-2 hover:bg-muted"
+                        onClick={() => setSelectedTenant(r)}
+                      >
+                        {r.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <Label className="flex items-center justify-between gap-3 rounded border p-2 text-sm">
+            <span>Enabled for this shop</span>
+            <Switch checked={enabled} onCheckedChange={setEnabled} />
+          </Label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={!selectedTenant || saving}>{saving ? "Saving..." : "Save override"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
