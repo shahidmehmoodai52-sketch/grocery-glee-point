@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Loader2, AlertTriangle } from "lucide-react";
+import { Camera, Loader2, AlertTriangle, Plus, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -59,6 +59,11 @@ export function PurchaseBillScannerButton({
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState("");
+  // Pages picked so far for the bill currently being scanned — a bill can span
+  // several photos or a multi-page PDF export, and picking again ADDS to this
+  // list rather than replacing it, so earlier and newly-added pages both end
+  // up in the same, single extraction.
+  const [pages, setPages] = useState<File[]>([]);
   const [preview, setPreview] = useState<PreviewLine[]>([]);
   const [extracted, setExtracted] = useState<ExtractedBill | null>(null);
   const [products, setProducts] = useState<MatchedProductOption[]>([]);
@@ -69,6 +74,7 @@ export function PurchaseBillScannerButton({
   const reset = () => {
     setStage("idle");
     setError("");
+    setPages([]);
     setPreview([]);
     setExtracted(null);
     setProducts([]);
@@ -76,13 +82,24 @@ export function PurchaseBillScannerButton({
     setSupplierChoice("none");
   };
 
-  const handleFile = async (file: File) => {
+  const addPages = (files: FileList | File[]) => {
+    setPages((ps) => [...ps, ...Array.from(files)]);
+  };
+
+  const removePage = (idx: number) => setPages((ps) => ps.filter((_, i) => i !== idx));
+
+  const fileToDataUrl = (file: File) => {
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    return isPdf ? pdfToCompressedDataUrl(file) : fileToCompressedDataUrl(file);
+  };
+
+  const runScan = async () => {
+    if (pages.length === 0) return;
     setStage("extracting");
     setError("");
     try {
-      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      const dataUrl = isPdf ? await pdfToCompressedDataUrl(file) : await fileToCompressedDataUrl(file);
-      const bill = await extract({ data: { image: dataUrl } });
+      const images = await Promise.all(pages.map(fileToDataUrl));
+      const bill = await extract({ data: { images } });
       setExtracted(bill);
 
       const [prodRes, bcRes] = await Promise.all([
@@ -183,19 +200,55 @@ export function PurchaseBillScannerButton({
 
           {stage === "idle" && (
             <div className="py-10 text-center space-y-4">
-              <p className="text-sm text-muted-foreground">Upload a photo or PDF of the supplier's bill. AI will read it — you review and confirm before anything is saved.</p>
-              <label className="inline-block">
-                <input
-                  type="file"
-                  accept="image/*,application/pdf,.pdf"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-                />
-                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-md border bg-primary text-primary-foreground cursor-pointer hover:opacity-90">
-                  <Camera className="h-4 w-4" /> Choose Photo / PDF or Take Photo
-                </span>
-              </label>
+              <p className="text-sm text-muted-foreground">
+                Upload photo(s) or PDF page(s) of the supplier's bill — add more than one if the bill has multiple pages, or you have separate photos of it. AI reads them together as one bill — you review and confirm before anything is saved.
+              </p>
+
+              {pages.length > 0 && (
+                <div className="mx-auto max-w-md text-left space-y-1.5">
+                  {pages.map((f, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-1.5 text-sm">
+                      <span className="truncate flex items-center gap-2 min-w-0">
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{f.name}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removePage(idx)}
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        title="Remove this page"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <label className="inline-block">
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,.pdf"
+                    capture="environment"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.length) addPages(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-md border bg-primary text-primary-foreground cursor-pointer hover:opacity-90">
+                    {pages.length > 0 ? <Plus className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                    {pages.length > 0 ? "Add Another Page" : "Choose Photo / PDF or Take Photo"}
+                  </span>
+                </label>
+                {pages.length > 0 && (
+                  <Button onClick={runScan}>
+                    Scan {pages.length} Page{pages.length > 1 ? "s" : ""}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -210,7 +263,9 @@ export function PurchaseBillScannerButton({
             <div className="py-10 text-center space-y-4">
               <AlertTriangle className="h-8 w-8 mx-auto text-destructive" />
               <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" onClick={reset}>Try again</Button>
+              {/* Back to idle, not a full reset — keeps the already-picked pages so a
+                  transient failure (AI busy, network blip) doesn't force re-selecting everything. */}
+              <Button variant="outline" onClick={() => setStage("idle")}>Try again</Button>
             </div>
           )}
 
