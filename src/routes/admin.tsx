@@ -2437,6 +2437,8 @@ function LibraryTab() {
   const [page, setPage] = useState(0);
   const pageSize = 50;
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [approveAllOpen, setApproveAllOpen] = useState(false);
+  const [approvingAll, setApprovingAll] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -2501,6 +2503,21 @@ function LibraryTab() {
     qc.invalidateQueries({ queryKey: ["admin-library-pending-count"] });
   };
 
+  const approveAll = async (_reason: string) => {
+    setApprovingAll(true);
+    const { error, data } = await supabase
+      .from("global_products")
+      .update({ status: "approved", reviewed_at: new Date().toISOString() })
+      .eq("status", "pending")
+      .select("id");
+    setApprovingAll(false);
+    setApproveAllOpen(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Approved ${data?.length ?? 0} item(s) — fanned out to shops`);
+    qc.invalidateQueries({ queryKey: ["admin-library"] });
+    qc.invalidateQueries({ queryKey: ["admin-library-pending-count"] });
+  };
+
   return (
     <div className="space-y-3">
       <Card className="p-3">
@@ -2525,6 +2542,11 @@ function LibraryTab() {
                 {f}{f === "pending" && pendingCount > 0 && status !== "pending" ? ` (${pendingCount})` : ""}
               </Button>
             ))}
+            {canManage && pendingCount > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setApproveAllOpen(true)}>
+                <CheckCircle2 className="h-4 w-4 mr-1" /> Approve all ({pendingCount})
+              </Button>
+            )}
           </div>
         </div>
         {!canManage && (
@@ -2637,6 +2659,16 @@ function LibraryTab() {
         destructive
         confirmLabel="Delete"
         onConfirm={remove}
+      />
+
+      <TypedConfirmDialog
+        open={approveAllOpen}
+        onOpenChange={setApproveAllOpen}
+        title="Approve all pending items"
+        description={`Approve all ${pendingCount} pending item(s)? Each one will be fanned out into every shop with library access enabled — this cannot be undone in bulk.`}
+        confirmLabel="Approve all"
+        isLoading={approvingAll}
+        onConfirm={approveAll}
       />
     </div>
   );

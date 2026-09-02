@@ -137,7 +137,7 @@ function LibraryPage() {
           <div className="flex gap-2">
             {!isSuperAdmin && hasAccess && <ImportAllButton onDone={invalidateAfterImport} />}
             {isSuperAdmin && <BulkUploadDialog onDone={invalidateAfterReview} />}
-            {isSuperAdmin && <ContributeDialog onDone={invalidateAfterReview} />}
+            {(isSuperAdmin || hasAccess) && <ContributeDialog onDone={invalidateAfterReview} />}
           </div>
         }
       />
@@ -163,7 +163,7 @@ function LibraryPage() {
               <Clock className="h-4 w-4 mr-1" /> {t('library.tab_review_queue', 'Review queue')}
             </TabsTrigger>
           )}
-          {isSuperAdmin && (
+          {(isSuperAdmin || hasAccess) && (
             <TabsTrigger value="mine">{t('library.tab_my_uploads', 'My uploads')}</TabsTrigger>
           )}
         </TabsList>
@@ -197,7 +197,7 @@ function LibraryPage() {
           </TabsContent>
         )}
 
-        {isSuperAdmin && (
+        {(isSuperAdmin || hasAccess) && (
           <TabsContent value="mine">
             <MineTable search={search} setSearch={setSearch} showSell={showSell} showCost={showCost} />
           </TabsContent>
