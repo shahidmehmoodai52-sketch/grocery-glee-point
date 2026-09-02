@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { useOfflineStatus } from "@/lib/offline/status";
+import { clearOfflineDataOnLogout } from "@/lib/offline/device";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,6 +75,7 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
             className="mt-6"
             variant="outline"
             onClick={async () => {
+              await clearOfflineDataOnLogout();
               await supabase.auth.signOut();
               window.location.href = "/auth";
             }}
@@ -111,6 +113,7 @@ function StaffAccountBlocked() {
           className="mt-6"
           variant="outline"
           onClick={async () => {
+            await clearOfflineDataOnLogout();
             await supabase.auth.signOut();
             window.location.href = "/auth";
           }}
@@ -186,7 +189,11 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
             type="button"
             variant="ghost"
             className="w-full"
-            onClick={async () => { await supabase.auth.signOut(); window.location.href = "/auth"; }}
+            onClick={async () => {
+              await clearOfflineDataOnLogout();
+              await supabase.auth.signOut();
+              window.location.href = "/auth";
+            }}
           >
             <LogOut className="mr-2 h-4 w-4" /> Sign out
           </Button>
