@@ -3890,6 +3890,7 @@ export type Database = {
         }
         Returns: string
       }
+      admin_billing_summary: { Args: never; Returns: Json }
       admin_block_identifier: {
         Args: {
           _hours?: number

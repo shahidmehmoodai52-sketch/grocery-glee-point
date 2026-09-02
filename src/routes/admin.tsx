@@ -243,6 +243,7 @@ function AdminPanelPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="health"><HeartPulse className="h-4 w-4 mr-1" />Health</TabsTrigger>
+          <TabsTrigger value="billing"><Wallet className="h-4 w-4 mr-1" />Billing</TabsTrigger>
         </TabsList>
          <TabsContent value="dashboard" className="mt-3"><DashboardTab setActiveTab={setActiveTab} /></TabsContent>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
@@ -254,6 +255,7 @@ function AdminPanelPage() {
         <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
         <TabsContent value="health" className="mt-3"><HealthTab /></TabsContent>
+        <TabsContent value="billing" className="mt-3"><BillingTab /></TabsContent>
       </Tabs>
     </div>
   );
@@ -339,6 +341,126 @@ function HealthTab() {
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+interface BillingSummary {
+  total_active: number;
+  expiring_7d: number;
+  expiring_30d: number;
+  expired: number;
+  status_distribution: { status: string; count: number }[];
+  plan_distribution: { plan_id: string; plan_name: string; active_count: number; price_monthly: number }[];
+  projected_mrr: number;
+  expiring_queue: {
+    tenant_id: string; tenant_name: string; plan_name: string | null;
+    expires_at: string; days_remaining: number; owner_email: string | null; status: string;
+  }[];
+  generated_at: string;
+}
+
+function BillingTab() {
+  const navigate = useNavigate();
+  const { data: billing, isLoading } = useQuery({
+    queryKey: ["admin-billing-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_billing_summary");
+      if (error) throw error;
+      return data as unknown as BillingSummary;
+    },
+  });
+
+  if (isLoading) return <TableSkeleton rows={5} columns={4} />;
+  if (!billing) return <EmptyState icon={Wallet} title="Billing unavailable" description="Could not load billing summary." />;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <StatCard label="Active subscriptions" value={billing.total_active} icon={CheckCircle2} />
+        <StatCard label="Expiring in 7 days" value={billing.expiring_7d} icon={CalendarClock} tone={billing.expiring_7d > 0 ? "warning" : "default"} />
+        <StatCard label="Expiring in 30 days" value={billing.expiring_30d} icon={CalendarClock} />
+        <StatCard label="Expired (still active)" value={billing.expired} icon={AlertTriangle} tone={billing.expired > 0 ? "danger" : "default"} />
+        <StatCard label="Projected MRR" value={fmtMoney(billing.projected_mrr, "")} icon={Wallet} sub="From assigned plan prices, not collected revenue" />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card className="p-4">
+          <div className="font-medium mb-3">Plan distribution</div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Plan</TableHead>
+                <TableHead>Price/mo</TableHead>
+                <TableHead className="text-right">Active subs</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {billing.plan_distribution.map((p) => (
+                <TableRow key={p.plan_id}>
+                  <TableCell>{p.plan_name}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{fmtMoney(p.price_monthly, "")}</TableCell>
+                  <TableCell className="text-right font-medium">{p.active_count}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+
+        <Card className="p-4">
+          <div className="font-medium mb-3">Status distribution</div>
+          {billing.status_distribution.length === 0 ? (
+            <EmptyState icon={Wallet} title="No subscriptions yet" description="No tenant has a billing subscription assigned." />
+          ) : (
+            <div className="space-y-2">
+              {billing.status_distribution.map((s) => (
+                <div key={s.status} className="flex items-center justify-between text-sm p-2 rounded border">
+                  <StatusBadge status={s.status} />
+                  <span className="font-medium">{s.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <Card className="p-4">
+        <div className="font-medium mb-3">Expiring / overdue queue (next 30 days)</div>
+        {billing.expiring_queue.length === 0 ? (
+          <EmptyState icon={CheckCircle2} title="Nothing expiring soon" description="No active subscription expires within 30 days." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Shop</TableHead>
+                <TableHead>Plan</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Expires</TableHead>
+                <TableHead className="text-right">Days remaining</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {billing.expiring_queue.map((q) => (
+                <TableRow
+                  key={q.tenant_id}
+                  className="cursor-pointer"
+                  onClick={() => navigate({ to: "/admin/shops/$id", params: { id: q.tenant_id } })}
+                >
+                  <TableCell className="font-medium text-primary">{q.tenant_name}</TableCell>
+                  <TableCell className="text-xs">{q.plan_name ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{q.owner_email ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{new Date(q.expires_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-right">
+                    <StatusBadge tone={q.days_remaining < 0 ? "danger" : q.days_remaining <= 7 ? "warning" : "neutral"}>
+                      {q.days_remaining < 0 ? `${Math.abs(q.days_remaining)}d overdue` : `${q.days_remaining}d left`}
+                    </StatusBadge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }
