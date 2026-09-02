@@ -24,6 +24,7 @@ import { printInvoiceDirect } from "@/components/receipt";
 import { db } from "@/lib/offline/db";
 import { fetchAll } from "@/lib/supabase-page";
 import { calculatePurchaseTotals } from "@/lib/purchase-totals";
+import { PurchaseBillScannerButton, type ImportedPurchase } from "@/features/purchase-ai/BillScannerDialog";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
@@ -818,6 +819,31 @@ function Page() {
     setSavedDrafts((prev) => prev.filter((_, i) => i !== index));
   };
 
+  /** AI scanner only prepares data — it hands off into the existing draft/entry flow, never saves directly. */
+  const importScannedPurchase = (result: ImportedPurchase) => {
+    if (draftHasContent(draft)) {
+      setSavedDrafts((prev) => [...prev, { ...draft, open: false }]);
+    }
+    setDraft({
+      ...emptyDraft,
+      open: true,
+      date: result.date || today,
+      supplier: result.supplierId ?? "none",
+      note: result.note,
+      tax: result.tax,
+      taxMode: "amt",
+      lines: result.lines.map((l) => ({
+        product_id: l.product_id,
+        name: l.name,
+        qty: roundToTillixQty(l.qty),
+        cost: l.cost,
+        discount: l.discount,
+        barcode: l.barcode,
+        item_code: l.item_code,
+      })),
+    });
+  };
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -855,6 +881,7 @@ function Page() {
             </Dialog>
           )}
         <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />{t('purchases.new_purchase', 'New purchase')}</Button>
+        <PurchaseBillScannerButton suppliers={suppliers} onImport={importScannedPurchase} />
         <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">
