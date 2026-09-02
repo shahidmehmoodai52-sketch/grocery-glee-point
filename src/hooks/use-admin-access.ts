@@ -40,6 +40,18 @@ export const ADMIN_PERMS = [
     group: "Shop management",
   },
   {
+    key: "shops.manage",
+    label: "Change shop plan & feature overrides",
+    description: "Assign a shop's plan and set per-shop feature flag overrides. Does not include deletion or password resets.",
+    group: "Shop management",
+  },
+  {
+    key: "errors.manage",
+    label: "Resolve / reopen system errors",
+    description: "Retry, resolve, bulk-resolve, or reopen (unresolve) entries in the Errors tab. Viewing errors only needs 'shops.view'.",
+    group: "Shop management",
+  },
+  {
     key: "library.manage",
     label: "Manage global product library",
     description: "Approve, edit, or remove items in the shared product library that all shops can import from.",
