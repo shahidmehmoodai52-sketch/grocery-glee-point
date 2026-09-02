@@ -59,7 +59,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty, fmtDate } from "@/lib/format";
-import { roundToTillixQty } from "@/lib/quantity-rounding";
 import {
   deriveDigitalCashBackSummary,
   normalizePaymentAllocations,
@@ -1075,7 +1074,7 @@ function POSPage() {
       items[exIdx] = {
         ...items[exIdx],
         code: items[exIdx].code || nextCode,
-        qty: roundToTillixQty(Number(items[exIdx].qty) + 1),
+        qty: Number(items[exIdx].qty) + 1,
       };
       idx = exIdx;
     } else {
@@ -1107,7 +1106,12 @@ function POSPage() {
       if (i !== idx) return it;
       const next = { ...it, ...patch };
       if ("qty" in patch) {
-        next.qty = roundToTillixQty(Number(patch.qty));
+        // Cashiers weigh loose/bulk items (sugar, rice, etc.) and need to enter
+        // the exact reading — 0.75kg, 0.1kg, whatever the scale shows — not
+        // have it silently snapped to the nearest half/whole unit. Only clamp
+        // to 3 decimal places (matches the qty field's step="0.001") to avoid
+        // floating-point noise, e.g. 0.1 + 0.2 rendering as 0.30000000000000004.
+        next.qty = Math.round(Number(patch.qty) * 1000) / 1000;
       }
       const gross = Number(next.qty) * Number(next.price);
       if ("disc" in patch) {
@@ -4787,21 +4791,12 @@ function EditableNumCell({
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
-        const n = Number(draft);
-        // Only the qty column uses step="0.001" (price/discount use "0.01") —
-        // that alone reliably identifies it, unlike the old check which
-        // pattern-matched the formatted display text and silently broke for
-        // any qty >= 1000 (comma-grouped by toLocaleString, so it no longer
-        // matched a plain-digits regex and skipped the rounding rule).
-        const final = step === "0.001" ? roundToTillixQty(n) : n;
-        onCommit(final);
+        onCommit(Number(draft));
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          const n = Number(draft);
-          const final = step === "0.001" ? roundToTillixQty(n) : n;
-          onCommit(final);
+          onCommit(Number(draft));
         } else if (e.key === "Escape") {
           e.preventDefault();
           onCancel();
