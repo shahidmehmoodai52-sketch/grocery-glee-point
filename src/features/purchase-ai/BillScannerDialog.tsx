@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 import { extractPurchaseBill } from "./scan.functions";
 import { fileToCompressedDataUrl } from "./image";
+import { pdfToCompressedDataUrl } from "./pdf";
 import { buildPreviewLine, matchSupplier } from "./matching";
 import type { ExtractedBill, MatchedProductOption, MatchStatus, PreviewLine, SupplierMatch } from "./types";
 
@@ -79,7 +80,8 @@ export function PurchaseBillScannerButton({
     setStage("extracting");
     setError("");
     try {
-      const dataUrl = await fileToCompressedDataUrl(file);
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const dataUrl = isPdf ? await pdfToCompressedDataUrl(file) : await fileToCompressedDataUrl(file);
       const bill = await extract({ data: { image: dataUrl } });
       setExtracted(bill);
 
@@ -102,7 +104,7 @@ export function PurchaseBillScannerButton({
 
       setStage("review");
     } catch (e: any) {
-      setError(e?.message ?? "Could not read this bill. Try a clearer photo.");
+      setError(e?.message ?? "Could not read this bill. Try a clearer photo or a different file.");
       setStage("error");
     }
   };
@@ -181,17 +183,17 @@ export function PurchaseBillScannerButton({
 
           {stage === "idle" && (
             <div className="py-10 text-center space-y-4">
-              <p className="text-sm text-muted-foreground">Upload or take a photo of the supplier's bill. AI will read it — you review and confirm before anything is saved.</p>
+              <p className="text-sm text-muted-foreground">Upload a photo or PDF of the supplier's bill. AI will read it — you review and confirm before anything is saved.</p>
               <label className="inline-block">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,application/pdf,.pdf"
                   capture="environment"
                   className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
                 />
                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-md border bg-primary text-primary-foreground cursor-pointer hover:opacity-90">
-                  <Camera className="h-4 w-4" /> Choose / Take Photo
+                  <Camera className="h-4 w-4" /> Choose Photo / PDF or Take Photo
                 </span>
               </label>
             </div>
