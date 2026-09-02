@@ -1394,9 +1394,23 @@ type BlocklistRow = {
   created_at: string;
 };
 
+type SupportSessionRow = {
+  id: string;
+  admin_id: string;
+  tenant_id: string;
+  tenant_name: string | null;
+  reason: string;
+  started_at: string;
+  expires_at: string;
+  ended_at: string | null;
+  ended_reason: string | null;
+  is_active: boolean;
+};
+
 
 function SecurityTab() {
   const qc = useQueryClient();
+  const { isSuperAdmin } = useAdminAccess();
   const [severity, setSeverity] = useState<"all" | "info" | "warning" | "critical">("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [debouncedEventType, setDebouncedEventType] = useState("");
@@ -1427,6 +1441,27 @@ function SecurityTab() {
     queryFn: async () => ((await list()) as AdminStaffRow[]) ?? [],
   });
   const adminEmailMap = useMemo(() => new Map(adminStaff.map((s) => [s.user_id, s.email])), [adminStaff]);
+
+  const { data: supportSessions = [] } = useQuery({
+    queryKey: ["admin-support-sessions-active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("admin_support_sessions_view")
+        .select("*")
+        .eq("is_active", true)
+        .order("started_at", { ascending: false });
+      if (error) throw error;
+      return (data as unknown as SupportSessionRow[]) ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+
+  const endSupportSession = async (id: string) => {
+    const { error } = await supabase.rpc("admin_end_support_session", { _session_id: id });
+    if (error) return toast.error(error.message);
+    toast.success("Support session ended");
+    qc.invalidateQueries({ queryKey: ["admin-support-sessions-active"] });
+  };
 
   const { data: summary } = useQuery({
     queryKey: ["admin-security-summary"],
@@ -1629,6 +1664,38 @@ function SecurityTab() {
             ))}
           </TableBody>
         </Table>
+        </Card>
+
+        <Card className="p-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Eye className="h-4 w-4" />
+            <div className="font-medium">Active support sessions</div>
+            <span className="text-xs text-muted-foreground">Read-only "View Shop" sessions currently open</span>
+          </div>
+          {supportSessions.length === 0 ? (
+            <EmptyState icon={Eye} title="No active sessions" description="No admin is currently in Support View for any shop." />
+          ) : (
+            <div className="space-y-2">
+              {supportSessions.map((s) => (
+                <div key={s.id} className="text-xs p-2 rounded border flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{s.tenant_name ?? s.tenant_id}</div>
+                    <div className="text-muted-foreground truncate">
+                      {adminEmailMap.get(s.admin_id) ?? s.admin_id.slice(0, 8)} · "{s.reason}"
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Started {new Date(s.started_at).toLocaleTimeString()} · Expires {new Date(s.expires_at).toLocaleTimeString()}
+                    </div>
+                  </div>
+                  {isSuperAdmin && (
+                    <Button size="sm" variant="outline" onClick={() => endSupportSession(s.id)}>
+                      End
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
 

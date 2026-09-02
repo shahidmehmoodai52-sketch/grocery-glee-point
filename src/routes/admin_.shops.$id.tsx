@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Store, Package, Users, ShoppingCart, TrendingUp, Wallet, AlertTriangle,
   KeyRound, CreditCard, CheckCircle2, Ban, Archive, ShieldCheck, Activity, ScrollText, Trophy, Library, Trash2,
-  Calendar, Search, Filter,
+  Calendar, Search, Filter, Eye,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -86,6 +86,7 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
   const navigate = useNavigate();
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
@@ -135,6 +136,16 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     navigate({ to: "/admin", replace: true });
   };
 
+  const enterSupportView = async (reason: string) => {
+    const { data: session, error } = await supabase.rpc("admin_start_support_session", {
+      _tenant_id: tenantId,
+      _reason: reason,
+    });
+    if (error) { toast.error(error.message); return; }
+    const s = session as unknown as { id: string };
+    navigate({ to: "/admin/support/$sessionId", params: { sessionId: s.id } });
+  };
+
   if (isLoading || !data) return <div className="p-6"><TableSkeleton rows={6} columns={4} /></div>;
   const t = data.tenant;
   const owner = data.members.find((m) => m.user_id === t.owner_id) ?? null;
@@ -168,6 +179,9 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setSupportOpen(true)}>
+            <Eye className="h-4 w-4 mr-1" /> View Shop (Support)
+          </Button>
           {t.status !== "active" && (
             <Button onClick={() => setStatus("active")}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> {t.status === "pending" ? "Approve" : "Activate"}
@@ -199,6 +213,16 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
           </Button>
         </div>
       </div>
+
+      <TypedConfirmDialog
+        open={supportOpen}
+        onOpenChange={setSupportOpen}
+        title="Enter Support View"
+        description={`Open a read-only Support View of "${t.name}"? You will NOT become this shop's user and cannot make any changes. A reason is required and this session is logged, time-limited (30 minutes), and auto-expires.`}
+        requireReason
+        confirmLabel="Enter Support View"
+        onConfirm={enterSupportView}
+      />
 
       <TypedConfirmDialog
         open={suspendOpen}

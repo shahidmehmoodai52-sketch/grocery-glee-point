@@ -114,6 +114,47 @@ export type Database = {
           },
         ]
       }
+      admin_support_sessions: {
+        Row: {
+          admin_id: string
+          ended_at: string | null
+          ended_reason: string | null
+          expires_at: string
+          id: string
+          reason: string
+          started_at: string
+          tenant_id: string
+        }
+        Insert: {
+          admin_id: string
+          ended_at?: string | null
+          ended_reason?: string | null
+          expires_at: string
+          id?: string
+          reason: string
+          started_at?: string
+          tenant_id: string
+        }
+        Update: {
+          admin_id?: string
+          ended_at?: string | null
+          ended_reason?: string | null
+          expires_at?: string
+          id?: string
+          reason?: string
+          started_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_support_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       application_errors: {
         Row: {
           created_at: string
@@ -3636,6 +3677,29 @@ export type Database = {
           },
         ]
       }
+      admin_support_sessions_view: {
+        Row: {
+          admin_id: string | null
+          ended_at: string | null
+          ended_reason: string | null
+          expires_at: string | null
+          id: string | null
+          is_active: boolean | null
+          reason: string | null
+          started_at: string | null
+          tenant_id: string | null
+          tenant_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_support_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_batch_status: {
         Row: {
           batch_no: string | null
@@ -3847,6 +3911,10 @@ export type Database = {
         Args: { _confirm: string; _reason?: string; _tenant_id: string }
         Returns: Json
       }
+      admin_end_support_session: {
+        Args: { _session_id: string }
+        Returns: undefined
+      }
       admin_has_perm: {
         Args: { _perm: string; _user_id: string }
         Returns: boolean
@@ -3944,6 +4012,10 @@ export type Database = {
       }
       admin_shop_analytics: {
         Args: { _from?: string; _tenant_id: string; _to?: string }
+        Returns: Json
+      }
+      admin_start_support_session: {
+        Args: { _reason: string; _tenant_id: string }
         Returns: Json
       }
       admin_tenant_audit: {
