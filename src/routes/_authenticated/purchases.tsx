@@ -1568,7 +1568,7 @@ function Page() {
                 <TableCell>{p.suppliers?.name ?? "—"}</TableCell>
                 <TableCell className="text-right font-medium">{fmtMoney(p.total, sym)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(p.paid, sym)}</TableCell>
-                <TableCell><span className="text-xs">{t(`sales.status_${p.status}`, p.status)}</span></TableCell>
+                <TableCell><span className="text-xs">{String(t(`sales.status_${p.status}`, p.status))}</span></TableCell>
                 <TableCell className="text-right space-x-1">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title={t('purchases.edit_purchase_tooltip', 'Edit purchase')}>
                     <Pencil className="h-4 w-4" />

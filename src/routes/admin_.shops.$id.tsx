@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -29,8 +29,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { fmtMoney } from "@/lib/format";
 import { resetTenantOwnerPassword } from "@/lib/admin.functions";
+import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
 
 export const Route = createFileRoute("/admin_/shops/$id")({
+  // This route uses the `admin_` escape-hatch naming, so it does NOT inherit
+  // /admin's own beforeLoad guard. Match that same server-side check here for
+  // consistency (am_i_admin_staff, not the page's own super-admin-only
+  // content gate below) so an unauthenticated or non-admin request never even
+  // renders a loading flash before the client-side redirect kicks in.
+  beforeLoad: async ({ location }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw redirect({ to: "/admin-login", search: { next: location.pathname } });
+    }
+    const { data: isAdmin } = await supabase.rpc("am_i_admin_staff");
+    if (!isAdmin) {
+      await supabase.auth.signOut();
+      throw redirect({ to: "/admin-login" });
+    }
+  },
   component: ShopDetailPage,
 });
 
@@ -67,6 +84,8 @@ type TenantDetail = {
 function ShopDetail({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [suspendOpen, setSuspendOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
@@ -85,28 +104,24 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     toast.success(`Shop ${status}`);
     qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
   };
 
-  const suspend = async () => {
-    const reason = window.prompt(`Suspend "${data?.tenant.name}"? Reason:`) ?? "";
-    if (!reason) return;
+  const suspend = async (reason: string) => {
     await setStatus("suspended", reason);
   };
 
-  const removeShop = async () => {
+  const removeShop = async (reason: string) => {
     if (!data) return;
     const expected = data.tenant.name.trim();
-    const typed = window.prompt(
-      `PERMANENTLY delete this shop and ALL its data (products, sales, customers, expenses, staff)?\n\nThis cannot be undone.\n\nType exactly:  ${expected}`,
-    );
-    if (typed === null) return;
-    if (typed.trim().toLowerCase() !== expected.toLowerCase()) {
-      return toast.error(`Confirmation did not match. Expected: "${expected}"`);
-    }
     let done = false;
     while (!done) {
-      const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", { _tenant_id: tenantId, _confirm: expected });
-      if (error) return toast.error(error.message);
+      const { data: deletionResult, error } = await supabase.rpc("admin_delete_tenant", {
+        _tenant_id: tenantId,
+        _confirm: expected,
+        _reason: reason,
+      });
+      if (error) { toast.error(error.message); return; }
       done = Boolean(
         deletionResult
         && typeof deletionResult === "object"
@@ -116,6 +131,7 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
     }
     toast.success(`Deleted "${expected}"`);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
     navigate({ to: "/admin", replace: true });
   };
 
@@ -158,7 +174,7 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
             </Button>
           )}
           {t.status === "active" && (
-            <Button variant="outline" onClick={suspend}>
+            <Button variant="outline" onClick={() => setSuspendOpen(true)}>
               <Ban className="h-4 w-4 mr-1 text-destructive" /> Suspend
             </Button>
           )}
@@ -178,11 +194,34 @@ function ShopDetail({ tenantId }: { tenantId: string }) {
             <Library className="h-4 w-4 mr-1" />
             {t.library_approved ? "Revoke Library" : "Grant Library"}
           </Button>
-          <Button variant="destructive" size="icon" onClick={removeShop} title="Delete shop">
+          <Button variant="destructive" size="icon" onClick={() => setDeleteOpen(true)} title="Delete shop">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      <TypedConfirmDialog
+        open={suspendOpen}
+        onOpenChange={setSuspendOpen}
+        title="Suspend shop"
+        description={`Suspend "${t.name}"? The shop's staff will be locked out until it's reactivated.`}
+        requireReason
+        destructive
+        confirmLabel="Suspend"
+        onConfirm={suspend}
+      />
+
+      <TypedConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete shop permanently"
+        description={`PERMANENTLY delete "${t.name}" and ALL its data (products, sales, customers, expenses, staff)? This cannot be undone.`}
+        confirmText={t.name}
+        requireReason
+        destructive
+        confirmLabel="Delete permanently"
+        onConfirm={removeShop}
+      />
 
       <Tabs defaultValue="overview">
         <TabsList>
@@ -302,6 +341,22 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
     },
   });
 
+  const { data: flags } = useQuery({
+    queryKey: ["tenant-library-flags", tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("library_show_sell_price, library_show_cost_price")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (error) throw error;
+      return {
+        showSell: data?.library_show_sell_price ?? true,
+        showCost: data?.library_show_cost_price ?? true,
+      };
+    },
+  });
+
   const allowedSet = useMemo(() => new Set(allowed), [allowed]);
   const restricted = allowed.length > 0;
 
@@ -358,22 +413,6 @@ function LibraryCategoryAccessCard({ tenantId, libraryApproved }: { tenantId: st
       </Card>
     );
   }
-
-  const { data: flags } = useQuery({
-    queryKey: ["tenant-library-flags", tenantId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tenants")
-        .select("library_show_sell_price, library_show_cost_price")
-        .eq("id", tenantId)
-        .maybeSingle();
-      if (error) throw error;
-      return {
-        showSell: data?.library_show_sell_price ?? true,
-        showCost: data?.library_show_cost_price ?? true,
-      };
-    },
-  });
 
   const summary = restricted
     ? `${allowed.length} categor${allowed.length === 1 ? "y" : "ies"} selected`

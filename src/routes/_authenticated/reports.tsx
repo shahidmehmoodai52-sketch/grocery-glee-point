@@ -992,7 +992,7 @@ function Page() {
                       <TableCell className="text-right">{qty}</TableCell>
                       <TableCell className="text-right font-medium">{fmtMoney(s.total, sym)}</TableCell>
                       <TableCell className="text-right text-success">{fmtMoney(profit, sym)}</TableCell>
-                      <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{t(`sales.status_${s.status}`, s.status)}</Badge></TableCell>
+                      <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{String(t(`sales.status_${s.status}`, s.status))}</Badge></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}><Button asChild variant="ghost" size="icon"><Link to="/sales"><Eye className="h-4 w-4" /></Link></Button></TableCell>
                     </TableRow>
                   );
@@ -1279,7 +1279,7 @@ function Page() {
                     <TableCell className="capitalize">{displayPaymentMethod(s.payment_method)}</TableCell>
                     <TableCell className="text-right font-medium">{fmtMoney(Number(s.total), sym)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(Number(s.paid), sym)}</TableCell>
-                    <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{t(`sales.status_${s.status}`, s.status)}</Badge></TableCell>
+                    <TableCell><Badge variant={s.status === "completed" ? "outline" : s.status === "credit" ? "secondary" : "destructive"}>{String(t(`sales.status_${s.status}`, s.status))}</Badge></TableCell>
                   </TableRow>
                 ))}
                 {drill.invoices.length > 0 && (

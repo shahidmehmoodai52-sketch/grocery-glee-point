@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1932,6 +1932,7 @@ export type Database = {
           account_id: string | null
           created_at: string
           id: string
+          incentive_amount: number
           invoice_no: string
           note: string | null
           paid: number
@@ -1948,6 +1949,7 @@ export type Database = {
           account_id?: string | null
           created_at?: string
           id?: string
+          incentive_amount?: number
           invoice_no?: string
           note?: string | null
           paid?: number
@@ -1964,6 +1966,7 @@ export type Database = {
           account_id?: string | null
           created_at?: string
           id?: string
+          incentive_amount?: number
           invoice_no?: string
           note?: string | null
           paid?: number
@@ -2200,8 +2203,10 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: string | null
+          expense_person_id: string | null
           id: string
           note: string | null
+          party_type: string
           refund_amount: number
           refund_method: string
           return_no: string
@@ -2215,8 +2220,10 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_id?: string | null
+          expense_person_id?: string | null
           id?: string
           note?: string | null
+          party_type?: string
           refund_amount?: number
           refund_method?: string
           return_no?: string
@@ -2230,8 +2237,10 @@ export type Database = {
         Update: {
           created_at?: string
           customer_id?: string | null
+          expense_person_id?: string | null
           id?: string
           note?: string | null
+          party_type?: string
           refund_amount?: number
           refund_method?: string
           return_no?: string
@@ -2248,6 +2257,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_returns_expense_person_id_fkey"
+            columns: ["expense_person_id"]
+            isOneToOne: false
+            referencedRelation: "expense_persons"
             referencedColumns: ["id"]
           },
           {
@@ -3270,6 +3286,7 @@ export type Database = {
       tenant_members: {
         Row: {
           created_at: string
+          display_name: string | null
           id: string
           invited_by: string | null
           role: Database["public"]["Enums"]["tenant_role"]
@@ -3279,6 +3296,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          display_name?: string | null
           id?: string
           invited_by?: string | null
           role?: Database["public"]["Enums"]["tenant_role"]
@@ -3288,6 +3306,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          display_name?: string | null
           id?: string
           invited_by?: string | null
           role?: Database["public"]["Enums"]["tenant_role"]
@@ -3817,11 +3836,15 @@ export type Database = {
         Returns: string
       }
       admin_clear_security_events: {
-        Args: { _older_than_days?: number; _severity?: string }
+        Args: {
+          _older_than_days?: number
+          _reason?: string
+          _severity?: string
+        }
         Returns: number
       }
       admin_delete_tenant: {
-        Args: { _confirm: string; _tenant_id: string }
+        Args: { _confirm: string; _reason?: string; _tenant_id: string }
         Returns: Json
       }
       admin_has_perm: {
@@ -3851,7 +3874,12 @@ export type Database = {
         }
       }
       admin_list_tenants: {
-        Args: never
+        Args: {
+          _limit?: number
+          _offset?: number
+          _search?: string
+          _status?: string
+        }
         Returns: {
           created_at: string
           id: string
@@ -3868,6 +3896,7 @@ export type Database = {
           status: string
           subscription_expires_at: string
           subscription_status: string
+          total_count: number
         }[]
       }
       admin_recent_errors: {
@@ -4128,6 +4157,7 @@ export type Database = {
           current_balance: number
           email: string
           id: string
+          incentive_total: number
           name: string
           opening_balance: number
           phone: string
@@ -4333,6 +4363,7 @@ export type Database = {
       }
       my_tenant_expires_at: { Args: never; Returns: string }
       my_tenant_status: { Args: never; Returns: string }
+      my_trial_info: { Args: never; Returns: Json }
       next_purchase_invoice_no: { Args: never; Returns: string }
       next_purchase_return_no: { Args: never; Returns: string }
       next_sale_invoice_no: { Args: never; Returns: string }

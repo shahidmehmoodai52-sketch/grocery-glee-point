@@ -264,7 +264,7 @@ function StaffRow({ u, reset, del, refresh, permLabel }: any) {
         {u.username}
         {u.is_owner && <Badge variant="outline" className="ml-2 text-[10px]">{t('shop_admin.you_owner_badge', 'You (owner)')}</Badge>}
       </TableCell>
-      <TableCell><Badge variant={u.role === "admin" || u.role === "super_admin" ? "default" : "secondary"}>{t(`shop_admin.role_value_${u.role}`, u.role)}</Badge></TableCell>
+      <TableCell><Badge variant={u.role === "admin" || u.role === "super_admin" ? "default" : "secondary"}>{String(t(`shop_admin.role_value_${u.role}`, u.role))}</Badge></TableCell>
       <TableCell className="max-w-md">
         {u.role !== "cashier" ? <span className="text-xs text-muted-foreground">{t('shop_admin.full_access', 'Full access')}</span> : (
           <div className="flex flex-wrap gap-1">

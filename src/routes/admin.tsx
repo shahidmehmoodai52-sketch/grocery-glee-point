@@ -20,7 +20,7 @@ import {
   AlertTriangle,
   Plus,
   Check,
-  Wand2,
+  RotateCcw,
   Trash2,
   CalendarClock,
   Printer,
@@ -67,7 +67,7 @@ import {
 } from "@/lib/admin-staff.functions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserCog, BookOpen } from "lucide-react";
-import { fetchAll } from "@/lib/supabase-page";
+import { autoRemediate } from "@/lib/admin-error-remediation";
 import { Toaster } from "@/components/ui/sonner";
 import { TypedConfirmDialog } from "@/components/ui/typed-confirm-dialog";
 
@@ -381,6 +381,15 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
     },
   });
 
+  const { data: errorCount = 0 } = useQuery({
+    queryKey: ["admin-errors-count"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_recent_errors", { _limit: 100 });
+      if (error) throw error;
+      return ((data as any[]) ?? []).length;
+    },
+  });
+
   const totals = useMemo(() => {
     return {
       total: tenants.length,
@@ -414,10 +423,11 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
           tone={summary?.critical_24h ? "danger" : "default"} 
           onClick={() => setActiveTab("security")}
         />
-        <StatCard 
-          label="System errors" 
-          value="Check" 
-          icon={Bug} 
+        <StatCard
+          label="System errors"
+          value={errorCount}
+          icon={Bug}
+          tone={errorCount ? "danger" : "default"}
           onClick={() => setActiveTab("errors")}
         />
         <StatCard 
@@ -508,15 +518,29 @@ function TenantsTab() {
 
   const { has } = useAdminAccess();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "suspended" | "archived">("all");
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
   const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [archiveDialog, setArchiveDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Debounce search so we don't hit the DB on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
+  // Reset to the first page whenever the search or status filter changes.
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, filter]);
 
-  const { data: tenants = [], isLoading } = useQuery({
+  // Unbounded, shared with Dashboard/Errors tab under the same query key —
+  // used only for the totals cards, which need true global counts.
+  const { data: allTenants = [] } = useQuery({
     queryKey: ["admin-tenants"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_tenants");
@@ -525,29 +549,35 @@ function TenantsTab() {
     },
   });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return tenants.filter((t) => {
-      if (filter !== "all" && t.status !== filter) return false;
-      if (!q) return true;
-      return (
-        t.name.toLowerCase().includes(q) ||
-        (t.owner_email ?? "").toLowerCase().includes(q) ||
-        (t.owner_name ?? "").toLowerCase().includes(q) ||
-        (t.slug ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [tenants, search, filter]);
-
   const totals = useMemo(() => {
     return {
-      total: tenants.length,
-      active: tenants.filter((t) => t.status === "active").length,
-      pending: tenants.filter((t) => t.status === "pending").length,
-      suspended: tenants.filter((t) => t.status === "suspended").length,
-      revenue: tenants.reduce((a, t) => a + Number(t.sales_total || 0), 0),
+      total: allTenants.length,
+      active: allTenants.filter((t) => t.status === "active").length,
+      pending: allTenants.filter((t) => t.status === "pending").length,
+      suspended: allTenants.filter((t) => t.status === "suspended").length,
+      revenue: allTenants.reduce((a, t) => a + Number(t.sales_total || 0), 0),
     };
-  }, [tenants]);
+  }, [allTenants]);
+
+  // Real server-side search/filter/pagination for the table itself.
+  const { data: page_, isLoading } = useQuery({
+    queryKey: ["admin-tenants-page", debouncedSearch, filter, page],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_tenants", {
+        _search: debouncedSearch || undefined,
+        _status: filter === "all" ? undefined : filter,
+        _limit: pageSize,
+        _offset: page * pageSize,
+      });
+      if (error) throw error;
+      const rows = (data as (TenantRow & { total_count: number })[]) ?? [];
+      return { rows, total: rows[0]?.total_count ?? 0 };
+    },
+  });
+  const filtered = page_?.rows ?? [];
+  const totalFiltered = page_?.total ?? 0;
+  const pageStart = totalFiltered === 0 ? 0 : page * pageSize + 1;
+  const pageEnd = Math.min((page + 1) * pageSize, totalFiltered);
 
   const setStatus = async (id: string, status: string, reason?: string) => {
     const { error } = await supabase.rpc("admin_set_tenant_status", {
@@ -556,6 +586,7 @@ function TenantsTab() {
     if (error) return toast.error(error.message);
     toast.success(`Tenant ${status}`);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
     qc.invalidateQueries({ queryKey: ["admin-tenant-detail", id] });
   };
 
@@ -578,15 +609,17 @@ function TenantsTab() {
     try {
       let done = false;
       while (!done) {
-        const { data, error } = await supabase.rpc("admin_delete_tenant", { 
-          _tenant_id: id, 
-          _confirm: name 
+        const { data, error } = await supabase.rpc("admin_delete_tenant", {
+          _tenant_id: id,
+          _confirm: name,
+          _reason: reason,
         });
         if (error) throw error;
         done = Boolean(data && typeof data === "object" && "done" in data && data.done);
       }
       toast.success(`Deleted "${name}"`);
       qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+      qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -714,6 +747,37 @@ function TenantsTab() {
             ))}
           </TableBody>
         </Table>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2 border-t border-border/40 mt-2">
+          <div className="text-xs text-muted-foreground font-medium">
+            Showing <span className="text-foreground">{pageStart}</span> to{" "}
+            <span className="text-foreground">{pageEnd}</span> of{" "}
+            <span className="text-foreground">{totalFiltered}</span> shops
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              Previous
+            </Button>
+            <div className="text-xs font-bold px-3 py-1 bg-muted rounded-md border border-border/40">
+              Page {page + 1} of {Math.max(1, Math.ceil(totalFiltered / pageSize))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={pageEnd >= totalFiltered}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
 
       <TypedConfirmDialog
@@ -745,6 +809,7 @@ function TenantsTab() {
         description={`This will permanently delete "${deleteDialog.name}" and ALL its data (products, sales, customers, expenses, staff). This action is irreversible.`}
         confirmText={deleteDialog.name}
         confirmLabel="Delete Everything"
+        requireReason
         destructive
         isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
@@ -777,6 +842,7 @@ function ExpiryCell({ tenantId, expiresAt }: { tenantId: string; expiresAt: stri
     toast.success("Expiry updated");
     setOpen(false);
     qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    qc.invalidateQueries({ queryKey: ["admin-tenants-page"] });
   };
 
   return (
@@ -904,39 +970,12 @@ type ErrorRow = {
   created_at: string;
 };
 
-/**
- * Best-effort auto-remediation for known error categories.
- * Returns a short human-readable note describing what was tried.
- * Real code-level bugs still need a code fix — this handles the recoverable ones.
- */
-async function autoRemediate(row: ErrorRow): Promise<string> {
-  const type = (row.error_type ?? "").toLowerCase();
-  try {
-    if (type.includes("sync") || type.includes("offline") || type.includes("queue")) {
-      const mod = await import("@/lib/offline/sync");
-      const fn = (mod as any).syncNow ?? (mod as any).runSync ?? (mod as any).default;
-      if (typeof fn === "function") { await fn(); return "Re-ran offline sync queue"; }
-      return "Marked resolved (no sync runner available)";
-    }
-    if (type.includes("cache") || type.includes("stale") || type.includes("query")) {
-      return "Cleared stale query cache";
-    }
-    if (type.includes("render") || type.includes("react") || type.includes("hydration")) {
-      return "Cleared boundary — user should reload the affected page";
-    }
-    if (type.includes("network") || type.includes("fetch") || type.includes("timeout")) {
-      return "Transient network error — safe to dismiss";
-    }
-    return "Marked as resolved (no automatic fix available for this type)";
-  } catch (e: any) {
-    return `Auto-fix attempt failed: ${e?.message ?? "unknown"} — marked resolved anyway`;
-  }
-}
-
 function ErrorsTab() {
   const qc = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [retryAllOpen, setRetryAllOpen] = useState(false);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-errors"],
@@ -986,9 +1025,14 @@ function ErrorsTab() {
     invalidate();
   };
 
-  const autoFixOne = async (row: ErrorRow) => {
+  const retryOne = async (row: ErrorRow) => {
     setBusyId(row.id);
-    const note = await autoRemediate(row);
+    const { note, autoResolved } = await autoRemediate(row);
+    if (!autoResolved) {
+      setBusyId(null);
+      toast.info(note, { description: "Not resolved automatically — review and resolve manually if this is safe to dismiss." });
+      return;
+    }
     const { error } = await supabase.rpc("admin_resolve_error", { _id: row.id, _note: note });
     setBusyId(null);
     if (error) return toast.error(error.message);
@@ -997,8 +1041,6 @@ function ErrorsTab() {
   };
 
   const clearAll = async () => {
-    if (!rows.length) return;
-    if (!confirm(`Mark all ${rows.length} errors as resolved?`)) return;
     setBulkBusy(true);
     const { data, error } = await supabase.rpc("admin_resolve_errors_bulk", {
       _note: "Bulk cleared by developer",
@@ -1009,18 +1051,18 @@ function ErrorsTab() {
     invalidate();
   };
 
-  const autoFixAll = async () => {
-    if (!rows.length) return;
-    if (!confirm(`Attempt auto-fix on all ${rows.length} errors? Unrecoverable ones will just be marked resolved.`)) return;
+  const retryAll = async () => {
     setBulkBusy(true);
-    let ok = 0;
+    let retried = 0;
+    let skipped = 0;
     for (const r of rows) {
-      const note = await autoRemediate(r);
+      const { note, autoResolved } = await autoRemediate(r);
+      if (!autoResolved) { skipped++; continue; }
       const { error } = await supabase.rpc("admin_resolve_error", { _id: r.id, _note: note });
-      if (!error) ok++;
+      if (!error) retried++;
     }
     setBulkBusy(false);
-    toast.success(`Auto-fixed ${ok} of ${rows.length}`);
+    toast.success(`Retried and resolved ${retried} of ${rows.length}${skipped ? ` — ${skipped} need manual review` : ""}`);
     invalidate();
   };
 
@@ -1033,10 +1075,10 @@ function ErrorsTab() {
             <div className="font-medium text-sm">Affected shops</div>
             <span className="text-xs text-muted-foreground">Which shop has which issue count</span>
             <div className="ml-auto flex gap-2">
-              <Button size="sm" variant="outline" onClick={autoFixAll} disabled={bulkBusy}>
-                <Wand2 className="h-4 w-4 mr-1" /> Auto-fix all
+              <Button size="sm" variant="outline" onClick={() => setRetryAllOpen(true)} disabled={bulkBusy || !rows.length}>
+                <RotateCcw className="h-4 w-4 mr-1" /> Retry all
               </Button>
-              <Button size="sm" variant="outline" onClick={clearAll} disabled={bulkBusy}>
+              <Button size="sm" variant="outline" onClick={() => setClearAllOpen(true)} disabled={bulkBusy || !rows.length}>
                 <Check className="h-4 w-4 mr-1" /> Clear all
               </Button>
             </div>
@@ -1098,8 +1140,8 @@ function ErrorsTab() {
                   <TableCell className="text-muted-foreground text-xs">{e.page_or_module ?? "—"}</TableCell>
                   <TableCell className="text-right whitespace-nowrap">
                     <div className="inline-flex gap-1">
-                      <Button size="sm" variant="outline" onClick={() => autoFixOne(e)} disabled={busy} title="Attempt auto-fix and mark resolved">
-                        <Wand2 className="h-4 w-4 mr-1" /> Auto-fix
+                      <Button size="sm" variant="outline" onClick={() => retryOne(e)} disabled={busy} title="Retry known recovery action, resolve only if it actually succeeds">
+                        <RotateCcw className="h-4 w-4 mr-1" /> Retry & resolve
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => resolveOne(e)} disabled={busy} title="Mark as resolved">
                         <Check className="h-4 w-4" />
@@ -1112,6 +1154,24 @@ function ErrorsTab() {
           </TableBody>
         </Table>
       </Card>
+
+      <TypedConfirmDialog
+        open={clearAllOpen}
+        onOpenChange={setClearAllOpen}
+        title="Resolve all errors"
+        description={`Mark all ${rows.length} unresolved errors as resolved? This does not fix anything — it only clears them from this list.`}
+        confirmLabel="Resolve all"
+        onConfirm={async () => { await clearAll(); }}
+      />
+
+      <TypedConfirmDialog
+        open={retryAllOpen}
+        onOpenChange={setRetryAllOpen}
+        title="Retry all errors"
+        description={`Attempt the known recovery action for each of the ${rows.length} unresolved errors. Only ones that actually recover will be marked resolved — the rest are left for manual review.`}
+        confirmLabel="Retry all"
+        onConfirm={async () => { await retryAll(); }}
+      />
     </div>
 
   );
@@ -1176,7 +1236,8 @@ function SecurityTab() {
       const { data, error } = await supabase
         .from("security_blocklist")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(500);
       if (error) throw error;
       return (data as BlocklistRow[]) ?? [];
     },
@@ -1581,33 +1642,53 @@ function LibraryTab() {
   const canManage = isSuperAdmin || has("library.manage");
   const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["admin-library", status],
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, status]);
+
+  const { data: libraryPage, isLoading } = useQuery({
+    queryKey: ["admin-library", status, debouncedSearch, page],
     queryFn: async () => {
-      const data = await fetchAll<LibraryRow>((from: number, to: number) => {
-        let q = supabase
-          .from("global_products")
-          .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at")
-          .order("created_at", { ascending: false });
-        if (status !== "all") q = q.eq("status", status);
-        return q.range(from, to) as any;
-      });
-      return data ?? [];
+      let q = supabase
+        .from("global_products")
+        .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at", { count: "exact" })
+        .order("created_at", { ascending: false });
+      if (status !== "all") q = q.eq("status", status);
+      if (debouncedSearch) {
+        const s = debouncedSearch.replace(/[%,]/g, "");
+        q = q.or(`name.ilike.%${s}%,barcode.ilike.%${s}%,item_code.ilike.%${s}%,category.ilike.%${s}%`);
+      }
+      const { data, error, count } = await q.range(page * pageSize, page * pageSize + pageSize - 1);
+      if (error) throw error;
+      return { rows: (data as LibraryRow[]) ?? [], total: count ?? 0 };
     },
   });
+  const filtered = libraryPage?.rows ?? [];
+  const totalFiltered = libraryPage?.total ?? 0;
+  const pageStart = totalFiltered === 0 ? 0 : page * pageSize + 1;
+  const pageEnd = Math.min((page + 1) * pageSize, totalFiltered);
 
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter(
-      (r) =>
-        r.name.toLowerCase().includes(s) ||
-        (r.barcode ?? "").toLowerCase().includes(s) ||
-        (r.item_code ?? "").toLowerCase().includes(s) ||
-        (r.category ?? "").toLowerCase().includes(s),
-    );
-  }, [rows, search]);
+  const { data: pendingCount = 0 } = useQuery({
+    queryKey: ["admin-library-pending-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("global_products")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
 
   const setRowStatus = async (id: string, next: "approved" | "rejected") => {
     const { error } = await supabase
@@ -1617,17 +1698,17 @@ function LibraryTab() {
     if (error) return toast.error(error.message);
     toast.success(next === "approved" ? "Item approved — fanned out to shops" : "Item rejected");
     qc.invalidateQueries({ queryKey: ["admin-library"] });
+    qc.invalidateQueries({ queryKey: ["admin-library-pending-count"] });
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}" from the global library?`)) return;
-    const { error } = await supabase.from("global_products").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+  const remove = async (_reason: string) => {
+    if (!deleteTarget) return;
+    const { error } = await supabase.from("global_products").delete().eq("id", deleteTarget.id);
+    if (error) { toast.error(error.message); return; }
     toast.success("Deleted");
     qc.invalidateQueries({ queryKey: ["admin-library"] });
+    qc.invalidateQueries({ queryKey: ["admin-library-pending-count"] });
   };
-
-  const pendingCount = rows.filter((r) => r.status === "pending").length;
 
   return (
     <div className="space-y-3">
@@ -1712,7 +1793,7 @@ function LibraryTab() {
                           <Ban className="h-4 w-4 mr-1 text-destructive" /> Reject
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" title="Delete permanently" onClick={() => remove(r.id, r.name)}>
+                      <Button size="icon" variant="ghost" title="Delete permanently" onClick={() => setDeleteTarget({ id: r.id, name: r.name })}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -1722,7 +1803,50 @@ function LibraryTab() {
             ))}
           </TableBody>
         </Table>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2 border-t border-border/40 mt-2">
+          <div className="text-xs text-muted-foreground font-medium">
+            Showing <span className="text-foreground">{pageStart}</span> to{" "}
+            <span className="text-foreground">{pageEnd}</span> of{" "}
+            <span className="text-foreground">{totalFiltered}</span> items
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              Previous
+            </Button>
+            <div className="text-xs font-bold px-3 py-1 bg-muted rounded-md border border-border/40">
+              Page {page + 1} of {Math.max(1, Math.ceil(totalFiltered / pageSize))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={pageEnd >= totalFiltered}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
+
+      <TypedConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete library item"
+        description={`Delete "${deleteTarget?.name}" from the global library? This removes it for every shop that hasn't already imported it.`}
+        confirmText={deleteTarget?.name}
+        requireReason
+        destructive
+        confirmLabel="Delete"
+        onConfirm={remove}
+      />
     </div>
   );
 }
@@ -1751,13 +1875,14 @@ function AdminStaffTab() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminStaffRow | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<AdminStaffRow | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-staff"] });
 
-  const removeStaff = async (u: AdminStaffRow) => {
-    if (!confirm(`Remove admin access for ${u.email}?`)) return;
+  const removeStaff = async (_reason: string) => {
+    if (!removeTarget) return;
     try {
-      await remove({ data: { user_id: u.user_id } });
+      await remove({ data: { user_id: removeTarget.user_id } });
       toast.success("Removed");
       invalidate();
     } catch (e: any) {
@@ -1811,7 +1936,7 @@ function AdminStaffTab() {
                 <TableCell className="text-right">
                   <div className="inline-flex gap-1">
                     <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>Edit</Button>
-                    <Button size="icon" variant="ghost" title="Remove" onClick={() => removeStaff(u)}>
+                    <Button size="icon" variant="ghost" title="Remove" onClick={() => setRemoveTarget(u)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -1821,6 +1946,17 @@ function AdminStaffTab() {
           </TableBody>
         </Table>
       </Card>
+
+      <TypedConfirmDialog
+        open={!!removeTarget}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}
+        title="Remove admin access"
+        description={`Remove admin panel access for ${removeTarget?.email}? They will immediately lose all admin permissions.`}
+        requireReason
+        destructive
+        confirmLabel="Remove access"
+        onConfirm={removeStaff}
+      />
 
       <AdminStaffDialog
         open={addOpen}
