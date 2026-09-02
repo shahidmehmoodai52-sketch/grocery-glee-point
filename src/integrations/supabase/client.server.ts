@@ -30,7 +30,12 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
+  // The URL isn't secret, so it can safely fall back to the VITE_-prefixed
+  // var (same pattern as requireCloudAuth in cloud-auth-middleware.ts) for
+  // deployments where only that one is set. The service-role key has no
+  // client-exposed equivalent and must never fall back to one.
+  const env = import.meta.env as Record<string, string | undefined>;
+  const SUPABASE_URL = process.env.SUPABASE_URL ?? env.VITE_SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {

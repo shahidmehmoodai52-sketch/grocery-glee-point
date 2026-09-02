@@ -33,8 +33,15 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
     
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+    // Falls back to the VITE_-prefixed vars (same as requireCloudAuth in
+    // cloud-auth-middleware.ts) -- in this deployment only those are set,
+    // so every server function using this middleware (AI bill scanner,
+    // admin panel actions, user management) was failing with "Missing
+    // Supabase environment variable(s)" even though the client-side app
+    // and requireCloudAuth-based functions worked fine.
+    const env = import.meta.env as Record<string, string | undefined>;
+    const SUPABASE_URL = process.env.SUPABASE_URL ?? env.VITE_SUPABASE_URL;
+    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY ?? env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       const missing = [
