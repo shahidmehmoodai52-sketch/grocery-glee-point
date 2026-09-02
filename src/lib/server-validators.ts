@@ -59,6 +59,11 @@ export const addAdminStaffInput = z.object({ email: emailSchema, perms: permsSch
 
 export const setAdminStaffPermsInput = z.object({ user_id: uuidSchema, perms: permsSchema });
 
+/** A compressed data: URL image, capped well under typical serverless body limits. */
+export const extractPurchaseBillInput = z.object({
+  image: z.string().startsWith("data:image/", "Expected an image data URL").max(8_000_000, "Image is too large"),
+});
+
 /** Turns zod issues into a single user-friendly message. */
 export function parseInput<T extends z.ZodTypeAny>(schema: T, data: unknown): z.infer<T> {
   const result = schema.safeParse(data);
