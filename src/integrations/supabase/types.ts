@@ -4034,12 +4034,15 @@ export type Database = {
           created_at: string
           id: string
           last_activity_at: string
+          last_login_at: string
           member_count: number
           name: string
           owner_email: string
           owner_id: string
           owner_name: string
           plan: string
+          plan_max_products: number
+          plan_max_users: number
           product_count: number
           sales_count: number
           sales_total: number

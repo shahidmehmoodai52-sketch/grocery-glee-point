@@ -135,6 +135,9 @@ type TenantRow = {
   subscription_expires_at: string | null;
   created_at: string;
   last_activity_at: string | null;
+  last_login_at: string | null;
+  plan_max_users: number | null;
+  plan_max_products: number | null;
 };
 
 type SecuritySummary = {
@@ -984,9 +987,25 @@ function tenantHealthWarning(t: TenantRow): string | null {
   if (t.subscription_expires_at && new Date(t.subscription_expires_at).getTime() < Date.now()) {
     return "Subscription expired";
   }
+  if (t.plan_max_products != null && t.product_count > t.plan_max_products) {
+    return `Over product limit (${t.product_count}/${t.plan_max_products})`;
+  }
+  if (t.plan_max_users != null && t.member_count > t.plan_max_users) {
+    return `Over seat limit (${t.member_count}/${t.plan_max_users})`;
+  }
   if (t.status === "active" && t.last_activity_at) {
     const daysSince = (Date.now() - new Date(t.last_activity_at).getTime()) / 86_400_000;
     if (daysSince >= 30) return `No activity in ${Math.floor(daysSince)} days`;
+  }
+  if (t.subscription_expires_at) {
+    const daysLeft = (new Date(t.subscription_expires_at).getTime() - Date.now()) / 86_400_000;
+    if (daysLeft >= 0 && daysLeft <= 7) return `Expiring in ${Math.ceil(daysLeft)}d`;
+  }
+  if (t.plan_max_products != null && t.product_count >= t.plan_max_products * 0.9) {
+    return `Near product limit (${t.product_count}/${t.plan_max_products})`;
+  }
+  if (t.plan_max_users != null && t.member_count >= t.plan_max_users * 0.9) {
+    return `Near seat limit (${t.member_count}/${t.plan_max_users})`;
   }
   return null;
 }
@@ -1193,11 +1212,24 @@ function TenantsTab() {
                   <ExpiryCell tenantId={t.id} expiresAt={t.subscription_expires_at} />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                  {t.last_activity_at ? new Date(t.last_activity_at).toLocaleDateString() : "—"}
+                  <div>{t.last_activity_at ? new Date(t.last_activity_at).toLocaleDateString() : "—"}</div>
+                  <div className="text-[10px]">Login: {t.last_login_at ? new Date(t.last_login_at).toLocaleDateString() : "—"}</div>
                 </TableCell>
 
-                <TableCell className="text-right text-sm">{t.member_count}</TableCell>
-                <TableCell className="text-right text-sm">{t.product_count}</TableCell>
+                <TableCell className="text-right text-sm">
+                  {t.plan_max_users != null ? (
+                    <span className={t.member_count > t.plan_max_users ? "text-destructive font-medium" : ""}>
+                      {t.member_count}/{t.plan_max_users}
+                    </span>
+                  ) : t.member_count}
+                </TableCell>
+                <TableCell className="text-right text-sm">
+                  {t.plan_max_products != null ? (
+                    <span className={t.product_count > t.plan_max_products ? "text-destructive font-medium" : ""}>
+                      {t.product_count}/{t.plan_max_products}
+                    </span>
+                  ) : t.product_count}
+                </TableCell>
                 <TableCell className="text-right text-sm">
                   <div className="font-medium">{t.sales_count}</div>
                   <div className="text-[11px] text-muted-foreground">{fmtMoney(t.sales_total)}</div>
