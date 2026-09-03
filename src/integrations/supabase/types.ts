@@ -4002,7 +4002,13 @@ export type Database = {
       }
       admin_list_feature_flags: { Args: never; Returns: Json }
       admin_list_security_events: {
-        Args: { _limit?: number; _severity?: string }
+        Args: {
+          _event_type?: string
+          _from_date?: string
+          _limit?: number
+          _severity?: string
+          _to_date?: string
+        }
         Returns: {
           created_at: string
           email: string | null
@@ -4132,6 +4138,28 @@ export type Database = {
         }
       }
       admin_tenant_detail: { Args: { _tenant_id: string }; Returns: Json }
+      admin_tenant_security_events: {
+        Args: { _limit?: number; _tenant_id: string }
+        Returns: {
+          created_at: string
+          email: string | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          path: string | null
+          severity: string
+          tenant_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "security_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       admin_unblock_identifier: { Args: { _id: string }; Returns: undefined }
       admin_unresolve_error: {
         Args: { _id: string; _note?: string }

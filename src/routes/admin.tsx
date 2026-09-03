@@ -1914,19 +1914,22 @@ function SecurityTab() {
     refetchInterval: 30_000,
   });
 
-  // Direct read of security_events (it already has its own super-admin-only
-  // RLS SELECT policy, same authorization as the admin_list_security_events
-  // RPC) so event-type and date-range filters can be applied server-side
-  // without needing a new RPC signature.
+  // security_events' RLS policy only allows super_admin — it doesn't know
+  // about admin_has_perm's delegable 'shops.view' permission, so an admin
+  // staff member granted that perm would see this tab silently go empty.
+  // Go through admin_list_security_events (already gated on 'shops.view')
+  // instead, extended with the event-type and date-range filters this tab
+  // applies.
   const { data: events = [], isLoading: eventsLoading } = useQuery({
     queryKey: ["admin-security-events", severity, debouncedEventType, eventsFrom, eventsTo],
     queryFn: async () => {
-      let q = supabase.from("security_events").select("*").order("created_at", { ascending: false }).limit(200);
-      if (severity !== "all") q = q.eq("severity", severity);
-      if (debouncedEventType) q = q.ilike("event_type", `%${debouncedEventType}%`);
-      if (eventsFrom) q = q.gte("created_at", new Date(eventsFrom + "T00:00:00").toISOString());
-      if (eventsTo) q = q.lte("created_at", new Date(eventsTo + "T23:59:59").toISOString());
-      const { data, error } = await q;
+      const { data, error } = await supabase.rpc("admin_list_security_events", {
+        _limit: 200,
+        _severity: severity !== "all" ? severity : undefined,
+        _event_type: debouncedEventType || undefined,
+        _from_date: eventsFrom ? new Date(eventsFrom + "T00:00:00").toISOString() : undefined,
+        _to_date: eventsTo ? new Date(eventsTo + "T23:59:59").toISOString() : undefined,
+      });
       if (error) throw error;
       return (data as SecurityEvent[]) ?? [];
     },

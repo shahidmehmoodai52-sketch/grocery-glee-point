@@ -1011,19 +1011,18 @@ function PlanTab({ detail, tenantId }: { detail: TenantDetail; tenantId: string 
 }
 
 function TenantSecurityCard({ tenantId }: { tenantId: string }) {
-  // Tenant-scoped read of the same security_events table the Security tab
-  // uses, filtered to this tenant only — reuses the existing RLS policy
-  // (super-admin-only SELECT), no new RPC, and the explicit tenant_id
-  // filter means this can never surface another tenant's events.
+  // security_events' RLS policy only allows super_admin, not admin staff
+  // granted the delegable 'shops.view' permission — going through
+  // admin_tenant_security_events (gated on 'shops.view', tenant-scoped
+  // server-side so this can never surface another tenant's events) instead
+  // of reading the table directly keeps this card working for both.
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["admin-tenant-security-events", tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("security_events")
-        .select("id, event_type, severity, ip_address, email, path, created_at")
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false })
-        .limit(20);
+      const { data, error } = await supabase.rpc("admin_tenant_security_events", {
+        _tenant_id: tenantId,
+        _limit: 20,
+      });
       if (error) throw error;
       return data ?? [];
     },
