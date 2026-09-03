@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,7 +63,7 @@ function Page() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [exp, setExp] = useState({
     person_id: "", category: "general", amount: 0, description: "",
-    method: "", expense_date: today(),
+    method: "", expense_date: today(), paid: true,
   });
 
   const [personOpen, setPersonOpen] = useState(false);
@@ -162,13 +163,25 @@ function Page() {
 
   const saveExpense = async () => {
     if (!exp.amount || exp.amount <= 0) return toast.error(t('expenses.amount_required', 'Amount required'));
-    let account: { id: string | null; name: string };
-    try {
-      account = await resolvePayAccount();
-    } catch (e: any) {
-      return toast.error(e?.message ?? t('expenses.could_not_resolve_payment', 'Could not resolve payment account'));
+    // The "paid immediately" toggle only applies to person-linked expenses
+    // (the accrued state is meaningless without a person to owe it to) —
+    // force paid=true whenever no person is selected, even if a stale
+    // unchecked value is sitting in state from before the person was cleared.
+    const effectivePaid = exp.person_id ? exp.paid : true;
+    // Accrued (unpaid) expenses never touch a cash account, so there's
+    // nothing to resolve — only "paid immediately" ones deduct real cash.
+    const payload: any = { ...exp, paid: effectivePaid };
+    if (effectivePaid) {
+      let account: { id: string | null; name: string };
+      try {
+        account = await resolvePayAccount();
+      } catch (e: any) {
+        return toast.error(e?.message ?? t('expenses.could_not_resolve_payment', 'Could not resolve payment account'));
+      }
+      payload.method = account.name;
+    } else {
+      payload.method = "";
     }
-    const payload: any = { ...exp, method: account.name };
     if (!payload.person_id) payload.person_id = null;
 
     try {
@@ -183,7 +196,7 @@ function Page() {
     } catch (e: any) { return toast.error(e?.message ?? t('common.failed', 'Failed')); }
     setExpOpen(false);
     setEditingId(null);
-    setExp({ person_id: "", category: "general", amount: 0, description: "", method: "", expense_date: today() });
+    setExp({ person_id: "", category: "general", amount: 0, description: "", method: "", expense_date: today(), paid: true });
     qc.invalidateQueries({ queryKey: ["expenses"] });
   };
 
@@ -207,6 +220,7 @@ function Page() {
       description: r.description || "",
       method: byName?.id ?? byType?.id ?? "",
       expense_date: r.expense_date || today(),
+      paid: r.paid ?? true,
     });
     setExpOpen(true);
   };
@@ -289,7 +303,7 @@ function Page() {
             setExpOpen(open);
             if (!open) {
               setEditingId(null);
-              setExp({ person_id: "", category: "general", amount: 0, description: "", method: "", expense_date: today() });
+              setExp({ person_id: "", category: "general", amount: 0, description: "", method: "", expense_date: today(), paid: true });
             }
           }}>
             <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />{t('expenses.new_expense', 'New expense')}</Button></DialogTrigger>
@@ -330,7 +344,7 @@ function Page() {
                   </div>
                   <div>
                     <Label>{t('sales.th_method', 'Method')}</Label>
-                    <Select value={effectivePaySource} onValueChange={(v) => setExp({ ...exp, method: v })}>
+                    <Select value={effectivePaySource} onValueChange={(v) => setExp({ ...exp, method: v })} disabled={!exp.paid}>
                       <SelectTrigger><SelectValue placeholder={t('purchases.pay_from_placeholder', 'Cash / Cheque / Bank…')} /></SelectTrigger>
                       <SelectContent>
                         {paySourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
@@ -340,6 +354,19 @@ function Page() {
                 </div>
                 <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={exp.amount || ""} onChange={(e) => setExp({ ...exp, amount: Number(e.target.value) })} /></div>
                 <div><Label>{t('expenses.th_description', 'Description')}</Label><Input placeholder={t('expenses.description_placeholder', 'What was this expense for?')} value={exp.description} onChange={(e) => setExp({ ...exp, description: e.target.value })} /></div>
+                {exp.person_id && (
+                  <div className="flex items-start gap-2 rounded-md border p-2">
+                    <Checkbox id="exp-paid" checked={exp.paid} onCheckedChange={(v) => setExp({ ...exp, paid: v === true })} className="mt-0.5" />
+                    <label htmlFor="exp-paid" className="text-sm leading-tight cursor-pointer">
+                      {t('expenses.paid_immediately_label', 'Paid immediately')}
+                      <div className="text-xs text-muted-foreground font-normal">
+                        {exp.paid
+                          ? t('expenses.paid_immediately_hint', 'Cash is deducted now and shows in Cash Flow.')
+                          : t('expenses.unpaid_accrued_hint', 'Uncheck if this person hasn’t taken the cash yet — it will show as owed in their ledger instead, with no effect on Cash Flow until settled.')}
+                      </div>
+                    </label>
+                  </div>
+                )}
               </div>
               <DialogFooter><Button variant="outline" onClick={() => setExpOpen(false)}>{t('common.cancel', 'Cancel')}</Button><Button onClick={saveExpense}>{t('common.save', 'Save')}</Button></DialogFooter>
             </DialogContent>
