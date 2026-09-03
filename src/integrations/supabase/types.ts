@@ -751,6 +751,7 @@ export type Database = {
           expense_date: string
           id: string
           method: string
+          paid: boolean
           person_id: string | null
           sale_id: string | null
           tenant_id: string
@@ -765,6 +766,7 @@ export type Database = {
           expense_date?: string
           id?: string
           method?: string
+          paid?: boolean
           person_id?: string | null
           sale_id?: string | null
           tenant_id?: string
@@ -779,6 +781,7 @@ export type Database = {
           expense_date?: string
           id?: string
           method?: string
+          paid?: boolean
           person_id?: string | null
           sale_id?: string | null
           tenant_id?: string
@@ -4336,6 +4339,19 @@ export type Database = {
           profit: number
           returns: number
           revenue: number
+        }[]
+      }
+      get_expense_person_ledger: {
+        Args: { p_person_id: string }
+        Returns: {
+          credit: number
+          debit: number
+          entry_type: string
+          id: string
+          note: string
+          occurred_at: string
+          reference: string
+          source_data: Json
         }[]
       }
       get_inventory_value: { Args: never; Returns: number }

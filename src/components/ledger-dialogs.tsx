@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { Trash2, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 
-export type Party = "customer" | "supplier";
+export type Party = "customer" | "supplier" | "expense_person";
 export type LedgerEntity = "sale" | "purchase" | "sale_return" | "purchase_return" | "payment";
 
 const tableFor: Record<Exclude<LedgerEntity, "payment">, string> = {
@@ -191,7 +191,7 @@ export function AddPaymentDialog({
           <DateTimeField value={when} onChange={setWhen} />
           <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div>
-            <Label>{party === "supplier" ? t('ledger.pay_from', 'Pay from') : t('ledger.receive_in', 'Receive in')}</Label>
+            <Label>{party === "customer" ? t('ledger.receive_in', 'Receive in') : t('ledger.pay_from', 'Pay from')}</Label>
             <Select
               value={accountId}
               onValueChange={(value) => {
