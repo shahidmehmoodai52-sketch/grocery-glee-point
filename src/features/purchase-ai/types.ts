@@ -33,6 +33,11 @@ export interface MatchedProductOption {
   stock: number;
 }
 
+/** How a line ended up resolved to `matched` — for the review screen's own
+ * labelling, never used by matching/business logic itself. Undefined means
+ * "resolved by the initial AI + barcode/sku/name matching pass". */
+export type ResolvedVia = "scan" | "search" | "new";
+
 /** One editable preview row: AI extraction + matching result + user edits. */
 export interface PreviewLine {
   extracted_name: string;
@@ -46,6 +51,7 @@ export interface PreviewLine {
   qty: number;
   cost: number;
   discount: number;
+  resolvedVia?: ResolvedVia;
 }
 
 export interface SupplierMatch {
