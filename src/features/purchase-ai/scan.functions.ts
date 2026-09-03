@@ -110,6 +110,12 @@ export const extractPurchaseBill = createServerFn({ method: "POST" })
           generationConfig: {
             responseMimeType: "application/json",
             responseSchema: EXTRACTION_SCHEMA,
+            // Straight field extraction into a fixed schema doesn't need
+            // deep reasoning — the default thinking level was burning
+            // ~1000+ tokens per bill on "thinking" before writing a single
+            // output token, which is most of the scan's latency. Verified
+            // live that "low" still returns the same well-formed JSON.
+            thinkingConfig: { thinkingLevel: "low" },
           },
         }),
       },
