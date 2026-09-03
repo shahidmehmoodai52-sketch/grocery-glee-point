@@ -699,6 +699,7 @@ export type Database = {
           is_active: boolean
           name: string
           notes: string | null
+          opening_balance: number
           phone: string | null
           role: string | null
           tenant_id: string
@@ -711,6 +712,7 @@ export type Database = {
           is_active?: boolean
           name: string
           notes?: string | null
+          opening_balance?: number
           phone?: string | null
           role?: string | null
           tenant_id?: string
@@ -723,6 +725,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           notes?: string | null
+          opening_balance?: number
           phone?: string | null
           role?: string | null
           tenant_id?: string
