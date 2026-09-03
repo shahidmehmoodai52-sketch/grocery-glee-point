@@ -94,35 +94,53 @@ export const extractPurchaseBill = createServerFn({ method: "POST" })
         ? `Extract this purchase bill (${data.images.length} pages, in order) as JSON matching the given schema.`
         : "Extract this purchase bill as JSON matching the given schema.";
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: promptText }, ...data.images.map(dataUrlToInlinePart)],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: EXTRACTION_SCHEMA,
-            // Straight field extraction into a fixed schema doesn't need
-            // deep reasoning — the default thinking level was burning
-            // ~1000+ tokens per bill on "thinking" before writing a single
-            // output token, which is most of the scan's latency. Verified
-            // live that "low" still returns the same well-formed JSON.
-            thinkingConfig: { thinkingLevel: "low" },
-          },
-        }),
+    const requestBody = JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: promptText }, ...data.images.map(dataUrlToInlinePart)],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: EXTRACTION_SCHEMA,
+        // Straight field extraction into a fixed schema doesn't need
+        // deep reasoning — the default thinking level was burning
+        // ~1000+ tokens per bill on "thinking" before writing a single
+        // output token, which is most of the scan's latency. Verified
+        // live that "low" still returns the same well-formed JSON.
+        thinkingConfig: { thinkingLevel: "low" },
       },
-    );
+    });
+
+    // 503 ("model is currently experiencing high demand") is a transient
+    // overload on Google's side, not a quota/key problem — Gemini's own
+    // error message says spikes are usually temporary. Retry a couple of
+    // times with a short backoff before surfacing it to the user, instead
+    // of dumping the raw error JSON on the very first overload.
+    const RETRYABLE_STATUSES = new Set([503, 502, 504]);
+    const RETRY_DELAYS_MS = [1000, 2000];
+    let response: Response;
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: requestBody },
+      );
+      if (
+        response.ok ||
+        !RETRYABLE_STATUSES.has(response.status) ||
+        attempt >= RETRY_DELAYS_MS.length
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+    }
 
     if (response.status === 429)
       throw new Error("AI is busy right now — please try again in a moment.");
+    if (RETRYABLE_STATUSES.has(response.status)) {
+      throw new Error("AI is experiencing high demand right now — please try again in a moment.");
+    }
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`AI extraction failed (${response.status}). ${body.slice(0, 200)}`);
