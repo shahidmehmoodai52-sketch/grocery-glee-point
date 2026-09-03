@@ -76,6 +76,23 @@ function ProductsPage() {
 
   useEffect(() => { setPage(1); }, [debouncedSearch, category, stockFilter, sortKey, sortAsc]);
 
+  // Suggest the next sequential SKU when opening the dialog to add a NEW
+  // product (never for editing an existing one, and never overwriting a
+  // SKU the user already typed or a kept draft). Still fully editable —
+  // this only pre-fills a starting value.
+  useEffect(() => {
+    if (!open || form.id || form.sku) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("next_product_sku");
+      if (!cancelled && !error && data) {
+        setForm((prev) => (prev.id || prev.sku ? prev : { ...prev, sku: data as string }));
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // ---- Server-side paginated list ------------------------------------------
   // Never pull the whole catalogue: one page of rows + an exact count.
   const listKey = ["products", "list", { q: debouncedSearch, category, stockFilter, sortKey, sortAsc, page }] as const;
@@ -182,9 +199,19 @@ function ProductsPage() {
       }
       productId = form.id;
     } else {
-      const { data, error } = await supabase.from("products").insert({ ...payload, stock: newStock }).select("id").single();
+      let insertPayload = { ...payload, stock: newStock };
+      let { data, error } = await supabase.from("products").insert(insertPayload).select("id").single();
+      if (error?.code === "23505" && error.message?.includes("products_tenant_sku_unique")) {
+        // Another "Add product" grabbed this auto-suggested SKU in the same instant —
+        // fetch a fresh one and retry once, rather than surfacing a raw DB error.
+        const { data: fresh } = await supabase.rpc("next_product_sku");
+        if (fresh) {
+          insertPayload = { ...insertPayload, sku: fresh as string };
+          ({ data, error } = await supabase.from("products").insert(insertPayload).select("id").single());
+        }
+      }
       if (error) return toast.error(error.message);
-      productId = data.id;
+      productId = data?.id;
     }
 
     if (productId) {

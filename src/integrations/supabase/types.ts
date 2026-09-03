@@ -4537,6 +4537,7 @@ export type Database = {
       my_tenant_expires_at: { Args: never; Returns: string }
       my_tenant_status: { Args: never; Returns: string }
       my_trial_info: { Args: never; Returns: Json }
+      next_product_sku: { Args: never; Returns: string }
       next_purchase_invoice_no: { Args: never; Returns: string }
       next_purchase_return_no: { Args: never; Returns: string }
       next_sale_invoice_no: { Args: never; Returns: string }
