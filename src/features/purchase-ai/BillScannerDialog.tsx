@@ -1,15 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Loader2, AlertTriangle, Plus, X, FileText } from "lucide-react";
+import { Camera, Loader2, AlertTriangle, Plus, X, FileText, Barcode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { calculatePurchaseTotals } from "@/lib/purchase-totals";
+import { QuickAddProductDialog, type QuickAddedProduct } from "@/components/quick-add-product-dialog";
 import { extractPurchaseBill } from "./scan.functions";
 import { fileToCompressedDataUrl } from "./image";
 import { pdfToCompressedDataUrl } from "./pdf";
@@ -32,6 +35,82 @@ const STATUS_TONE: Record<MatchStatus, "success" | "warning" | "danger" | "neutr
   ambiguous: "danger",
   unmatched: "neutral",
 };
+
+const RESOLVED_VIA_LABEL: Record<NonNullable<PreviewLine["resolvedVia"]>, string> = {
+  scan: "✓ Found in your system (scanned)",
+  search: "✓ Picked from your system",
+  new: "+ New product",
+};
+
+/**
+ * Same-line searchable product field: a plain text input (so free typing —
+ * a name not in the catalogue — keeps working exactly as before) that also
+ * opens a filtered, clickable list of this shop's own products on focus.
+ * Classification (matched vs left as free text) happens on blur via
+ * `onCommit`, never on every keystroke — changing that mid-type would keep
+ * yanking focus away via the review screen's auto-advance-to-next-scan
+ * effect.
+ */
+function ProductPicker({
+  products,
+  value,
+  onTextChange,
+  onCommit,
+  onSelect,
+  placeholder,
+}: {
+  products: MatchedProductOption[];
+  value: string;
+  onTextChange: (text: string) => void;
+  onCommit: (text: string) => void;
+  onSelect: (product: MatchedProductOption) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const term = value.trim().toLowerCase();
+  const filtered = (term ? products.filter((p) => p.name.toLowerCase().includes(term)) : products).slice(0, 50);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <input
+          className="w-full h-8 rounded border bg-background px-2 text-sm mt-0.5"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => { onTextChange(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={(e) => { onCommit(e.target.value); setOpen(false); }}
+        />
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[280px] p-0"
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        // Keep the row's own text input focused — this popover is driven by
+        // it, not by a separate CommandInput.
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <Command shouldFilter={false}>
+          <CommandList>
+            <CommandEmpty>No product found.</CommandEmpty>
+            <CommandGroup>
+              {filtered.map((p) => (
+                <CommandItem
+                  key={p.id}
+                  value={p.id}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onSelect={() => { onSelect(p); setOpen(false); }}
+                >
+                  <span className="truncate">{p.name}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export interface ImportedPurchase {
   supplierId: string | null;
@@ -67,8 +146,16 @@ export function PurchaseBillScannerButton({
   const [preview, setPreview] = useState<PreviewLine[]>([]);
   const [extracted, setExtracted] = useState<ExtractedBill | null>(null);
   const [products, setProducts] = useState<MatchedProductOption[]>([]);
+  const [extraBarcodes, setExtraBarcodes] = useState<{ product_id: string; barcode: string }[]>([]);
   const [supplierMatch, setSupplierMatch] = useState<SupplierMatch | null>(null);
   const [supplierChoice, setSupplierChoice] = useState<string>("none");
+  // "Not found in this shop's catalogue" flow: which line triggered it, and
+  // what to prefill the shared Add-product dialog with.
+  const [newProductOpen, setNewProductOpen] = useState(false);
+  const [newProductLineIdx, setNewProductLineIdx] = useState<number | null>(null);
+  const [newProductPrefill, setNewProductPrefill] = useState<{ name?: string; barcode?: string }>({});
+  const scanRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const lastAutoFocusedIdx = useRef<number | null>(null);
   const extract = useServerFn(extractPurchaseBill);
 
   const reset = () => {
@@ -78,8 +165,13 @@ export function PurchaseBillScannerButton({
     setPreview([]);
     setExtracted(null);
     setProducts([]);
+    setExtraBarcodes([]);
     setSupplierMatch(null);
     setSupplierChoice("none");
+    setNewProductOpen(false);
+    setNewProductLineIdx(null);
+    setNewProductPrefill({});
+    lastAutoFocusedIdx.current = null;
   };
 
   const addPages = (files: FileList | File[]) => {
@@ -107,12 +199,13 @@ export function PurchaseBillScannerButton({
         supabase.from("product_barcodes").select("product_id,barcode").limit(5000),
       ]);
       const prods = (prodRes.data ?? []) as MatchedProductOption[];
-      const extraBarcodes = (bcRes.data ?? []) as { product_id: string; barcode: string }[];
+      const extraBc = (bcRes.data ?? []) as { product_id: string; barcode: string }[];
       setProducts(prods);
+      setExtraBarcodes(extraBc);
 
       const lines = bill.items
         .filter((i) => i.name || i.barcode || i.sku)
-        .map((i) => buildPreviewLine(i, prods, extraBarcodes));
+        .map((i) => buildPreviewLine(i, prods, extraBc));
       setPreview(lines);
 
       const sMatch = matchSupplier(bill.supplier_name, suppliers);
@@ -129,22 +222,78 @@ export function PurchaseBillScannerButton({
   const patchLine = (idx: number, patch: Partial<PreviewLine>) =>
     setPreview((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
 
-  const assignProductByName = (idx: number, typedName: string) => {
+  const applyProductToLine = (idx: number, product: MatchedProductOption, via: NonNullable<PreviewLine["resolvedVia"]>) => {
+    setPreview((ls) => ls.map((l, i) => (i === idx ? {
+      ...l,
+      product_id: product.id,
+      product_name: product.name,
+      barcode: product.barcode,
+      sku: product.sku,
+      cost: product.cost_price || l.cost,
+      matchStatus: "matched",
+      matchConfidence: 100,
+      resolvedVia: via,
+    } : l)));
+  };
+
+  const commitTypedName = (idx: number, typedName: string) => {
     const hit = products.find((p) => p.name.toLowerCase() === typedName.trim().toLowerCase());
     if (hit) {
-      patchLine(idx, {
-        product_id: hit.id,
-        product_name: hit.name,
-        barcode: hit.barcode,
-        sku: hit.sku,
-        cost: hit.cost_price || preview[idx].cost,
-        matchStatus: "matched",
-        matchConfidence: 100,
-      });
+      applyProductToLine(idx, hit, "search");
     } else {
-      patchLine(idx, { product_id: null, product_name: typedName, matchStatus: "unmatched", matchConfidence: 0 });
+      patchLine(idx, { product_id: null, product_name: typedName, matchStatus: "unmatched", matchConfidence: 0, resolvedVia: undefined });
     }
   };
+
+  /** Scoped to this tenant's already-loaded catalogue only (the initial
+   * products/product_barcodes query is RLS-filtered server-side) — never a
+   * cross-shop lookup. */
+  const findByBarcode = (code: string): MatchedProductOption | null => {
+    const norm = code.trim().toLowerCase();
+    if (!norm) return null;
+    const direct = products.find((p) => (p.barcode ?? "").toLowerCase() === norm);
+    if (direct) return direct;
+    const extra = extraBarcodes.find((b) => b.barcode.toLowerCase() === norm);
+    return extra ? (products.find((p) => p.id === extra.product_id) ?? null) : null;
+  };
+
+  const resolveScan = (idx: number, rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+    const hit = findByBarcode(code);
+    if (hit) {
+      applyProductToLine(idx, hit, "scan");
+    } else {
+      setNewProductLineIdx(idx);
+      setNewProductPrefill({ name: preview[idx]?.extracted_name || preview[idx]?.product_name, barcode: code });
+      setNewProductOpen(true);
+    }
+  };
+
+  const handleNewProductSaved = (p: QuickAddedProduct) => {
+    const option: MatchedProductOption = { id: p.id, name: p.name, sku: p.sku, barcode: p.barcode, cost_price: p.cost_price, sell_price: p.sell_price, stock: p.stock };
+    // Fold the freshly created product straight into this session's own
+    // catalogue snapshot — if the same new barcode shows up again later in
+    // this same bill, it now resolves locally instead of creating a
+    // duplicate product row.
+    setProducts((prev) => [...prev, option]);
+    if (p.barcode) setExtraBarcodes((prev) => [...prev, { product_id: p.id, barcode: p.barcode as string }]);
+    if (newProductLineIdx !== null) applyProductToLine(newProductLineIdx, option, "new");
+    setNewProductLineIdx(null);
+  };
+
+  // Auto-advance: focus the next still-unresolved line's scan field, but
+  // only when which line is "next" actually changes — never on every
+  // keystroke elsewhere in the table (qty/cost edits on other rows also
+  // touch `preview`), or it would yank focus away mid-edit.
+  useEffect(() => {
+    if (stage !== "review") return;
+    const idx = preview.findIndex((l) => l.matchStatus !== "matched");
+    if (idx >= 0 && idx !== lastAutoFocusedIdx.current) {
+      lastAutoFocusedIdx.current = idx;
+      scanRefs.current[idx]?.focus();
+    }
+  }, [preview, stage]);
 
   const totals = useMemo(() => {
     const billDiscount = Number(extracted?.total_discount ?? 0) || 0;
@@ -163,11 +312,19 @@ export function PurchaseBillScannerButton({
   const grandTotalMismatch =
     extracted?.grand_total != null && Math.abs(Number(extracted.grand_total) - totals.total) > Math.max(1, totals.total * 0.02);
 
-  const needsReview = preview.some((l) => l.matchStatus === "review" || l.matchStatus === "ambiguous" || l.matchStatus === "unmatched");
+  // Anything short of a confirmed 100% match (barcode/sku from the bill, or
+  // resolved here via scan/search/new-product) still needs the purchaser to
+  // scan or search it before the purchase can proceed.
+  const unresolvedCount = preview.filter((l) => l.matchStatus !== "matched").length;
+  const needsReview = unresolvedCount > 0;
 
   const confirm = () => {
     if (preview.length === 0) {
       toast.error("No items to import");
+      return;
+    }
+    if (unresolvedCount > 0) {
+      toast.error(`${unresolvedCount} item${unresolvedCount > 1 ? "s" : ""} still need${unresolvedCount > 1 ? "" : "s"} to be scanned or matched`);
       return;
     }
     onImport({
@@ -322,20 +479,37 @@ export function PurchaseBillScannerButton({
                   <TableBody>
                     {preview.map((l, idx) => (
                       <TableRow key={idx}>
-                        <TableCell className="min-w-[220px]">
-                          <div className="text-[10px] text-muted-foreground truncate">{l.extracted_name}</div>
-                          <input
-                            list={`pab-products-${idx}`}
-                            className="w-full h-8 rounded border bg-background px-2 text-sm mt-0.5"
+                        <TableCell className="min-w-[240px]">
+                          <div className="text-[10px] text-muted-foreground truncate">As on bill: {l.extracted_name}</div>
+                          <ProductPicker
+                            products={products}
                             value={l.product_name}
-                            onChange={(e) => patchLine(idx, { product_name: e.target.value })}
-                            onBlur={(e) => assignProductByName(idx, e.target.value)}
+                            onTextChange={(text) => patchLine(idx, { product_name: text })}
+                            onCommit={(text) => commitTypedName(idx, text)}
+                            onSelect={(p) => applyProductToLine(idx, p, "search")}
+                            placeholder="Type to search this shop's products…"
                           />
-                          <datalist id={`pab-products-${idx}`}>
-                            {(l.candidates.length ? l.candidates : products.slice(0, 50)).map((p) => (
-                              <option key={p.id} value={p.name} />
-                            ))}
-                          </datalist>
+                          {l.resolvedVia && (
+                            <div className={`mt-1 text-[10px] font-medium ${l.resolvedVia === "new" ? "text-blue-600 dark:text-blue-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                              {RESOLVED_VIA_LABEL[l.resolvedVia]}
+                            </div>
+                          )}
+                          {l.matchStatus !== "matched" && (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <Barcode className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <input
+                                ref={(el) => { scanRefs.current[idx] = el; }}
+                                className="w-full h-7 rounded border bg-background px-2 text-xs"
+                                placeholder="Scan barcode to confirm…"
+                                onKeyDown={(e) => {
+                                  if (e.key !== "Enter") return;
+                                  e.preventDefault();
+                                  resolveScan(idx, e.currentTarget.value);
+                                  e.currentTarget.value = "";
+                                }}
+                              />
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <StatusBadge tone={STATUS_TONE[l.matchStatus]}>
@@ -361,7 +535,9 @@ export function PurchaseBillScannerButton({
               </div>
 
               {needsReview && (
-                <p className="text-xs text-amber-700 dark:text-amber-400">Some items need review — pick the correct product above. You can also fix this on the next screen before saving.</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {unresolvedCount} item{unresolvedCount > 1 ? "s" : ""} not 100% matched — scan its barcode to confirm, search for it if you know it's already in your system, or scanning an unrecognized barcode opens "Add new product" for you.
+                </p>
               )}
 
               <div className="text-sm text-right text-muted-foreground">
@@ -374,12 +550,23 @@ export function PurchaseBillScannerButton({
             {stage === "review" && (
               <>
                 <Button variant="outline" onClick={() => { setOpen(false); reset(); }}>Cancel</Button>
-                <Button onClick={confirm}>Continue to Purchase Entry</Button>
+                <Button onClick={confirm} disabled={unresolvedCount > 0}>
+                  {unresolvedCount > 0
+                    ? `Resolve ${unresolvedCount} item${unresolvedCount > 1 ? "s" : ""} to continue`
+                    : "Continue to Purchase Entry"}
+                </Button>
               </>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <QuickAddProductDialog
+        open={newProductOpen}
+        onOpenChange={(v) => { setNewProductOpen(v); if (!v) setNewProductLineIdx(null); }}
+        prefill={newProductPrefill}
+        suppliers={suppliers}
+        onSaved={handleNewProductSaved}
+      />
     </>
   );
 }
