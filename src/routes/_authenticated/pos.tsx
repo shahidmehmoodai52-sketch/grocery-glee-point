@@ -578,6 +578,12 @@ function POSPage() {
   const [highlight, setHighlight] = useState(0);
   const [cartCursor, setCartCursor] = useState<number>(-1);
   const cartRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
+  // Buffers the first digit typed while a cart row is selected, briefly, so
+  // a barcode scan arriving right after a row click (every character lands
+  // within a few ms of the next) can be told apart from a single manual
+  // keypress (the next key, if any, is a human typing speed away) before
+  // committing to "open the qty editor" — see the keydown handler below.
+  const qtyDigitBurstRef = useRef<{ idx: number; digit: string; timer: ReturnType<typeof setTimeout> } | null>(null);
   const searchRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   // True while the user is navigating results with the keyboard — blocks hover
   // (including hover caused by auto-scrolling) from stealing the highlight.
@@ -618,9 +624,9 @@ function POSPage() {
     setTimeout(() => searchRef.current?.focus(), 0);
   };
   const [now, setNow] = useState(() => new Date());
-  const [editing, setEditing] = useState<{ idx: number; field: "price" | "qty" | "disc" } | null>(
-    null,
-  );
+  const [editing, setEditing] = useState<
+    { idx: number; field: "price" | "qty" | "disc"; initialDraft?: string } | null
+  >(null);
   const [quickAdd, setQuickAdd] = useState<{
     open: boolean;
     barcode: string;
@@ -661,8 +667,11 @@ function POSPage() {
 
   const openQuickAdd = (term: string) => {
     const raw = term.trim();
-    // Detect scanner-style codes vs a name typed by hand
-    const looksLikeBarcode = /^[0-9A-Za-z\-]{4,}$/.test(raw) && /\d/.test(raw);
+    // Detect scanner-style codes vs a name typed by hand. Barcodes in this
+    // app are numeric (EAN/UPC), so require digits-only — the previous
+    // "any digit present" check misclassified ordinary alphanumeric product
+    // names like "Maggi70g" or "Amul500" as scanned codes.
+    const looksLikeBarcode = /^\d{4,}$/.test(raw);
     setQuickAdd({
       open: true,
       barcode: looksLikeBarcode ? raw : "",
@@ -2363,11 +2372,31 @@ function POSPage() {
         // selected (clicking anywhere on the row sets cartCursor, not just the
         // small qty button) almost certainly means "change this row's
         // quantity" — the same intent Enter already opens the qty editor for.
-        // Without this, those keystrokes silently went into the search bar
-        // instead, so the qty cell never changed no matter what was typed.
+        // But a barcode scanner "typing" the next item's code right after the
+        // cashier clicked a row looks identical at the first keystroke. A
+        // scanner emits every character within a few ms of the next; a human
+        // pressing one digit doesn't. So the first digit is buffered briefly
+        // — if a second keystroke arrives inside that window, it's a scan:
+        // hand both characters to search instead. If nothing follows, it's a
+        // real manual digit: open the qty editor seeded with it.
+        if (qtyDigitBurstRef.current) {
+          e.preventDefault();
+          clearTimeout(qtyDigitBurstRef.current.timer);
+          const { digit } = qtyDigitBurstRef.current;
+          qtyDigitBurstRef.current = null;
+          searchRef.current?.focus();
+          setSearch((s) => `${s}${digit}${e.key}`);
+          return;
+        }
         if (!search && /[0-9.]/.test(e.key) && cartCursor >= 0 && cartCursor < tab.items.length) {
           e.preventDefault();
-          setEditing({ idx: cartCursor, field: "qty" });
+          const idx = cartCursor;
+          const digit = e.key;
+          const timer = setTimeout(() => {
+            qtyDigitBurstRef.current = null;
+            setEditing({ idx, field: "qty", initialDraft: digit });
+          }, 60);
+          qtyDigitBurstRef.current = { idx, digit, timer };
           return;
         }
         e.preventDefault();
@@ -2439,6 +2468,15 @@ function POSPage() {
       }
     };
     window.addEventListener("keydown", onKey, true);
+    // Deliberately NOT clearing qtyDigitBurstRef's timer here: this effect
+    // re-runs on every render (no dependency array, by design, so onKey
+    // always closes over fresh state) — a per-render cleanup would cancel
+    // the burst-detection window on the very next re-render, which happens
+    // far more often than every 60ms in this screen, breaking it almost
+    // immediately. The timer's own callback only touches the stable
+    // setEditing setter plus values captured by value, so it stays correct
+    // across re-renders on its own; it's harmless if it fires after a real
+    // unmount (React no-ops a state update on an unmounted component).
     return () => window.removeEventListener("keydown", onKey, true);
   });
 
@@ -2837,6 +2875,7 @@ function POSPage() {
                           value={it.qty}
                           step="0.001"
                           display={fmtQty(it.qty)}
+                          initialDraft={editing?.idx === idx && editing.field === "qty" ? editing.initialDraft : undefined}
                           onActivate={() => setEditing({ idx, field: "qty" })}
                           onCommit={(v) => {
                             updateLine(idx, { qty: v });
@@ -3618,7 +3657,7 @@ function POSPage() {
                   // save a bogus product named after the scanned barcode. Recognize a
                   // scanned-looking value — same check openQuickAdd() already uses to
                   // tell a scan from a typed name — and refuse to save it as a name.
-                  const looksLikeBarcode = /^[0-9A-Za-z\-]{4,}$/.test(val) && /\d/.test(val);
+                  const looksLikeBarcode = /^\d{4,}$/.test(val);
                   if (looksLikeBarcode) {
                     setQuickAdd((q) => ({ ...q, name: "" }));
                     toast.error("That looks like a scanned barcode, not an item name. Finish or cancel this item before scanning the next one.");
@@ -4824,6 +4863,7 @@ function EditableNumCell({
   onActivate,
   onCommit,
   onCancel,
+  initialDraft,
 }: {
   active: boolean;
   value: number;
@@ -4833,18 +4873,27 @@ function EditableNumCell({
   onActivate: () => void;
   onCommit: (v: number) => void;
   onCancel: () => void;
+  /** Seeds the field with this value instead of the row's current value —
+   * used when activation itself was triggered by a typed digit, so that
+   * digit becomes the starting value instead of being silently dropped
+   * while the field opens with the old value selected. */
+  initialDraft?: string;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(String(value));
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (active) {
-      setDraft(String(value));
+      setDraft(initialDraft ?? String(value));
       setTimeout(() => {
         ref.current?.focus();
-        ref.current?.select();
+        // Only select the old value when there's nothing typed to preserve —
+        // selecting would let the next keystroke wipe out initialDraft too.
+        if (initialDraft === undefined) ref.current?.select();
+        else ref.current?.setSelectionRange(ref.current.value.length, ref.current.value.length);
       }, 0);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, value]);
 
   if (!active) {
