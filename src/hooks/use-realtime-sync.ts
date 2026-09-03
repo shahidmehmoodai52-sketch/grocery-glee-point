@@ -98,19 +98,45 @@ const clients = new Set<QueryClient>();
 
 let cachedTenantId: string | null | undefined;
 let tenantIdPromise: Promise<string | null> | null = null;
+// Bumped whenever the cache is reset (subscribers hits 0). Lets a retry
+// chain still in flight from a prior mount detect it's stale and avoid
+// clobbering a fresher resolution after unmount+remount.
+let tenantIdGeneration = 0;
+
+// current_tenant_id() can come back null right after login while the
+// tenant_members row is still being provisioned, or on a transient network
+// error — neither means the user has no tenant. Retry with backoff a
+// bounded number of times before giving up, so realtime doesn't require a
+// full page reload to start once the tenant becomes resolvable, but a user
+// who genuinely has no tenant (e.g. a broken/removed membership) doesn't
+// get polled forever for the rest of the session.
+const TENANT_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchTenantIdWithRetry(): Promise<string | null> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const { data } = await supabase.rpc("current_tenant_id");
+      if (data) return data as string;
+    } catch {
+      // fall through to retry/give-up below
+    }
+    if (attempt >= TENANT_RETRY_DELAYS_MS.length) return null;
+    await sleep(TENANT_RETRY_DELAYS_MS[attempt]);
+  }
+}
 
 async function resolveTenantId(): Promise<string | null> {
   if (cachedTenantId !== undefined) return cachedTenantId;
   if (!tenantIdPromise) {
-    tenantIdPromise = Promise.resolve(supabase.rpc("current_tenant_id"))
-      .then(({ data }) => {
-        cachedTenantId = (data as string) ?? null;
-        return cachedTenantId;
-      })
-      .catch(() => {
-        cachedTenantId = null;
-        return null;
-      });
+    const generation = tenantIdGeneration;
+    tenantIdPromise = fetchTenantIdWithRetry().then((id) => {
+      if (generation === tenantIdGeneration) cachedTenantId = id;
+      return id;
+    });
   }
   return tenantIdPromise;
 }
@@ -198,6 +224,7 @@ export function useRealtimeSync() {
         }
         cachedTenantId = undefined;
         tenantIdPromise = null;
+        tenantIdGeneration += 1;
       }
 
     };
