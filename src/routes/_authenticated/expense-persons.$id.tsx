@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, Receipt as ReceiptIcon } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Printer, Receipt as ReceiptIcon, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtDate } from "@/lib/format";
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/_authenticated/expense-persons/$id")({ co
 function Page() {
   const { t } = useTranslation();
   const { id } = Route.useParams();
+  const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   const categoryLabel = (c: string) => t(`expenses.category_${c}`, c.replace(/_/g, " "));
@@ -32,6 +34,9 @@ function Page() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [view, setView] = useState<any>(null);
+  const [openingOpen, setOpeningOpen] = useState(false);
+  const [openingDraft, setOpeningDraft] = useState("0");
+  const [savingOpening, setSavingOpening] = useState(false);
 
   const applyPreset = (k: DatePreset) => {
     setPreset(k);
@@ -65,11 +70,29 @@ function Page() {
     });
   }, [allExpenses, from, to]);
 
-  const totalAll = allExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0);
+  const openingBalance = Number(person?.opening_balance ?? 0);
+  const totalAll = openingBalance + allExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0);
   const totalPeriod = filtered.reduce((s: number, e: any) => s + Number(e.amount), 0);
-  const opening = allExpenses
+  const opening = openingBalance + allExpenses
     .filter((e: any) => from && e.expense_date < from)
     .reduce((s: number, e: any) => s + Number(e.amount), 0);
+
+  const openOpeningDialog = () => {
+    setOpeningDraft(String(openingBalance || ""));
+    setOpeningOpen(true);
+  };
+
+  const saveOpeningBalance = async () => {
+    const value = Number(openingDraft);
+    if (Number.isNaN(value)) return toast.error(t('expenses.invalid_amount', 'Invalid amount'));
+    setSavingOpening(true);
+    const { error } = await supabase.from("expense_persons").update({ opening_balance: value }).eq("id", id);
+    setSavingOpening(false);
+    if (error) return toast.error(error.message);
+    toast.success(t('expenses.opening_balance_saved', 'Opening balance saved'));
+    setOpeningOpen(false);
+    qc.invalidateQueries({ queryKey: ["expense_person", id] });
+  };
 
   const openSale = async (saleId: string) => {
     const { data } = await supabase
@@ -108,6 +131,7 @@ function Page() {
           </div>
           <div><Label className="text-xs">{t('customers.from_label', 'From')}</Label><Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset("custom" as any); }} className="h-9" /></div>
           <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset("custom" as any); }} className="h-9" /></div>
+          <Button variant="outline" size="sm" onClick={openOpeningDialog}><Wallet className="h-4 w-4 mr-1" />{t('expenses.opening_balance_label', 'Opening balance')}</Button>
           <Button variant="outline" size="sm" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />{t('common.print', 'Print')}</Button>
         </div>
       </div>
@@ -180,6 +204,20 @@ function Page() {
             <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />{t('common.print', 'Print')}</Button>
           </div>
           <div className="text-xs text-muted-foreground">{view?.created_at && fmtDate(view.created_at)}</div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openingOpen} onOpenChange={setOpeningOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{t('expenses.opening_balance_label', 'Opening balance')}</DialogTitle></DialogHeader>
+          <div className="space-y-1">
+            <Label>{t('expenses.opening_balance_amount', 'Amount owed before this system was used')}</Label>
+            <Input type="number" step="0.01" value={openingDraft} onChange={(e) => setOpeningDraft(e.target.value)} autoFocus />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setOpeningOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={saveOpeningBalance} disabled={savingOpening}>{t('common.save', 'Save')}</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
