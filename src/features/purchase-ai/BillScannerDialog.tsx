@@ -67,7 +67,14 @@ function ProductPicker({
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const term = value.trim().toLowerCase();
+  // The filter query is deliberately its own state, separate from the
+  // field's displayed `value` — that value starts out as the bill's raw
+  // OCR text, which usually matches nothing in the catalogue, so filtering
+  // by it immediately showed "No product found" the instant the row was
+  // clicked. Opening the picker resets the query to empty (full list, or
+  // top matches), and only live typing narrows it from there.
+  const [search, setSearch] = useState("");
+  const term = search.trim().toLowerCase();
   const filtered = (term ? products.filter((p) => p.name.toLowerCase().includes(term)) : products).slice(0, 50);
 
   return (
@@ -77,8 +84,8 @@ function ProductPicker({
           className="w-full h-8 rounded border bg-background px-2 text-sm mt-0.5"
           value={value}
           placeholder={placeholder}
-          onChange={(e) => { onTextChange(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onChange={(e) => { onTextChange(e.target.value); setSearch(e.target.value); setOpen(true); }}
+          onFocus={() => { setSearch(""); setOpen(true); }}
           onBlur={(e) => { onCommit(e.target.value); setOpen(false); }}
         />
       </PopoverTrigger>
