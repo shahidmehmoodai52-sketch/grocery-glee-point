@@ -24,6 +24,28 @@ export const Route = createFileRoute("/_authenticated/expenses")({ component: Pa
 function today() { return new Date().toISOString().slice(0, 10); }
 function startOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); }
 
+// Presets offered when the shop hasn't created these heads in Cash Flow yet.
+// Selecting one creates the matching cash account so expenses always land on
+// a real account (and show up correctly in Cash Flow) — mirrors purchases.tsx.
+const PAY_SOURCE_PRESETS = ["Cash in hand", "Bank", "Card", "Online"];
+function guessAccountType(name: string) {
+  const s = (name || "").toLowerCase();
+  if (s.includes("bank") || s.includes("cheque") || s.includes("check") || s.includes("online")) return "bank";
+  if (s.includes("card")) return "card";
+  if (s.includes("easy") || s.includes("jazz") || s.includes("wallet")) return "mobile_wallet";
+  return "cash";
+}
+// Old rows stored one of these 4 generic bucket words instead of a real
+// account name. Map them to a real account of the matching type so editing
+// an old expense doesn't appear to jump to an unrelated account.
+function legacyBucketType(method: string): string {
+  const m = (method || "cash").toLowerCase().trim();
+  if (m === "bank") return "bank";
+  if (m === "card") return "card";
+  if (m === "cash") return "cash";
+  return "other";
+}
+
 function Page() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -40,7 +62,7 @@ function Page() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [exp, setExp] = useState({
     person_id: "", category: "general", amount: 0, description: "",
-    method: "cash", expense_date: today(),
+    method: "", expense_date: today(),
   });
 
   const [personOpen, setPersonOpen] = useState(false);
@@ -51,6 +73,52 @@ function Page() {
     queryKey: ["expense-persons"],
     queryFn: async () => (await supabase.from("expense_persons").select("*").eq("is_active", true).order("name")).data ?? [],
   });
+
+  // Payment heads come from Cash Flow accounts so both screens stay in sync.
+  const { data: cashAccounts = [] } = useQuery({
+    queryKey: ["cash-accounts", "expense-pay"],
+    staleTime: 30_000,
+    queryFn: async () =>
+      (await supabase.from("cash_accounts").select("id,name,type,is_active")
+        .eq("is_active", true).order("sort_order").order("name")).data ?? [],
+  });
+  const paySourceOptions = useMemo(() => [
+    ...(cashAccounts as any[]).map((a) => ({ id: a.id as string, name: a.name as string, preset: false })),
+    ...PAY_SOURCE_PRESETS
+      .filter((p) => !(cashAccounts as any[]).some((a) => String(a.name).toLowerCase() === p.toLowerCase()))
+      .map((p) => ({ id: `preset:${p}`, name: p, preset: true })),
+  ], [cashAccounts]);
+  const defaultPaySource =
+    paySourceOptions.find((a) => a.name.toLowerCase() === "cash in hand")
+    ?? paySourceOptions.find((a) => a.name.toLowerCase().includes("cash"))
+    ?? paySourceOptions[0];
+  const effectivePaySource = exp.method || defaultPaySource?.id || "";
+
+  /** Turn the selected option into a real cash_accounts row (creating presets on demand). */
+  const resolvePayAccount = async (optionId?: string): Promise<{ id: string | null; name: string }> => {
+    const wanted = optionId || effectivePaySource;
+    const selected = paySourceOptions.find((a) => a.id === wanted) ?? defaultPaySource;
+    if (!selected) return { id: null, name: "cash" };
+    if (!selected.preset) return { id: selected.id, name: selected.name };
+
+    const existing = cashAccounts.find((a: any) => a.name.toLowerCase() === selected.name.toLowerCase());
+    if (existing) return { id: existing.id, name: existing.name };
+
+    const { data, error } = await supabase
+      .from("cash_accounts")
+      .insert({ name: selected.name, type: guessAccountType(selected.name), opening_balance: 0, is_active: true })
+      .select("id,name")
+      .single();
+    if (error) {
+      if (error.code === "23505") {
+        const { data: found } = await supabase.from("cash_accounts").select("id,name").eq("name", selected.name).single();
+        if (found) return { id: found.id, name: found.name };
+      }
+      throw error;
+    }
+    qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    return { id: data.id as string, name: data.name as string };
+  };
 
   const { data: rows = [] } = useQuery({
     queryKey: ["expenses", from, to],
@@ -94,7 +162,13 @@ function Page() {
 
   const saveExpense = async () => {
     if (!exp.amount || exp.amount <= 0) return toast.error(t('expenses.amount_required', 'Amount required'));
-    const payload: any = { ...exp };
+    let account: { id: string | null; name: string };
+    try {
+      account = await resolvePayAccount();
+    } catch (e: any) {
+      return toast.error(e?.message ?? t('expenses.could_not_resolve_payment', 'Could not resolve payment account'));
+    }
+    const payload: any = { ...exp, method: account.name };
     if (!payload.person_id) payload.person_id = null;
 
     try {
@@ -109,18 +183,29 @@ function Page() {
     } catch (e: any) { return toast.error(e?.message ?? t('common.failed', 'Failed')); }
     setExpOpen(false);
     setEditingId(null);
-    setExp({ person_id: "", category: "general", amount: 0, description: "", method: "cash", expense_date: today() });
+    setExp({ person_id: "", category: "general", amount: 0, description: "", method: "", expense_date: today() });
     qc.invalidateQueries({ queryKey: ["expenses"] });
   };
 
   const openEditExpense = (r: any) => {
     setEditingId(r.id);
+    // r.method holds the real account name for new-style rows, or a legacy
+    // generic bucket word ("cash"/"bank"/"card"/"other") for old ones —
+    // resolve either to the matching option so the dropdown pre-selects the
+    // right account instead of always resetting to the default.
+    // Match against real accounts only (never a generic preset) — a shop
+    // whose real bank account isn't literally named "Bank" must still land
+    // on that real account, not a same-named preset that would create a
+    // duplicate account on save.
+    const rawMethod = (r.method || "cash") as string;
+    const byName = cashAccounts.find((a: any) => a.name.toLowerCase() === rawMethod.toLowerCase());
+    const byType = !byName ? cashAccounts.find((a: any) => a.type === legacyBucketType(rawMethod)) : null;
     setExp({
       person_id: r.person_id || "",
       category: r.category || "general",
       amount: Number(r.amount),
       description: r.description || "",
-      method: r.method || "cash",
+      method: byName?.id ?? byType?.id ?? "",
       expense_date: r.expense_date || today(),
     });
     setExpOpen(true);
@@ -204,7 +289,7 @@ function Page() {
             setExpOpen(open);
             if (!open) {
               setEditingId(null);
-              setExp({ person_id: "", category: "general", amount: 0, description: "", method: "cash", expense_date: today() });
+              setExp({ person_id: "", category: "general", amount: 0, description: "", method: "", expense_date: today() });
             }
           }}>
             <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />{t('expenses.new_expense', 'New expense')}</Button></DialogTrigger>
@@ -245,13 +330,10 @@ function Page() {
                   </div>
                   <div>
                     <Label>{t('sales.th_method', 'Method')}</Label>
-                    <Select value={exp.method} onValueChange={(v) => setExp({ ...exp, method: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select value={effectivePaySource} onValueChange={(v) => setExp({ ...exp, method: v })}>
+                      <SelectTrigger><SelectValue placeholder={t('purchases.pay_from_placeholder', 'Cash / Cheque / Bank…')} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cash">{t('expenses.method_cash', 'Cash')}</SelectItem>
-                        <SelectItem value="bank">{t('expenses.method_bank', 'Bank')}</SelectItem>
-                        <SelectItem value="card">{t('expenses.method_card', 'Card')}</SelectItem>
-                        <SelectItem value="other">{t('expenses.method_other', 'Other')}</SelectItem>
+                        {paySourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
