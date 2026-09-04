@@ -1,8 +1,8 @@
 # Pending Tasks — Grocery Glee / Tillix.co
 
-Notes saved by Claude on 2026-08-27 so this work can be picked up in a future session.
-This file lives on branch `claude/grocery-glee-repo-check-u2j4hy` (not merged to `main`),
-so it won't sync into the Lovable editor or affect the live app.
+Notes saved by Claude on 2026-08-27 (updated 2026-09-04) so this work can be picked up
+in a future session. This file lives on branch `claude/grocery-glee-repo-check-u2j4hy`
+(not merged to `main`), so it won't sync into the Lovable editor or affect the live app.
 
 ## 1. Rename everything to "Tillix.co" (pending — not started)
 
@@ -131,6 +131,53 @@ make sure the header's `<LanguageSelect>` (already global, mounted in
 so no new switcher is needed, just content to translate. Given ~30 files,
 this is worth doing as its own dedicated pass rather than folded into
 something else.
+
+## 5. WhatsApp support/sales agent on Tillix's own number — waiting on credentials (pending — backend built, not activated)
+
+Built and pushed (2026-09-04, commit `c69107c` on this branch): a Supabase Edge
+Function (`supabase/functions/whatsapp-agent/index.ts`) that answers inbound
+WhatsApp messages to Tillix's own number (+923096431377, shown on the landing
+page) using Claude, grounded only in the real product/pricing facts from the
+landing page (plans, features, 7-day trial) — it's instructed to never invent
+a price or feature not on that list.
+
+Backend (`supabase/migrations/20260904120000_whatsapp_agent_infra.sql`):
+applied and functionally verified on the Supabase migration-test project
+(`ubylxunrlzhijkelgxxx`) — a `whatsapp_agent_messages` table for short
+per-contact conversation history, and a `get_whatsapp_agent_secrets()`
+SECURITY DEFINER RPC that reads credentials from Vault, confirmed callable
+only by `service_role` (not anon/authenticated). Not yet applied to production.
+
+The edge function itself was deployed and smoke-tested only on the
+migration-test project — **not on production**, because that Supabase
+project is Lovable-Cloud-managed and isn't reachable via this session's
+direct Supabase access; deploying it there needs a Lovable-side deploy
+(`mcp__Lovable__send_message`), which spends the user's Lovable workspace
+credits — needs the user's go-ahead before doing that.
+
+Four things are needed before this can go live, none of which exist yet:
+1. **WhatsApp Phone Number ID** and **2. a permanent access token** — from
+   Meta (developers.facebook.com → WhatsApp → API Setup for the ID and a
+   temporary token; business.facebook.com/settings/system-users → System
+   User → Generate New Token with `whatsapp_business_messaging` permission
+   for a permanent one). Same Meta setup that item 3 below also needs — one
+   Meta configuration pass covers both features.
+2. **Meta App Secret** — same app's dashboard → Settings → Basic → App
+   Secret. Needed so the webhook can verify a request genuinely came from
+   Meta (HMAC over `X-Hub-Signature-256`) — the endpoint is otherwise
+   publicly POST-able by anyone.
+3. **An Anthropic API key** — the user's own paid key (explicitly requested:
+   "use Claude's, I already pay for it"). Console: console.anthropic.com/settings/keys.
+
+A webhook verify token does NOT need to come from the user — Claude
+generates a random one and gives it to the user to paste into Meta's
+webhook config once the function is deployed.
+
+Once all of the above exist: store the 5 secrets in Vault (mirroring the
+`notify_whatsapp_new_shop()` pattern — never in the repo), deploy the
+function to production via Lovable, then have the user paste the
+function's URL + verify token into Meta's App Dashboard → WhatsApp →
+Configuration → Webhooks.
 
 ## Also noted (informational, no action needed)
 - Root `.env` is committed to the repo with Supabase URL + anon/publishable key
