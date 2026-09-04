@@ -1424,11 +1424,11 @@ function Page() {
               <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as typeof dateFilter)}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="yesterday">Yesterday</SelectItem>
-                  <SelectItem value="week">This week</SelectItem>
-                  <SelectItem value="month">This month</SelectItem>
-                  <SelectItem value="custom">Custom range</SelectItem>
+                  <SelectItem value="today">{t('purchases.today', 'Today')}</SelectItem>
+                  <SelectItem value="yesterday">{t('purchases.yesterday', 'Yesterday')}</SelectItem>
+                  <SelectItem value="week">{t('purchases.this_week', 'This week')}</SelectItem>
+                  <SelectItem value="month">{t('purchases.this_month', 'This month')}</SelectItem>
+                  <SelectItem value="custom">{t('purchases.custom_range', 'Custom range')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

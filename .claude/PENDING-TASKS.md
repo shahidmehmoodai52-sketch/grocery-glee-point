@@ -101,36 +101,48 @@ create and get a simple message template approved in WhatsApp Manager; Claude
 can then switch the trigger's payload from `type: text` to `type: template`
 once one exists.
 
-## 4. Multi-language: language switch only affects the landing page (pending — not started)
+## 4. Multi-language: language switch only affects the landing page (DONE — 2026-09-04)
 
-User's ask: changing the selected language should apply to the **whole
-application** (POS, dashboard, reports, every authenticated screen), not
-just the public landing page.
+This note was stale by the time it was picked back up: when re-checked on
+2026-09-04, all 29 files under `src/routes/_authenticated/` already called
+`useTranslation()`/`t(...)` extensively (some other pass between
+2026-08-28 and now had already done the bulk of this work, uncredited in
+this file) and all 6 `public/locales/*/translation.json` files already had
+full 1:1 key parity (2233 keys each) with real, distinct translations
+(verified by spot-checking actual string values in ur/ar/es/de/no, not
+just key presence).
 
-Root cause (checked 2026-08-28, not yet fixed): this is not a bug in the
-language switcher itself — `i18next`/`react-i18next` is a single global
-instance, so `i18n.changeLanguage()` already takes effect everywhere in
-principle. The real gap is coverage: only 3 of the ~30 files under
-`src/routes/_authenticated/` (plus a few shared components) actually call
-`useTranslation()`/`t(...)` at all — the rest (dashboard, reports,
-customers, suppliers, purchases, expenses, settings, etc.) have their
-labels, buttons, and messages as hardcoded English strings, so there is
-nothing for a language switch to translate on those screens.
+What was actually still missing (found via a systematic grep sweep for
+hardcoded JSX text, `toast.error/success(...)` literals, and `title=`/
+`placeholder=` attributes across every `_authenticated` file) was a small,
+finite residual — not a from-scratch ~30-file rewrite:
+- `pos.tsx`: 26 toast messages, the entire "Held bills" dialog (title,
+  table headers, empty state, "Untitled"/"Editing {invoice}"/"Resume"),
+  and the customer-search combobox (placeholder, empty state, "owes
+  {amount}", the quick-add-customer button tooltip) — the biggest gap,
+  since it's the most-used screen.
+- `dashboard.tsx`: one string ("No records").
+- `purchases.tsx`: the date-filter dropdown (Today/Yesterday/This week/
+  This month/Custom range).
+- `route.tsx` (shared authenticated layout): the "Unsynced Data Detected"
+  logout-confirmation dialog (added `useTranslation()` was already there;
+  used `<Trans>` for the sentence with embedded `<b>permanently
+  delete</b>`, and a one/other key pair for the transaction-count
+  pluralization) and the error-boundary / 404 pages (`AuthedError`,
+  `AuthedNotFound` — neither had `useTranslation()` before).
 
-`public/locales/<lang>/translation.json` already has `landing.*` (fully
-used), plus `common.*` and `pos.*` namespaces with some real translated
-strings prepared but only partially wired up (`pos.tsx` uses a handful,
-e.g. table headers) — so there's a real head start, not a blank slate.
+All ~36 new keys were added to all 6 locale files with real translations
+(not copies of the English text), verified via a flatten-and-diff script
+showing 0 missing/extra keys across languages after the change, plus
+`npx tsc --noEmit` clean.
 
-To actually deliver this: audit each `_authenticated` route file, replace
-hardcoded strings with `t('namespace.key', 'English fallback')` calls
-(matching the existing `pos.*` pattern), add the missing keys to all 6
-`public/locales/*/translation.json` files (en, ur, ar, es, de, no), and
-make sure the header's `<LanguageSelect>` (already global, mounted in
-`src/routes/_authenticated/route.tsx`) is what drives it — it already is,
-so no new switcher is needed, just content to translate. Given ~30 files,
-this is worth doing as its own dedicated pass rather than folded into
-something else.
+Deliberately left as-is (not a translation gap): `library.tsx`'s bulk
+CSV-upload helper text listing literal recognized column header names
+("Item Name", "Barcode", etc.) — these are the actual expected CSV
+header strings the importer matches against, not UI copy; translating
+them would misrepresent what the importer accepts. Also left alone:
+keyboard-shortcut hints ("Esc"), the "SKU" abbreviation, and browser
+names ("Chrome"/"Edge"/"Brave") — none of these are meant to translate.
 
 ## 5. WhatsApp support/sales agent on Tillix's own number — waiting on credentials (pending — backend built, not activated)
 

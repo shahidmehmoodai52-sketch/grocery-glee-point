@@ -479,7 +479,7 @@ function CustomerCombobox({
         >
           <span className="truncate">
             {selected
-              ? `${selected.name}${Number(selected.balance) > 0 ? ` · owes ${fmtMoney(selected.balance, sym)}` : ""}`
+              ? `${selected.name}${Number(selected.balance) > 0 ? ` · ${t('pos.owes_amount', 'owes {{amount}}', { amount: fmtMoney(selected.balance, sym) })}` : ""}`
               : walkInLabel}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -487,9 +487,9 @@ function CustomerCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-[280px] p-0" align="start">
         <Command filter={(itemValue, search) => (itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
-          <CommandInput placeholder="Search customer or phone…" />
+          <CommandInput placeholder={t('pos.customer_search_placeholder', 'Search customer or phone…')} />
           <CommandList>
-            <CommandEmpty>No customer found.</CommandEmpty>
+            <CommandEmpty>{t('pos.no_customer_found', 'No customer found.')}</CommandEmpty>
             <CommandGroup>
               <CommandItem
                 value="walk-in customer"
@@ -602,7 +602,7 @@ function POSPage() {
   };
   const saveQuickCustomer = async () => {
     const name = newCustomer.name.trim();
-    if (!name) return toast.error("Customer name required");
+    if (!name) return toast.error(t('pos.toast_customer_name_required', 'Customer name required'));
     try {
       const data = await insertOfflineAware("customers", {
         name,
@@ -799,7 +799,7 @@ function POSPage() {
 
   const saveQuickAdd = async () => {
     const name = quickAdd.name.trim();
-    if (!name) return toast.error("Item name is required");
+    if (!name) return toast.error(t('pos.toast_item_name_required', 'Item name is required'));
     const sell = Number(quickAdd.sell_price || 0);
     const cost = Number(quickAdd.cost_price || 0);
     const stock = Number(quickAdd.stock || 0);
@@ -1585,7 +1585,7 @@ function POSPage() {
     let payload: any = null;
     if (isOfflineNow()) {
       const local = await offlineDb().held_bills.get(id);
-      if (!local) return toast.error("Held bill not available offline");
+      if (!local) return toast.error(t('pos.toast_held_bill_offline_unavailable', 'Held bill not available offline'));
       payload = local.payload;
       await offlineDb().held_bills.put({ ...local, status: "resumed" });
       await enqueueWrite({ op: "rpc", table: "resume_bill", payload: { _id: id } });
@@ -1597,7 +1597,7 @@ function POSPage() {
     restorePayloadIntoNewTab(payload as any, "↺");
     setHeldOpen(false);
     refetchHeld();
-    toast.success("Bill resumed");
+    toast.success(t('pos.toast_bill_resumed', 'Bill resumed'));
   };
 
   const discardHeld = async (id: string) => {
@@ -1617,12 +1617,12 @@ function POSPage() {
       if (error) return toast.error(error.message);
     }
     refetchHeld();
-    toast.success("Discarded");
+    toast.success(t('pos.toast_discarded', 'Discarded'));
   };
 
   const holdCurrent = async () => {
-    if (!tab.items.length) return toast.error("Cart is empty");
-    if (!holdBillsEnabled) return toast.error("Hold bills is disabled in Settings");
+    if (!tab.items.length) return toast.error(t('pos.toast_cart_empty', 'Cart is empty'));
+    if (!holdBillsEnabled) return toast.error(t('pos.toast_hold_disabled', 'Hold bills is disabled in Settings'));
     setHolding(true);
     try {
       const payload = {
@@ -1661,11 +1661,11 @@ function POSPage() {
           _offline_pending: true,
         });
         await enqueueWrite({ op: "rpc", table: "hold_bill", payload: args });
-        toast.success("Bill held offline");
+        toast.success(t('pos.toast_bill_held_offline', 'Bill held offline'));
       } else {
         const { error } = await supabase.rpc("hold_bill", args);
         if (error) throw error;
-        toast.success("Bill held");
+        toast.success(t('pos.toast_bill_held', 'Bill held'));
       }
       closeTab(active);
       refetchHeld();
@@ -1683,7 +1683,7 @@ function POSPage() {
       if (!raw) return;
       localStorage.removeItem("pos:resume_payload");
       restorePayloadIntoNewTab(JSON.parse(raw), "↺");
-      toast.success("Bill resumed");
+      toast.success(t('pos.toast_bill_resumed', 'Bill resumed'));
     } catch {
       /* noop */
     }
@@ -1703,30 +1703,30 @@ function POSPage() {
   };
 
   const handleSaleInner = async () => {
-    if (!tab.items.length) return toast.error("Cart is empty");
+    if (!tab.items.length) return toast.error(t('pos.toast_cart_empty', 'Cart is empty'));
     if (isDigitalCashBackMode) {
       if (!tab.digital_received_amount || Number(tab.digital_received_amount) <= 0) {
-        return toast.error("Enter the amount received in the digital account");
+        return toast.error(t('pos.toast_digital_amount_required', 'Enter the amount received in the digital account'));
       }
       if (!digitalCashBackSummary.isValid) {
-        return toast.error("Digital amount received cannot be less than the sale total");
+        return toast.error(t('pos.toast_digital_amount_too_low', 'Digital amount received cannot be less than the sale total'));
       }
       if (!tab.digital_account_id) {
-        return toast.error("Select a digital account to receive the payment");
+        return toast.error(t('pos.toast_select_digital_account_receive', 'Select a digital account to receive the payment'));
       }
     }
     if (isDigitalMode) {
       const hasAccounts = ((cashAccountOptions ?? []) as any[]).some((a: any) => a.type !== "cash");
       if (hasAccounts && !tab.digital_account_id) {
-        return toast.error("Select the digital account that received the payment");
+        return toast.error(t('pos.toast_select_digital_account_received', 'Select the digital account that received the payment'));
       }
       if (Number(tab.paid || 0) <= 0) {
-        return toast.error("Enter the digital amount received");
+        return toast.error(t('pos.toast_enter_digital_amount', 'Enter the digital amount received'));
       }
     }
     const isCredit = !isDigitalCashBackMode && due > 0;
     if (isCredit && !tab.customer_id && !tab.expense_person_id)
-      return toast.error("Select a customer or a staff/owner for credit sale");
+      return toast.error(t('pos.toast_select_customer_or_staff_credit', 'Select a customer or a staff/owner for credit sale'));
     // Negative-stock guard: block sale if any line would push a non-negative-allowed product below zero.
     // Skip guard when editing an existing invoice — the edit_sale RPC restores original stock before re-decrementing.
     if (tab.editing_sale_id) {
@@ -2137,7 +2137,7 @@ function POSPage() {
 
   const attemptUndo = () => {
     if (!undoCandidate) {
-      toast.error("No recent sale to undo");
+      toast.error(t('pos.toast_no_recent_sale_undo', 'No recent sale to undo'));
       return;
     }
     if (undoExpired) {
@@ -3077,7 +3077,7 @@ function POSPage() {
                   size="sm"
                   variant="outline"
                   className="h-9 w-9 shrink-0"
-                  title="Quick add customer"
+                  title={t('pos.quick_add_customer', 'Quick add customer')}
                   onClick={() => setQuickAddCustomerOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -3471,17 +3471,17 @@ function POSPage() {
       <Dialog open={heldOpen} onOpenChange={setHeldOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Held bills</DialogTitle>
+            <DialogTitle>{t('pos.held_bills_title', 'Held bills')}</DialogTitle>
           </DialogHeader>
           <div className="rounded-md border max-h-[60vh] overflow-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-xs uppercase tracking-wide sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2">Label</th>
-                  <th className="text-left px-3 py-2">Customer</th>
-                  <th className="text-left px-3 py-2">Held at</th>
-                  <th className="text-right px-3 py-2">Items</th>
-                  <th className="text-right px-3 py-2">Total</th>
+                  <th className="text-left px-3 py-2">{t('pos.held_bills_label', 'Label')}</th>
+                  <th className="text-left px-3 py-2">{t('pos.customer', 'Customer')}</th>
+                  <th className="text-left px-3 py-2">{t('pos.held_at', 'Held at')}</th>
+                  <th className="text-right px-3 py-2">{t('pos.items', 'Items')}</th>
+                  <th className="text-right px-3 py-2">{t('pos.total', 'Total')}</th>
                   <th className="px-2 py-2"></th>
                 </tr>
               </thead>
@@ -3489,7 +3489,7 @@ function POSPage() {
                 {heldBills.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center py-6 text-muted-foreground">
-                      No held bills
+                      {t('pos.no_held_bills', 'No held bills')}
                     </td>
                   </tr>
                 )}
@@ -3500,24 +3500,24 @@ function POSPage() {
                         {b.payload?.editing_sale_id ? (
                           <span
                             className="inline-flex items-center gap-1 text-primary"
-                            title="Paused edit — resume to continue editing invoice"
+                            title={t('pos.paused_edit_tooltip', 'Paused edit — resume to continue editing invoice')}
                           >
                             <Clock className="h-3.5 w-3.5" />
                             <Pencil className="h-3 w-3" />
                           </span>
                         ) : null}
-                        <span>{b.label || "Untitled"}</span>
+                        <span>{b.label || t('pos.untitled', 'Untitled')}</span>
                         {b.payload?.editing_sale_id && (
                           <Badge
                             variant="outline"
                             className="text-[10px] h-4 px-1 border-primary/40 text-primary"
                           >
-                            Editing {b.payload?.editing_invoice_no ?? ""}
+                            {t('pos.editing_invoice', 'Editing {{invoice}}', { invoice: b.payload?.editing_invoice_no ?? "" })}
                           </Badge>
                         )}
                       </span>
                     </td>
-                    <td className="px-3 py-1.5">{b.customers?.name ?? "Walk-in"}</td>
+                    <td className="px-3 py-1.5">{b.customers?.name ?? t('pos.walk_in', 'Walk-in')}</td>
                     <td className="px-3 py-1.5 text-xs text-muted-foreground">
                       {fmtDate(b.created_at)}
                     </td>
@@ -3527,7 +3527,7 @@ function POSPage() {
                     </td>
                     <td className="px-2 py-1 text-right whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => resumeHeld(b.id)}>
-                        <Play className="h-3.5 w-3.5 mr-1" /> Resume
+                        <Play className="h-3.5 w-3.5 mr-1" /> {t('pos.resume', 'Resume')}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => discardHeld(b.id)}>
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -3648,7 +3648,7 @@ function POSPage() {
                   e.preventDefault();
                   const val = quickAdd.name.trim();
                   if (!val) {
-                    toast.error("Please enter item name");
+                    toast.error(t('pos.toast_enter_item_name', 'Please enter item name'));
                     return;
                   }
                   // A barcode scanner always ends a scan with Enter. If the cashier
@@ -3660,7 +3660,7 @@ function POSPage() {
                   const looksLikeBarcode = /^\d{4,}$/.test(val);
                   if (looksLikeBarcode) {
                     setQuickAdd((q) => ({ ...q, name: "" }));
-                    toast.error("That looks like a scanned barcode, not an item name. Finish or cancel this item before scanning the next one.");
+                    toast.error(t('pos.toast_barcode_not_item_name', 'That looks like a scanned barcode, not an item name. Finish or cancel this item before scanning the next one.'));
                     return;
                   }
                   saveQuickAdd();
@@ -4216,10 +4216,10 @@ function CashOutDialog({
   const selectedCustomer = customers.find((c) => c.id === activeTab.customer_id);
 
   const handleCashOut = async () => {
-    if (!activeTab.customer_id) return toast.error("Select a customer first");
+    if (!activeTab.customer_id) return toast.error(t('pos.toast_select_customer_first', 'Select a customer first'));
     const amt = Number(amount);
-    if (!amt || amt <= 0) return toast.error("Enter a valid amount");
-    if (!accountId) return toast.error("Select a payment source account");
+    if (!amt || amt <= 0) return toast.error(t('pos.toast_enter_valid_amount', 'Enter a valid amount'));
+    if (!accountId) return toast.error(t('pos.toast_select_payment_source_account', 'Select a payment source account'));
 
     setSubmitting(true);
     try {
@@ -4264,7 +4264,7 @@ function CashOutDialog({
           },
         });
 
-        toast.success("Cash Out recorded offline");
+        toast.success(t('pos.toast_cash_out_recorded_offline', 'Cash Out recorded offline'));
       } else {
         // Online: Directly record both records. 
         // We ensure tenant_id is set via trigger or we can pass it if we have it, 
@@ -4309,7 +4309,7 @@ function CashOutDialog({
           if (balErr) console.error("Balance update failed:", balErr);
         }
 
-        toast.success("Cash Out successful");
+        toast.success(t('pos.toast_cash_out_successful', 'Cash Out successful'));
       }
 
       setOpen(false);
@@ -4342,7 +4342,7 @@ function CashOutDialog({
           onClick={(e) => {
             if (!activeTab.customer_id) {
               e.preventDefault();
-              toast.error("Please select a customer first");
+              toast.error(t('pos.toast_please_select_customer_first', 'Please select a customer first'));
               return;
             }
           }}

@@ -593,7 +593,7 @@ function Page() {
                 </tbody>
               </table>
             ) : (
-              <div className="p-8 text-center text-sm text-muted-foreground">No records</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">{t('dashboard.no_records', 'No records')}</div>
             )}
           </div>
         </DialogContent>

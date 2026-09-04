@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect, useRouter, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { LanguageSelect } from "@/components/language-select/language-select";
 
 import { LogOut, AlertTriangle } from "lucide-react";
@@ -147,22 +147,31 @@ function Layout() {
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-5 w-5" />
-                  Unsynced Data Detected
+                  {t('common.unsynced_data_title', 'Unsynced Data Detected')}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  You have {pendingCount} transaction{pendingCount > 1 ? "s" : ""} waiting to be synced to the cloud.
-                  Logging out now will <strong>permanently delete</strong> these offline sales.
+                  {t(pendingCount > 1 ? 'common.unsynced_data_count_other' : 'common.unsynced_data_count_one',
+                    pendingCount > 1
+                      ? 'You have {{count}} transactions waiting to be synced to the cloud.'
+                      : 'You have {{count}} transaction waiting to be synced to the cloud.',
+                    { count: pendingCount })}
+                  {' '}
+                  <Trans
+                    i18nKey="common.unsynced_data_warning"
+                    defaults="Logging out now will <b>permanently delete</b> these offline sales."
+                    components={{ b: <strong /> }}
+                  />
                   <br /><br />
-                  Please connect to the internet and wait for the sync to complete, or confirm if you want to discard these transactions.
+                  {t('common.unsynced_data_instructions', 'Please connect to the internet and wait for the sync to complete, or confirm if you want to discard these transactions.')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Go Back</AlertDialogCancel>
+                <AlertDialogCancel>{t('common.go_back', 'Go Back')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => handleSignOut(true)}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  Discard & Log Out
+                  {t('common.discard_and_log_out', 'Discard & Log Out')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -176,29 +185,31 @@ function Layout() {
 
 function AuthedError({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
+  const { t } = useTranslation();
   return (
     <div className="p-8 max-w-xl mx-auto space-y-4">
-      <h1 className="text-xl font-semibold">Something went wrong</h1>
+      <h1 className="text-xl font-semibold">{t('common.something_went_wrong', 'Something went wrong')}</h1>
       <p className="text-sm text-muted-foreground">
-        We couldn't load this page. This is usually temporary — please try again.
+        {t('common.load_error_desc', "We couldn't load this page. This is usually temporary — please try again.")}
       </p>
       {error?.message && (
         <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-40">{error.message}</pre>
       )}
       <div className="flex gap-2">
-        <Button onClick={() => { router.invalidate(); reset(); }}>Try again</Button>
-        <Button variant="outline" asChild><Link to="/dashboard">Go to dashboard</Link></Button>
+        <Button onClick={() => { router.invalidate(); reset(); }}>{t('common.try_again', 'Try again')}</Button>
+        <Button variant="outline" asChild><Link to="/dashboard">{t('common.go_to_dashboard', 'Go to dashboard')}</Link></Button>
       </div>
     </div>
   );
 }
 
 function AuthedNotFound() {
+  const { t } = useTranslation();
   return (
     <div className="p-8 max-w-xl mx-auto space-y-4">
-      <h1 className="text-xl font-semibold">Page not found</h1>
-      <p className="text-sm text-muted-foreground">The page you're looking for doesn't exist or has moved.</p>
-      <Button asChild><Link to="/dashboard">Back to dashboard</Link></Button>
+      <h1 className="text-xl font-semibold">{t('common.page_not_found', 'Page not found')}</h1>
+      <p className="text-sm text-muted-foreground">{t('common.page_not_found_desc', "The page you're looking for doesn't exist or has moved.")}</p>
+      <Button asChild><Link to="/dashboard">{t('common.back_to_dashboard', 'Back to dashboard')}</Link></Button>
     </div>
   );
 }
