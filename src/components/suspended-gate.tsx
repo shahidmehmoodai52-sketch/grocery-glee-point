@@ -24,7 +24,9 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
     enabled: !!user?.id && online,
     staleTime: 30_000,
     queryFn: async () => {
-      let { data, error } = await supabase.rpc("my_tenant_status");
+      const call = () => supabase.rpc("my_tenant_status");
+
+      let { data, error } = await call();
       if (error) {
         // A stale/about-to-expire access token is a known cause of a spurious
         // failure here (same class of bug already fixed for the sale-save path
@@ -32,9 +34,27 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
         // owner with a perfectly real shop is never dropped into "Register
         // your shop" just because their token needed a refresh.
         await supabase.auth.refreshSession().catch(() => {});
-        ({ data, error } = await supabase.rpc("my_tenant_status"));
+        ({ data, error } = await call());
         if (error) throw error;
       }
+
+      // A clean `null` result (no error) right after login can also be a
+      // transient race, not proof the user has no shop: the client's auth
+      // session can resolve in React state slightly before the Supabase
+      // client actually has a token attached to outgoing requests (common
+      // right after a Google OAuth redirect), or the tenant_members row can
+      // still be mid-provisioning. This is the exact same race already
+      // handled for realtime tenant resolution in use-realtime-sync.ts
+      // (fetchTenantIdWithRetry) — mirrored here with a shorter budget since
+      // this is a foreground gate, not a background subscription setup.
+      for (const delayMs of [800, 1500, 3000]) {
+        if (data !== null) break;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        ({ data, error } = await call());
+        if (error) break; // a real error surfaces as-is below, not silently as "no tenant"
+      }
+
+      if (error) throw error;
       return (data as string | null) ?? null;
     },
   });
