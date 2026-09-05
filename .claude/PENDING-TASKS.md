@@ -1,8 +1,8 @@
 # Pending Tasks — Grocery Glee / Tillix.co
 
-Notes saved by Claude on 2026-08-27 so this work can be picked up in a future session.
-This file lives on branch `claude/grocery-glee-repo-check-u2j4hy` (not merged to `main`),
-so it won't sync into the Lovable editor or affect the live app.
+Notes saved by Claude on 2026-08-27 (updated 2026-09-04) so this work can be picked up
+in a future session. This file lives on branch `claude/grocery-glee-repo-check-u2j4hy`
+(not merged to `main`), so it won't sync into the Lovable editor or affect the live app.
 
 ## 1. Rename everything to "Tillix.co" (pending — not started)
 
@@ -101,36 +101,95 @@ create and get a simple message template approved in WhatsApp Manager; Claude
 can then switch the trigger's payload from `type: text` to `type: template`
 once one exists.
 
-## 4. Multi-language: language switch only affects the landing page (pending — not started)
+## 4. Multi-language: language switch only affects the landing page (DONE — 2026-09-04)
 
-User's ask: changing the selected language should apply to the **whole
-application** (POS, dashboard, reports, every authenticated screen), not
-just the public landing page.
+This note was stale by the time it was picked back up: when re-checked on
+2026-09-04, all 29 files under `src/routes/_authenticated/` already called
+`useTranslation()`/`t(...)` extensively (some other pass between
+2026-08-28 and now had already done the bulk of this work, uncredited in
+this file) and all 6 `public/locales/*/translation.json` files already had
+full 1:1 key parity (2233 keys each) with real, distinct translations
+(verified by spot-checking actual string values in ur/ar/es/de/no, not
+just key presence).
 
-Root cause (checked 2026-08-28, not yet fixed): this is not a bug in the
-language switcher itself — `i18next`/`react-i18next` is a single global
-instance, so `i18n.changeLanguage()` already takes effect everywhere in
-principle. The real gap is coverage: only 3 of the ~30 files under
-`src/routes/_authenticated/` (plus a few shared components) actually call
-`useTranslation()`/`t(...)` at all — the rest (dashboard, reports,
-customers, suppliers, purchases, expenses, settings, etc.) have their
-labels, buttons, and messages as hardcoded English strings, so there is
-nothing for a language switch to translate on those screens.
+What was actually still missing (found via a systematic grep sweep for
+hardcoded JSX text, `toast.error/success(...)` literals, and `title=`/
+`placeholder=` attributes across every `_authenticated` file) was a small,
+finite residual — not a from-scratch ~30-file rewrite:
+- `pos.tsx`: 26 toast messages, the entire "Held bills" dialog (title,
+  table headers, empty state, "Untitled"/"Editing {invoice}"/"Resume"),
+  and the customer-search combobox (placeholder, empty state, "owes
+  {amount}", the quick-add-customer button tooltip) — the biggest gap,
+  since it's the most-used screen.
+- `dashboard.tsx`: one string ("No records").
+- `purchases.tsx`: the date-filter dropdown (Today/Yesterday/This week/
+  This month/Custom range).
+- `route.tsx` (shared authenticated layout): the "Unsynced Data Detected"
+  logout-confirmation dialog (added `useTranslation()` was already there;
+  used `<Trans>` for the sentence with embedded `<b>permanently
+  delete</b>`, and a one/other key pair for the transaction-count
+  pluralization) and the error-boundary / 404 pages (`AuthedError`,
+  `AuthedNotFound` — neither had `useTranslation()` before).
 
-`public/locales/<lang>/translation.json` already has `landing.*` (fully
-used), plus `common.*` and `pos.*` namespaces with some real translated
-strings prepared but only partially wired up (`pos.tsx` uses a handful,
-e.g. table headers) — so there's a real head start, not a blank slate.
+All ~36 new keys were added to all 6 locale files with real translations
+(not copies of the English text), verified via a flatten-and-diff script
+showing 0 missing/extra keys across languages after the change, plus
+`npx tsc --noEmit` clean.
 
-To actually deliver this: audit each `_authenticated` route file, replace
-hardcoded strings with `t('namespace.key', 'English fallback')` calls
-(matching the existing `pos.*` pattern), add the missing keys to all 6
-`public/locales/*/translation.json` files (en, ur, ar, es, de, no), and
-make sure the header's `<LanguageSelect>` (already global, mounted in
-`src/routes/_authenticated/route.tsx`) is what drives it — it already is,
-so no new switcher is needed, just content to translate. Given ~30 files,
-this is worth doing as its own dedicated pass rather than folded into
-something else.
+Deliberately left as-is (not a translation gap): `library.tsx`'s bulk
+CSV-upload helper text listing literal recognized column header names
+("Item Name", "Barcode", etc.) — these are the actual expected CSV
+header strings the importer matches against, not UI copy; translating
+them would misrepresent what the importer accepts. Also left alone:
+keyboard-shortcut hints ("Esc"), the "SKU" abbreviation, and browser
+names ("Chrome"/"Edge"/"Brave") — none of these are meant to translate.
+
+## 5. WhatsApp support/sales agent on Tillix's own number — waiting on credentials (pending — backend built, not activated)
+
+Built and pushed (2026-09-04, commit `c69107c` on this branch): a Supabase Edge
+Function (`supabase/functions/whatsapp-agent/index.ts`) that answers inbound
+WhatsApp messages to Tillix's own number (+923096431377, shown on the landing
+page) using Claude, grounded only in the real product/pricing facts from the
+landing page (plans, features, 7-day trial) — it's instructed to never invent
+a price or feature not on that list.
+
+Backend (`supabase/migrations/20260904120000_whatsapp_agent_infra.sql`):
+applied and functionally verified on the Supabase migration-test project
+(`ubylxunrlzhijkelgxxx`) — a `whatsapp_agent_messages` table for short
+per-contact conversation history, and a `get_whatsapp_agent_secrets()`
+SECURITY DEFINER RPC that reads credentials from Vault, confirmed callable
+only by `service_role` (not anon/authenticated). Not yet applied to production.
+
+The edge function itself was deployed and smoke-tested only on the
+migration-test project — **not on production**, because that Supabase
+project is Lovable-Cloud-managed and isn't reachable via this session's
+direct Supabase access; deploying it there needs a Lovable-side deploy
+(`mcp__Lovable__send_message`), which spends the user's Lovable workspace
+credits — needs the user's go-ahead before doing that.
+
+Four things are needed before this can go live, none of which exist yet:
+1. **WhatsApp Phone Number ID** and **2. a permanent access token** — from
+   Meta (developers.facebook.com → WhatsApp → API Setup for the ID and a
+   temporary token; business.facebook.com/settings/system-users → System
+   User → Generate New Token with `whatsapp_business_messaging` permission
+   for a permanent one). Same Meta setup that item 3 below also needs — one
+   Meta configuration pass covers both features.
+2. **Meta App Secret** — same app's dashboard → Settings → Basic → App
+   Secret. Needed so the webhook can verify a request genuinely came from
+   Meta (HMAC over `X-Hub-Signature-256`) — the endpoint is otherwise
+   publicly POST-able by anyone.
+3. **An Anthropic API key** — the user's own paid key (explicitly requested:
+   "use Claude's, I already pay for it"). Console: console.anthropic.com/settings/keys.
+
+A webhook verify token does NOT need to come from the user — Claude
+generates a random one and gives it to the user to paste into Meta's
+webhook config once the function is deployed.
+
+Once all of the above exist: store the 5 secrets in Vault (mirroring the
+`notify_whatsapp_new_shop()` pattern — never in the repo), deploy the
+function to production via Lovable, then have the user paste the
+function's URL + verify token into Meta's App Dashboard → WhatsApp →
+Configuration → Webhooks.
 
 ## Also noted (informational, no action needed)
 - Root `.env` is committed to the repo with Supabase URL + anon/publishable key

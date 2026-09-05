@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, XCircle, X, ChevronDown, ChevronUp, Plus, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,6 +44,7 @@ function AlertRow({
   sym: string;
   onDismiss: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [qty, setQty] = useState<string>("");
@@ -50,7 +52,7 @@ function AlertRow({
 
   const saveStock = async () => {
     const add = roundToTillixQty(Number(qty));
-    if (!add || add <= 0) return toast.error("Enter a positive quantity");
+    if (!add || add <= 0) return toast.error(t('low_stock.toast_enter_positive_qty', 'Enter a positive quantity'));
     setSaving(true);
     const newStock = Number(p.stock) + add;
     const { error } = await supabase
@@ -59,7 +61,7 @@ function AlertRow({
       .eq("id", p.id);
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(`Added ${fmtQty(add)} ${p.unit ?? ""} to ${p.name}`);
+    toast.success(t('low_stock.toast_added_stock', 'Added {{qty}} {{unit}} to {{name}}', { qty: fmtQty(add), unit: p.unit ?? "", name: p.name }));
     setAdding(false);
     setQty("");
     qc.invalidateQueries({ queryKey: ["low-stock-alerts"] });
@@ -77,7 +79,7 @@ function AlertRow({
               : "text-[10px]"
           }
         >
-          {kind === "oos" ? "OUT" : "LOW"}
+          {kind === "oos" ? t('low_stock.badge_out', 'OUT') : t('low_stock.badge_low', 'LOW')}
         </Badge>
         <div className="flex-1 min-w-0">
           <div className="truncate font-medium">{p.name}</div>
@@ -90,13 +92,13 @@ function AlertRow({
             {fmtQty(p.stock)} {p.unit ?? ""}
           </div>
           <div className="text-muted-foreground">
-            limit {fmtQty(p.low_stock_threshold)} · {fmtMoney(p.sell_price, sym)}
+            {t('low_stock.limit_line', 'limit {{limit}} · {{price}}', { limit: fmtQty(p.low_stock_threshold), price: fmtMoney(p.sell_price, sym) })}
           </div>
         </div>
         <Button size="sm" variant="outline" className="h-7" onClick={() => setAdding((v) => !v)}>
-          <Plus className="h-3 w-3 mr-1" /> Stock
+          <Plus className="h-3 w-3 mr-1" /> {t('low_stock.stock_button', 'Stock')}
         </Button>
-        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onDismiss} title="Hide this alert">
+        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onDismiss} title={t('low_stock.hide_this_alert', 'Hide this alert')}>
           <X className="h-3 w-3" />
         </Button>
       </div>
@@ -106,17 +108,17 @@ function AlertRow({
             type="number"
             step="0.001"
             autoFocus
-            placeholder={`Qty to add (${p.unit ?? "pcs"})`}
+            placeholder={t('low_stock.qty_to_add_placeholder', 'Qty to add ({{unit}})', { unit: p.unit ?? "pcs" })}
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") saveStock(); }}
             className="h-8 max-w-[180px]"
           />
           <Button size="sm" className="h-8" onClick={saveStock} disabled={saving}>
-            <Check className="h-3 w-3 mr-1" /> Save
+            <Check className="h-3 w-3 mr-1" /> {t('low_stock.save', 'Save')}
           </Button>
           <Button size="sm" variant="ghost" className="h-8" onClick={() => { setAdding(false); setQty(""); }}>
-            Cancel
+            {t('low_stock.cancel', 'Cancel')}
           </Button>
         </div>
       )}
@@ -125,6 +127,7 @@ function AlertRow({
 }
 
 export function LowStockAlerts() {
+  const { t } = useTranslation();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   const [expanded, setExpanded] = useState(false);
@@ -198,20 +201,20 @@ export function LowStockAlerts() {
           ? <XCircle className="h-4 w-4 text-destructive shrink-0" />
           : <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />}
         <div className="text-xs flex-1 min-w-0 truncate">
-          {activeOOS.length > 0 && <span className="font-medium text-destructive">{activeOOS.length} out of stock</span>}
+          {activeOOS.length > 0 && <span className="font-medium text-destructive">{t('low_stock.out_of_stock_count', '{{count}} out of stock', { count: activeOOS.length })}</span>}
           {activeOOS.length > 0 && activeLow.length > 0 && <span className="mx-2 text-muted-foreground">·</span>}
-          {activeLow.length > 0 && <span className="text-amber-700 dark:text-amber-400 font-medium">{activeLow.length} low stock</span>}
+          {activeLow.length > 0 && <span className="text-amber-700 dark:text-amber-400 font-medium">{t('low_stock.low_stock_count', '{{count}} low stock', { count: activeLow.length })}</span>}
         </div>
         <Button size="sm" variant="ghost" onClick={() => setExpanded((v) => !v)} className="h-7">
-          {expanded ? <><ChevronUp className="h-3 w-3 mr-1" /> Hide</> : <><ChevronDown className="h-3 w-3 mr-1" /> View</>}
+          {expanded ? <><ChevronUp className="h-3 w-3 mr-1" /> {t('low_stock.hide', 'Hide')}</> : <><ChevronDown className="h-3 w-3 mr-1" /> {t('low_stock.view', 'View')}</>}
         </Button>
-        <Button size="sm" variant="outline" onClick={dismissAll} className="h-7">Dismiss all</Button>
+        <Button size="sm" variant="outline" onClick={dismissAll} className="h-7">{t('low_stock.dismiss_all', 'Dismiss all')}</Button>
         <Button
           size="sm"
           variant="ghost"
           onClick={() => { dismissAll(); setLowHidden(true); }}
           className="h-7"
-          title="Hide alert bar"
+          title={t('low_stock.hide_alert_bar', 'Hide alert bar')}
         >
           <X className="h-3 w-3" />
         </Button>
