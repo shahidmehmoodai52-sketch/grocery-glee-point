@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AlertOctagon, LogOut, Store, Loader2, Clock } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export function SuspendedGate({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
   const { online } = useOfflineStatus();
@@ -64,12 +66,14 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
             {isExpired ? <Clock className="h-6 w-6" /> : <AlertOctagon className="h-6 w-6" />}
           </div>
           <h1 className="mt-4 text-xl font-semibold">
-            {isExpired ? "Subscription expired" : "Shop suspended"}
+            {isExpired ? t('suspended_gate.subscription_expired_title', 'Subscription expired') : t('suspended_gate.shop_suspended_title', 'Shop suspended')}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {isExpired
-              ? "Your shop's subscription has expired. Please contact the tillix.co support (info@tillix.co · +923096431377) to renew your plan and restore access."
-              : `Your shop has been ${status === "archived" ? "archived" : "suspended"} by the platform administrator. Please contact support to restore access.`}
+              ? t('suspended_gate.expired_body', 'Your shop\'s subscription has expired. Please contact the tillix.co support (info@tillix.co · +923096431377) to renew your plan and restore access.')
+              : t('suspended_gate.suspended_body', 'Your shop has been {{status}} by the platform administrator. Please contact support to restore access.', {
+                  status: status === "archived" ? t('suspended_gate.status_archived', 'archived') : t('suspended_gate.status_suspended', 'suspended'),
+                })}
           </p>
           <Button
             className="mt-6"
@@ -80,7 +84,7 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
               window.location.href = "/auth";
             }}
           >
-            <LogOut className="mr-2 h-4 w-4" /> Sign out
+            <LogOut className="mr-2 h-4 w-4" /> {t('suspended_gate.sign_out', 'Sign out')}
           </Button>
         </div>
       </div>
@@ -99,15 +103,16 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
 }
 
 function StaffAccountBlocked() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md rounded-lg border border-destructive/40 bg-destructive/5 p-8 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           <AlertOctagon className="h-6 w-6" />
         </div>
-        <h1 className="mt-4 text-xl font-semibold">Account not linked to a shop</h1>
+        <h1 className="mt-4 text-xl font-semibold">{t('suspended_gate.account_not_linked_title', 'Account not linked to a shop')}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          This staff login isn't linked to a shop yet. Please ask your shop owner to remove this staff account and add it again from Staff Management.
+          {t('suspended_gate.account_not_linked_body', "This staff login isn't linked to a shop yet. Please ask your shop owner to remove this staff account and add it again from Staff Management.")}
         </p>
         <Button
           className="mt-6"
@@ -118,7 +123,7 @@ function StaffAccountBlocked() {
             window.location.href = "/auth";
           }}
         >
-          <LogOut className="mr-2 h-4 w-4" /> Sign out
+          <LogOut className="mr-2 h-4 w-4" /> {t('suspended_gate.sign_out', 'Sign out')}
         </Button>
       </div>
     </div>
@@ -126,6 +131,7 @@ function StaffAccountBlocked() {
 }
 
 function ShopSetup({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -134,9 +140,9 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim().length < 2) { toast.error("Shop name is required."); return; }
+    if (name.trim().length < 2) { toast.error(t('suspended_gate.toast_shop_name_required', 'Shop name is required.')); return; }
     if (!phone.trim() || !address.trim() || !city.trim()) {
-      toast.error("Please enter phone, address and city."); return;
+      toast.error(t('suspended_gate.toast_enter_phone_address_city', 'Please enter phone, address and city.')); return;
     }
     setBusy(true);
     const { error } = await supabase.rpc("register_shop" as any, {
@@ -146,8 +152,8 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
       _city: city.trim(),
     } as any);
     setBusy(false);
-    if (error) { toast.error(error.message ?? "Could not register shop."); return; }
-    toast.success("Shop registered! Your 7-day free trial has started.");
+    if (error) { toast.error(error.message ?? t('suspended_gate.toast_could_not_register', 'Could not register shop.')); return; }
+    toast.success(t('suspended_gate.toast_shop_registered', 'Shop registered! Your 7-day free trial has started.'));
     onDone();
   };
 
@@ -158,32 +164,32 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-3">
             <Store className="h-6 w-6" />
           </div>
-          <h1 className="text-xl font-semibold">Register your shop</h1>
+          <h1 className="text-xl font-semibold">{t('suspended_gate.register_shop_title', 'Register your shop')}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Please enter shop details to continue. You'll get full access right away with a 7-day free trial.
+            {t('suspended_gate.register_shop_intro', "Please enter shop details to continue. You'll get full access right away with a 7-day free trial.")}
           </p>
         </div>
         <form className="space-y-4" onSubmit={submit}>
           <div className="space-y-1.5">
-            <Label htmlFor="s_name">Shop name</Label>
-            <Input id="s_name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Ali General Store" />
+            <Label htmlFor="s_name">{t('suspended_gate.shop_name_label', 'Shop name')}</Label>
+            <Input id="s_name" value={name} onChange={(e) => setName(e.target.value)} required placeholder={t('suspended_gate.shop_name_placeholder', 'e.g. Ali General Store')} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="s_phone">Phone</Label>
+              <Label htmlFor="s_phone">{t('suspended_gate.phone_label', 'Phone')}</Label>
               <Input id="s_phone" value={phone} onChange={(e) => setPhone(e.target.value)} required placeholder="03xx-xxxxxxx" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="s_city">City</Label>
+              <Label htmlFor="s_city">{t('suspended_gate.city_label', 'City')}</Label>
               <Input id="s_city" value={city} onChange={(e) => setCity(e.target.value)} required placeholder="Lahore" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="s_addr">Address</Label>
-            <Input id="s_addr" value={address} onChange={(e) => setAddress(e.target.value)} required placeholder="Shop # / Street / Area" />
+            <Label htmlFor="s_addr">{t('suspended_gate.address_label', 'Address')}</Label>
+            <Input id="s_addr" value={address} onChange={(e) => setAddress(e.target.value)} required placeholder={t('suspended_gate.address_placeholder', 'Shop # / Street / Area')} />
           </div>
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Register shop
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t('suspended_gate.register_shop_button', 'Register shop')}
           </Button>
           <Button
             type="button"
@@ -195,7 +201,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
               window.location.href = "/auth";
             }}
           >
-            <LogOut className="mr-2 h-4 w-4" /> Sign out
+            <LogOut className="mr-2 h-4 w-4" /> {t('suspended_gate.sign_out', 'Sign out')}
           </Button>
         </form>
       </div>

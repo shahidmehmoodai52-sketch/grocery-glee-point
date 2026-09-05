@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
+import { useTranslation } from "react-i18next";
 import { fmtMoney, fmtQty } from "@/lib/format";
 
 export type ReceiptSettings = {
@@ -253,6 +254,7 @@ export function printInvoiceDirect(invoice: ReceiptInvoice, settings: ReceiptSet
 }
 
 export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Props) {
+  const { t } = useTranslation();
   const sym = "";
   const width = settings?.paper_width === "58mm" ? "58mm" : "80mm";
   const date = invoice.created_at ? new Date(invoice.created_at) : new Date();
@@ -260,21 +262,21 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
   const docNo = invoice.return_no ?? invoice.invoice_no ?? "—";
   const docTitle =
     kind === "sale-return"
-      ? "SALES RETURN"
+      ? t('receipt.doc_sales_return', 'SALES RETURN')
       : kind === "purchase-return"
-      ? "PURCHASE RETURN"
+      ? t('receipt.doc_purchase_return', 'PURCHASE RETURN')
       : invoice.isPurchase
-      ? "PURCHASE INVOICE"
-      : "SALES INVOICE";
+      ? t('receipt.doc_purchase_invoice', 'PURCHASE INVOICE')
+      : t('receipt.doc_sales_invoice', 'SALES INVOICE');
 
   const staffName = invoice.expense_persons?.name ?? invoice.expense_person_name ?? null;
   const party = invoice.customers?.name ?? invoice.suppliers?.name ?? staffName ?? undefined;
   const partyLabel =
     kind === "purchase-return"
-      ? "Supplier"
+      ? t('receipt.party_supplier', 'Supplier')
       : !invoice.customers?.name && !invoice.suppliers?.name && staffName
-        ? "Staff"
-        : "Customer";
+        ? t('receipt.party_staff', 'Staff')
+        : t('receipt.party_customer', 'Customer');
   const savings = Number(invoice.discount ?? 0);
 
   useEffect(() => {
@@ -327,7 +329,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       <div className="flex flex-col items-center">
         <div className="w-full flex items-center gap-1 mb-1">
           <span className="flex-1 border-t-2 border-double border-black" />
-          <span className="text-[8px] tracking-[0.3em] uppercase">★ Receipt ★</span>
+          <span className="text-[8px] tracking-[0.3em] uppercase">{t('receipt.star_receipt', '★ Receipt ★')}</span>
           <span className="flex-1 border-t-2 border-double border-black" />
         </div>
 
@@ -336,7 +338,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         )}
 
         <div className="font-extrabold text-[15px] uppercase tracking-[0.08em] text-center">
-          {settings?.store_name ?? "Store"}
+          {settings?.store_name ?? t('receipt.store_fallback', 'Store')}
         </div>
         {settings?.show_address !== false && settings?.address && (
           <div className="text-[9.5px] text-center leading-tight">{settings.address}</div>
@@ -344,7 +346,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         <div className="text-[9.5px] text-center flex flex-wrap justify-center gap-x-2">
           {settings?.show_phone !== false && settings?.phone && <span>☎ {settings.phone}</span>}
           {settings?.show_tax_id !== false && settings?.tax_id && (
-            <span>NTN/Tax: {settings.tax_id}</span>
+            <span>{t('receipt.ntn_tax_label', 'NTN/Tax:')} {settings.tax_id}</span>
           )}
         </div>
         {settings?.receipt_header && (
@@ -360,7 +362,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       <div className="mt-1 grid grid-cols-2 gap-x-2 text-[10px]">
         <div>
-          <span className="font-bold">No:</span>{" "}
+          <span className="font-bold">{t('receipt.no_label', 'No:')}</span>{" "}
           <span className="font-mono">{docNo}</span>
         </div>
         <div className="text-right">{date.toLocaleDateString()}</div>
@@ -370,7 +372,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
               <span className="font-bold">{partyLabel}:</span> {party}
             </>
           ) : (
-            <span className="text-black/60">Walk-in</span>
+            <span className="text-black/60">{t('receipt.walk_in', 'Walk-in')}</span>
           )}
         </div>
         <div className="text-right">
@@ -378,7 +380,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         </div>
         {settings?.show_cashier !== false && invoice.cashier_name && (
           <div className="col-span-2">
-            <span className="font-bold">Cashier:</span> {invoice.cashier_name}
+            <span className="font-bold">{t('receipt.cashier_label', 'Cashier:')}</span> {invoice.cashier_name}
           </div>
         )}
       </div>
@@ -386,10 +388,10 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       <div className="my-1 border-t border-dashed border-black" />
 
       <div className="text-[9.5px] grid grid-cols-12 font-bold uppercase tracking-wider pb-1 border-b border-black">
-        <div className="col-span-5">Item</div>
-        <div className="col-span-2 text-right">Rate</div>
-        <div className="col-span-2 text-right">Qty</div>
-        <div className="col-span-3 text-right">Amt</div>
+        <div className="col-span-5">{t('receipt.col_item', 'Item')}</div>
+        <div className="col-span-2 text-right">{t('receipt.col_rate', 'Rate')}</div>
+        <div className="col-span-2 text-right">{t('receipt.col_qty', 'Qty')}</div>
+        <div className="col-span-3 text-right">{t('receipt.col_amt', 'Amt')}</div>
       </div>
       <div className="divide-y divide-dotted divide-black/30">
         {invoice.sale_items?.map((it, i) => (
@@ -413,25 +415,29 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
       <div className="space-y-0.5">
         {invoice.sale_items && invoice.sale_items.length > 0 && (
           <Row
-            label="Items"
-            value={`${invoice.sale_items.length} item${invoice.sale_items.length === 1 ? "" : "s"}`}
+            label={t('receipt.items_label', 'Items')}
+            value={t(
+              invoice.sale_items.length === 1 ? 'receipt.item_count_one' : 'receipt.item_count_other',
+              invoice.sale_items.length === 1 ? '{{count}} item' : '{{count}} items',
+              { count: invoice.sale_items.length },
+            )}
           />
         )}
-        <Row label="Subtotal" value={fmtMoney(invoice.subtotal, sym)} />
+        <Row label={t('receipt.subtotal', 'Subtotal')} value={fmtMoney(invoice.subtotal, sym)} />
         {settings?.show_tax_lines !== false && (
           <Row
-            label={`Tax${settings?.tax_rate ? ` (${settings.tax_rate}%)` : ""}`}
+            label={`${t('receipt.tax_label', 'Tax')}${settings?.tax_rate ? ` (${settings.tax_rate}%)` : ""}`}
             value={fmtMoney(invoice.tax, sym)}
           />
         )}
-        {savings > 0 && <Row label="Discount" value={`-${fmtMoney(savings, sym)}`} />}
+        {savings > 0 && <Row label={t('receipt.discount', 'Discount')} value={`-${fmtMoney(savings, sym)}`} />}
         {Number(invoice.charge ?? 0) > 0 && (
-          <Row label="Charges" value={fmtMoney(invoice.charge ?? 0, sym)} />
+          <Row label={t('receipt.charges', 'Charges')} value={fmtMoney(invoice.charge ?? 0, sym)} />
         )}
       </div>
 
       <div className="mt-1 flex justify-between items-center px-1 py-1 text-[15px] font-extrabold uppercase tracking-wide" style={{ borderTop: "2px solid #000", borderBottom: "2px solid #000" }}>
-        <span>{isReturn ? "Refund Due" : "Total"}</span>
+        <span>{isReturn ? t('receipt.refund_due', 'Refund Due') : t('receipt.total', 'Total')}</span>
         <span>{fmtMoney(invoice.total, sym)}</span>
       </div>
 
@@ -439,12 +445,12 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
         {isReturn ? (
           <>
             <Row
-              label={`Refund (${invoice.refund_method ?? "cash"})`}
+              label={t('receipt.refund_label', 'Refund ({{method}})', { method: invoice.refund_method ?? "cash" })}
               value={fmtMoney(invoice.refund_amount ?? 0, sym)}
             />
             {Number(invoice.total) - Number(invoice.refund_amount ?? 0) > 0 && (
               <Row
-                label={kind === "purchase-return" ? "Credit from supplier" : "Store credit"}
+                label={kind === "purchase-return" ? t('receipt.credit_from_supplier', 'Credit from supplier') : t('receipt.store_credit', 'Store credit')}
                 value={fmtMoney(
                   Number(invoice.total) - Number(invoice.refund_amount ?? 0),
                   sym,
@@ -454,9 +460,9 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
           </>
         ) : (
           <>
-            <Row label="Paid" value={fmtMoney(invoice.paid ?? 0, sym)} />
+            <Row label={t('receipt.paid', 'Paid')} value={fmtMoney(invoice.paid ?? 0, sym)} />
             {Number(invoice.change_due ?? 0) > 0 && (
-              <Row label="Change" value={fmtMoney(invoice.change_due ?? 0, sym)} />
+              <Row label={t('receipt.change', 'Change')} value={fmtMoney(invoice.change_due ?? 0, sym)} />
             )}
           </>
         )}
@@ -464,7 +470,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       {invoice.note && (
         <div className="mt-2 border border-dashed border-black p-1.5 text-[10.5px] whitespace-pre-line">
-          <span className="font-bold uppercase tracking-wider text-[9px]">Note: </span>
+          <span className="font-bold uppercase tracking-wider text-[9px]">{t('receipt.note_label', 'Note:')} </span>
           {invoice.note}
         </div>
       )}
@@ -473,27 +479,27 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       {savings > 0 && !isReturn && (
         <div className="mt-2 text-center text-[10px] border border-dashed border-black py-1 font-semibold">
-          ★ You saved {fmtMoney(savings, sym)} today! ★
+          {t('receipt.you_saved', '★ You saved {{amount}} today! ★', { amount: fmtMoney(savings, sym) })}
         </div>
       )}
 
       {(invoice.payment_method || invoice.refund_method) && (
         <div className="text-[10px] mt-2 text-center uppercase tracking-widest">
           {isReturn
-            ? `Refunded via ${invoice.refund_method ?? "cash"}`
-            : `Paid by ${invoice.payment_method}`}
+            ? t('receipt.refunded_via', 'Refunded via {{method}}', { method: invoice.refund_method ?? "cash" })
+            : t('receipt.paid_by', 'Paid by {{method}}', { method: invoice.payment_method })}
         </div>
       )}
 
       {isReturn && (
         <div className="my-2 mx-auto w-fit border-2 border-black px-3 py-0.5 text-[11px] font-extrabold tracking-widest" style={{ transform: "rotate(-4deg)" }}>
-          ✦ RETURN ✦
+          {t('receipt.return_stamp', '✦ RETURN ✦')}
         </div>
       )}
 
       {settings?.show_payment_qr !== false && settings?.payment_qr_url && !isReturn && (
         <div className="mt-2 border border-dashed border-black p-2 flex flex-col items-center">
-          <div className="text-[9px] uppercase tracking-[0.25em] font-bold mb-1">Scan & Pay</div>
+          <div className="text-[9px] uppercase tracking-[0.25em] font-bold mb-1">{t('receipt.scan_and_pay', 'Scan & Pay')}</div>
           <img
             src={settings.payment_qr_url}
             alt="Payment QR"
@@ -538,13 +544,13 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
       <div className="mt-1 flex items-center gap-1">
         <span className="flex-1 border-t-2 border-double border-black" />
-        <span className="text-[8px] tracking-[0.3em] uppercase">end</span>
+        <span className="text-[8px] tracking-[0.3em] uppercase">{t('receipt.end_marker', 'end')}</span>
         <span className="flex-1 border-t-2 border-double border-black" />
       </div>
 
       <div className="mt-1 text-center" style={{ marginBottom: 0 }}>
         <div className="text-[9px] uppercase tracking-[0.28em] font-bold">
-          Powered by Tillix.co
+          {t('receipt.powered_by', 'Powered by Tillix.co')}
         </div>
         <div className="text-[9px] tracking-wider mt-0.5">☎ +92 301 7160701</div>
       </div>
