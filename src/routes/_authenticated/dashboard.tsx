@@ -225,7 +225,11 @@ function Page() {
   // Kept identical to Reports' P&L formula (reports.tsx) on purpose — this
   // tile and the Reports "Net profit" row must always show the same number.
   const salesProfit = Number(stats?.sales_total || 0) - Number(stats?.sales_cost || 0) - Number(stats?.sales_tax || 0);
-  const returnsLoss = Number(stats?.returns_total || 0); // Simplified loss from returns
+  // A return's real hit to profit is only the margin that was on the
+  // returned items, not the full refund — the shop gets the (resellable)
+  // stock back, so its cost was never truly lost. Example: item cost 200,
+  // sold for 240 (profit 40) → returned → true loss is 40, not 240.
+  const returnsLoss = Number(stats?.returns_total || 0) - Number(stats?.returns_cost || 0);
   const expensesTotal = Number(stats?.expenses_total || 0);
   // Supplier target incentives never touch the purchase bill — pure bonus income.
   const incentiveTotal = Number(stats?.incentive_total || 0);
@@ -235,7 +239,7 @@ function Page() {
   const profit = salesProfit - returnsLoss - expensesTotal - discountTotal + incentiveTotal;
 
   const prevSalesProfit = Number(prevStats?.sales_total || 0) - Number(prevStats?.sales_cost || 0) - Number(prevStats?.sales_tax || 0);
-  const prevReturnsLoss = Number(prevStats?.returns_total || 0);
+  const prevReturnsLoss = Number(prevStats?.returns_total || 0) - Number(prevStats?.returns_cost || 0);
   const prevExpensesTotal = Number(prevStats?.expenses_total || 0);
   const prevIncentiveTotal = Number(prevStats?.incentive_total || 0);
   const prevDiscountTotal = Number(prevStats?.discount_total || 0);
