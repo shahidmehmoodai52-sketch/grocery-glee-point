@@ -934,7 +934,8 @@
     "return_recorded": "Purchase return recorded, stock removed",
     "failed_to_process": "Failed to process return",
     "items_label": "Items:",
-    "total_qty_label": "Total Qty:"
+    "total_qty_label": "Total Qty:",
+    "return_saved_offline": "Return saved offline — will sync automatically"
   },
   "sale_returns": {
     "title": "Sale Returns",

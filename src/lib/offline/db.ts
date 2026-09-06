@@ -90,6 +90,9 @@ const QUEUE_PRIORITY: Record<string, number> = {
   sale_returns: 50,
   sale_return_items: 51,
   complete_sale_return: 50,
+  purchase_returns: 55,
+  purchase_return_items: 56,
+  complete_purchase_return: 55,
   inventory_movements: 60,
   adjust_product_stock: 60,
   record_damage: 60,
@@ -114,6 +117,8 @@ class PosOfflineDB extends Dexie {
   sale_items!: Table<any, string>;
   sale_returns!: Table<any, string>;
   sale_return_items!: Table<any, string>;
+  purchase_returns!: Table<any, string>;
+  purchase_return_items!: Table<any, string>;
   purchases!: Table<any, string>;
   purchase_items!: Table<any, string>;
   expenses!: Table<any, string>;
@@ -204,6 +209,13 @@ class PosOfflineDB extends Dexie {
             if (r.status === "syncing") r.status = "pending";
           });
       });
+    // v5 — purchase returns mirror, matching the sale_returns tables so
+    // purchase-returns.tsx gets the same offline-aware save path as
+    // sale-returns.tsx (previously it only worked online).
+    this.version(5).stores({
+      purchase_returns: "id, return_no, supplier_id, purchase_id, created_at",
+      purchase_return_items: "id, return_id, product_id",
+    });
   }
 }
 
@@ -228,7 +240,7 @@ export type MasterTable = typeof MASTER_TABLES[number];
 export const MIRRORED_TABLES = [
   "products", "product_barcodes", "customers", "suppliers",
   "sales", "sale_items", "sale_returns", "sale_return_items",
-  "purchases", "purchase_items", "expenses", "held_bills",
+  "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses", "held_bills",
   "cash_accounts", "store_settings", "user_roles",
   ...MASTER_TABLES,
 ] as const;

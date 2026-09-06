@@ -17,6 +17,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { Receipt, printReceipt } from "@/components/receipt";
+import { completePurchaseReturnOfflineAware } from "@/lib/offline/purchase-returns";
 import { fetchAll } from "@/lib/supabase-page";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { cn } from "@/lib/utils";
@@ -216,29 +217,41 @@ function Page() {
     if (refund > total + 0.01) return toast.error(t('purchase_returns.refund_exceeds_total', 'Refund cannot exceed total'));
     
     setProcessing(true);
+    let offline = false;
+    let localRet: any = null;
     try {
-      const { error } = await supabase.rpc("complete_purchase_return" as any, {
-        payload: {
+      const res = await completePurchaseReturnOfflineAware(
+        {
           purchase_id: purchaseId === "none" ? null : purchaseId,
           supplier_id: supplier === "none" ? null : supplier,
-          tax, 
-          refund_amount: refund, 
-          refund_method: method === "account" ? draft.paySource : (method === "credit" ? "credit" : method), 
+          tax,
+          refund_amount: refund,
+          refund_method: method === "account" ? (draft.paySource ?? "") : (method === "credit" ? "credit" : method),
           note,
           items: items.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, cost: l.cost })),
         },
-      });
-      if (error) throw error;
-      toast.success(t('purchase_returns.return_recorded', 'Purchase return recorded, stock removed'));
-      reset();
-      qc.invalidateQueries({ queryKey: ["purchase-returns"] });
-      qc.invalidateQueries({ queryKey: ["products"] });
-      qc.invalidateQueries({ queryKey: ["suppliers"] });
+        { original_invoice_no: purchaseId !== "none" ? (purchases.find((p: any) => p.id === purchaseId)?.invoice_no ?? null) : null },
+      );
+      offline = res.offline;
+      localRet = res.ret;
     } catch (e: any) {
       toast.error(e.message || t('purchase_returns.failed_to_process', 'Failed to process return'));
-    } finally {
       setProcessing(false);
+      return;
     }
+    toast.success(
+      offline
+        ? t('purchase_returns.return_saved_offline', 'Return saved offline — will sync automatically')
+        : t('purchase_returns.return_recorded', 'Purchase return recorded, stock removed'),
+    );
+    reset();
+    // Offline the cloud row doesn't exist yet — open the local record so the
+    // shop can still print the return receipt.
+    if (offline && localRet) setViewing(localRet);
+    qc.invalidateQueries({ queryKey: ["purchase-returns"] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["suppliers"] });
+    setProcessing(false);
   };
 
   const handleEntryKey = (e: React.KeyboardEvent) => {

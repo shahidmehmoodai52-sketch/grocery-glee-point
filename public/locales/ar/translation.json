@@ -934,7 +934,8 @@
     "return_recorded": "تم تسجيل مرتجع الشراء وإزالة المخزون",
     "failed_to_process": "فشلت معالجة المرتجع",
     "items_label": "الأصناف:",
-    "total_qty_label": "إجمالي الكمية:"
+    "total_qty_label": "إجمالي الكمية:",
+    "return_saved_offline": "تم حفظ المرتجع دون اتصال — ستتم المزامنة تلقائيًا"
   },
   "sale_returns": {
     "title": "مرتجعات المبيعات",

@@ -934,7 +934,8 @@
     "return_recorded": "Devolución de compra registrada, stock eliminado",
     "failed_to_process": "No se pudo procesar la devolución",
     "items_label": "Artículos:",
-    "total_qty_label": "Cantidad total:"
+    "total_qty_label": "Cantidad total:",
+    "return_saved_offline": "Devolución guardada sin conexión — se sincronizará automáticamente"
   },
   "sale_returns": {
     "title": "Devoluciones de venta",
