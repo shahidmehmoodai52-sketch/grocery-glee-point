@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import {
   LabelSheet,
-  type LabelSize,
+  LabelSizeFields,
+  useLabelSize,
   type BarcodeLabelProduct,
   printBarcodeLabels,
 } from "@/components/barcode-print-dialog";
@@ -62,7 +62,7 @@ function BarcodeGeneratorPage() {
   const [expiryDate, setExpiryDate] = useState("");
   const [generating, setGenerating] = useState(false);
 
-  const [labelSize, setLabelSize] = useState<LabelSize>("small");
+  const { choice: labelChoice, setChoice: setLabelChoice, custom: labelCustom, setCustom: setLabelCustom, dimensions: labelDimensions } = useLabelSize("small");
   const [qty, setQty] = useState(1);
 
   // Prefill from store settings once loaded, without clobbering anything the
@@ -229,19 +229,12 @@ function BarcodeGeneratorPage() {
 
         <Card className="p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>{t("products.label_size", "Label size")}</Label>
-              <Select value={labelSize} onValueChange={(v) => setLabelSize(v as LabelSize)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="small">{t("products.label_small", "Small (40×25mm)")}</SelectItem>
-                  <SelectItem value="medium">{t("products.label_medium", "Medium (50×30mm)")}</SelectItem>
-                  <SelectItem value="large">{t("products.label_large", "Large (60×40mm)")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <LabelSizeFields
+              choice={labelChoice}
+              onChoiceChange={setLabelChoice}
+              custom={labelCustom}
+              onCustomChange={setLabelCustom}
+            />
             <div>
               <Label>{t("products.label_quantity", "Quantity")}</Label>
               <Input
@@ -257,7 +250,7 @@ function BarcodeGeneratorPage() {
           <div className="border rounded-md p-6 flex justify-center items-center bg-muted/20 min-h-[180px]">
             {canPrint ? (
               <div style={{ transform: "scale(2)" }}>
-                <LabelSheet product={label} qty={1} size={labelSize} />
+                <LabelSheet product={label} qty={1} size={labelDimensions} />
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center">
@@ -266,7 +259,7 @@ function BarcodeGeneratorPage() {
             )}
           </div>
 
-          <Button className="w-full" disabled={!canPrint} onClick={() => printBarcodeLabels(label, qty, labelSize)}>
+          <Button className="w-full" disabled={!canPrint} onClick={() => printBarcodeLabels(label, qty, labelDimensions)}>
             <Printer className="h-4 w-4 mr-2" />
             {t("common.print", "Print")}
           </Button>

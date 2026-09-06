@@ -768,7 +768,10 @@
     "label_small": "Liten (40×25mm)",
     "label_medium": "Middels (50×30mm)",
     "label_large": "Stor (60×40mm)",
-    "label_quantity": "Antall"
+    "label_quantity": "Antall",
+    "label_custom": "Egendefinert størrelse…",
+    "label_width_mm": "Bredde (mm)",
+    "label_height_mm": "Høyde (mm)"
   },
   "expenses": {
     "title": "Utgifter",
