@@ -260,7 +260,8 @@
     "go_to_dashboard": "الذهاب إلى لوحة التحكم",
     "page_not_found": "الصفحة غير موجودة",
     "page_not_found_desc": "الصفحة التي تبحث عنها غير موجودة أو تم نقلها.",
-    "back_to_dashboard": "العودة إلى لوحة التحكم"
+    "back_to_dashboard": "العودة إلى لوحة التحكم",
+    "barcode_generator": "مولّد الباركود"
   },
   "pos": {
     "search_placeholder": "🔍 امسح الباركود أو ابحث عن منتج… (F3)",
@@ -887,7 +888,8 @@
     "perm_shifts": "الورديات ودرج النقد",
     "perm_operations": "عمليات الأعمال",
     "perm_backup": "النسخ الاحتياطي التلقائي",
-    "perm_settings": "إعدادات المتجر"
+    "perm_settings": "إعدادات المتجر",
+    "perm_barcode_generator": "مولّد الباركود"
   },
   "purchase_returns": {
     "new_return_title": "مرتجع شراء جديد",
@@ -2459,5 +2461,18 @@
     "toast_enter_phone_address_city": "يرجى إدخال الهاتف والعنوان والمدينة.",
     "toast_could_not_register": "تعذر تسجيل المتجر.",
     "toast_shop_registered": "تم تسجيل المتجر! بدأت فترتك التجريبية المجانية لمدة 7 أيام."
+  },
+  "barcode_generator": {
+    "title": "مولّد الباركود",
+    "description": "أنشئ باركودًا قابلاً للمسح واطبع ملصقًا لأي منتج — من كتالوجك أو مخصص بالكامل.",
+    "find_product": "ابحث عن منتج (اختياري)",
+    "no_barcode_yet": "لا يوجد باركود بعد",
+    "clear_selection": "مسح — ابدأ ملصقًا مخصصًا بدلاً من ذلك",
+    "business_name": "اسم النشاط التجاري / المتجر",
+    "size_weight": "الحجم / الوزن (اختياري)",
+    "packed_date": "تاريخ التعبئة",
+    "price_optional": "السعر (اختياري)",
+    "preview_placeholder": "أدخل اسم المنتج والباركود لمعاينة الملصق.",
+    "untitled_product": "منتج"
   }
 }

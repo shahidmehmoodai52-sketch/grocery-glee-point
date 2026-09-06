@@ -260,7 +260,8 @@
     "go_to_dashboard": "Ir al panel",
     "page_not_found": "Página no encontrada",
     "page_not_found_desc": "La página que busca no existe o se ha movido.",
-    "back_to_dashboard": "Volver al panel"
+    "back_to_dashboard": "Volver al panel",
+    "barcode_generator": "Generador de códigos de barras"
   },
   "pos": {
     "search_placeholder": "🔍 Escanee el código de barras o busque el producto... (F3)",
@@ -887,7 +888,8 @@
     "perm_shifts": "Turnos y caja",
     "perm_operations": "Operaciones del negocio",
     "perm_backup": "Copia de seguridad automática",
-    "perm_settings": "Configuración de la tienda"
+    "perm_settings": "Configuración de la tienda",
+    "perm_barcode_generator": "Generador de códigos de barras"
   },
   "purchase_returns": {
     "new_return_title": "Nueva devolución de compra",
@@ -2459,5 +2461,18 @@
     "toast_enter_phone_address_city": "Ingrese el teléfono, la dirección y la ciudad.",
     "toast_could_not_register": "No se pudo registrar la tienda.",
     "toast_shop_registered": "¡Tienda registrada! Su prueba gratuita de 7 días ha comenzado."
+  },
+  "barcode_generator": {
+    "title": "Generador de códigos de barras",
+    "description": "Cree un código de barras escaneable e imprima una etiqueta para cualquier producto, desde su catálogo o totalmente personalizada.",
+    "find_product": "Buscar un producto (opcional)",
+    "no_barcode_yet": "Aún sin código de barras",
+    "clear_selection": "Borrar — crear una etiqueta personalizada en su lugar",
+    "business_name": "Nombre del negocio / tienda",
+    "size_weight": "Tamaño / peso (opcional)",
+    "packed_date": "Fecha de empaquetado",
+    "price_optional": "Precio (opcional)",
+    "preview_placeholder": "Complete el nombre del producto y el código de barras para ver la vista previa de la etiqueta.",
+    "untitled_product": "Producto"
   }
 }

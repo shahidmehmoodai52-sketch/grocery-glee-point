@@ -260,7 +260,8 @@
     "go_to_dashboard": "Gå til dashbord",
     "page_not_found": "Siden ble ikke funnet",
     "page_not_found_desc": "Siden du leter etter finnes ikke eller er flyttet.",
-    "back_to_dashboard": "Tilbake til dashbord"
+    "back_to_dashboard": "Tilbake til dashbord",
+    "barcode_generator": "Strekkodegenerator"
   },
   "pos": {
     "search_placeholder": "🔍 Skann strekkode eller søk produkt... (F3)",
@@ -887,7 +888,8 @@
     "perm_shifts": "Skift og kassaskuff",
     "perm_operations": "Forretningsdrift",
     "perm_backup": "Automatisk sikkerhetskopi",
-    "perm_settings": "Butikkinnstillinger"
+    "perm_settings": "Butikkinnstillinger",
+    "perm_barcode_generator": "Strekkodegenerator"
   },
   "purchase_returns": {
     "new_return_title": "Ny innkjøpsretur",
@@ -2459,5 +2461,18 @@
     "toast_enter_phone_address_city": "Vennligst angi telefon, adresse og by.",
     "toast_could_not_register": "Kunne ikke registrere butikk.",
     "toast_shop_registered": "Butikk registrert! Din 7-dagers gratis prøveperiode har startet."
+  },
+  "barcode_generator": {
+    "title": "Strekkodegenerator",
+    "description": "Lag en skannbar strekkode og skriv ut en etikett for et hvilket som helst produkt — fra katalogen din eller helt tilpasset.",
+    "find_product": "Finn et produkt (valgfritt)",
+    "no_barcode_yet": "Ingen strekkode ennå",
+    "clear_selection": "Fjern — start en tilpasset etikett i stedet",
+    "business_name": "Firma-/butikknavn",
+    "size_weight": "Størrelse / vekt (valgfritt)",
+    "packed_date": "Pakkedato",
+    "price_optional": "Pris (valgfritt)",
+    "preview_placeholder": "Fyll inn produktnavn og strekkode for å se etikettforhåndsvisningen.",
+    "untitled_product": "Produkt"
   }
 }
