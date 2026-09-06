@@ -928,10 +928,19 @@ function POSPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Bridges search while the full catalogue preload below is still in
+  // flight (or, offline, before anything has ever synced locally) — the only
+  // window where `products` is genuinely empty. `searchTerm` changes on
+  // every keystroke of a scan, and this hits the network (or, offline, an
+  // indexed Dexie query) per call, so it's debounced far more conservatively
+  // than the in-memory filter below: without this, a single scan during
+  // that window fired one full round of parallel Supabase queries per
+  // character instead of one for the whole scan.
+  const debouncedSearchTerm = useDebounced(searchTerm, 300);
   const { data: remoteProducts = [], isFetching: remoteProductsLoading } = useQuery({
-    queryKey: ["products", "pos-search", searchTerm],
-    enabled: searchTerm.length > 0 && products.length === 0,
-    queryFn: () => searchProducts(searchTerm),
+    queryKey: ["products", "pos-search", debouncedSearchTerm],
+    enabled: debouncedSearchTerm.length > 0 && products.length === 0,
+    queryFn: () => searchProducts(debouncedSearchTerm),
     staleTime: 60 * 1000,
   });
 
