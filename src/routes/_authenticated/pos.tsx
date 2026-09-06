@@ -448,9 +448,25 @@ async function searchProductsOnline(q: string) {
   return Array.from(merged.values());
 }
 
+// A real barcode scanner "types" every character of a code within a few ms
+// of the next, then sends Enter. Recomputing the full ranked search list (and
+// re-rendering its dropdown) on every one of those keystrokes is wasted work
+// that never gets seen — only the final value matters. Debouncing just the
+// value fed into that expensive list collapses a whole scan into one
+// computation; correctness at Enter time never depends on this debounced
+// value (see productByCodeLower in POSPage), only the visible dropdown does.
+function useDebounced<T>(value: T, ms: number) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
 /** Searchable customer picker — same Command+Popover combobox pattern already used
  * for supplier-style pickers elsewhere in the app, so cashiers can type a name or
- * phone number instead of scrolling a plain dropdown once the customer list grows. */
+ * phone number instead of scrolling a plain dropdown once the catalogue grows. */
 function CustomerCombobox({
   customers,
   value,
@@ -1025,6 +1041,22 @@ function POSPage() {
     return m;
   }, [searchableProducts, barcodesByProduct]);
 
+  // Case-insensitive sku/barcode -> product, so the Enter-key handler's
+  // "exact match" fallback is an O(1) lookup instead of scanning the
+  // (debounced, display-only) `filtered` list — keeping scan-resolution
+  // correctness fully independent of that debounce.
+  const productByCodeLower = useMemo(() => {
+    const m: Record<string, any> = {};
+    searchableProducts.forEach((p) => {
+      const sku = (p.sku ?? "").toLowerCase();
+      if (sku) m[sku] = p;
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => {
+        m[String(bc).toLowerCase()] = p;
+      });
+    });
+    return m;
+  }, [searchableProducts, barcodesByProduct]);
+
   // O(1) id -> product lookup so cart rows never linear-scan the catalogue.
   const productById = useMemo(() => {
     const m: Record<string, any> = {};
@@ -1059,8 +1091,15 @@ function POSPage() {
     queryFn: fetchExpensePersons,
   });
 
+  // Debounced so a fast barcode scan (search changing on every keystroke)
+  // doesn't re-run this scored/sorted scan-over-the-catalogue and re-render
+  // the dropdown once per character — only once the input settles. Never
+  // used for scan-resolution correctness (see productByCodeLower), only for
+  // the human-facing search dropdown and arrow-key highlighted selection,
+  // both of which already require the dropdown to have rendered first.
+  const debouncedSearch = useDebounced(search, 40);
   const filtered = useMemo(() => {
-    const q = search.trim().replace(/\s+/g, " ").toLowerCase();
+    const q = debouncedSearch.trim().replace(/\s+/g, " ").toLowerCase();
     if (!q) return [];
     // Score each product so best matches float to the top.
     // 0 = exact sku/barcode, 1 = sku/barcode prefix, 2 = name prefix,
@@ -1086,7 +1125,7 @@ function POSPage() {
     }
     scored.sort((a, b) => a.s - b.s || a.p.name.localeCompare(b.p.name));
     return scored.slice(0, 200).map((x) => x.p);
-  }, [searchableProducts, search, barcodesByProduct]);
+  }, [searchableProducts, debouncedSearch, barcodesByProduct]);
 
   // reset highlight whenever the filtered list changes
   useEffect(() => {
@@ -2436,15 +2475,13 @@ function POSPage() {
           }
         }
         
-        // 2. Exact match in filtered results (e.g. if scan matches exactly even if not indexed in productByBarcode)
+        // 2. Case-insensitive exact sku/barcode match (e.g. if the scan's
+        // case doesn't match what's stored, so step 1 missed it). Looked up
+        // directly rather than via `filtered`, since `filtered` is debounced
+        // for the dropdown and may not reflect `raw` yet on a fast scan.
         if (!kbNavRef.current) {
-          const exactFiltered = filtered.find(p => {
-            const sku = (p.sku ?? "").toLowerCase();
-            const bcs = (barcodesByProduct[p.id] ?? []).map(b => b.toLowerCase());
-            const lRaw = raw.toLowerCase();
-            return sku === lRaw || bcs.includes(lRaw);
-          });
-          
+          const exactFiltered = productByCodeLower[raw.toLowerCase()];
+
           if (exactFiltered) {
             addProduct(exactFiltered);
             setSearch("");
@@ -2670,15 +2707,12 @@ function POSPage() {
                     }
                   }
                   
-                  // Double-check exact match in filtered results
+                  // Double-check case-insensitive exact sku/barcode match —
+                  // looked up directly rather than via the debounced
+                  // `filtered` list, same reasoning as the global handler above.
                   if (!kbNavRef.current) {
-                    const exactFiltered = filtered.find(p => {
-                      const sku = (p.sku ?? "").toLowerCase();
-                      const bcs = (barcodesByProduct[p.id] ?? []).map(b => b.toLowerCase());
-                      const lRaw = raw.toLowerCase();
-                      return sku === lRaw || bcs.includes(lRaw);
-                    });
-                    
+                    const exactFiltered = productByCodeLower[raw.toLowerCase()];
+
                     if (exactFiltered) {
                       addProduct(exactFiltered);
                       setSearch("");
