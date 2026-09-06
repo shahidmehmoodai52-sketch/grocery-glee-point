@@ -247,4 +247,21 @@
   .no-print { display: none !important; }
 }
 
+@media print {
+  html.barcode-printing body > :not(.barcode-print-root) { display: none !important; }
+  html.barcode-printing .barcode-print-root,
+  html.barcode-printing .barcode-print-root * { visibility: visible !important; }
+  html.barcode-printing .barcode-print-root {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
+}
+
 

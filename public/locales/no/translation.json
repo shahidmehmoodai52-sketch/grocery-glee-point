@@ -759,7 +759,15 @@
     "row_total_cost": "Totalkostnad",
     "row_profit_est": "Fortjeneste (est.)",
     "row_reason": "Årsak",
-    "page_of_alt": "Side {{page}} av {{total}}"
+    "page_of_alt": "Side {{page}} av {{total}}",
+    "generate_barcode": "Generer en ny strekkode",
+    "print_barcode_label": "Skriv ut strekkodeetikett",
+    "no_barcode_set": "Dette produktet har ingen strekkode ennå. Legg til eller generer en først, og kom deretter tilbake hit for å skrive ut en etikett.",
+    "label_size": "Etikettstørrelse",
+    "label_small": "Liten (40×25mm)",
+    "label_medium": "Middels (50×30mm)",
+    "label_large": "Stor (60×40mm)",
+    "label_quantity": "Antall"
   },
   "expenses": {
     "title": "Utgifter",
