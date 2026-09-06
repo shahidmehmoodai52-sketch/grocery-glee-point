@@ -257,9 +257,28 @@ function Page() {
     }
   };
 
+  // Stable reference: Receipt's print-sizing effect depends on `invoice`, so
+  // rebuilding this object (plus a fresh .map()) inline on every render (as
+  // it was before) reran that effect on every unrelated re-render of this
+  // page while the dialog was open, instead of only when the viewed return
+  // actually changes.
+  const viewingInvoice = useMemo(
+    () =>
+      viewing
+        ? {
+            ...viewing,
+            sale_items: (viewing.purchase_return_items ?? []).map((it: any) => ({
+              ...it,
+              price: it.cost,
+            })),
+          }
+        : null,
+    [viewing],
+  );
+
   if (open) {
     return (
-      <div 
+      <div
         className="fixed inset-0 z-50 bg-background flex flex-col animate-in fade-in zoom-in duration-200"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
@@ -586,12 +605,7 @@ function Page() {
               <div className="print-area mx-auto">
                 <Receipt
                   kind="purchase-return"
-                  invoice={{
-                    ...viewing,
-                    sale_items: (viewing.purchase_return_items ?? []).map((it: any) => ({
-                      ...it, price: it.cost,
-                    })),
-                  }}
+                  invoice={viewingInvoice}
                   settings={settings}
                 />
               </div>
