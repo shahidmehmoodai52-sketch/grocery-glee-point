@@ -103,12 +103,35 @@ async function fetchAll(table: string): Promise<any[]> {
   return out;
 }
 
+// A shop's own backup must stay useful for their own bookkeeping (barcode,
+// stock, prices, SKU) but must not hand out a clean, ready-to-import
+// name+category catalog — that association (whether the shop typed it in
+// themselves or pulled it from the shared Global Library) is what makes the
+// product data reusable in a competing system. Stripped for every product
+// row regardless of origin, since there's no reliable per-row marker of
+// which products came from the library. The admin panel's own tenant-export
+// (admin_export_tenant_data RPC) is a separate code path and keeps full
+// name/category — this restriction is shop-side only.
+const REDACT_COLUMNS: Partial<Record<(typeof TABLES)[number], string[]>> = {
+  products: ["name", "category"],
+};
+
+function redactRows(table: string, rows: any[]): any[] {
+  const cols = REDACT_COLUMNS[table as (typeof TABLES)[number]];
+  if (!cols) return rows;
+  return rows.map((r) => {
+    const copy = { ...r };
+    for (const c of cols) delete copy[c];
+    return copy;
+  });
+}
+
 export async function buildWorkbookBlob(): Promise<{ blob: Blob; counts: Record<string, number> }> {
   const wb = XLSX.utils.book_new();
   const counts: Record<string, number> = {};
   for (const t of TABLES) {
     try {
-      const rows = await fetchAll(t);
+      const rows = redactRows(t, await fetchAll(t));
       counts[t] = rows.length;
       const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
       XLSX.utils.book_append_sheet(wb, ws, t.slice(0, 31));
