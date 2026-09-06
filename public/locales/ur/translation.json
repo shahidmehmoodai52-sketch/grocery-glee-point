@@ -768,7 +768,10 @@
     "label_small": "چھوٹا (40×25mm)",
     "label_medium": "درمیانہ (50×30mm)",
     "label_large": "بڑا (60×40mm)",
-    "label_quantity": "تعداد"
+    "label_quantity": "تعداد",
+    "label_custom": "کسٹم سائز…",
+    "label_width_mm": "چوڑائی (ملی میٹر)",
+    "label_height_mm": "اونچائی (ملی میٹر)"
   },
   "expenses": {
     "title": "اخراجات",

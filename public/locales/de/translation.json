@@ -768,7 +768,10 @@
     "label_small": "Klein (40×25mm)",
     "label_medium": "Mittel (50×30mm)",
     "label_large": "Groß (60×40mm)",
-    "label_quantity": "Menge"
+    "label_quantity": "Menge",
+    "label_custom": "Benutzerdefinierte Größe…",
+    "label_width_mm": "Breite (mm)",
+    "label_height_mm": "Höhe (mm)"
   },
   "expenses": {
     "title": "Ausgaben",
