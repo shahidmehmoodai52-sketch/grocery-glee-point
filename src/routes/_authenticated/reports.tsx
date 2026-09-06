@@ -596,13 +596,19 @@ function Page() {
   // Customer discounts settle the ledger without cash — a real cost, so
   // they come off profit the same way a return does.
   const discountTotal = Number(summaryStats.discount_total || 0);
-  const netProfit = grossProfit - taxCollected - returnsTotal - expensesPeriod - discountTotal + incentiveTotal;
+  // A return's real hit to profit is only the margin that was on the
+  // returned items, not the full refund — the shop gets the (resellable)
+  // stock back, so cost_total already counted in `cogs` above isn't a loss.
+  // Example: item cost 200, sold for 240 (profit 40) → returned → true loss
+  // is 40, not the full 240 refunded.
+  const returnsCost = Number(summaryStats.returns_cost || 0);
+  const returnsProfitLoss = returnsTotal - returnsCost;
+  const netProfit = grossProfit - taxCollected - returnsProfitLoss - expensesPeriod - discountTotal + incentiveTotal;
   const grossRevenue = revenue;
   const netOfReturns = revenue - returnsTotal;
   const creditOut = Number(summaryStats.credit_sales_total || 0);
   const cashIn = Number(summaryStats.cash_sales_total || 0);
-  const returnsLoss = Number(summaryStats.returns_total || 0);
-  const returnsSubtotal = returnsLoss;
+  const returnsSubtotal = returnsTotal;
 
   // ---- drill-down helpers (every report row is clickable)
   const openInvoices = (title: string, list: any[], note?: string) =>
@@ -850,7 +856,7 @@ function Page() {
                 <Row label={t('reports.row_net_of_returns', 'Sales (net of returns & discount)')} value={fmtMoney(netOfReturns, sym)} onClick={() => openInvoices(t('reports.row_net_of_returns', 'Sales (net of returns & discount)'), allSales as any[])} />
                 <Row label={t('reports.row_cogs', 'Cost of goods sold')} value={`(${fmtMoney(cogs, sym)})`} onClick={() => openInvoices(t('reports.row_cogs', 'Cost of goods sold'), allSales as any[])} />
                 <Row label={t('reports.row_gross_profit', 'Gross profit')} value={fmtMoney(grossProfit, sym)} bold onClick={() => openInvoices(t('reports.row_gross_profit', 'Gross profit'), allSales as any[])} />
-                <Row label={t('reports.row_sale_returns_loss', 'Sale returns (loss)')} value={`(${fmtMoney(returnsTotal, sym)})`} onClick={() => openReturns(t('reports.row_sale_returns', 'Sale returns'))} />
+                <Row label={t('reports.row_sale_returns_loss', 'Sale returns (loss)')} value={`(${fmtMoney(returnsProfitLoss, sym)})`} onClick={() => openReturns(t('reports.row_sale_returns', 'Sale returns'))} />
                 <Row label={t('reports.row_operating_expenses', 'Operating expenses')} value={`(${fmtMoney(expensesPeriod, sym)})`} onClick={openExpenses} />
                 <Row label={t('reports.row_tax_collected', 'Tax collected')} value={`(${fmtMoney(taxCollected, sym)})`} onClick={() => openInvoices(t('reports.row_tax_collected', 'Tax collected'), (allSales as any[]).filter((s) => Number(s.tax) > 0))} />
                 {discountTotal > 0 && (
