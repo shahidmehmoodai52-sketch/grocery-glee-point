@@ -759,7 +759,15 @@
     "row_total_cost": "Total cost",
     "row_profit_est": "Profit (est.)",
     "row_reason": "Reason",
-    "page_of_alt": "Page {{page}} of {{total}}"
+    "page_of_alt": "Page {{page}} of {{total}}",
+    "generate_barcode": "Generate a new barcode",
+    "print_barcode_label": "Print barcode label",
+    "no_barcode_set": "This product has no barcode yet. Add or generate one first, then come back here to print a label.",
+    "label_size": "Label size",
+    "label_small": "Small (40×25mm)",
+    "label_medium": "Medium (50×30mm)",
+    "label_large": "Large (60×40mm)",
+    "label_quantity": "Quantity"
   },
   "expenses": {
     "title": "Expenses",

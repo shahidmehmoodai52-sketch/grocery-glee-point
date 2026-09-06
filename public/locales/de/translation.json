@@ -759,7 +759,15 @@
     "row_total_cost": "Gesamtkosten",
     "row_profit_est": "Gewinn (geschätzt)",
     "row_reason": "Grund",
-    "page_of_alt": "Seite {{page}} von {{total}}"
+    "page_of_alt": "Seite {{page}} von {{total}}",
+    "generate_barcode": "Neuen Barcode generieren",
+    "print_barcode_label": "Barcode-Etikett drucken",
+    "no_barcode_set": "Dieses Produkt hat noch keinen Barcode. Fügen Sie zuerst einen hinzu oder generieren Sie einen, und kommen Sie dann hierher zurück, um ein Etikett zu drucken.",
+    "label_size": "Etikettengröße",
+    "label_small": "Klein (40×25mm)",
+    "label_medium": "Mittel (50×30mm)",
+    "label_large": "Groß (60×40mm)",
+    "label_quantity": "Menge"
   },
   "expenses": {
     "title": "Ausgaben",

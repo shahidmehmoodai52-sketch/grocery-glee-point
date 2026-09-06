@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Search, History, Package, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, History, Package, ArrowUpDown, Barcode, Wand2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import { usePriceVisibility } from "@/hooks/use-price-visibility";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { BarcodePrintDialog, type BarcodeLabelProduct } from "@/components/barcode-print-dialog";
 
 
 export const Route = createFileRoute("/_authenticated/products")({
@@ -73,6 +74,8 @@ function ProductsPage() {
   const [page, setPage] = useState(1);
   const [open, setOpen, clearOpen] = usePersistentState<boolean>("product-entry-open", false);
   const [form, setForm, clearForm] = usePersistentState<ProductForm>("product-entry-form", empty);
+  const [generatingBarcode, setGeneratingBarcode] = useState(false);
+  const [labelProduct, setLabelProduct] = useState<BarcodeLabelProduct | null>(null);
 
   useEffect(() => { setPage(1); }, [debouncedSearch, category, stockFilter, sortKey, sortAsc]);
 
@@ -169,6 +172,17 @@ function ProductsPage() {
 
   const parseBarcodes = (text: string) =>
     Array.from(new Set(text.split(/[\s,;\n]+/).map((s) => s.trim()).filter(Boolean)));
+
+  const generateBarcode = async () => {
+    setGeneratingBarcode(true);
+    try {
+      const { data, error } = await supabase.rpc("next_internal_barcode");
+      if (error) return toast.error(error.message);
+      setForm((prev) => ({ ...prev, barcode: data as string }));
+    } finally {
+      setGeneratingBarcode(false);
+    }
+  };
 
   const invalidateProducts = () => qc.invalidateQueries({ queryKey: ["products"] });
 
@@ -292,7 +306,15 @@ function ProductsPage() {
                   </select>
                 </div>
                 <div><Label>{t('pos.qa_sku', 'SKU')}</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
-                <div><Label>{t('pos.qa_primary_barcode', 'Primary barcode')}</Label><Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder={t('common.optional', 'Optional')} /></div>
+                <div>
+                  <Label>{t('pos.qa_primary_barcode', 'Primary barcode')}</Label>
+                  <div className="flex gap-1">
+                    <Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder={t('common.optional', 'Optional')} />
+                    <Button type="button" variant="outline" size="icon" title={t('products.generate_barcode', 'Generate a new barcode')} disabled={generatingBarcode} onClick={generateBarcode}>
+                      <Wand2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
                 <div className="col-span-2">
                   <Label>{t('products.additional_barcodes_full', 'Additional barcodes (one per line — for different versions/packs of the same item)')}</Label>
                   <textarea
@@ -446,6 +468,9 @@ function ProductsPage() {
                   <Link to="/products/$id" params={{ id: p.id }}>
                     <Button variant="ghost" size="icon" title={t('products.stock_timeline', 'Stock timeline')}><History className="h-4 w-4" /></Button>
                   </Link>
+                  <Button variant="ghost" size="icon" title={t('products.print_barcode_label', 'Print barcode label')} onClick={() => setLabelProduct({ name: p.name, barcode: p.barcode ?? "", sell_price: Number(p.sell_price) })}>
+                    <Barcode className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => edit(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
@@ -465,6 +490,7 @@ function ProductsPage() {
           </div>
         </div>
       </Card>
+      <BarcodePrintDialog open={!!labelProduct} onOpenChange={(v) => !v && setLabelProduct(null)} product={labelProduct} />
     </div>
   );
 }
