@@ -410,6 +410,15 @@ function Page() {
 
   const selectedSale = saleId !== "none" ? (sales as any[]).find((s) => s.id === saleId) : null;
 
+  // Stable reference: Receipt's print-sizing effect depends on `invoice`, so
+  // rebuilding this object inline on every render (as it was before) reran
+  // that effect on every unrelated re-render of this page while the dialog
+  // was open, instead of only when the viewed return actually changes.
+  const viewingInvoice = useMemo(
+    () => (viewing ? { ...viewing, sale_items: viewing.sale_return_items } : null),
+    [viewing],
+  );
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
@@ -809,7 +818,7 @@ function Page() {
               <div className="print-area">
                 <Receipt
                   kind="sale-return"
-                  invoice={{ ...viewing, sale_items: viewing.sale_return_items }}
+                  invoice={viewingInvoice}
                   settings={settings}
                 />
               </div>
