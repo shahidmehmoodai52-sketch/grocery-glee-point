@@ -260,7 +260,8 @@
     "go_to_dashboard": "Go to dashboard",
     "page_not_found": "Page not found",
     "page_not_found_desc": "The page you're looking for doesn't exist or has moved.",
-    "back_to_dashboard": "Back to dashboard"
+    "back_to_dashboard": "Back to dashboard",
+    "barcode_generator": "Barcode generator"
   },
   "pos": {
     "search_placeholder": "🔍 Scan barcode or search product… (F3)",
@@ -887,7 +888,8 @@
     "perm_shifts": "Shifts & cash drawer",
     "perm_operations": "Business operations",
     "perm_backup": "Auto backup",
-    "perm_settings": "Store settings"
+    "perm_settings": "Store settings",
+    "perm_barcode_generator": "Barcode generator"
   },
   "purchase_returns": {
     "new_return_title": "New Purchase Return",
@@ -2459,5 +2461,18 @@
     "toast_enter_phone_address_city": "Please enter phone, address and city.",
     "toast_could_not_register": "Could not register shop.",
     "toast_shop_registered": "Shop registered! Your 7-day free trial has started."
+  },
+  "barcode_generator": {
+    "title": "Barcode generator",
+    "description": "Create a scannable barcode and print a label for any product — from your catalog or fully custom.",
+    "find_product": "Find a product (optional)",
+    "no_barcode_yet": "No barcode yet",
+    "clear_selection": "Clear — start a custom label instead",
+    "business_name": "Business / shop name",
+    "size_weight": "Size / weight (optional)",
+    "packed_date": "Packed date",
+    "price_optional": "Price (optional)",
+    "preview_placeholder": "Fill in a product name and barcode to see the label preview.",
+    "untitled_product": "Product"
   }
 }

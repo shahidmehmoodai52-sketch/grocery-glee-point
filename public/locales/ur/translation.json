@@ -260,7 +260,8 @@
     "go_to_dashboard": "ڈیش بورڈ پر جائیں",
     "page_not_found": "صفحہ نہیں ملا",
     "page_not_found_desc": "جو صفحہ آپ تلاش کر رہے ہیں وہ موجود نہیں یا منتقل ہو چکا ہے۔",
-    "back_to_dashboard": "ڈیش بورڈ پر واپس جائیں"
+    "back_to_dashboard": "ڈیش بورڈ پر واپس جائیں",
+    "barcode_generator": "بارکوڈ جنریٹر"
   },
   "pos": {
     "search_placeholder": "🔍 بارکوڈ اسکین کریں یا پروڈکٹ تلاش کریں… (F3)",
@@ -887,7 +888,8 @@
     "perm_shifts": "شفٹیں اور کیش دراز",
     "perm_operations": "کاروباری آپریشنز",
     "perm_backup": "خودکار بیک اپ",
-    "perm_settings": "دکان کی سیٹنگز"
+    "perm_settings": "دکان کی سیٹنگز",
+    "perm_barcode_generator": "بارکوڈ جنریٹر"
   },
   "purchase_returns": {
     "new_return_title": "نئی خریداری واپسی",
@@ -2459,5 +2461,18 @@
     "toast_enter_phone_address_city": "براہ کرم فون، پتہ اور شہر درج کریں۔",
     "toast_could_not_register": "دکان رجسٹر نہیں ہو سکی۔",
     "toast_shop_registered": "دکان رجسٹر ہو گئی! آپ کا 7 دن کا مفت ٹرائل شروع ہو گیا ہے۔"
+  },
+  "barcode_generator": {
+    "title": "بارکوڈ جنریٹر",
+    "description": "کسی بھی پروڈکٹ کے لیے سکین ہونے والا بارکوڈ بنائیں اور لیبل پرنٹ کریں — اپنی کیٹلاگ سے یا مکمل کسٹم۔",
+    "find_product": "پروڈکٹ تلاش کریں (اختیاری)",
+    "no_barcode_yet": "ابھی کوئی بارکوڈ نہیں",
+    "clear_selection": "صاف کریں — اس کی بجائے کسٹم لیبل بنائیں",
+    "business_name": "کاروبار / دکان کا نام",
+    "size_weight": "سائز / وزن (اختیاری)",
+    "packed_date": "پیکنگ کی تاریخ",
+    "price_optional": "قیمت (اختیاری)",
+    "preview_placeholder": "لیبل پیش نظارہ دیکھنے کے لیے پروڈکٹ کا نام اور بارکوڈ درج کریں۔",
+    "untitled_product": "پروڈکٹ"
   }
 }

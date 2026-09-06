@@ -260,7 +260,8 @@
     "go_to_dashboard": "Zum Dashboard",
     "page_not_found": "Seite nicht gefunden",
     "page_not_found_desc": "Die gesuchte Seite existiert nicht oder wurde verschoben.",
-    "back_to_dashboard": "Zurück zum Dashboard"
+    "back_to_dashboard": "Zurück zum Dashboard",
+    "barcode_generator": "Barcode-Generator"
   },
   "pos": {
     "search_placeholder": "🔍 Barcode scannen oder Produkt suchen... (F3)",
@@ -887,7 +888,8 @@
     "perm_shifts": "Schichten & Kasse",
     "perm_operations": "Geschäftsabläufe",
     "perm_backup": "Automatische Sicherung",
-    "perm_settings": "Ladeneinstellungen"
+    "perm_settings": "Ladeneinstellungen",
+    "perm_barcode_generator": "Barcode-Generator"
   },
   "purchase_returns": {
     "new_return_title": "Neue Einkaufsretoure",
@@ -2459,5 +2461,18 @@
     "toast_enter_phone_address_city": "Bitte geben Sie Telefon, Adresse und Stadt ein.",
     "toast_could_not_register": "Geschäft konnte nicht registriert werden.",
     "toast_shop_registered": "Geschäft registriert! Ihre 7-tägige kostenlose Testversion hat begonnen."
+  },
+  "barcode_generator": {
+    "title": "Barcode-Generator",
+    "description": "Erstellen Sie einen scanbaren Barcode und drucken Sie ein Etikett für jedes Produkt — aus Ihrem Katalog oder vollständig individuell.",
+    "find_product": "Produkt suchen (optional)",
+    "no_barcode_yet": "Noch kein Barcode",
+    "clear_selection": "Zurücksetzen — stattdessen ein individuelles Etikett erstellen",
+    "business_name": "Geschäfts-/Ladenname",
+    "size_weight": "Größe / Gewicht (optional)",
+    "packed_date": "Verpackungsdatum",
+    "price_optional": "Preis (optional)",
+    "preview_placeholder": "Geben Sie Produktname und Barcode ein, um die Etikettenvorschau zu sehen.",
+    "untitled_product": "Produkt"
   }
 }

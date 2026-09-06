@@ -2,7 +2,7 @@ import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
-  BarChart3, Settings, LogOut, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library, ShieldCheck, Box, Coins, Scale,
+  BarChart3, Settings, LogOut, Undo2, RotateCcw, Wallet, Upload, HardDriveDownload, UserCog, ClipboardCheck, CalendarClock, Brain, Clock, Library, ShieldCheck, Box, Coins, Scale, Barcode,
 } from "lucide-react";
 
 
@@ -54,6 +54,7 @@ const groups: { labelKey: string; label: string; items: Item[] }[] = [
       { titleKey: "common.intelligence", title: "Intelligence", url: "/intelligence", icon: Brain, perm: "intelligence" },
       { titleKey: "common.global_library", title: "Global library", url: "/library", icon: Library, perm: "library" },
       { titleKey: "common.assets", title: "Assets", url: "/assets", icon: Box, perm: "assets" },
+      { titleKey: "common.barcode_generator", title: "Barcode generator", url: "/barcode-generator", icon: Barcode, perm: "barcode-generator" },
     ],
 
   },

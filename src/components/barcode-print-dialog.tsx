@@ -11,14 +11,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmtMoney } from "@/lib/format";
 
-export type BarcodeLabelProduct = { name: string; barcode: string; sell_price?: number | null };
+export type BarcodeLabelProduct = {
+  name: string;
+  barcode: string;
+  sell_price?: number | null;
+  businessName?: string | null;
+  size?: string | null;
+  packedDate?: string | null;
+  expiryDate?: string | null;
+};
 
-const LABEL_SIZES = {
+export const LABEL_SIZES = {
   small: { widthMm: 40, heightMm: 25 },
   medium: { widthMm: 50, heightMm: 30 },
   large: { widthMm: 60, heightMm: 40 },
 } as const;
-type LabelSize = keyof typeof LABEL_SIZES;
+export type LabelSize = keyof typeof LABEL_SIZES;
 
 function BarcodeSvg({ value }: { value: string }) {
   const ref = useRef<SVGSVGElement>(null);
@@ -39,8 +47,12 @@ function BarcodeSvg({ value }: { value: string }) {
   return <svg ref={ref} />;
 }
 
-function LabelSheet({ product, qty, size }: { product: BarcodeLabelProduct; qty: number; size: LabelSize }) {
+export function LabelSheet({ product, qty, size }: { product: BarcodeLabelProduct; qty: number; size: LabelSize }) {
   const { widthMm, heightMm } = LABEL_SIZES[size];
+  const dateLine = [
+    product.packedDate ? `PKD: ${product.packedDate}` : "",
+    product.expiryDate ? `Exp: ${product.expiryDate}` : "",
+  ].filter(Boolean).join("  ");
   return (
     <div className="barcode-label-sheet" style={{ display: "flex", flexDirection: "column", gap: "1.5mm" }}>
       {Array.from({ length: qty }).map((_, i) => (
@@ -59,9 +71,17 @@ function LabelSheet({ product, qty, size }: { product: BarcodeLabelProduct; qty:
             padding: "1mm",
           }}
         >
+          {product.businessName && (
+            <div style={{ fontSize: "9px", fontWeight: 700, textAlign: "center", lineHeight: 1.1, width: "100%" }}>
+              {product.businessName}
+            </div>
+          )}
           <div style={{ fontSize: "8px", fontWeight: 600, textAlign: "center", lineHeight: 1.1, maxHeight: "2.2em", overflow: "hidden", width: "100%" }}>
-            {product.name}
+            {product.name}{product.size ? ` ${product.size}` : ""}
           </div>
+          {dateLine && (
+            <div style={{ fontSize: "6px", textAlign: "center", width: "100%" }}>{dateLine}</div>
+          )}
           <BarcodeSvg value={product.barcode} />
           {typeof product.sell_price === "number" && (
             <div style={{ fontSize: "9px", fontWeight: 700 }}>{fmtMoney(product.sell_price)}</div>
