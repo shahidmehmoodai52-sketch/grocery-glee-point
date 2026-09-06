@@ -934,7 +934,8 @@
     "return_recorded": "خریداری واپسی درج ہو گئی، اسٹاک ہٹا دیا گیا",
     "failed_to_process": "واپسی پروسیس کرنے میں ناکامی",
     "items_label": "اشیاء:",
-    "total_qty_label": "کل مقدار:"
+    "total_qty_label": "کل مقدار:",
+    "return_saved_offline": "واپسی آف لائن محفوظ ہوئی — خودکار سنک ہو گی"
   },
   "sale_returns": {
     "title": "سیل واپسیاں",

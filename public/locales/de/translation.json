@@ -934,7 +934,8 @@
     "return_recorded": "Einkaufsretoure erfasst, Bestand entfernt",
     "failed_to_process": "Retoure konnte nicht verarbeitet werden",
     "items_label": "Artikel:",
-    "total_qty_label": "Gesamtmenge:"
+    "total_qty_label": "Gesamtmenge:",
+    "return_saved_offline": "Retoure offline gespeichert — wird automatisch synchronisiert"
   },
   "sale_returns": {
     "title": "Verkaufsretouren",

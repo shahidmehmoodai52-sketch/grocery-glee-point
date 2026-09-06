@@ -934,7 +934,8 @@
     "return_recorded": "Innkjøpsretur registrert, lager fjernet",
     "failed_to_process": "Kunne ikke behandle returen",
     "items_label": "Varer:",
-    "total_qty_label": "Totalt antall:"
+    "total_qty_label": "Totalt antall:",
+    "return_saved_offline": "Retur lagret offline — synkroniseres automatisk"
   },
   "sale_returns": {
     "title": "Salgsreturer",

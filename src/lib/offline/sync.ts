@@ -20,7 +20,7 @@ const PULL_TABLES: MirroredTable[] = [
   "products", "product_barcodes", "customers", "suppliers",
   "store_settings", "user_roles", "cash_accounts", "held_bills",
   "sales", "sale_items", "sale_returns", "sale_return_items",
-  "purchases", "purchase_items", "expenses",
+  "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses",
 ];
 
 const PAGE = 1000;
@@ -46,7 +46,7 @@ const HAS_UPDATED_AT = new Set<string>(["products", "expenses", "store_settings"
 /** Tables with neither timestamp usable as a watermark → always full pull (small). */
 const FULL_PULL = new Set<string>([
   "store_settings", "user_roles", "cash_accounts",
-  "sale_items", "sale_return_items", "purchase_items",
+  "sale_items", "sale_return_items", "purchase_items", "purchase_return_items",
 ]);
 
 /** Notified with the set of tables whose local mirror actually changed. */
