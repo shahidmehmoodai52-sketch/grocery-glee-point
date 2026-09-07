@@ -5,6 +5,14 @@ import { logPerf, whenIdle } from "@/lib/offline/perf";
 
 
 // Tables → query keys to invalidate when any row changes anywhere in the system.
+//
+// Deliberately NOT included anywhere here: ["report-sales-full"] (reports.tsx's
+// all-time, full-row sales/returns fetch behind every P&L drill-down). It used
+// to be invalidated by products, sales, AND sale_returns changes — so leaving
+// the Reports page mounted (including in a backgrounded browser tab) meant
+// every single sale anywhere in the shop re-triggered a full sales-history
+// refetch. Report data going briefly stale until the page/date-range is next
+// touched is an acceptable tradeoff for not doing that on every scan.
 const MAP: Record<string, string[][]> = {
   products: [
     ["products"],
@@ -17,7 +25,6 @@ const MAP: Record<string, string[][]> = {
 
     ["products-picker"],
     ["stock-count-products"],
-    ["report-sales-full"],
     ["report-purchases"],
     ["product-health"],
     ["morning-dashboard"],
@@ -29,7 +36,6 @@ const MAP: Record<string, string[][]> = {
   sales: [
     ["sales"],
     ["dash-sales"],
-    ["report-sales-full"],
     ["morning-dashboard"],
     ["daily-summary"],
     ["daily-timeline"],
@@ -45,7 +51,7 @@ const MAP: Record<string, string[][]> = {
     ["purchase-suggestions"],
   ],
   purchase_items: [["purchases"], ["product-intel"], ["purchase-suggestions"]],
-  sale_returns: [["sale-returns"], ["dash-sale-returns"], ["report-sales-full"]],
+  sale_returns: [["sale-returns"], ["dash-sale-returns"]],
   sale_return_items: [["sale-returns"]],
   purchase_returns: [["purchase-returns"], ["report-purchases"]],
   purchase_return_items: [["purchase-returns"]],

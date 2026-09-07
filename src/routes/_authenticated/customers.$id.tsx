@@ -164,8 +164,8 @@ function Page() {
     qc.invalidateQueries();
   };
 
-  const downloadPdf = (includeItems: boolean) => {
-    const blob = buildPdf(includeItems);
+  const downloadPdf = async (includeItems: boolean) => {
+    const blob = await buildPdf(includeItems);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

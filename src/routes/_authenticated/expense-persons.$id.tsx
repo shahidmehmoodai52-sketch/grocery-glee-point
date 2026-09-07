@@ -125,8 +125,8 @@ function Page() {
           <div><Label className="text-xs">{t('customers.from_label', 'From')}</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
           <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
           <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
-          <Button variant="outline" onClick={() => {
-            const blob = buildLedgerPdf({
+          <Button variant="outline" onClick={async () => {
+            const blob = await buildLedgerPdf({
               storeName: settings?.store_name ?? "Store", storeAddress: settings?.address ?? "", storePhone: settings?.phone ?? "",
               partyName: person?.name ?? "Staff", partyPhone: person?.phone ?? "",
               heading: "Staff Ledger", from, to, currency: sym,

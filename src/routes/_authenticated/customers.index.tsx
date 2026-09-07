@@ -17,8 +17,6 @@ import { fmtMoney } from "@/lib/format";
 import { offlineFirst, cacheCustomers, insertOfflineAware } from "@/lib/offline/pos";
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db } from "@/lib/offline/db";
-import { summarizeCustomerLedger, buildLedgerEntries } from "@/lib/customer-ledger";
-import { fetchAll } from "@/lib/supabase-page";
 
 
 export const Route = createFileRoute("/_authenticated/customers/")({ component: Page });
@@ -100,46 +98,27 @@ function Page() {
     queryKey: ["cash-accounts", "customer-receive"],
     queryFn: async () => (await supabase.from("cash_accounts").select("id,name,type,is_active").eq("is_active", true).order("sort_order").order("name")).data ?? [],
   });
-  const { data: sales = [] } = useQuery({
-    queryKey: ["customer-list-sales"],
-    queryFn: async () => await fetchAll<any>((f, t) => 
-      supabase.from("sales").select("id,customer_id,total,paid,created_at,status").order("created_at", { ascending: true }).range(f, t)
-    ),
+  // Server-side balance per customer (mirrors get_supplier_balances(), used
+  // the same way by suppliers.index.tsx) instead of downloading the
+  // tenant's entire sales/party_payments/sale_returns tables client-side
+  // just to sum a few numbers per customer. Falls back to each customer's
+  // own cached `balance` column (below, same as before) when this hasn't
+  // loaded yet or the RPC call fails — that column is part of the `rows`
+  // query above, which already has an offline-safe local mirror, so the
+  // list still shows a reasonable balance while offline.
+  const { data: balanceRows = [] } = useQuery({
+    queryKey: ["customer-balances"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_customer_balances");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
-  const { data: payments = [] } = useQuery({
-    queryKey: ["customer-list-payments"],
-    queryFn: async () => await fetchAll<any>((f, t) => 
-      supabase.from("party_payments").select("id,party_type,party_id,amount,note,method,created_at").eq("party_type", "customer").order("created_at", { ascending: true }).range(f, t)
-    ),
-  });
-  const { data: returns = [] } = useQuery({
-    queryKey: ["customer-list-returns"],
-    queryFn: async () => await fetchAll<any>((f, t) => 
-      supabase.from("sale_returns").select("id,customer_id,total,refund_amount,created_at").order("created_at", { ascending: true }).range(f, t)
-    ),
-  });
-
   const customerBalances = useMemo(() => {
     const map = new Map<string, number>();
-    for (const c of rows as any[]) {
-      const cSales = (sales as any[]).filter(s => s.customer_id === c.id);
-      const cPayments = (payments as any[]).filter(p => p.party_id === c.id);
-      const cReturns = (returns as any[]).filter(r => r.customer_id === c.id);
-
-      const entries = buildLedgerEntries({
-        sales: cSales,
-        payments: cPayments,
-        returns: cReturns,
-      });
-
-      const summary = summarizeCustomerLedger({
-        openingBalance: Number(c.opening_balance ?? 0),
-        entries
-      });
-      map.set(c.id, summary.closing);
-    }
+    for (const b of balanceRows as any[]) map.set(b.id, Number(b.current_balance ?? 0));
     return map;
-  }, [rows, sales, payments, returns]);
+  }, [balanceRows]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

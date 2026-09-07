@@ -4323,6 +4323,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_customer_balances: {
+        Args: never
+        Returns: {
+          address: string
+          current_balance: number
+          email: string
+          id: string
+          name: string
+          opening_balance: number
+          phone: string
+        }[]
+      }
       get_dashboard_stats: {
         Args: { p_from_date: string; p_to_date: string }
         Returns: {

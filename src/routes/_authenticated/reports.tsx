@@ -343,6 +343,15 @@ const displayPaymentMethod = (methodValue: string | null | undefined) => {
 };
 
 function today() { return new Date().toISOString().slice(0, 10); }
+
+function useDebounced<T>(value: T, ms: number) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
 const toISO = (d: Date) => {
   const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
   const da = String(d.getDate()).padStart(2, "0");
@@ -451,6 +460,15 @@ function Page() {
   // the first page. These key names match the invalidations already fired
   // elsewhere (sale-returns.tsx, use-realtime-sync.ts) which were pointing
   // at query keys that didn't otherwise exist here.
+  // These three "full" queries are the heaviest thing on this page (every
+  // sale/return/purchase row, with line items, for the whole selected range
+  // — up to all-time). A 5-minute staleTime means switching away and back to
+  // Reports (or to a different tab within it) within that window reuses the
+  // already-fetched data instead of re-downloading it; realtime no longer
+  // invalidates these at all (see the comment in use-realtime-sync.ts), so
+  // in practice this only truly refetches on an actual date-range change.
+  const REPORT_FULL_STALE_TIME = 5 * 60 * 1000;
+
   const { data: allSales = [] } = useQuery({
     queryKey: ["report-sales-full", fromTime, toTime],
     queryFn: async () =>
@@ -465,6 +483,7 @@ function Page() {
           .range(fIdx, tIdx),
         1000,
       ),
+    staleTime: REPORT_FULL_STALE_TIME,
   });
 
   const { data: allSaleReturns = [] } = useQuery({
@@ -480,6 +499,7 @@ function Page() {
           .range(fIdx, tIdx),
         1000,
       ),
+    staleTime: REPORT_FULL_STALE_TIME,
   });
 
   // Same pagination-vs-aggregate issue as sales: the "Total purchases" P&L
@@ -497,6 +517,7 @@ function Page() {
           .range(fIdx, tIdx),
         1000,
       ),
+    staleTime: REPORT_FULL_STALE_TIME,
   });
 
   const { data: purchasesPaged = { data: [], count: 0 } } = useQuery({
@@ -738,7 +759,8 @@ function Page() {
     return Array.from(map.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   }, [allSales, partyPayments]);
 
-  const q = search.trim().toLowerCase();
+  const debouncedSearch = useDebounced(search, 200);
+  const q = debouncedSearch.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
     if (!q) return sales as any[];
     if (q === "status:credit") return (sales as any[]).filter(s => s.status === "credit");
