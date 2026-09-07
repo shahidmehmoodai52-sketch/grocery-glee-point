@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   Plus,
   X,
@@ -90,6 +90,7 @@ import {
   searchProductsLocal,
 } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
+import { computeSoldQtyByProduct, applyStockDeltas, type SoldLine } from "@/lib/pos-stock-patch";
 import { enqueueWrite } from "@/lib/offline/sync";
 import { useTranslation } from "react-i18next";
 import { isOfflineNow } from "@/lib/offline/session";
@@ -377,6 +378,24 @@ function parsePaymentMethod(
     .filter((entry) => entry.amount > 0);
   if (!rows.length) return [{ method: "cash", amount: paid }];
   return rows;
+}
+
+// After a normal checkout, the cashier already knows exactly which products
+// changed and by how much — there's no need to invalidate + refetch the
+// whole ["products","active"] catalogue (a sequential, paginated reload of
+// potentially several thousand rows) just to show the new stock numbers.
+// This patches the cached catalogue in place instead, so the screen updates
+// with zero network wait. The realtime sync listener will still separately
+// invalidate the same query shortly after (it can't tell this change apart
+// from one made by another till), so this is purely an optimization, not a
+// replacement for that backstop — if this patch is ever wrong for any edge
+// case, the following realtime refetch corrects it moments later.
+function patchProductStockAfterSale(qc: QueryClient, items: SoldLine[]) {
+  const soldQtyByProduct = computeSoldQtyByProduct(items);
+  if (soldQtyByProduct.size === 0) return;
+  qc.setQueryData(["products", "active"], (old: any[] | undefined) =>
+    Array.isArray(old) ? applyStockDeltas(old, soldQtyByProduct) : old,
+  );
 }
 
 async function searchProducts(term: string) {
@@ -2138,7 +2157,7 @@ function POSPage() {
       closeTab(active);
       // restored badge is cleared implicitly since tab is closed
       void 0;
-      qc.invalidateQueries({ queryKey: ["products"] });
+      patchProductStockAfterSale(qc, tab.items);
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
