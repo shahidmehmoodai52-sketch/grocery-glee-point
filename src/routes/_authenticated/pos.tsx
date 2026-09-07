@@ -979,6 +979,10 @@ function POSPage() {
         () => offlineDb().product_barcodes.toArray(),
         (rows) => cacheProductBarcodes(rows),
       ),
+    // Feeds the same scan lookup maps as `products` above — same staleTime
+    // for the same reason (a fresh mount still refetches; it just doesn't
+    // force one on every unrelated realtime tick).
+    staleTime: 5 * 60 * 1000,
   });
 
   // product_id -> array of all barcodes (primary + extras)
