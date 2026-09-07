@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { fmtMoney, fmtQty } from "@/lib/format";
 
 export type ReceiptSettings = {
@@ -171,9 +172,11 @@ export function printReceipt(sourceElement?: HTMLElement | null, settings?: Rece
   document.querySelector(".receipt-print-root")?.remove();
   const source = sourceElement ?? document.querySelector<HTMLElement>(".print-area");
   if (!source) {
-    void tryDirectPrint({ 
+    void tryDirectPrint({
       printerName: settings?.printer_name,
       silent: settings?.direct_print_enabled === true
+    }).then((printed) => {
+      if (!printed) toast.error("Print failed — check the printer connection and try again.");
     });
     return;
   }
@@ -211,10 +214,14 @@ export function printReceipt(sourceElement?: HTMLElement | null, settings?: Rece
   setReceiptPrintPageSize(styleEl, width, printRoot);
   
   requestAnimationFrame(() => {
-    void tryDirectPrint({ 
+    void tryDirectPrint({
       printerName: settings?.printer_name,
       silent: settings?.direct_print_enabled === true
-    }).then(() => {
+    }).then((printed) => {
+      // Direct printing silently gives up rather than popping a native dialog
+      // mid-shift (see tryDirectPrint) — so the cashier must be told when it
+      // fails, or a real sale's receipt just never comes out with no sign why.
+      if (!printed) toast.error("Print failed — check the printer connection and try again.");
       // Small delay to ensure browser print dialog has handed off or desktop bridge finished
       setTimeout(cleanup, 1000);
     });
