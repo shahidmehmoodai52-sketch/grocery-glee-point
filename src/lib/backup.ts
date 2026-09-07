@@ -1,5 +1,4 @@
 import { get, set, del } from "idb-keyval";
-import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 
 const DIR_KEY = "backup_dir_handle";
@@ -127,6 +126,7 @@ function redactRows(table: string, rows: any[]): any[] {
 }
 
 export async function buildWorkbookBlob(): Promise<{ blob: Blob; counts: Record<string, number> }> {
+  const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
   const counts: Record<string, number> = {};
   for (const t of TABLES) {

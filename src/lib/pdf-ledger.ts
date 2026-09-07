@@ -1,6 +1,3 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-
 export type LedgerRow = {
   date: string;
   type: string;
@@ -20,7 +17,7 @@ export type LedgerItem = {
   total: number;
 };
 
-export function buildLedgerPdf(opts: {
+export async function buildLedgerPdf(opts: {
   storeName: string;
   storeAddress?: string;
   storePhone?: string;
@@ -38,7 +35,11 @@ export function buildLedgerPdf(opts: {
   /** Direction label used for non-zero balances. e.g. customer: "they owe" / "advance" ; supplier: "we owe" / "advance" */
   owedLabel?: string;
   advanceLabel?: string;
-}): Blob {
+}): Promise<Blob> {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const sym = opts.currency;
   const money = (n: number) => `${sym}${Number(n || 0).toFixed(2)}`;

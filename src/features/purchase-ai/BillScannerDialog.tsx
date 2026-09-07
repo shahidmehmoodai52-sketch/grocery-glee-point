@@ -15,7 +15,6 @@ import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 import { QuickAddProductDialog, type QuickAddedProduct } from "@/components/quick-add-product-dialog";
 import { extractPurchaseBill } from "./scan.functions";
 import { fileToCompressedDataUrl } from "./image";
-import { pdfToCompressedDataUrl } from "./pdf";
 import { buildPreviewLine, matchSupplier } from "./matching";
 import type { ExtractedBill, MatchedProductOption, MatchStatus, PreviewLine, SupplierMatch } from "./types";
 
@@ -187,9 +186,11 @@ export function PurchaseBillScannerButton({
 
   const removePage = (idx: number) => setPages((ps) => ps.filter((_, i) => i !== idx));
 
-  const fileToDataUrl = (file: File) => {
+  const fileToDataUrl = async (file: File) => {
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    return isPdf ? pdfToCompressedDataUrl(file) : fileToCompressedDataUrl(file);
+    if (!isPdf) return fileToCompressedDataUrl(file);
+    const { pdfToCompressedDataUrl } = await import("./pdf");
+    return pdfToCompressedDataUrl(file);
   };
 
   const runScan = async () => {
