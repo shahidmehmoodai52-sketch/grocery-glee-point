@@ -150,6 +150,38 @@ function isPermanentSyncError(e: any): boolean {
   return /invalid input syntax|null value|foreign key|does not exist|function .* does not exist|unknown|not authenticated|forbidden|permission denied|does not belong to current tenant|no active tenant|party does not belong/.test(msg);
 }
 
+/** After an offline sale's queued `complete_sale` RPC finally uploads, the
+ *  server has inserted a brand-new row with its own id and the real
+ *  `S-<shop_code>-<n>` invoice number — completely different from the local
+ *  placeholder row (`localId` / `OFF-<device>-...` invoice number) created
+ *  while offline. Without this, the placeholder just sits in Dexie forever
+ *  (a plain `pullTable("sales")` can't help: it filters by `created_at >
+ *  watermark`, and the server row's `created_at` is backdated to match the
+ *  original offline timestamp, so once the watermark has moved past that
+ *  point — e.g. any other sale synced since — the incremental pull skips it
+ *  entirely). Reprinting that invoice from history would then show the
+ *  temporary offline number forever instead of the real one. Replace the
+ *  placeholder with the server's row immediately after a successful upload. */
+async function reconcileSyncedSale(localId: string, serverId: string): Promise<void> {
+  try {
+    const { data: sale, error } = await supabase
+      .from("sales")
+      .select("*, sale_items(*), customers(name,phone)")
+      .eq("id", serverId)
+      .maybeSingle();
+    if (error || !sale) return;
+    await db().transaction("rw", db().sales, db().sale_items, async () => {
+      await db().sales.delete(localId);
+      await db().sale_items.where("sale_id").equals(localId).delete();
+      await db().sales.put(sale);
+      const items = (sale as any).sale_items;
+      if (Array.isArray(items) && items.length) await db().sale_items.bulkPut(items);
+    });
+  } catch {
+    // Best-effort — the next full mirror pull will eventually catch up.
+  }
+}
+
 /** Recover items interrupted mid-upload (crash / power loss / tab kill). */
 export async function recoverInterruptedQueue(): Promise<number> {
   try {
@@ -208,8 +240,11 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
     try {
       await db()._queue.update(item.id!, { status: "uploading" });
       if (item.op === "rpc") {
-        const { error } = await supabase.rpc(item.table as any, item.payload);
+        const { data, error } = await supabase.rpc(item.table as any, item.payload);
         if (error) throw error;
+        if (item.table === "complete_sale" && item.client_uuid && typeof data === "string") {
+          await reconcileSyncedSale(item.client_uuid, data);
+        }
       } else if (item.op === "insert") {
         // upsert on the client uuid → replaying a half-applied write cannot duplicate.
         const { error } = await supabase
