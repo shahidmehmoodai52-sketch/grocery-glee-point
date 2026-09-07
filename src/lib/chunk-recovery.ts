@@ -48,6 +48,15 @@ function recoveredRecently(): boolean {
 /** Returns true when a recovery reload was started. */
 export function recoverFromChunkError(): boolean {
   if (typeof window === "undefined") return false;
+  // A chunk fetch can fail for two very different reasons: the chunk is
+  // genuinely stale (a new deploy renamed it — reload fixes it), or there is
+  // simply no network right now (offline). Reloading in the second case
+  // can't fetch anything either, and replaces the page the cashier was
+  // already using with a blank/broken one that needs the app relaunched —
+  // reported directly as "app closes when printing offline". Only ever
+  // attempt recovery when there's a network to actually fetch fresh chunks
+  // over; otherwise leave the normal error UI in place.
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
   if (recoveredRecently()) return false;
   try {
     window.sessionStorage.setItem(FLAG, String(Date.now()));
