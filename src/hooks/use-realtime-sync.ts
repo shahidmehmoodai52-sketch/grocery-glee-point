@@ -15,8 +15,22 @@ import { logPerf, whenIdle } from "@/lib/offline/perf";
 // touched is an acceptable tradeoff for not doing that on every scan.
 const MAP: Record<string, string[][]> = {
   products: [
-    ["products"],
+    // ["products", "active"] — POS's own catalogue, feeding the barcode/SKU
+    // lookup maps scanning depends on — is deliberately NOT force-refetched
+    // here (see the PASSIVE_KEYS override below). Every completed sale
+    // ANYWHERE in the shop (any till) updates a product's stock, which is a
+    // `products` row change like any other; forcing every open till to
+    // re-download the full catalogue (thousands of rows for a real shop) and
+    // rebuild its lookup maps on every single sale — its own included — was
+    // showing up as barcode-scan lag, worse the busier the shop got. It's
+    // still marked stale here, so a genuine remount/revisit still refreshes
+    // it; only the eager forced re-download during active scanning is
+    // skipped. Checkout's own optimistic patch (patchProductStockAfterSale)
+    // already keeps this till's own view accurate for its own sales.
     ["products", "active"],
+    ["products", "list"], // admin Products page
+    ["products", "counts"],
+    ["products", "categories"],
     ["dash-products"],
     ["product-intel"],
     ["purchase-suggestions"],
@@ -156,6 +170,13 @@ const dirty = new Set<string>();
 let flushTimer: number | null = null;
 const FLUSH_MS = 600;
 
+// Keys that should only be marked stale on a realtime change, never forced to
+// refetch immediately — for data that's expensive to re-download in full and
+// isn't safety-critical to keep millisecond-fresh (the source RPC remains the
+// authority either way). Currently just POS's own product catalogue; see the
+// comment on ["products", "active"] in MAP above.
+const PASSIVE_KEYS = new Set<string>([JSON.stringify(["products", "active"])]);
+
 function scheduleFlush() {
   if (typeof window === "undefined") return;
   if (flushTimer !== null) return;
@@ -171,7 +192,10 @@ function scheduleFlush() {
       for (const k of keys) {
         // Only refetch queries currently rendered; everything else is marked
         // stale and refetches lazily on next mount.
-        qc.invalidateQueries({ queryKey: JSON.parse(k), refetchType: "active" });
+        qc.invalidateQueries({
+          queryKey: JSON.parse(k),
+          refetchType: PASSIVE_KEYS.has(k) ? "none" : "active",
+        });
       }
     }
     logPerf("realtime invalidate", { tables: tables.length, keys: keys.size });
