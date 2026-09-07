@@ -61,6 +61,8 @@ export interface OfflineStatus {
   /** Sync progress while flushing the offline queue (null when idle). */
   progressDone: number | null;
   progressTotal: number | null;
+  /** Human-readable description of the item currently uploading, e.g. "Sale S-023-1042". */
+  progressLabel: string | null;
 }
 
 const LS_LAST = "pos_offline_last_synced";
@@ -77,6 +79,7 @@ let state: OfflineStatus = {
   error: null,
   progressDone: null,
   progressTotal: null,
+  progressLabel: null,
 };
 
 
@@ -95,8 +98,8 @@ export function setOfflineEnabled(_v: boolean) {
 }
 
 
-export function setSyncProgress(done: number | null, total: number | null) {
-  state = { ...state, progressDone: done, progressTotal: total };
+export function setSyncProgress(done: number | null, total: number | null, label: string | null = null) {
+  state = { ...state, progressDone: done, progressTotal: total, progressLabel: label };
   emit();
 }
 
@@ -107,11 +110,11 @@ export function markSyncStart() {
 export function markSyncDone() {
   const now = new Date().toISOString();
   try { window.localStorage.setItem(LS_LAST, now); } catch {}
-  state = { ...state, phase: "idle", lastSyncedAt: now, error: null, progressDone: null, progressTotal: null };
+  state = { ...state, phase: "idle", lastSyncedAt: now, error: null, progressDone: null, progressTotal: null, progressLabel: null };
   emit();
 }
 export function markSyncError(msg: string) {
-  state = { ...state, phase: "error", error: msg, progressDone: null, progressTotal: null };
+  state = { ...state, phase: "error", error: msg, progressDone: null, progressTotal: null, progressLabel: null };
   emit();
 }
 export async function refreshPendingCount() {

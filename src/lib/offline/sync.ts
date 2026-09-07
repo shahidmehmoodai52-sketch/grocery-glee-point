@@ -182,6 +182,35 @@ async function reconcileSyncedSale(localId: string, serverId: string): Promise<v
   }
 }
 
+const RPC_QUEUE_LABELS: Record<string, string> = {
+  complete_sale: "Sale",
+  complete_sale_return: "Sale return",
+  complete_purchase_return: "Purchase return",
+  edit_sale: "Sale edit",
+  undo_last_sale: "Sale undo",
+  resume_bill: "Held bill resume",
+  hold_bill: "Held bill",
+};
+const TABLE_QUEUE_LABELS: Record<string, string> = {
+  customers: "Customer",
+  suppliers: "Supplier",
+  expenses: "Expense",
+  audit_logs: "Activity log",
+};
+
+/** Human-readable "what's uploading right now" text for the sync status badge. */
+function describeQueueItem(item: { op: string; table: string; payload: any }): string {
+  if (item.op === "rpc") {
+    const base = RPC_QUEUE_LABELS[item.table] ?? item.table;
+    if (item.table === "complete_sale") {
+      const invoiceNo = item.payload?.payload?._local_invoice_no;
+      return invoiceNo ? `${base} ${invoiceNo}` : base;
+    }
+    return base;
+  }
+  return TABLE_QUEUE_LABELS[item.table] ?? item.table;
+}
+
 /** Recover items interrupted mid-upload (crash / power loss / tab kill). */
 export async function recoverInterruptedQueue(): Promise<number> {
   try {
@@ -236,7 +265,7 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
 
   for (const item of runnable) {
     if (blocked.has(item.table)) continue;
-    if (totalItems > 0 && !opts.silent) setSyncProgress(ok + failed, totalItems);
+    if (totalItems > 0 && !opts.silent) setSyncProgress(ok + failed, totalItems, describeQueueItem(item));
     try {
       await db()._queue.update(item.id!, { status: "uploading" });
       if (item.op === "rpc") {

@@ -10,17 +10,21 @@ export function OfflineStatusBadge({ className }: { className?: string }) {
   const s = useOfflineStatus();
   if (!s.enabled) return null;
 
+  const remaining = s.progressTotal != null ? Math.max(s.progressTotal - (s.progressDone ?? 0), 0) : null;
   const label = !s.online
     ? `Offline Mode${s.pending ? ` · ${s.pending} pending` : ""}`
     : s.phase === "syncing"
       ? s.progressTotal
-        ? `Syncing ${s.progressDone ?? 0}/${s.progressTotal}…`
+        ? `Syncing ${s.progressLabel ?? "…"} · ${remaining} left`
         : "Syncing…"
       : s.phase === "error"
         ? "Sync error"
         : s.pending
           ? `${s.pending} pending`
           : "Synced";
+  const tooltip = s.phase === "syncing" && s.progressTotal
+    ? `Uploading: ${s.progressLabel ?? "…"} (item ${(s.progressDone ?? 0) + 1} of ${s.progressTotal}, ${remaining} left)`
+    : s.error ?? undefined;
 
   const Icon = !s.online ? WifiOff
     : s.phase === "syncing" ? RefreshCw
@@ -35,7 +39,7 @@ export function OfflineStatusBadge({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      <Badge variant="outline" className={cn("gap-1 font-normal", tone)} title={s.error ?? undefined}>
+      <Badge variant="outline" className={cn("gap-1 font-normal", tone)} title={tooltip}>
         <Icon className={cn("h-3 w-3", s.phase === "syncing" && "animate-spin")} />
         {label}
       </Badge>
