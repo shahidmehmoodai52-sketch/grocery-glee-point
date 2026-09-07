@@ -264,4 +264,32 @@
   }
 }
 
+/* Wide, full-page document printing (ledgers, item-wise breakdowns, reports)
+ * — distinct from the thermal-receipt printing above. `.print-area` (used by
+ * printReceipt()) is hard-locked to 80mm/58mm receipt width, which clips a
+ * wide multi-column table down to an unreadable sliver. `.doc-print-area`
+ * (used by printDocument()) reuses the same hide-everything-else pattern but
+ * keeps the printed page at its normal width. Higher specificity than the
+ * plain `html, body` receipt rule above, so it wins regardless of source
+ * order. */
+@media print {
+  html.doc-printing,
+  html.doc-printing body {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  .doc-print-area,
+  .doc-print-area * { visibility: visible !important; }
+  .doc-print-area {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+}
+
 

@@ -231,6 +231,40 @@ export function printReceipt(sourceElement?: HTMLElement | null, settings?: Rece
 }
 
 
+/** Print a wide, full-page document (a customer/supplier ledger, an
+ *  item-wise breakdown, etc.) — distinct from printReceipt()'s narrow
+ *  thermal-receipt sizing. Marks every `.doc-print-area` on the page visible
+ *  (see styles.css) and prints in place, at normal page width, instead of
+ *  squeezing a multi-column table into 80mm and clipping most of it. */
+export function printDocument() {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  document.documentElement.classList.add("doc-printing");
+
+  const styleId = "doc-print-page-size";
+  let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = styleId;
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = `@media print { @page { size: auto; margin: 12mm; } }`;
+
+  let done = false;
+  const cleanup = () => {
+    if (done) return;
+    done = true;
+    document.documentElement.classList.remove("doc-printing");
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+
+  requestAnimationFrame(() => {
+    window.print();
+    setTimeout(cleanup, 1000);
+    window.setTimeout(cleanup, 10000);
+  });
+}
+
 /** Print an invoice directly without opening a preview dialog.
  *  Renders the receipt off-screen, prints it, then cleans up. */
 export function printInvoiceDirect(invoice: ReceiptInvoice, settings: ReceiptSettings | null | undefined, kind: Props["kind"] = "sale") {

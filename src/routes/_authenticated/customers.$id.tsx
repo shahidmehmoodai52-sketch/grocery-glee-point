@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ import { fetchAll } from "@/lib/supabase-page";
 
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
-import { Receipt, printReceipt } from "@/components/receipt";
+import { Receipt, printReceipt, printDocument } from "@/components/receipt";
 import { AddPaymentDialog, AddDiscountDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger, buildLedgerEntries } from "@/lib/customer-ledger";
 
@@ -56,6 +56,7 @@ function Page() {
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
   const [obValue, setObValue] = useState<string>("");
   const [obSaving, setObSaving] = useState(false);
+  const invoicePrintAreaRef = useRef<HTMLDivElement>(null);
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
@@ -193,7 +194,7 @@ function Page() {
         <div className="flex items-end gap-2 no-print flex-wrap">
           <div><Label className="text-xs">{t('customers.from_label', 'From')}</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
           <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
+          <Button variant="outline" onClick={() => printDocument()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
           <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />{t('customers.pdf', 'PDF')}</Button>
           <Button variant="outline" onClick={() => { setPayDefault(Math.max(closing, 0)); setAddDiscountOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />{t('ledger.add_discount', 'Add discount')}
@@ -251,7 +252,7 @@ function Page() {
         <Stat icon={Wallet} label={closingLabel === "Settled" ? t('customers.closing_settled', 'Settled') : closingLabel === "Outstanding (they owe)" ? t('customers.closing_outstanding', 'Outstanding (they owe)') : closingLabel === "Advance (credit)" ? t('customers.closing_advance', 'Advance (credit)') : closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
       </div>
 
-      <Card className="p-3 print-area">
+      <Card className="p-3 doc-print-area">
         <div className="hidden print:block text-center mb-3">
           <div className="text-lg font-semibold">{settings?.store_name ?? "Store"} — Customer Ledger</div>
           <div className="text-xs">{customer?.name} · {new Date().toLocaleString()}</div>
@@ -378,13 +379,17 @@ function Page() {
             <DialogTitle>{t('sales.invoice_title', 'Invoice {{no}}', { no: openInvoice?.invoice_no })}</DialogTitle>
           </DialogHeader>
           <div className="bg-muted/30 rounded p-3 max-h-[70vh] overflow-auto">
-            <div className="print-area">
+            <div className="print-area" ref={invoicePrintAreaRef}>
               {openInvoice && <Receipt invoice={openInvoice} settings={settings as any} />}
             </div>
           </div>
           <DialogFooter className="no-print">
             <Button variant="outline" onClick={() => setOpenInvoice(null)}>{t('common.close', 'Close')}</Button>
-            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
+            {/* Explicit target — without it, printReceipt() falls back to the
+                first .print-area in the DOM, which is the ledger table below
+                (this dialog's own .print-area sits in a portal appended after
+                it), so printing a single invoice printed the whole ledger. */}
+            <Button onClick={() => printReceipt(invoicePrintAreaRef.current, settings)}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -417,7 +422,7 @@ function Page() {
         </DialogContent>
       </Dialog>
 
-      <Card className="p-3 print-area">
+      <Card className="p-3 doc-print-area">
 
         <div className="mb-2 font-semibold">{t('customers.item_wise_details', 'Item-wise details')}</div>
         <Table>
