@@ -29,6 +29,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty, fmtDate } from "@/lib/format";
+import { printDocument } from "@/components/receipt";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 
 export const Route = createFileRoute("/_authenticated/stock-count/$id")({
@@ -336,7 +337,7 @@ function StockCountDetailPage() {
     URL.revokeObjectURL(url);
   };
 
-  const printReport = () => window.print();
+  const printReport = () => printDocument();
 
   if (sessionQ.isLoading) {
     return <div className="p-6 text-muted-foreground">{t('stock_count.loading', 'Loading…')}</div>;
@@ -423,7 +424,7 @@ function StockCountDetailPage() {
       </div>
 
       {/* Variance Report */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="doc-print-area grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="p-3">
           <div className="text-xs text-muted-foreground flex items-center gap-1"><Equal className="h-3.5 w-3.5" /> {t('stock_count.metric_perfect_matches', 'Perfect matches')}</div>
           <div className="text-2xl font-semibold mt-1">{metrics.matchCount}</div>
@@ -455,7 +456,7 @@ function StockCountDetailPage() {
 
       {/* Scan + search */}
       {!isLocked && (
-        <Card className="p-3">
+        <Card className="p-3 no-print">
           <div className="space-y-3">
             <div>
               <Label className="text-xs">{t('stock_count.scan_label', 'Scan barcode or search product')}</Label>
@@ -529,7 +530,7 @@ function StockCountDetailPage() {
       )}
 
       {/* Items table */}
-      <Card className="p-0 overflow-hidden">
+      <Card className="p-0 overflow-hidden doc-print-area">
         <div className="p-3 border-b flex items-center justify-between">
           <div className="font-medium">{t('stock_count.counted_items', 'Counted items · {{count}}', { count: rows.length })}</div>
         </div>

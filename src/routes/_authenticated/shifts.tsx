@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Printer, PlayCircle, StopCircle, AlertOctagon, CheckCircle2, RefreshCw } from "lucide-react";
@@ -19,6 +19,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
+import { printReceipt } from "@/components/receipt";
 
 export const Route = createFileRoute("/_authenticated/shifts")({ component: Page });
 
@@ -66,6 +67,7 @@ function Page() {
   const [closeDlg, setCloseDlg] = useState<{ shift: ShiftRow } | null>(null);
   const [emgDlg, setEmgDlg] = useState<{ shift: ShiftRow } | null>(null);
   const [reportDlg, setReportDlg] = useState<{ shift: ShiftRow; kind: "X" | "Z" } | null>(null);
+  const reportPrintAreaRef = useRef<HTMLDivElement>(null);
 
   const [openingCash, setOpeningCash] = useState("");
   const [openingNotes, setOpeningNotes] = useState("");
@@ -386,11 +388,13 @@ function Page() {
           {reportQ.isLoading ? (
             <div className="text-sm text-muted-foreground">{t('pos.loading', 'Loading…')}</div>
           ) : reportQ.data ? (
-            <ReportView data={reportQ.data} kind={reportDlg!.kind} />
+            <div className="print-area" ref={reportPrintAreaRef}>
+              <ReportView data={reportQ.data} kind={reportDlg!.kind} />
+            </div>
           ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setReportDlg(null)}>{t('common.close', 'Close')}</Button>
-            <Button onClick={() => window.print()}>
+            <Button onClick={() => printReceipt(reportPrintAreaRef.current, settings)}>
               <Printer className="h-4 w-4 mr-1" /> {t('common.print', 'Print')}
             </Button>
           </DialogFooter>

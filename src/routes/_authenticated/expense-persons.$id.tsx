@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtDate } from "@/lib/format";
-import { Receipt, printReceipt } from "@/components/receipt";
+import { Receipt, printReceipt, printDocument } from "@/components/receipt";
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { AddPaymentDialog, EditPaymentDialog } from "@/components/ledger-dialogs";
@@ -38,6 +38,7 @@ function Page() {
   const [obValue, setObValue] = useState<string>("");
   const [obSaving, setObSaving] = useState(false);
   const [view, setView] = useState<any>(null);
+  const invoicePrintAreaRef = useRef<HTMLDivElement>(null);
 
   const openSale = async (saleId: string) => {
     const { data } = await supabase
@@ -124,7 +125,7 @@ function Page() {
         <div className="flex items-end gap-2 no-print flex-wrap">
           <div><Label className="text-xs">{t('customers.from_label', 'From')}</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
           <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
+          <Button variant="outline" onClick={() => printDocument()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
           <Button variant="outline" onClick={async () => {
             const blob = await buildLedgerPdf({
               storeName: settings?.store_name ?? "Store", storeAddress: settings?.address ?? "", storePhone: settings?.phone ?? "",
@@ -183,7 +184,7 @@ function Page() {
         <Stat icon={Wallet} label={closing > 0 ? t('expenses.closing_owed', 'Owed to staff') : closing < 0 ? t('expenses.closing_advance', 'Advance given') : t('expenses.closing_settled', 'Settled')} value={fmtMoney(Math.abs(closing), sym)} tone={closing > 0 ? "destructive" : closing < 0 ? "success" : "primary"} />
       </div>
 
-      <Card className="p-3 print-area">
+      <Card className="p-3 doc-print-area">
         <div className="hidden print:block text-center mb-3">
           <div className="text-lg font-semibold">{settings?.store_name ?? "Store"} — Staff Ledger</div>
           <div className="text-xs">{person?.name} · {new Date().toLocaleString()}</div>
@@ -284,10 +285,12 @@ function Page() {
       <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{t('sales.invoice_title', 'Invoice {{no}}', { no: view?.invoice_no })}</DialogTitle></DialogHeader>
-          {view && <Receipt invoice={view} settings={settings} />}
+          <div className="print-area" ref={invoicePrintAreaRef}>
+            {view && <Receipt invoice={view} settings={settings} />}
+          </div>
           <div className="flex justify-end gap-2 no-print">
             <Button variant="outline" onClick={() => setView(null)}>{t('common.close', 'Close')}</Button>
-            <Button onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-1" />{t('common.print', 'Print')}</Button>
+            <Button onClick={() => printReceipt(invoicePrintAreaRef.current, settings)}><Printer className="h-4 w-4 mr-1" />{t('common.print', 'Print')}</Button>
           </div>
           <div className="text-xs text-muted-foreground">{view?.created_at && fmtDate(view.created_at)}</div>
         </DialogContent>

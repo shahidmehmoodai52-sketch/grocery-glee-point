@@ -13,7 +13,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
-import { printReceipt } from "@/components/receipt";
+import { printDocument } from "@/components/receipt";
 
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
@@ -144,7 +144,7 @@ function Page() {
         <div className="flex items-end gap-2 no-print flex-wrap">
           <div><Label className="text-xs">{t('customers.from_label', 'From')}</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /></div>
           <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
-          <Button variant="outline" onClick={() => printReceipt()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
+          <Button variant="outline" onClick={() => printDocument()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
           <Button variant="outline" onClick={async () => {
             const blob = await buildLedgerPdf({
               storeName: settings?.store_name ?? "Store", storeAddress: settings?.address ?? "", storePhone: settings?.phone ?? "",
@@ -211,7 +211,7 @@ function Page() {
         <Stat icon={Gift} label={t('suppliers.incentive_all_time', 'Incentive received (all time)')} value={fmtMoney(incentiveAllTime, sym)} tone="success" />
       </div>
 
-      <Card className="p-3 print-area">
+      <Card className="p-3 doc-print-area">
         <div className="hidden print:block text-center mb-3">
           <div className="text-lg font-semibold">{settings?.store_name ?? "Store"} — Supplier Ledger</div>
           <div className="text-xs">{supplier?.name} · {new Date().toLocaleString()}</div>

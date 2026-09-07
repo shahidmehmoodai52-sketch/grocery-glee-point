@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
+import { printDocument } from "@/components/receipt";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { useEarliestDataDate } from "@/lib/earliest-date";
@@ -790,7 +791,7 @@ function Page() {
         </div>
         <div className="flex items-center gap-2 no-print">
           {salesLoading && <Badge variant="outline" className="animate-pulse">{t('reports.loading', 'Loading...')}</Badge>}
-          <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> {t('common.print', 'Print')}</Button>
+          <Button variant="outline" size="sm" onClick={() => printDocument()}><Printer className="h-4 w-4 mr-2" /> {t('common.print', 'Print')}</Button>
         </div>
       </div>
 
@@ -847,7 +848,7 @@ function Page() {
         <Stat icon={TrendingDown} label={t('reports.stat_expenses_period', 'Expenses (period)')} value={fmtMoney(expensesPeriod, sym)} tone="warning" />
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={setTab} className="doc-print-area">
         <div className="flex items-center justify-between gap-2 flex-wrap no-print">
           <TabsList>
             <TabsTrigger value="pnl">{t('reports.tab_pnl', 'P&L')}</TabsTrigger>
