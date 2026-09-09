@@ -1182,7 +1182,11 @@ function POSPage() {
       if (s >= 0) scored.push({ p, s });
     }
     scored.sort((a, b) => a.s - b.s || a.p.name.localeCompare(b.p.name));
-    return scored.slice(0, 200).map((x) => x.p);
+    // Capped well below the old 200: nobody scrolls a POS dropdown that
+    // deep mid-sale, and each extra row is an unvirtualized <tr> — a
+    // narrower search term already surfaces the intended match well
+    // within this limit.
+    return scored.slice(0, 50).map((x) => x.p);
   }, [searchIndex, debouncedSearch]);
 
   // reset highlight whenever the filtered list changes
