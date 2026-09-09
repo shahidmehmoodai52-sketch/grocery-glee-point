@@ -1014,13 +1014,23 @@ function POSPage() {
     queryFn: async () => {
       const map: Record<string, string> = {};
       try {
+        const chunks: string[][] = [];
         for (let i = 0; i < itemCodeLookupBarcodes.length; i += 500) {
-          const slice = itemCodeLookupBarcodes.slice(i, i + 500);
-          const { data, error } = await supabase
-            .from("global_products")
-            .select("barcode,item_code")
-            .in("barcode", slice)
-            .not("item_code", "is", null);
+          chunks.push(itemCodeLookupBarcodes.slice(i, i + 500));
+        }
+        // Chunks fire together instead of one-at-a-time — each is an
+        // independent query, so there's no reason to pay N sequential
+        // round-trips when N parallel ones return in roughly one round-trip.
+        const results = await Promise.all(
+          chunks.map((slice) =>
+            supabase
+              .from("global_products")
+              .select("barcode,item_code")
+              .in("barcode", slice)
+              .not("item_code", "is", null),
+          ),
+        );
+        for (const { data, error } of results) {
           if (error) throw error;
           (data ?? []).forEach((row: any) => {
             const barcode = String(row.barcode ?? "").trim();
@@ -1052,10 +1062,15 @@ function POSPage() {
   const itemCodeForProduct = (p: any) => {
     const sku = cleanItemCode(p?.sku);
     if (sku) return sku;
-    const candidates = Array.from(
-      new Set([p?.barcode, ...(barcodesByProduct[p?.id] ?? [])].filter(Boolean).map(String)),
-    );
-    for (const bc of candidates) {
+    // Checks p.barcode then the product's other barcodes directly, skipping
+    // the Set/Array.from dedup pass — this runs per search-result row per
+    // render, and the first matching code wins regardless of duplicates.
+    if (p?.barcode) {
+      const bc = String(p.barcode);
+      const itemCode = cleanItemCode(itemCodeByBarcode[bc]);
+      if (itemCode && itemCode !== bc) return itemCode;
+    }
+    for (const bc of barcodesByProduct[p?.id] ?? []) {
       const itemCode = cleanItemCode(itemCodeByBarcode[bc]);
       if (itemCode && itemCode !== bc) return itemCode;
     }
@@ -1123,6 +1138,22 @@ function POSPage() {
     queryFn: fetchExpensePersons,
   });
 
+  // Precomputed once per catalogue/barcode change — lowercasing name/sku/category
+  // and mapping barcodes to lowercase here (instead of inside `filtered`, which
+  // re-runs on every keystroke) means each keystroke only pays for string
+  // compares, not a full re-lowercase-and-remap of the whole catalogue.
+  const searchIndex = useMemo(
+    () =>
+      searchableProducts.map((p) => ({
+        p,
+        name: (p.name ?? "").toLowerCase(),
+        sku: (p.sku ?? "").toLowerCase(),
+        cat: (p.category ?? "").toLowerCase(),
+        bcs: (barcodesByProduct[p.id] ?? []).map((b) => b.toLowerCase()),
+      })),
+    [searchableProducts, barcodesByProduct],
+  );
+
   // Debounced so a fast barcode scan (search changing on every keystroke)
   // doesn't re-run this scored/sorted scan-over-the-catalogue and re-render
   // the dropdown once per character — only once the input settles. Never
@@ -1138,12 +1169,7 @@ function POSPage() {
     // 3 = word-start in name, 4 = name substring, 5 = sku/barcode substring,
     // 6 = category match. Lower is better.
     const scored: { p: any; s: number }[] = [];
-    for (const p of searchableProducts) {
-      const name = (p.name ?? "").toLowerCase();
-      const sku = (p.sku ?? "").toLowerCase();
-      const cat = (p.category ?? "").toLowerCase();
-      const bcs = (barcodesByProduct[p.id] ?? []).map((b) => b.toLowerCase());
-
+    for (const { p, name, sku, cat, bcs } of searchIndex) {
       let s = -1;
       if (sku === q || bcs.includes(q)) s = 0;
       else if (sku.startsWith(q) || bcs.some((b) => b.startsWith(q))) s = 1;
@@ -1157,7 +1183,7 @@ function POSPage() {
     }
     scored.sort((a, b) => a.s - b.s || a.p.name.localeCompare(b.p.name));
     return scored.slice(0, 200).map((x) => x.p);
-  }, [searchableProducts, debouncedSearch, barcodesByProduct]);
+  }, [searchIndex, debouncedSearch]);
 
   // reset highlight whenever the filtered list changes
   useEffect(() => {
