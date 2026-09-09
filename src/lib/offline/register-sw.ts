@@ -75,6 +75,17 @@ export async function registerAppShellSW(): Promise<void> {
 
   if (isDev || inIframe || refusedHost || swOff) {
     await unregisterMatching();
+    if (swOff) {
+      // Unregistering only stops the *next* navigation from being served by
+      // the old worker — the page already on screen may itself have been
+      // served stale (by that same worker) before this ran. Force one clean
+      // reload, with the kill-switch param stripped, so this visit actually
+      // lands on fresh, unintercepted content instead of silently leaving
+      // the stale page up and requiring a second manual refresh to notice
+      // anything changed.
+      url.searchParams.delete("sw");
+      window.location.replace(url.toString());
+    }
     return;
   }
 
