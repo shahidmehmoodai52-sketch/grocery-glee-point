@@ -78,11 +78,24 @@ export default defineConfig({
     // replace the exact `process.env.SUPABASE_*` expressions client.ts
     // already reads (previously dead in the browser — process.env isn't
     // real there) so the integration's values reach the client bundle too.
+    // Top-level `define` alone doesn't reach the "client" Vite Environment
+    // this project builds separately (see the NODE_ENV override above for
+    // the same pattern) — it must also be set under environments.client.
     define: {
       "process.env.SUPABASE_URL": JSON.stringify(process.env.SUPABASE_URL ?? ""),
       "process.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
         process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
       ),
+    },
+    environments: {
+      client: {
+        define: {
+          "process.env.SUPABASE_URL": JSON.stringify(process.env.SUPABASE_URL ?? ""),
+          "process.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+            process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+          ),
+        },
+      },
     },
     plugins: [
       mcpPlugin(),
