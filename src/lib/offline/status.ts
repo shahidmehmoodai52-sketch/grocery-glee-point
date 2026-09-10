@@ -2,10 +2,12 @@
 import { useEffect, useState } from "react";
 import { db } from "./db";
 
-// See client.ts: some tenants' ISPs reset connections to *.supabase.co
-// directly, so this browser-only probe goes through the same Cloudflare
-// Worker reverse-proxy the app itself uses, not the raw Supabase URL.
-const SUPABASE_URL = 'https://aged-truth-688d.shahidmehmoodai52.workers.dev';
+// Resolve the SAME URL the browser Supabase client uses (client.ts):
+// Cloudflare Worker proxy first, direct Supabase URL only as fallback.
+// Probing the direct URL falsely marks users offline where supabase.co is blocked.
+const PROXY_URL = (import.meta.env.VITE_SUPABASE_PROXY_URL ?? 'https://aged-truth-688d.shahidmehmoodai52.workers.dev') as string;
+const DIRECT_URL = (process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
+const SUPABASE_URL = PROXY_URL || DIRECT_URL;
 const SUPABASE_KEY = (process.env.SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
 
 /** Real connectivity probe — navigator.onLine only reflects the network
@@ -17,8 +19,10 @@ async function probeConnectivity(): Promise<boolean> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 5000);
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/store_settings?select=id&limit=1`, {
-      method: "HEAD",
+    // Lightweight GET instead of HEAD — some proxies/CDNs reject HEAD or
+    // return misleading statuses while authenticated GET works fine.
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      method: "GET",
       headers: { apikey: SUPABASE_KEY },
       signal: ctrl.signal,
       cache: "no-store",

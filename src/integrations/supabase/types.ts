@@ -3722,6 +3722,76 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_agent_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          tenant_id: string | null
+          wa_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          tenant_id?: string | null
+          wa_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          tenant_id?: string | null
+          wa_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_agent_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_agent_state: {
+        Row: {
+          diagnosis_summary: string | null
+          pending_candidates: Json | null
+          stage: string
+          tenant_id: string | null
+          updated_at: string
+          wa_id: string
+        }
+        Insert: {
+          diagnosis_summary?: string | null
+          pending_candidates?: Json | null
+          stage?: string
+          tenant_id?: string | null
+          updated_at?: string
+          wa_id: string
+        }
+        Update: {
+          diagnosis_summary?: string | null
+          pending_candidates?: Json | null
+          stage?: string
+          tenant_id?: string | null
+          updated_at?: string
+          wa_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_agent_state_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       admin_action_log_view: {
@@ -4171,6 +4241,59 @@ export type Database = {
         Args: { _id: string; _note?: string }
         Returns: undefined
       }
+      agent_business_day_summary: {
+        Args: { _date: string; _tenant_id: string }
+        Returns: {
+          longest_gap_after: string
+          longest_gap_before: string
+          longest_gap_minutes: number
+          purchases_count: number
+          purchases_total: number
+          sales_count: number
+          sales_total: number
+        }[]
+      }
+      agent_customer_balance: {
+        Args: { _query: string; _tenant_id: string }
+        Returns: {
+          current_balance: number
+          name: string
+          opening_balance: number
+          phone: string
+        }[]
+      }
+      agent_find_invoice: {
+        Args: { _invoice_no: string; _tenant_id: string }
+        Returns: {
+          created_at: string
+          invoice_no: string
+          items: Json
+          kind: string
+          note: string
+          paid: number
+          party_name: string
+          subtotal: number
+          total: number
+        }[]
+      }
+      agent_find_tenant_by_phone: {
+        Args: { _wa_id: string }
+        Returns: {
+          shop_code: string
+          shop_name: string
+          tenant_id: string
+        }[]
+      }
+      agent_supplier_balance: {
+        Args: { _query: string; _tenant_id: string }
+        Returns: {
+          current_balance: number
+          incentive_total: number
+          name: string
+          opening_balance: number
+          phone: string
+        }[]
+      }
       am_i_admin_staff: { Args: never; Returns: boolean }
       am_i_super_admin: { Args: never; Returns: boolean }
       approve_shift: { Args: { _shift_id: string }; Returns: string }
@@ -4415,6 +4538,16 @@ export type Database = {
           name: string
           qty: number
           total: number
+        }[]
+      }
+      get_whatsapp_agent_secrets: {
+        Args: never
+        Returns: {
+          anthropic_api_key: string
+          whatsapp_access_token: string
+          whatsapp_app_secret: string
+          whatsapp_phone_number_id: string
+          whatsapp_verify_token: string
         }[]
       }
       has_active_subscription: {
@@ -4833,12 +4966,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4862,11 +4995,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4887,11 +5020,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4912,11 +5045,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4929,11 +5062,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
