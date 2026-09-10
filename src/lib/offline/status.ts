@@ -21,7 +21,7 @@ async function probeConnectivity(): Promise<boolean> {
   try {
     // Lightweight GET instead of HEAD — some proxies/CDNs reject HEAD or
     // return misleading statuses while authenticated GET works fine.
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/store_settings?select=id&limit=1`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
       method: "GET",
       headers: { apikey: SUPABASE_KEY },
       signal: ctrl.signal,
