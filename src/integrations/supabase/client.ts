@@ -33,7 +33,14 @@ function createSupabaseClient() {
   // (kept current automatically when the connected project changes) and is
   // checked first; VITE_SUPABASE_* falls back for environments where that
   // integration isn't present (e.g. local dev, the Lovable sandbox).
-  const SUPABASE_URL = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  //
+  // Some regions cannot reach supabase.co directly, so production browser
+  // builds route through the public Cloudflare Worker proxy. The direct
+  // Supabase URL remains available as a fallback when the proxy is not
+  // configured or is explicitly disabled.
+  const PROXY_URL = import.meta.env.VITE_SUPABASE_PROXY_URL ?? 'https://aged-truth-688d.shahidmehmoodai52.workers.dev';
+  const DIRECT_URL = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const SUPABASE_URL = PROXY_URL || DIRECT_URL;
   const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
