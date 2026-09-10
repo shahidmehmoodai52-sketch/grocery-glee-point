@@ -2,7 +2,12 @@
 import { useEffect, useState } from "react";
 import { db } from "./db";
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
+// Resolve the SAME URL the browser Supabase client uses (client.ts):
+// Cloudflare Worker proxy first, direct Supabase URL only as fallback.
+// Probing the direct URL falsely marks users offline where supabase.co is blocked.
+const PROXY_URL = (import.meta.env.VITE_SUPABASE_PROXY_URL ?? 'https://aged-truth-688d.shahidmehmoodai52.workers.dev') as string;
+const DIRECT_URL = (process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
+const SUPABASE_URL = PROXY_URL || DIRECT_URL;
 const SUPABASE_KEY = (process.env.SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
 
 /** Real connectivity probe — navigator.onLine only reflects the network
