@@ -19,8 +19,10 @@ async function probeConnectivity(): Promise<boolean> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 5000);
   try {
+    // Lightweight GET instead of HEAD — some proxies/CDNs reject HEAD or
+    // return misleading statuses while authenticated GET works fine.
     const res = await fetch(`${SUPABASE_URL}/rest/v1/store_settings?select=id&limit=1`, {
-      method: "HEAD",
+      method: "GET",
       headers: { apikey: SUPABASE_KEY },
       signal: ctrl.signal,
       cache: "no-store",
