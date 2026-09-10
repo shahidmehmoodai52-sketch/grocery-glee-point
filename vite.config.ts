@@ -71,6 +71,19 @@ export default defineConfig({
     router: { autoCodeSplitting: true },
   },
   vite: {
+    // The Vercel Supabase integration writes its own SUPABASE_URL /
+    // SUPABASE_PUBLISHABLE_KEY project env vars (distinct from this repo's
+    // VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY), and Vite only
+    // auto-exposes VITE_-prefixed vars to the client bundle. Explicitly
+    // replace the exact `process.env.SUPABASE_*` expressions client.ts
+    // already reads (previously dead in the browser — process.env isn't
+    // real there) so the integration's values reach the client bundle too.
+    define: {
+      "process.env.SUPABASE_URL": JSON.stringify(process.env.SUPABASE_URL ?? ""),
+      "process.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+        process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+      ),
+    },
     plugins: [
       mcpPlugin(),
       VitePWA({

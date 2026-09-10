@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { db } from "./db";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+const SUPABASE_URL = (process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
+const SUPABASE_KEY = (process.env.SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
 
 /** Real connectivity probe — navigator.onLine only reflects the network
  *  interface, not actual reachability (Windows/Chrome NCSI can report
