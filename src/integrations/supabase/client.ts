@@ -28,12 +28,23 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 
+// Several tenants' ISPs reset/block connections to *.supabase.co directly
+// (confirmed via ERR_CONNECTION_RESET from an affected shop's own device,
+// hitting the raw Supabase URL with no app involved — a known regional ISP
+// block pattern, not something in our control). This Cloudflare Worker just
+// reverse-proxies every request to the real project unchanged, so browsers
+// reach Supabase via Cloudflare's edge instead, which ISPs generally don't
+// block. Only applied client-side: Vercel's SSR runs outside Pakistan and
+// isn't affected, so server-side calls go straight to Supabase as before.
+const CLOUDFLARE_ISP_PROXY_URL = 'https://aged-truth-688d.shahidmehmoodai52.workers.dev';
+
 function createSupabaseClient() {
   // process.env.SUPABASE_* is populated by the Vercel Supabase integration
   // (kept current automatically when the connected project changes) and is
   // checked first; VITE_SUPABASE_* falls back for environments where that
   // integration isn't present (e.g. local dev, the Lovable sandbox).
-  const SUPABASE_URL = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const directUrl = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const SUPABASE_URL = typeof window !== 'undefined' ? CLOUDFLARE_ISP_PROXY_URL : directUrl;
   const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {

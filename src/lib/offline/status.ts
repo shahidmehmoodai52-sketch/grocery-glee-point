@@ -2,7 +2,10 @@
 import { useEffect, useState } from "react";
 import { db } from "./db";
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
+// See client.ts: some tenants' ISPs reset connections to *.supabase.co
+// directly, so this browser-only probe goes through the same Cloudflare
+// Worker reverse-proxy the app itself uses, not the raw Supabase URL.
+const SUPABASE_URL = 'https://aged-truth-688d.shahidmehmoodai52.workers.dev';
 const SUPABASE_KEY = (process.env.SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
 
 /** Real connectivity probe — navigator.onLine only reflects the network
