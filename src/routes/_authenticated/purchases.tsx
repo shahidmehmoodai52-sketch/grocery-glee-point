@@ -620,15 +620,13 @@ function Page() {
           }
 
           const lineAfterBillDisc = Math.max(0, lineNet - discShare);
-          
-          // Distribute taxAmt across lines proportionally after bill discount
-          let taxShare = 0;
-          const discountedSubtotal = Math.max(0, totalLineSum - billDiscountAmt);
-          if (discountedSubtotal > 0) {
-            taxShare = +(taxAmt * (lineAfterBillDisc / discountedSubtotal)).toFixed(2);
-          }
 
-          const effLineTotal = +(lineAfterBillDisc + taxShare).toFixed(2);
+          // Bill-level tax is recorded once on the purchase header (payload.tax)
+          // and added to the total there — it must NOT also be folded into
+          // per-line cost/line_total, or complete_purchase() (which recomputes
+          // subtotal from items and then adds tax again) would double-count it,
+          // and products.cost_price would get inflated with tax on every purchase.
+          const effLineTotal = +lineAfterBillDisc.toFixed(2);
           const effCost = l.qty > 0 ? effLineTotal / l.qty : l.cost;
           return {
             product_id: l.product_id,
@@ -981,8 +979,11 @@ function Page() {
                           const lineSub = Math.max(0, lineGross - lineDiscount);
                           const billDiscShare = subtotal > 0 ? billDiscountAmt * (lineSub / subtotal) : 0;
                           const lineAfterBillDisc = Math.max(0, lineSub - billDiscShare);
+                          // Shown to the user as an informational per-line tax breakdown only —
+                          // NOT folded into effCost/newAvg below, since bill-level tax is saved
+                          // once on the purchase header (see submit()), not baked into cost_price.
                           const taxShare = discountedSubtotal > 0 ? taxAmt * (lineAfterBillDisc / discountedSubtotal) : 0;
-                          const effCost = qty > 0 ? (lineAfterBillDisc + taxShare) / qty : cost;
+                          const effCost = qty > 0 ? lineAfterBillDisc / qty : cost;
                           const newAvg = hasProduct
                             ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
                             : effCost;
@@ -1024,8 +1025,8 @@ function Page() {
                                   className="h-8 text-right text-sm"
                                 />
                                 {taxShare > 0 && qty > 0 && (
-                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title={t('purchases.cost_incl_tax_title', 'Cost including distributed tax')}>
-                                    {t('purchases.plus_tax', '+tax = {{amount}}', { amount: fmtMoney(effCost, sym) })}
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground" title={t('purchases.cost_incl_tax_title', 'Cost including distributed tax — informational only, not saved to cost_price')}>
+                                    {t('purchases.plus_tax', '+tax = {{amount}}', { amount: fmtMoney(effCost + taxShare / qty, sym) })}
                                   </div>
                                 )}
                               </TableCell>
