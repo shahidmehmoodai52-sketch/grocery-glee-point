@@ -23,7 +23,7 @@ async function probeConnectivity(): Promise<boolean> {
     // return misleading statuses while authenticated GET works fine.
     const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
       method: "GET",
-      headers: { apikey: SUPABASE_KEY },
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
       signal: ctrl.signal,
       cache: "no-store",
     });
