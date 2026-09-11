@@ -495,6 +495,8 @@
     "kpi_purchases": "Purchases",
     "kpi_entries_sub": "{{count}} entries",
     "kpi_inventory_value": "Inventory value",
+    "kpi_expiring_batches": "Expiring batches",
+    "kpi_expiring_batches_sub": "Expired or expiring soon",
     "kpi_active_skus_sub": "{{count}} active SKUs",
     "chart_revenue_profit": "Revenue & profit",
     "legend_profit": "Profit",
