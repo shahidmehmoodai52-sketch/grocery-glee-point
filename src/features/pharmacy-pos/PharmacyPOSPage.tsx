@@ -96,6 +96,7 @@ type Line = {
   product_id: string; name: string; qty: number; price: number; cost: number;
   tax_rate: number; track_batches: boolean;
   generic_name: string | null; prescription_required: boolean;
+  drug_schedule: string | null;
 };
 
 /** Pharmacy-only product search: brand name / SKU / barcode, plus generic
@@ -229,6 +230,7 @@ export function PharmacyPOSPage() {
         tax_rate: Number(p.tax_rate ?? 0), track_batches: !!p.track_batches,
         generic_name: p.pharmacy?.generic_name ?? null,
         prescription_required: !!p.pharmacy?.prescription_required,
+        drug_schedule: p.pharmacy?.drug_schedule?.trim() || null,
       };
       return [...prev, line];
     });
@@ -245,7 +247,7 @@ export function PharmacyPOSPage() {
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.qty * l.price, 0), [cart]);
   const taxAmt = useMemo(() => cart.reduce((s, l) => s + (l.qty * l.price * (l.tax_rate || 0)) / 100, 0), [cart]);
   const total = useMemo(() => Math.max(0, subtotal - discount + taxAmt), [subtotal, discount, taxAmt]);
-  const hasScheduledItem = cart.some((l) => l.prescription_required);
+  const hasScheduledItem = cart.some((l) => l.prescription_required || !!l.drug_schedule);
 
   const checkout = async () => {
     if (cart.length === 0) return toast.error(t('pharmacy_pos.toast_cart_empty', 'Cart is empty'));
@@ -333,6 +335,11 @@ export function PharmacyPOSPage() {
                     {p.pharmacy?.prescription_required && (
                       <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">{t('pharmacy_pos.badge_rx', 'Rx')}</Badge>
                     )}
+                    {p.pharmacy?.drug_schedule && (
+                      <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600" title={t('pharmacy_pos.drug_schedule_title', 'Controlled/scheduled drug')}>
+                        {p.pharmacy.drug_schedule}
+                      </Badge>
+                    )}
                     {p.track_batches && (
                       <Badge variant="outline" className="text-[10px]">{t('pharmacy_pos.badge_fefo', 'FEFO')}</Badge>
                     )}
@@ -385,7 +392,9 @@ export function PharmacyPOSPage() {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{l.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {l.generic_name ?? ""} {l.prescription_required && <span className="text-destructive">· {t('pharmacy_pos.badge_rx', 'Rx')}</span>}
+                      {l.generic_name ?? ""}
+                      {l.prescription_required && <span className="text-destructive"> · {t('pharmacy_pos.badge_rx', 'Rx')}</span>}
+                      {l.drug_schedule && <span className="text-amber-600"> · {l.drug_schedule}</span>}
                     </div>
                   </div>
                   <Input

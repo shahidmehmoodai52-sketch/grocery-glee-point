@@ -472,7 +472,8 @@
     "owes_amount": "owes {{amount}}",
     "customer_search_placeholder": "Search customer or phone…",
     "no_customer_found": "No customer found.",
-    "toast_select_customer_for_credit": "Select a customer to sell on credit — walk-in sales must be paid in full"
+    "toast_select_customer_for_credit": "Select a customer to sell on credit — walk-in sales must be paid in full",
+    "drug_schedule_title": "Controlled/scheduled drug"
   },
   "dashboard": {
     "open_pos": "Open POS",
