@@ -1,21 +1,79 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Search, Trash2, ShoppingCart, Loader2, Printer, Pill, AlertTriangle } from "lucide-react";
+import { Search, Trash2, ShoppingCart, Loader2, Printer, Pill, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { printInvoiceDirect } from "@/components/receipt";
 import { ShiftBanner } from "@/components/shift-banner";
-import { completeSaleOfflineAware, searchProductsLocal, type CompleteSalePayload } from "@/lib/offline/pos";
+import { completeSaleOfflineAware, offlineFirst, cacheCustomers, searchProductsLocal, type CompleteSalePayload } from "@/lib/offline/pos";
+import { db as offlineDb } from "@/lib/offline/db";
 import { isOfflineNow } from "@/lib/offline/session";
+
+type CustomerRow = { id: string; name: string; balance: number | null; phone: string | null };
+
+/** Minimal inline customer combobox — a simplified, self-contained
+ *  equivalent of pos.tsx's CustomerCombobox (which is a private,
+ *  unexported component in that file). Same walk-in-vs-select-existing
+ *  interaction pattern. */
+function CustomerPicker({
+  customers, value, onSelect, sym, t,
+}: {
+  customers: CustomerRow[]; value: string | null; onSelect: (id: string | null) => void; sym: string;
+  t: (key: string, fallback: string, opts?: any) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = value ? customers.find((c) => c.id === value) ?? null : null;
+  const walkInLabel = t('pharmacy_pos.walk_in_customer', 'Walk-in customer');
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" role="combobox" aria-expanded={open} className="h-8 w-full justify-between font-normal text-sm">
+          <span className="truncate">
+            {selected
+              ? `${selected.name}${Number(selected.balance) > 0 ? ` · ${t('pharmacy_pos.owes_amount', 'owes {{amount}}', { amount: fmtMoney(selected.balance, sym) })}` : ""}`
+              : walkInLabel}
+          </span>
+          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command filter={(itemValue, search) => (itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
+          <CommandInput placeholder={t('pharmacy_pos.customer_search_placeholder', 'Search customer or phone…')} />
+          <CommandList>
+            <CommandEmpty>{t('pharmacy_pos.no_customer_found', 'No customer found.')}</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="walk-in customer" onSelect={() => { onSelect(null); setOpen(false); }}>
+                <Check className={cn("mr-2 h-4 w-4", !value ? "opacity-100" : "opacity-0")} />
+                {walkInLabel}
+              </CommandItem>
+              {customers.map((c) => (
+                <CommandItem key={c.id} value={`${c.name} ${c.phone ?? ""}`} onSelect={() => { onSelect(c.id); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-4 w-4", value === c.id ? "opacity-100" : "opacity-0")} />
+                  <span className="truncate flex-1">{c.name}</span>
+                  {Number(c.balance) > 0 && (
+                    <span className="ml-2 text-[10px] text-destructive shrink-0">{fmtMoney(c.balance, sym)}</span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category,tax_rate,track_batches";
 
@@ -103,6 +161,7 @@ export function PharmacyPOSPage() {
   const [cart, setCart, clearCart] = usePersistentState<Line[]>("pharmacy-pos-cart", []);
   const [discount, setDiscount] = useState(0);
   const [paid, setPaid] = useState<number | "">("");
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const [prescriptionRef, setPrescriptionRef] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
   const [lastSale, setLastSale] = useState<any>(null);
@@ -142,6 +201,22 @@ export function PharmacyPOSPage() {
     retry: false,
   });
 
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: () =>
+      offlineFirst<CustomerRow[]>(
+        async () => {
+          const { data, error } = await supabase.from("customers").select("id,name,balance,phone").order("name");
+          if (error) throw error;
+          return (data ?? []) as CustomerRow[];
+        },
+        async () =>
+          (await offlineDb().customers.toArray())
+            .sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")) as CustomerRow[],
+        (rows) => cacheCustomers(rows),
+      ),
+  });
+
   const addToCart = (p: ProductRow) => {
     setCart((prev) => {
       const existing = prev.find((l) => l.product_id === p.id);
@@ -175,25 +250,30 @@ export function PharmacyPOSPage() {
   const checkout = async () => {
     if (cart.length === 0) return toast.error(t('pharmacy_pos.toast_cart_empty', 'Cart is empty'));
     if (cart.some((l) => l.qty <= 0)) return toast.error(t('pharmacy_pos.toast_qty_required', 'Every line needs a quantity greater than 0'));
+    const paidAmount = paid === "" ? total : Number(paid);
+    if (paidAmount < total && !customerId) {
+      return toast.error(t('pharmacy_pos.toast_select_customer_for_credit', 'Select a customer to sell on credit — walk-in sales must be paid in full'));
+    }
     setCheckingOut(true);
     try {
       const payload: CompleteSalePayload = {
-        customer_id: null,
+        customer_id: customerId,
         expense_person_id: null,
         payment_method: "cash",
         tax: +taxAmt.toFixed(2),
         discount: +discount.toFixed(2),
-        paid: +(paid === "" ? total : Number(paid)).toFixed(2),
+        paid: +paidAmount.toFixed(2),
         note: "",
         prescription_ref: prescriptionRef.trim() || null,
         items: cart.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price, cost: l.cost })),
       };
-      const { sale, offline } = await completeSaleOfflineAware(payload, { tendered: paid === "" ? total : Number(paid) });
+      const { sale, offline } = await completeSaleOfflineAware(payload, { tendered: paidAmount });
       toast.success(offline ? t('pharmacy_pos.toast_saved_offline', 'Sale saved offline — will sync automatically') : t('pharmacy_pos.toast_sale_completed', 'Sale completed'));
       setLastSale(sale);
       clearCart();
       setDiscount(0);
       setPaid("");
+      setCustomerId(null);
       setPrescriptionRef("");
       if (sale && settings) {
         printInvoiceDirect(sale as any, settings as any, "sale");
@@ -279,6 +359,9 @@ export function PharmacyPOSPage() {
                   {t('pharmacy_pos.badge_contains_rx', 'Contains Rx item')}
                 </Badge>
               )}
+            </div>
+            <div className="px-3 pt-2">
+              <CustomerPicker customers={customers} value={customerId} onSelect={setCustomerId} sym={sym} t={t} />
             </div>
             {hasScheduledItem && (
               <div className="px-3 pt-2">
