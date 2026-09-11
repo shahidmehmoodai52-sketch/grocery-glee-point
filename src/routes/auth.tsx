@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, ShoppingCart, Pill } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +59,7 @@ function AuthPage() {
   const [shopPhone, setShopPhone] = useState("");
   const [shopAddress, setShopAddress] = useState("");
   const [shopCity, setShopCity] = useState("");
+  const [shopBusinessType, setShopBusinessType] = useState<"grocery" | "pharmacy">("grocery");
 
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -244,6 +245,7 @@ function AuthPage() {
         _phone: shopPhone.trim(),
         _address: shopAddress.trim(),
         _city: shopCity.trim(),
+        _business_type: shopBusinessType,
       } as any);
       if (rpcErr) { 
         showErr(`Shop registration failed: ${rpcErr.message}`); 
@@ -261,6 +263,7 @@ function AuthPage() {
 
   const resetRegister = () => {
     setRegPwd(""); setShopName(""); setShopPhone(""); setShopAddress(""); setShopCity(""); setFullName(""); setRegEmail("");
+    setShopBusinessType("grocery");
     setFieldErrors({});
   };
 
@@ -510,6 +513,35 @@ function AuthPage() {
               </div>
               <div className="rounded-md border p-3 space-y-3 bg-muted/30">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shop details</p>
+                <div className="space-y-1.5">
+                  <Label>Business type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShopBusinessType("grocery")}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                        shopBusinessType === "grocery"
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-input hover:bg-accent"
+                      }`}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                      Grocery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShopBusinessType("pharmacy")}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                        shopBusinessType === "pharmacy"
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-input hover:bg-accent"
+                      }`}
+                    >
+                      <Pill className="h-4 w-4" />
+                      Pharmacy
+                    </button>
+                  </div>
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="shop_name">Shop name</Label>
                   <Input 

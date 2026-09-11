@@ -26,12 +26,13 @@ import { fetchAll } from "@/lib/supabase-page";
 import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 import { PurchaseBillScannerButton, type ImportedPurchase } from "@/features/purchase-ai/BillScannerDialog";
 import { QuickAddProductDialog } from "@/components/quick-add-product-dialog";
+import { useBusinessType } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
 const PURCHASE_LIST_LIMIT = 2000;
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; batch_no?: string; expiry_date?: string; mfg_date?: string };
 
 type Draft = {
   open: boolean;
@@ -138,6 +139,7 @@ function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   const today = new Date().toISOString().slice(0,10);
+  const isPharmacy = useBusinessType() === "pharmacy";
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
   // Multiple parked drafts.
@@ -633,7 +635,13 @@ function Page() {
             name: l.name,
             qty: l.qty,
             cost: +effCost.toFixed(4),
-            line_total: effLineTotal
+            line_total: effLineTotal,
+            // Pharmacy business type only — complete_purchase() treats these
+            // as optional (defaults to NULL exactly as before) when absent,
+            // so this is a no-op for grocery tenants.
+            ...(l.batch_no ? { batch_no: l.batch_no } : {}),
+            ...(l.expiry_date ? { expiry_date: l.expiry_date } : {}),
+            ...(l.mfg_date ? { mfg_date: l.mfg_date } : {}),
           };
         });
       })(),
@@ -690,14 +698,17 @@ function Page() {
         const { error: delErr } = await supabase.from("purchase_items").delete().eq("purchase_id", editingId);
         if (delErr) throw delErr;
 
-        const newItems = payload.items.map(it => ({
+        const newItems = payload.items.map((it: any) => ({
           purchase_id: editingId,
           tenant_id: parentPurchase?.tenant_id,
           product_id: it.product_id,
           name: it.name,
           qty: it.qty,
           cost: it.cost,
-          line_total: it.line_total
+          line_total: it.line_total,
+          batch_no: it.batch_no ?? null,
+          expiry_date: it.expiry_date ?? null,
+          mfg_date: it.mfg_date ?? null,
         }));
         const { error: insErr } = await supabase.from("purchase_items").insert(newItems);
         if (insErr) throw insErr;
@@ -1009,6 +1020,23 @@ function Page() {
                                 {(l.item_code || l.barcode) && (
                                   <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
                                     {l.item_code ? t('purchases.code_prefix', 'Code {{code}}', { code: l.item_code }) : t('purchases.bc_short', 'BC {{barcode}}', { barcode: l.barcode })} · {t('purchases.stock_inline', 'stock {{qty}}', { qty: oldStock })}
+                                  </div>
+                                )}
+                                {isPharmacy && (
+                                  <div className="mt-1 flex gap-1">
+                                    <Input
+                                      value={l.batch_no ?? ""}
+                                      onChange={(e) => setLine(i, { batch_no: e.target.value })}
+                                      placeholder={t('purchases.batch_no_placeholder', 'Batch #')}
+                                      className="h-6 text-[11px] px-1.5"
+                                    />
+                                    <Input
+                                      type="date"
+                                      value={l.expiry_date ?? ""}
+                                      onChange={(e) => setLine(i, { expiry_date: e.target.value })}
+                                      title={t('purchases.expiry_date_title', 'Expiry date')}
+                                      className="h-6 text-[11px] px-1.5"
+                                    />
                                   </div>
                                 )}
                               </TableCell>

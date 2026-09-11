@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePriceVisibility } from "@/hooks/use-price-visibility";
+import { useBusinessType } from "@/hooks/use-tenant";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { usePersistentState } from "@/hooks/use-persistent-state";
@@ -34,8 +35,17 @@ type ProductForm = {
   cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean; low_stock_threshold: number;
   preferred_supplier_id: string;
   batch_no: string; expiry_date: string; rack_location: string; allow_negative_stock: boolean;
+  track_batches: boolean;
+  // Pharmacy business-type only — not columns on `products`, saved to
+  // pharmacy_product_details separately (see save()).
+  generic_name: string; strength: string; dosage_form: string; manufacturer: string;
+  drug_schedule: string; prescription_required: boolean;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true };
+const empty: ProductForm = {
+  name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true,
+  track_batches: false,
+  generic_name: "", strength: "", dosage_form: "", manufacturer: "", drug_schedule: "", prescription_required: false,
+};
 
 const PAGE_SIZE = 50;
 
@@ -61,6 +71,8 @@ function ProductsPage() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const { data: priceVisibility } = usePriceVisibility();
+  const businessType = useBusinessType();
+  const isPharmacy = businessType === "pharmacy";
   const sym = settings?.currency_symbol ?? "Rs";
   const showCost = priceVisibility?.showCost ?? true;
   const showSell = priceVisibility?.showSell ?? true;
@@ -190,9 +202,13 @@ function ProductsPage() {
     if (!form.name) return toast.error(t('products.name_required', 'Name is required'));
     const allBarcodes = parseBarcodes(form.barcodes_text);
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
-    const { barcodes_text: _bt, stock: rawStock, ...rest } = form;
+    const {
+      barcodes_text: _bt, stock: rawStock,
+      generic_name, strength, dosage_form, manufacturer, drug_schedule, prescription_required,
+      ...rest
+    } = form;
     const newStock = roundToTillixQty(Number(rawStock));
-    const payload = { ...rest, sku: form.sku || null, barcode: primary || null, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null, batch_no: form.batch_no || null, expiry_date: form.expiry_date || null, rack_location: form.rack_location || null, allow_negative_stock: form.allow_negative_stock };
+    const payload = { ...rest, sku: form.sku || null, barcode: primary || null, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null, batch_no: form.batch_no || null, expiry_date: form.expiry_date || null, rack_location: form.rack_location || null, allow_negative_stock: form.allow_negative_stock, track_batches: form.track_batches };
     let productId = form.id;
     if (form.id) {
       // Update all non-stock fields directly
@@ -237,6 +253,22 @@ function ProductsPage() {
         const { error: bcErr } = await supabase.from("product_barcodes").insert(rows);
         if (bcErr) return toast.error(bcErr.message);
       }
+
+      if (isPharmacy) {
+        const { error: pdErr } = await supabase.from("pharmacy_product_details" as any).upsert(
+          {
+            product_id: productId,
+            generic_name: generic_name || null,
+            strength: strength || null,
+            dosage_form: dosage_form || null,
+            manufacturer: manufacturer || null,
+            drug_schedule: drug_schedule || null,
+            prescription_required,
+          } as any,
+          { onConflict: "product_id" },
+        );
+        if (pdErr) return toast.error(pdErr.message);
+      }
     }
     toast.success(form.id ? t('products.product_updated', 'Product updated') : t('products.product_added', 'Product added'));
     clearOpen();
@@ -257,6 +289,15 @@ function ProductsPage() {
   const edit = async (p: any) => {
     const { data: bcs } = await supabase.from("product_barcodes").select("barcode").eq("product_id", p.id);
     const list = (bcs ?? []).map((b: any) => b.barcode).filter((b: string) => b && b !== p.barcode);
+    let pharmacyDetails: any = null;
+    if (isPharmacy) {
+      const { data } = await supabase
+        .from("pharmacy_product_details" as any)
+        .select("*")
+        .eq("product_id", p.id)
+        .maybeSingle();
+      pharmacyDetails = data;
+    }
     setForm({
       id: p.id, name: p.name, sku: p.sku ?? "", barcode: p.barcode ?? "",
       barcodes_text: list.join("\n"),
@@ -269,6 +310,13 @@ function ProductsPage() {
       expiry_date: p.expiry_date ?? "",
       rack_location: p.rack_location ?? "",
       allow_negative_stock: !!p.allow_negative_stock,
+      track_batches: !!p.track_batches,
+      generic_name: pharmacyDetails?.generic_name ?? "",
+      strength: pharmacyDetails?.strength ?? "",
+      dosage_form: pharmacyDetails?.dosage_form ?? "",
+      manufacturer: pharmacyDetails?.manufacturer ?? "",
+      drug_schedule: pharmacyDetails?.drug_schedule ?? "",
+      prescription_required: !!pharmacyDetails?.prescription_required,
     });
     setOpen(true);
   };
@@ -361,6 +409,62 @@ function ProductsPage() {
                     </div>
                   </label>
                 </div>
+                {isPharmacy && (
+                  <div className="col-span-2 rounded-md border p-3 space-y-3 bg-muted/30">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {t('products.pharmacy_details_heading', 'Pharmacy details')}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>{t('products.generic_name_label', 'Generic / salt name')}</Label>
+                        <Input value={form.generic_name} onChange={(e) => setForm({ ...form, generic_name: e.target.value })} placeholder={t('products.generic_name_placeholder', 'e.g. Amoxicillin')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.strength_label', 'Strength')}</Label>
+                        <Input value={form.strength} onChange={(e) => setForm({ ...form, strength: e.target.value })} placeholder={t('products.strength_placeholder', 'e.g. 500mg')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.dosage_form_label', 'Dosage form')}</Label>
+                        <Input value={form.dosage_form} onChange={(e) => setForm({ ...form, dosage_form: e.target.value })} placeholder={t('products.dosage_form_placeholder', 'e.g. Tablet, Syrup, Injection')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.manufacturer_label', 'Manufacturer')}</Label>
+                        <Input value={form.manufacturer} onChange={(e) => setForm({ ...form, manufacturer: e.target.value })} />
+                      </div>
+                      <div className="col-span-2">
+                        <Label>{t('products.drug_schedule_label', 'Drug schedule / controlled category')}</Label>
+                        <Input value={form.drug_schedule} onChange={(e) => setForm({ ...form, drug_schedule: e.target.value })} placeholder={t('products.drug_schedule_placeholder', 'Leave blank for regular OTC medicines')} />
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <input
+                        id="prescription-required"
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        checked={form.prescription_required}
+                        onChange={(e) => setForm({ ...form, prescription_required: e.target.checked })}
+                      />
+                      <label htmlFor="prescription-required" className="text-sm cursor-pointer">
+                        {t('products.prescription_required_label', 'Prescription required to sell')}
+                      </label>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <input
+                        id="track-batches"
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        checked={form.track_batches}
+                        onChange={(e) => setForm({ ...form, track_batches: e.target.checked })}
+                      />
+                      <label htmlFor="track-batches" className="text-sm cursor-pointer">
+                        <div className="font-medium">{t('products.track_batches_label', 'Track batches & expiry (FEFO)')}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t('products.track_batches_desc', 'Purchases with a batch/expiry date will create a batch, and sales will automatically consume the batch closest to expiring first.')}
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>{t('products.hide_keep_draft', 'Hide (keep draft)')}</Button>

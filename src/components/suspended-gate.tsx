@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertOctagon, LogOut, Store, Loader2, Clock } from "lucide-react";
+import { AlertOctagon, LogOut, Store, Loader2, Clock, ShoppingCart, Pill } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -156,6 +156,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
+  const [businessType, setBusinessType] = useState<"grocery" | "pharmacy">("grocery");
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -170,6 +171,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
       _phone: phone.trim(),
       _address: address.trim(),
       _city: city.trim(),
+      _business_type: businessType,
     } as any);
     setBusy(false);
     if (error) { toast.error(error.message ?? t('suspended_gate.toast_could_not_register', 'Could not register shop.')); return; }
@@ -190,6 +192,29 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
           </p>
         </div>
         <form className="space-y-4" onSubmit={submit}>
+          <div className="space-y-1.5">
+            <Label>{t('suspended_gate.business_type_label', 'Business type')}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setBusinessType("grocery")}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  businessType === "grocery" ? "border-primary bg-primary/10 text-primary font-medium" : "border-input hover:bg-accent"
+                }`}
+              >
+                <ShoppingCart className="h-4 w-4" /> {t('suspended_gate.business_type_grocery', 'Grocery')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBusinessType("pharmacy")}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  businessType === "pharmacy" ? "border-primary bg-primary/10 text-primary font-medium" : "border-input hover:bg-accent"
+                }`}
+              >
+                <Pill className="h-4 w-4" /> {t('suspended_gate.business_type_pharmacy', 'Pharmacy')}
+              </button>
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="s_name">{t('suspended_gate.shop_name_label', 'Shop name')}</Label>
             <Input id="s_name" value={name} onChange={(e) => setName(e.target.value)} required placeholder={t('suspended_gate.shop_name_placeholder', 'e.g. Ali General Store')} />
