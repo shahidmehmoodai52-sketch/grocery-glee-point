@@ -103,6 +103,7 @@ export function PharmacyPOSPage() {
   const [cart, setCart, clearCart] = usePersistentState<Line[]>("pharmacy-pos-cart", []);
   const [discount, setDiscount] = useState(0);
   const [paid, setPaid] = useState<number | "">("");
+  const [prescriptionRef, setPrescriptionRef] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
   const [lastSale, setLastSale] = useState<any>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -184,6 +185,7 @@ export function PharmacyPOSPage() {
         discount: +discount.toFixed(2),
         paid: +(paid === "" ? total : Number(paid)).toFixed(2),
         note: "",
+        prescription_ref: prescriptionRef.trim() || null,
         items: cart.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price, cost: l.cost })),
       };
       const { sale, offline } = await completeSaleOfflineAware(payload, { tendered: paid === "" ? total : Number(paid) });
@@ -192,6 +194,7 @@ export function PharmacyPOSPage() {
       clearCart();
       setDiscount(0);
       setPaid("");
+      setPrescriptionRef("");
       if (sale && settings) {
         printInvoiceDirect(sale as any, settings as any, "sale");
       }
@@ -277,6 +280,17 @@ export function PharmacyPOSPage() {
                 </Badge>
               )}
             </div>
+            {hasScheduledItem && (
+              <div className="px-3 pt-2">
+                <Label className="text-xs text-muted-foreground">{t('pharmacy_pos.prescription_ref_label', 'Prescription # / note (optional)')}</Label>
+                <Input
+                  value={prescriptionRef}
+                  onChange={(e) => setPrescriptionRef(e.target.value)}
+                  placeholder={t('pharmacy_pos.prescription_ref_placeholder', 'e.g. Dr. Ahmed, slip #45')}
+                  className="h-8 text-sm mt-1"
+                />
+              </div>
+            )}
             <div className="flex-1 min-h-0 overflow-y-auto divide-y">
               {cart.length === 0 && (
                 <div className="p-6 text-center text-sm text-muted-foreground">

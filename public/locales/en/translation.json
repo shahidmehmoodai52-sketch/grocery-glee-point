@@ -465,7 +465,9 @@
     "total_label": "Total",
     "paid_cash_label": "Paid (cash)",
     "checkout_button": "Checkout",
-    "reprint_button": "Reprint last receipt"
+    "reprint_button": "Reprint last receipt",
+    "prescription_ref_label": "Prescription # / note (optional)",
+    "prescription_ref_placeholder": "e.g. Dr. Ahmed, slip #45"
   },
   "dashboard": {
     "open_pos": "Open POS",
