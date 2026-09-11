@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Search, Trash2, ShoppingCart, Loader2, Printer, Pill, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { Search, Trash2, ShoppingCart, Loader2, Printer, Pill, AlertTriangle, Check, ChevronsUpDown, PauseCircle, ListOrdered } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,7 @@ import { printInvoiceDirect } from "@/components/receipt";
 import { ShiftBanner } from "@/components/shift-banner";
 import { completeSaleOfflineAware, offlineFirst, cacheCustomers, searchProductsLocal, type CompleteSalePayload } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
+import { enqueueWrite } from "@/lib/offline/sync";
 import { isOfflineNow } from "@/lib/offline/session";
 
 type CustomerRow = { id: string; name: string; balance: number | null; phone: string | null };
@@ -226,6 +228,138 @@ export function PharmacyPOSPage() {
       ),
   });
 
+  // ---- Held bills — same shared held_bills table/RPCs used by the grocery
+  // POS (hold_bill/resume_bill/discard_held_bill). Payload is opaque jsonb
+  // so pharmacy's cart shape doesn't need to match grocery's tab shape.
+  const holdBillsEnabled = !!(settings as any)?.ops_hold_bills_enabled;
+  const [heldOpen, setHeldOpen] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const { data: heldBills = [], refetch: refetchHeld } = useQuery({
+    queryKey: ["held_bills", "pharmacy_pos"],
+    enabled: holdBillsEnabled,
+    queryFn: () =>
+      offlineFirst(
+        async () => {
+          const { data, error } = await supabase
+            .from("held_bills")
+            .select("id,label,total,item_count,created_at,customer_id,payload,customers(name)")
+            .eq("status", "held")
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          return (data as any[]) ?? [];
+        },
+        async () =>
+          (await offlineDb()
+            .held_bills.where("status")
+            .equals("held")
+            .reverse()
+            .sortBy("created_at")) as any[],
+        async (rows) => {
+          try {
+            await offlineDb().held_bills.bulkPut(
+              (rows as any[]).map((r) => ({ ...r, status: "held" })),
+            );
+          } catch {}
+        },
+      ),
+    staleTime: 30_000,
+  });
+
+  const holdCurrent = async () => {
+    if (!cart.length) return toast.error(t('pharmacy_pos.toast_cart_empty', 'Cart is empty'));
+    if (!holdBillsEnabled) return toast.error(t('pharmacy_pos.toast_hold_disabled', 'Hold bills is disabled in Settings'));
+    setHolding(true);
+    try {
+      const label = t('pharmacy_pos.held_bill_label', 'Rx {{time}}', {
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      });
+      const payload = {
+        items: cart,
+        customer_id: customerId,
+        discount,
+        paid,
+        prescription_ref: prescriptionRef,
+        label,
+      };
+      const args = {
+        _customer: customerId as any,
+        _item_count: cart.length,
+        _label: label,
+        _payload: payload as any,
+        _total: total,
+      };
+      if (isOfflineNow()) {
+        const localId = crypto.randomUUID();
+        await offlineDb().held_bills.put({
+          id: localId,
+          label,
+          total,
+          item_count: cart.length,
+          customer_id: customerId,
+          payload,
+          status: "held",
+          created_at: new Date().toISOString(),
+          _offline_pending: true,
+        });
+        await enqueueWrite({ op: "rpc", table: "hold_bill", payload: args });
+        toast.success(t('pharmacy_pos.toast_bill_held_offline', 'Bill held offline'));
+      } else {
+        const { error } = await supabase.rpc("hold_bill", args);
+        if (error) throw error;
+        toast.success(t('pharmacy_pos.toast_bill_held', 'Bill held'));
+      }
+      clearCart();
+      setDiscount(0);
+      setPaid("");
+      setCustomerId(null);
+      setPrescriptionRef("");
+      refetchHeld();
+    } catch (err: any) {
+      toast.error(err.message ?? t('pharmacy_pos.toast_hold_failed', 'Could not hold bill'));
+    } finally {
+      setHolding(false);
+    }
+  };
+
+  const resumeHeld = async (id: string) => {
+    if (cart.length && !confirm(t('pharmacy_pos.confirm_replace_cart', 'This will replace the current cart. Continue?'))) return;
+    let payload: any = null;
+    if (isOfflineNow()) {
+      const local = await offlineDb().held_bills.get(id);
+      if (!local) return toast.error(t('pharmacy_pos.toast_held_bill_offline_unavailable', 'Held bill not available offline'));
+      payload = local.payload;
+      await offlineDb().held_bills.put({ ...local, status: "resumed" });
+      await enqueueWrite({ op: "rpc", table: "resume_bill", payload: { _id: id } });
+    } else {
+      const { data, error } = await supabase.rpc("resume_bill", { _id: id });
+      if (error) return toast.error(error.message);
+      payload = data;
+    }
+    if (payload && Array.isArray(payload.items)) {
+      setCart(payload.items as Line[]);
+      setCustomerId(payload.customer_id ?? null);
+      setDiscount(Number(payload.discount ?? 0));
+      setPaid(payload.paid === "" || payload.paid == null ? "" : Number(payload.paid));
+      setPrescriptionRef(payload.prescription_ref ?? "");
+    }
+    setHeldOpen(false);
+    refetchHeld();
+    toast.success(t('pharmacy_pos.toast_bill_resumed', 'Bill resumed'));
+  };
+
+  const discardHeld = async (id: string) => {
+    if (!confirm(t('pharmacy_pos.confirm_discard_held', 'Discard this held bill?'))) return;
+    if (isOfflineNow()) {
+      await offlineDb().held_bills.delete(id);
+      await enqueueWrite({ op: "rpc", table: "discard_held_bill", payload: { _id: id, _reason: null } });
+    } else {
+      const { error } = await (supabase.rpc as any)("discard_held_bill", { _id: id, _reason: null });
+      if (error) return toast.error(error.message);
+    }
+    refetchHeld();
+    toast.success(t('pharmacy_pos.toast_discarded', 'Discarded'));
+  };
+
   const addToCart = (p: ProductRow) => {
     setCart((prev) => {
       const existing = prev.find((l) => l.product_id === p.id);
@@ -385,9 +519,20 @@ export function PharmacyPOSPage() {
             <div className="p-3 border-b flex items-center gap-2 font-medium">
               <ShoppingCart className="h-4 w-4" /> {t('pharmacy_pos.cart_heading', 'Cart')}
               {hasScheduledItem && (
-                <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive ml-auto">
+                <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">
                   {t('pharmacy_pos.badge_contains_rx', 'Contains Rx item')}
                 </Badge>
+              )}
+              {holdBillsEnabled && (
+                <Button
+                  type="button" variant="ghost" size="sm"
+                  className="ml-auto h-7 px-2 text-xs font-normal"
+                  onClick={() => setHeldOpen(true)}
+                >
+                  <ListOrdered className="h-3.5 w-3.5 mr-1" />
+                  {t('pharmacy_pos.held_bills_button', 'Held')}
+                  {heldBills.length > 0 && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{heldBills.length}</Badge>}
+                </Button>
               )}
             </div>
             <div className="px-3 pt-2">
@@ -466,10 +611,22 @@ export function PharmacyPOSPage() {
                 <Label className="text-muted-foreground">{t('pharmacy_pos.paid_cash_label', 'Paid (cash)')}</Label>
                 <Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(e.target.value === "" ? "" : Number(e.target.value))} className="h-7 w-24 text-right" placeholder={String(total)} />
               </div>
-              <Button className="w-full h-10" disabled={checkingOut || cart.length === 0} onClick={checkout}>
-                {checkingOut ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
-                {t('pharmacy_pos.checkout_button', 'Checkout')}
-              </Button>
+              <div className="flex gap-2">
+                {holdBillsEnabled && (
+                  <Button
+                    variant="outline" className="h-10 px-3"
+                    disabled={holding || cart.length === 0}
+                    onClick={holdCurrent}
+                    title={t('pharmacy_pos.hold_button_title', 'Hold this bill and start a new one — resume it later')}
+                  >
+                    {holding ? <Loader2 className="h-4 w-4 animate-spin" /> : <PauseCircle className="h-4 w-4" />}
+                  </Button>
+                )}
+                <Button className="flex-1 h-10" disabled={checkingOut || cart.length === 0} onClick={checkout}>
+                  {checkingOut ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
+                  {t('pharmacy_pos.checkout_button', 'Checkout')}
+                </Button>
+              </div>
               {lastSale && (
                 <Button variant="outline" className="w-full h-9" onClick={() => settings && printInvoiceDirect(lastSale, settings as any, "sale")}>
                   <Printer className="h-4 w-4 mr-2" /> {t('pharmacy_pos.reprint_button', 'Reprint last receipt')}
@@ -479,6 +636,37 @@ export function PharmacyPOSPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={heldOpen} onOpenChange={setHeldOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('pharmacy_pos.held_bills_title', 'Held bills')}</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-md border max-h-[60vh] overflow-auto divide-y">
+            {heldBills.length === 0 && (
+              <div className="text-center py-6 text-sm text-muted-foreground">
+                {t('pharmacy_pos.no_held_bills', 'No held bills')}
+              </div>
+            )}
+            {heldBills.map((b: any) => (
+              <div key={b.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{b.label || t('pharmacy_pos.untitled', 'Untitled')}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {b.customers?.name ?? t('pharmacy_pos.walk_in_customer', 'Walk-in customer')} · {t('pharmacy_pos.items_count', '{{count}} items', { count: b.item_count ?? 0 })} · {fmtMoney(b.total, sym)}
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" className="h-7" onClick={() => resumeHeld(b.id)}>
+                  {t('pharmacy_pos.resume_button', 'Resume')}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => discardHeld(b.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
