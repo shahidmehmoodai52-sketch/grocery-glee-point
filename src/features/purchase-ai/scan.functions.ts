@@ -6,51 +6,67 @@ import type { ExtractedBill } from "./types";
 // Gemini's responseSchema is an OpenAPI-3.0 subset: a single uppercase `type`
 // per field (no `["string","null"]` unions) with `nullable: true` for optional
 // values, instead of the OpenAI-style JSON Schema used by chat-completions APIs.
-const EXTRACTION_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    supplier_name: { type: "STRING", nullable: true },
-    invoice_number: { type: "STRING", nullable: true },
-    invoice_date: {
+//
+// batch_no/expiry_date are only added to the item schema when the caller asks
+// for them (pharmacy tenants) — every other caller gets the exact same
+// schema/prompt as before, so this is a no-op for existing grocery bills.
+function buildExtractionSchema(extractBatchExpiry: boolean) {
+  const itemProperties: Record<string, unknown> = {
+    name: { type: "STRING", nullable: true },
+    barcode: { type: "STRING", nullable: true },
+    sku: { type: "STRING", nullable: true },
+    qty: { type: "NUMBER", nullable: true },
+    unit_cost: { type: "NUMBER", nullable: true },
+    discount: { type: "NUMBER", nullable: true },
+    tax: { type: "NUMBER", nullable: true },
+    line_total: { type: "NUMBER", nullable: true },
+  };
+  const itemRequired = ["name", "barcode", "sku", "qty", "unit_cost", "discount", "tax", "line_total"];
+  if (extractBatchExpiry) {
+    itemProperties.batch_no = { type: "STRING", nullable: true };
+    itemProperties.expiry_date = {
       type: "STRING",
       nullable: true,
-      description: "ISO yyyy-mm-dd if determinable, else null",
-    },
-    subtotal: { type: "NUMBER", nullable: true },
-    total_discount: { type: "NUMBER", nullable: true },
-    total_tax: { type: "NUMBER", nullable: true },
-    grand_total: { type: "NUMBER", nullable: true },
-    items: {
-      type: "ARRAY",
+      description:
+        "ISO yyyy-mm-dd if a full date is printed. Many medicine packs/labels only print month+year " +
+        "(e.g. \"EXP 03/2027\") — in that case return yyyy-mm-01 for that month, never guess a day. " +
+        "If no expiry is legible for this line, return null — do not estimate or reuse another line's date.",
+    };
+    itemRequired.push("batch_no", "expiry_date");
+  }
+  return {
+    type: "OBJECT",
+    properties: {
+      supplier_name: { type: "STRING", nullable: true },
+      invoice_number: { type: "STRING", nullable: true },
+      invoice_date: {
+        type: "STRING",
+        nullable: true,
+        description: "ISO yyyy-mm-dd if determinable, else null",
+      },
+      subtotal: { type: "NUMBER", nullable: true },
+      total_discount: { type: "NUMBER", nullable: true },
+      total_tax: { type: "NUMBER", nullable: true },
+      grand_total: { type: "NUMBER", nullable: true },
       items: {
-        type: "OBJECT",
-        properties: {
-          name: { type: "STRING", nullable: true },
-          barcode: { type: "STRING", nullable: true },
-          sku: { type: "STRING", nullable: true },
-          qty: { type: "NUMBER", nullable: true },
-          unit_cost: { type: "NUMBER", nullable: true },
-          discount: { type: "NUMBER", nullable: true },
-          tax: { type: "NUMBER", nullable: true },
-          line_total: { type: "NUMBER", nullable: true },
-        },
-        required: ["name", "barcode", "sku", "qty", "unit_cost", "discount", "tax", "line_total"],
+        type: "ARRAY",
+        items: { type: "OBJECT", properties: itemProperties, required: itemRequired },
       },
     },
-  },
-  required: [
-    "supplier_name",
-    "invoice_number",
-    "invoice_date",
-    "subtotal",
-    "total_discount",
-    "total_tax",
-    "grand_total",
-    "items",
-  ],
-} as const;
+    required: [
+      "supplier_name",
+      "invoice_number",
+      "invoice_date",
+      "subtotal",
+      "total_discount",
+      "total_tax",
+      "grand_total",
+      "items",
+    ],
+  } as const;
+}
 
-const SYSTEM_PROMPT =
+const BASE_SYSTEM_PROMPT =
   "You extract structured data from photos of supplier purchase bills/invoices for a retail shop. " +
   "You may be given more than one image — in that case they are multiple pages/photos of the SAME " +
   "single bill, in order; combine them into one extraction (e.g. sum line items across pages) " +
@@ -58,6 +74,18 @@ const SYSTEM_PROMPT =
   "missing, or you are not confident, return null for that field rather than guessing. Numbers " +
   "must be plain numbers (no currency symbols). Handle rotated or skewed photos and handwritten " +
   "values as best you can, but never invent a value.";
+
+// Extra instruction appended only for pharmacy extraction — expiry dates feed
+// a real FEFO/stock-safety system, so this is deliberately more cautious than
+// the base "never invent a value" line above: it must be legible on the bill
+// itself, not inferred from a product's typical shelf life or from another
+// line on the same invoice.
+const BATCH_EXPIRY_SYSTEM_PROMPT =
+  " This bill is from a pharmacy/medicine distributor. Also read each line's batch/lot number and " +
+  "expiry date if printed on the bill (these are commonly labeled \"Batch\", \"B.No\", \"Lot\", \"Exp\", " +
+  "or \"Exp. Date\"). Only report an expiry date you can actually see printed for that specific line — " +
+  "never infer, estimate, or copy an expiry/batch from a different line or from general knowledge of the " +
+  "medicine. If a line has no visible batch/expiry, return null for it.";
 
 /** Splits a `data:image/xxx;base64,....` URL into a Gemini inlineData part. */
 function dataUrlToInlinePart(dataUrl: string): { inlineData: { mimeType: string; data: string } } {
@@ -89,13 +117,15 @@ export const extractPurchaseBill = createServerFn({ method: "POST" })
       );
     }
 
+    const extractBatchExpiry = !!data.extractBatchExpiry;
     const promptText =
       data.images.length > 1
         ? `Extract this purchase bill (${data.images.length} pages, in order) as JSON matching the given schema.`
         : "Extract this purchase bill as JSON matching the given schema.";
+    const systemPrompt = BASE_SYSTEM_PROMPT + (extractBatchExpiry ? BATCH_EXPIRY_SYSTEM_PROMPT : "");
 
     const requestBody = JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [
         {
           role: "user",
@@ -104,7 +134,7 @@ export const extractPurchaseBill = createServerFn({ method: "POST" })
       ],
       generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: EXTRACTION_SCHEMA,
+        responseSchema: buildExtractionSchema(extractBatchExpiry),
         // Straight field extraction into a fixed schema doesn't need
         // deep reasoning — the default thinking level was burning
         // ~1000+ tokens per bill on "thinking" before writing a single

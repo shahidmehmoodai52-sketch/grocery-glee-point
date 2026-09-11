@@ -829,6 +829,8 @@ function Page() {
         discount: l.discount,
         barcode: l.barcode,
         item_code: l.item_code,
+        ...(l.batch_no ? { batch_no: l.batch_no } : {}),
+        ...(l.expiry_date ? { expiry_date: l.expiry_date } : {}),
       })),
     });
   };
@@ -870,7 +872,7 @@ function Page() {
             </Dialog>
           )}
         <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />{t('purchases.new_purchase', 'New purchase')}</Button>
-        <PurchaseBillScannerButton suppliers={suppliers} onImport={importScannedPurchase} />
+        <PurchaseBillScannerButton suppliers={suppliers} onImport={importScannedPurchase} isPharmacy={isPharmacy} />
         <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">

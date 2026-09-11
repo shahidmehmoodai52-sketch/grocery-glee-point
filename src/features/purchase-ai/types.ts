@@ -8,6 +8,10 @@ export interface ExtractedBillItem {
   discount: number | null;
   tax: number | null;
   line_total: number | null;
+  // Only populated when the caller asked for batch/expiry extraction
+  // (pharmacy tenants) — absent/null for every other bill.
+  batch_no?: string | null;
+  expiry_date?: string | null;
 }
 
 export interface ExtractedBill {
@@ -52,6 +56,10 @@ export interface PreviewLine {
   cost: number;
   discount: number;
   resolvedVia?: ResolvedVia;
+  // Pharmacy-only, AI-extracted (never invented — the model returns null if
+  // it can't confidently read a value); always editable before confirming.
+  batch_no?: string | null;
+  expiry_date?: string | null;
 }
 
 export interface SupplierMatch {
