@@ -83,6 +83,8 @@ type PharmacyDetail = {
   dosage_form: string | null;
   drug_schedule: string | null;
   prescription_required: boolean | null;
+  pack_size: string | null;
+  units_per_pack: number | null;
 };
 
 type ProductRow = {
@@ -97,6 +99,12 @@ type Line = {
   tax_rate: number; track_batches: boolean;
   generic_name: string | null; prescription_required: boolean;
   drug_schedule: string | null;
+  // Unit-of-measure conversion — qty/price above always stay in the
+  // product's base unit (e.g. "tablet"); pack_size/units_per_pack only
+  // drive the optional pack-quantity input below. unit_mode is display-
+  // only and never itself sent anywhere.
+  pack_size: string | null; units_per_pack: number;
+  unit_mode: "base" | "pack";
 };
 
 /** Pharmacy-only product search: brand name / SKU / barcode, plus generic
@@ -140,7 +148,7 @@ async function searchPharmacyProducts(term: string): Promise<ProductRow[]> {
   if (allIds.length) {
     const { data: details } = await supabase
       .from("pharmacy_product_details" as any)
-      .select("product_id,generic_name,strength,dosage_form,drug_schedule,prescription_required")
+      .select("product_id,generic_name,strength,dosage_form,drug_schedule,prescription_required,pack_size,units_per_pack")
       .in("product_id", allIds);
     for (const d of (details ?? []) as any[]) {
       const row = merged.get(d.product_id);
@@ -231,6 +239,9 @@ export function PharmacyPOSPage() {
         generic_name: p.pharmacy?.generic_name ?? null,
         prescription_required: !!p.pharmacy?.prescription_required,
         drug_schedule: p.pharmacy?.drug_schedule?.trim() || null,
+        pack_size: p.pharmacy?.pack_size?.trim() || null,
+        units_per_pack: Number(p.pharmacy?.units_per_pack ?? 0),
+        unit_mode: "base",
       };
       return [...prev, line];
     });
@@ -239,8 +250,17 @@ export function PharmacyPOSPage() {
     searchInputRef.current?.focus();
   };
 
-  const setQty = (productId: string, qty: number) => {
-    setCart((prev) => prev.map((l) => (l.product_id === productId ? { ...l, qty: Math.max(0, qty) } : l)));
+  /** qty is always stored in base units. When the line is in "pack" display
+   *  mode, the input shows/accepts pack counts and this converts both ways. */
+  const setQty = (productId: string, displayQty: number) => {
+    setCart((prev) => prev.map((l) => {
+      if (l.product_id !== productId) return l;
+      const baseQty = l.unit_mode === "pack" && l.units_per_pack > 0 ? displayQty * l.units_per_pack : displayQty;
+      return { ...l, qty: Math.max(0, baseQty) };
+    }));
+  };
+  const setUnitMode = (productId: string, mode: "base" | "pack") => {
+    setCart((prev) => prev.map((l) => (l.product_id === productId ? { ...l, unit_mode: mode } : l)));
   };
   const removeLine = (productId: string) => setCart((prev) => prev.filter((l) => l.product_id !== productId));
 
@@ -348,6 +368,9 @@ export function PharmacyPOSPage() {
                     {[p.pharmacy?.generic_name, p.pharmacy?.strength, p.pharmacy?.dosage_form].filter(Boolean).join(" · ") ||
                       (p.sku ? t('pharmacy_pos.sku_prefix', 'SKU {{sku}}', { sku: p.sku }) : p.barcode ?? "")}
                     {" · "}{t('pharmacy_pos.stock_inline', 'stock {{qty}} {{unit}}', { qty: fmtQty(p.stock), unit: p.unit ?? "" })}
+                    {!!p.pharmacy?.units_per_pack && !!p.pharmacy?.pack_size && (
+                      <> {" · "}{t('pharmacy_pos.pack_hint', '1 {{pack}} = {{count}} {{unit}}', { pack: p.pharmacy.pack_size, count: p.pharmacy.units_per_pack, unit: p.unit ?? "" })}</>
+                    )}
                   </div>
                 </div>
                 <div className="text-right shrink-0 font-semibold">{fmtMoney(p.sell_price, sym)}</div>
@@ -387,7 +410,10 @@ export function PharmacyPOSPage() {
                   {t('pharmacy_pos.cart_empty', 'Cart is empty — search and select a medicine.')}
                 </div>
               )}
-              {cart.map((l) => (
+              {cart.map((l) => {
+                const hasPack = l.units_per_pack > 0 && !!l.pack_size;
+                const displayQty = l.unit_mode === "pack" && hasPack ? l.qty / l.units_per_pack : l.qty;
+                return (
                 <div key={l.product_id} className="px-3 py-2 flex items-center gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{l.name}</div>
@@ -396,9 +422,27 @@ export function PharmacyPOSPage() {
                       {l.prescription_required && <span className="text-destructive"> · {t('pharmacy_pos.badge_rx', 'Rx')}</span>}
                       {l.drug_schedule && <span className="text-amber-600"> · {l.drug_schedule}</span>}
                     </div>
+                    {hasPack && (
+                      <div className="flex gap-1 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setUnitMode(l.product_id, "base")}
+                          className={cn("text-[10px] px-1.5 py-0.5 rounded border", l.unit_mode === "base" ? "border-primary bg-primary/10 text-primary" : "border-input text-muted-foreground")}
+                        >
+                          {t('pharmacy_pos.unit_mode_base', 'per unit')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUnitMode(l.product_id, "pack")}
+                          className={cn("text-[10px] px-1.5 py-0.5 rounded border", l.unit_mode === "pack" ? "border-primary bg-primary/10 text-primary" : "border-input text-muted-foreground")}
+                        >
+                          {t('pharmacy_pos.unit_mode_pack', 'per {{pack}}', { pack: l.pack_size })}
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <Input
-                    type="number" step="1" value={l.qty}
+                    type="number" step="1" value={displayQty}
                     onChange={(e) => setQty(l.product_id, Number(e.target.value))}
                     className="h-8 w-16 text-right text-sm"
                   />
@@ -407,7 +451,8 @@ export function PharmacyPOSPage() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <div className="border-t p-3 space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">{t('pharmacy_pos.subtotal_label', 'Subtotal')}</span><span>{fmtMoney(subtotal, sym)}</span></div>

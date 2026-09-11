@@ -40,11 +40,19 @@ type ProductForm = {
   // pharmacy_product_details separately (see save()).
   generic_name: string; strength: string; dosage_form: string; manufacturer: string;
   drug_schedule: string; prescription_required: boolean;
+  // Unit-of-measure conversion: `unit` above stays the canonical/base unit
+  // every qty in this app is already stored and reported in (e.g.
+  // "tablet") — nothing else changes. pack_size/units_per_pack just let
+  // purchases/POS optionally enter quantity in a bulk pack (e.g. "Strip"
+  // of 10) and convert to base units client-side before hitting the same
+  // qty-based RPCs, so no backend/report code needs to know this exists.
+  pack_size: string; units_per_pack: number;
 };
 const empty: ProductForm = {
   name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true,
   track_batches: false,
   generic_name: "", strength: "", dosage_form: "", manufacturer: "", drug_schedule: "", prescription_required: false,
+  pack_size: "", units_per_pack: 0,
 };
 
 const PAGE_SIZE = 50;
@@ -205,6 +213,7 @@ function ProductsPage() {
     const {
       barcodes_text: _bt, stock: rawStock,
       generic_name, strength, dosage_form, manufacturer, drug_schedule, prescription_required,
+      pack_size, units_per_pack,
       ...rest
     } = form;
     const newStock = roundToTillixQty(Number(rawStock));
@@ -264,6 +273,8 @@ function ProductsPage() {
             manufacturer: manufacturer || null,
             drug_schedule: drug_schedule || null,
             prescription_required,
+            pack_size: pack_size || null,
+            units_per_pack: units_per_pack > 0 ? units_per_pack : null,
           } as any,
           { onConflict: "product_id" },
         );
@@ -317,6 +328,8 @@ function ProductsPage() {
       manufacturer: pharmacyDetails?.manufacturer ?? "",
       drug_schedule: pharmacyDetails?.drug_schedule ?? "",
       prescription_required: !!pharmacyDetails?.prescription_required,
+      pack_size: pharmacyDetails?.pack_size ?? "",
+      units_per_pack: Number(pharmacyDetails?.units_per_pack ?? 0),
     });
     setOpen(true);
   };
@@ -435,7 +448,20 @@ function ProductsPage() {
                         <Label>{t('products.drug_schedule_label', 'Drug schedule / controlled category')}</Label>
                         <Input value={form.drug_schedule} onChange={(e) => setForm({ ...form, drug_schedule: e.target.value })} placeholder={t('products.drug_schedule_placeholder', 'Leave blank for regular OTC medicines')} />
                       </div>
+                      <div>
+                        <Label>{t('products.pack_size_label', 'Pack name (optional)')}</Label>
+                        <Input value={form.pack_size} onChange={(e) => setForm({ ...form, pack_size: e.target.value })} placeholder={t('products.pack_size_placeholder', 'e.g. Strip, Box')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.units_per_pack_label', 'Units per pack')}</Label>
+                        <Input type="number" step="1" min="0" value={form.units_per_pack || ""} onChange={(e) => setForm({ ...form, units_per_pack: Number(e.target.value) })} placeholder={t('products.units_per_pack_placeholder', 'e.g. 10')} />
+                      </div>
                     </div>
+                    {form.pack_size && form.units_per_pack > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('products.pack_conversion_hint', '1 {{pack}} = {{count}} {{unit}} — purchases and POS can enter quantity either way.', { pack: form.pack_size, count: form.units_per_pack, unit: form.unit || 'unit' })}
+                      </p>
+                    )}
                     <div className="flex items-start gap-2">
                       <input
                         id="prescription-required"

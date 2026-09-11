@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/purchases")({ component: P
 
 const PURCHASE_LIST_LIMIT = 2000;
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; batch_no?: string; expiry_date?: string; mfg_date?: string; bonus_qty?: number };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; batch_no?: string; expiry_date?: string; mfg_date?: string; bonus_qty?: number; pack_size?: string | null; units_per_pack?: number; pack_qty?: number };
 
 type Draft = {
   open: boolean;
@@ -294,6 +294,26 @@ function Page() {
     // focus the name field instead of cost.
     const target = product ? "cost" : "name";
     focusCell(target as any, newIndex);
+
+    // Pharmacy-only, best-effort: look up pack size/conversion so the row
+    // can offer "receive by pack" entry. Fire-and-forget — if this is slow
+    // or fails, the line just doesn't get pack conversion, nothing else
+    // about the purchase flow depends on it.
+    if (isPharmacy && product) {
+      supabase
+        .from("pharmacy_product_details" as any)
+        .select("pack_size,units_per_pack")
+        .eq("product_id", product.id)
+        .maybeSingle()
+        .then(({ data }: any) => {
+          if (!data?.pack_size || !data?.units_per_pack) return;
+          setLines((ls) => ls.map((l, idx) =>
+            idx === newIndex && l.product_id === product.id
+              ? { ...l, pack_size: data.pack_size, units_per_pack: Number(data.units_per_pack) }
+              : l,
+          ));
+        });
+    }
   };
   const addFromSearch = async () => {
     const term = entrySearch.trim();
@@ -1116,6 +1136,25 @@ function Page() {
                                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusSearch(); } }}
                                   className="h-8 text-right text-sm"
                                 />
+                                {isPharmacy && !!l.units_per_pack && (
+                                  <div className="mt-0.5 flex items-center justify-end gap-1">
+                                    <Input
+                                      type="number"
+                                      step="0.001"
+                                      min="0"
+                                      value={l.pack_qty ?? ""}
+                                      placeholder="0"
+                                      onChange={(e) => {
+                                        const packQty = Number(e.target.value);
+                                        const perPack = Number(l.units_per_pack || 0);
+                                        setLine(i, { pack_qty: packQty, qty: +(packQty * perPack).toFixed(4) });
+                                      }}
+                                      title={t('purchases.pack_qty_title', 'Enter quantity in packs/boxes — auto-converts to {{unit}}', { unit: l.pack_size || t('purchases.base_unit', 'base units') })}
+                                      className="h-6 w-16 text-[11px] px-1.5 text-right"
+                                    />
+                                    <span className="text-[10px] text-muted-foreground">{t('purchases.pack_qty_suffix', '× {{pack}}', { pack: l.pack_size || t('purchases.pack_word', 'pack') })}</span>
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell className="text-right text-xs text-muted-foreground">
                                 {hasProduct ? fmtMoney(oldCost, sym) : "—"}
