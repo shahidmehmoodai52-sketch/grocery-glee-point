@@ -1,0 +1,322 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, Trash2, ShoppingCart, Loader2, Printer, Pill, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useSettings } from "@/hooks/use-settings";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { fmtMoney, fmtQty } from "@/lib/format";
+import { printInvoiceDirect } from "@/components/receipt";
+import { ShiftBanner } from "@/components/shift-banner";
+import { completeSaleOfflineAware, searchProductsLocal, type CompleteSalePayload } from "@/lib/offline/pos";
+import { isOfflineNow } from "@/lib/offline/session";
+
+const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category,tax_rate,track_batches";
+
+type PharmacyDetail = {
+  generic_name: string | null;
+  strength: string | null;
+  dosage_form: string | null;
+  drug_schedule: string | null;
+  prescription_required: boolean | null;
+};
+
+type ProductRow = {
+  id: string; name: string; sku: string | null; barcode: string | null;
+  sell_price: number; cost_price: number; stock: number; unit: string | null;
+  category: string | null; tax_rate: number | null; track_batches: boolean | null;
+  pharmacy?: PharmacyDetail | null;
+};
+
+type Line = {
+  product_id: string; name: string; qty: number; price: number; cost: number;
+  tax_rate: number; track_batches: boolean;
+  generic_name: string | null; prescription_required: boolean;
+};
+
+/** Pharmacy-only product search: brand name / SKU / barcode, plus generic
+ *  (salt) name via pharmacy_product_details. Falls back to the shared
+ *  offline product mirror when offline — generic-name matching and
+ *  prescription/schedule flags aren't available offline yet since
+ *  pharmacy_product_details isn't in the offline mirror (see PR notes). */
+async function searchPharmacyProducts(term: string): Promise<ProductRow[]> {
+  const q = term.trim().replace(/\s+/g, " ");
+  if (!q) return [];
+
+  if (isOfflineNow()) {
+    const rows = await searchProductsLocal(q);
+    return rows.map((p: any) => ({ ...p, pharmacy: null }));
+  }
+
+  const prefix = `${q}%`;
+  const like = `%${q}%`;
+  const [byNameRes, byBarcodeRes, bySkuRes, byGenericRes] = await Promise.all([
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("name", like).order("name").limit(30),
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("barcode", prefix).limit(20),
+    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).ilike("sku", prefix).limit(20),
+    supabase.from("pharmacy_product_details" as any).select("product_id,generic_name").ilike("generic_name", like).limit(30),
+  ]);
+  const firstError = byNameRes.error ?? byBarcodeRes.error ?? bySkuRes.error ?? byGenericRes.error;
+  if (firstError) throw firstError;
+
+  const merged = new Map<string, ProductRow>();
+  for (const p of [...(byNameRes.data ?? []), ...(byBarcodeRes.data ?? []), ...(bySkuRes.data ?? [])]) {
+    merged.set((p as any).id, p as any);
+  }
+
+  const genericIds = ((byGenericRes.data ?? []) as any[]).map((r) => r.product_id).filter(Boolean);
+  if (genericIds.length) {
+    const { data: genericProducts } = await supabase
+      .from("products").select(PRODUCT_COLUMNS).eq("is_active", true).in("id", genericIds);
+    for (const p of genericProducts ?? []) merged.set((p as any).id, p as any);
+  }
+
+  const allIds = Array.from(merged.keys());
+  if (allIds.length) {
+    const { data: details } = await supabase
+      .from("pharmacy_product_details" as any)
+      .select("product_id,generic_name,strength,dosage_form,drug_schedule,prescription_required")
+      .in("product_id", allIds);
+    for (const d of (details ?? []) as any[]) {
+      const row = merged.get(d.product_id);
+      if (row) row.pharmacy = d;
+    }
+  }
+
+  return Array.from(merged.values());
+}
+
+export function PharmacyPOSPage() {
+  const { data: settings } = useSettings();
+  const sym = settings?.currency_symbol ?? "Rs";
+
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<ProductRow[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [cart, setCart, clearCart] = usePersistentState<Line[]>("pharmacy-pos-cart", []);
+  const [discount, setDiscount] = useState(0);
+  const [paid, setPaid] = useState<number | "">("");
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [lastSale, setLastSale] = useState<any>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const term = search.trim();
+    if (!term) { setResults([]); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const rows = await searchPharmacyProducts(term);
+        if (!cancelled) setResults(rows);
+      } catch (e: any) {
+        if (!cancelled) toast.error(e?.message ?? "Search failed");
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [search]);
+
+  // Near-expiry / expired batch count — a pharmacy-specific alert grocery
+  // doesn't need. Read-only, uses the existing product_batch_status view.
+  const expiryAlertQ = useQuery({
+    queryKey: ["pharmacy-pos-expiry-alert"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("product_batch_status" as any)
+        .select("id", { count: "exact", head: true })
+        .in("expiry_status", ["expired", "critical", "expiring_soon"]);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+  const addToCart = (p: ProductRow) => {
+    setCart((prev) => {
+      const existing = prev.find((l) => l.product_id === p.id);
+      if (existing) {
+        return prev.map((l) => (l.product_id === p.id ? { ...l, qty: l.qty + 1 } : l));
+      }
+      const line: Line = {
+        product_id: p.id, name: p.name, qty: 1,
+        price: Number(p.sell_price ?? 0), cost: Number(p.cost_price ?? 0),
+        tax_rate: Number(p.tax_rate ?? 0), track_batches: !!p.track_batches,
+        generic_name: p.pharmacy?.generic_name ?? null,
+        prescription_required: !!p.pharmacy?.prescription_required,
+      };
+      return [...prev, line];
+    });
+    setSearch("");
+    setResults([]);
+    searchInputRef.current?.focus();
+  };
+
+  const setQty = (productId: string, qty: number) => {
+    setCart((prev) => prev.map((l) => (l.product_id === productId ? { ...l, qty: Math.max(0, qty) } : l)));
+  };
+  const removeLine = (productId: string) => setCart((prev) => prev.filter((l) => l.product_id !== productId));
+
+  const subtotal = useMemo(() => cart.reduce((s, l) => s + l.qty * l.price, 0), [cart]);
+  const taxAmt = useMemo(() => cart.reduce((s, l) => s + (l.qty * l.price * (l.tax_rate || 0)) / 100, 0), [cart]);
+  const total = useMemo(() => Math.max(0, subtotal - discount + taxAmt), [subtotal, discount, taxAmt]);
+  const hasScheduledItem = cart.some((l) => l.prescription_required);
+
+  const checkout = async () => {
+    if (cart.length === 0) return toast.error("Cart is empty");
+    if (cart.some((l) => l.qty <= 0)) return toast.error("Every line needs a quantity greater than 0");
+    setCheckingOut(true);
+    try {
+      const payload: CompleteSalePayload = {
+        customer_id: null,
+        expense_person_id: null,
+        payment_method: "cash",
+        tax: +taxAmt.toFixed(2),
+        discount: +discount.toFixed(2),
+        paid: +(paid === "" ? total : Number(paid)).toFixed(2),
+        note: "",
+        items: cart.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price, cost: l.cost })),
+      };
+      const { sale, offline } = await completeSaleOfflineAware(payload, { tendered: paid === "" ? total : Number(paid) });
+      toast.success(offline ? "Sale saved offline — will sync automatically" : "Sale completed");
+      setLastSale(sale);
+      clearCart();
+      setDiscount(0);
+      setPaid("");
+      if (sale && settings) {
+        printInvoiceDirect(sale as any, settings as any, "sale");
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not complete sale");
+    } finally {
+      setCheckingOut(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <ShiftBanner />
+      {(expiryAlertQ.data ?? 0) > 0 && (
+        <div className="no-print flex items-center gap-2 bg-amber-500/10 border-b border-amber-500/30 text-amber-900 dark:text-amber-200 px-3 py-1.5 text-xs">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          {expiryAlertQ.data} batch{expiryAlertQ.data === 1 ? "" : "es"} expired or expiring soon — check Expiry & waste.
+        </div>
+      )}
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-3 p-3">
+        {/* Search + results */}
+        <div className="flex flex-col min-h-0 gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={searchInputRef}
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search medicine, generic/salt name, SKU or scan barcode…"
+              className="pl-9 h-11 text-base"
+            />
+            {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
+          <Card className="flex-1 min-h-0 overflow-y-auto p-0 divide-y">
+            {results.length === 0 && search.trim() && !searching && (
+              <div className="p-6 text-center text-sm text-muted-foreground">No medicines match "{search}".</div>
+            )}
+            {results.length === 0 && !search.trim() && (
+              <div className="p-6 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+                <Pill className="h-8 w-8 opacity-30" />
+                Start typing a medicine or generic/salt name to search.
+              </div>
+            )}
+            {results.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => addToCart(p)}
+                className="w-full text-left px-4 py-2.5 hover:bg-accent/40 flex items-center justify-between gap-3 transition"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium truncate">{p.name}</span>
+                    {p.pharmacy?.prescription_required && (
+                      <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">Rx</Badge>
+                    )}
+                    {p.track_batches && (
+                      <Badge variant="outline" className="text-[10px]">FEFO</Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {[p.pharmacy?.generic_name, p.pharmacy?.strength, p.pharmacy?.dosage_form].filter(Boolean).join(" · ") || (p.sku ? `SKU ${p.sku}` : p.barcode ?? "")}
+                    {` · stock ${fmtQty(p.stock)} ${p.unit ?? ""}`}
+                  </div>
+                </div>
+                <div className="text-right shrink-0 font-semibold">{fmtMoney(p.sell_price, sym)}</div>
+              </button>
+            ))}
+          </Card>
+        </div>
+
+        {/* Cart */}
+        <div className="flex flex-col min-h-0 gap-2">
+          <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="p-3 border-b flex items-center gap-2 font-medium">
+              <ShoppingCart className="h-4 w-4" /> Cart
+              {hasScheduledItem && <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive ml-auto">Contains Rx item</Badge>}
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto divide-y">
+              {cart.length === 0 && (
+                <div className="p-6 text-center text-sm text-muted-foreground">Cart is empty — search and select a medicine.</div>
+              )}
+              {cart.map((l) => (
+                <div key={l.product_id} className="px-3 py-2 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{l.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {l.generic_name ?? ""} {l.prescription_required && <span className="text-destructive">· Rx</span>}
+                    </div>
+                  </div>
+                  <Input
+                    type="number" step="1" value={l.qty}
+                    onChange={(e) => setQty(l.product_id, Number(e.target.value))}
+                    className="h-8 w-16 text-right text-sm"
+                  />
+                  <div className="w-20 text-right text-sm font-medium">{fmtMoney(l.qty * l.price, sym)}</div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeLine(l.product_id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="border-t p-3 space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{fmtMoney(subtotal, sym)}</span></div>
+              <div className="flex justify-between items-center">
+                <Label className="text-muted-foreground">Discount</Label>
+                <Input type="number" step="0.01" value={discount || ""} onChange={(e) => setDiscount(Number(e.target.value))} className="h-7 w-24 text-right" placeholder="0" />
+              </div>
+              {taxAmt > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{fmtMoney(taxAmt, sym)}</span></div>}
+              <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{fmtMoney(total, sym)}</span></div>
+              <div className="flex justify-between items-center">
+                <Label className="text-muted-foreground">Paid (cash)</Label>
+                <Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(e.target.value === "" ? "" : Number(e.target.value))} className="h-7 w-24 text-right" placeholder={String(total)} />
+              </div>
+              <Button className="w-full h-10" disabled={checkingOut || cart.length === 0} onClick={checkout}>
+                {checkingOut ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
+                Checkout
+              </Button>
+              {lastSale && (
+                <Button variant="outline" className="w-full h-9" onClick={() => settings && printInvoiceDirect(lastSale, settings as any, "sale")}>
+                  <Printer className="h-4 w-4 mr-2" /> Reprint last receipt
+                </Button>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
