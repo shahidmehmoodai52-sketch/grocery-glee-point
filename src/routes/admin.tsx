@@ -2431,6 +2431,7 @@ type LibraryRow = {
   category: string | null;
   unit: string | null;
   status: "pending" | "approved" | "rejected";
+  business_type: string;
   default_sell_price: number;
   default_cost_price: number;
   contributed_by_tenant: string | null;
@@ -2464,7 +2465,7 @@ function LibraryTab() {
     queryFn: async () => {
       let q = supabase
         .from("global_products")
-        .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at", { count: "exact" })
+        .select("id, name, barcode, item_code, category, unit, status, business_type, default_sell_price, default_cost_price, contributed_by_tenant, created_at", { count: "exact" })
         .order("created_at", { ascending: false });
       if (status !== "all") q = q.eq("status", status);
       if (debouncedSearch) {
@@ -2588,7 +2589,10 @@ function LibraryTab() {
             {filtered.map((r) => (
               <TableRow key={r.id}>
                 <TableCell>
-                  <div className="font-medium">{r.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">{r.name}</span>
+                    <span className="capitalize text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">{r.business_type}</span>
+                  </div>
                   <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()} · {r.unit ?? "pcs"}</div>
                 </TableCell>
                 <TableCell className="text-xs font-mono">
