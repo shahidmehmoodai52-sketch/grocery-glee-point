@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/purchases")({ component: P
 
 const PURCHASE_LIST_LIMIT = 2000;
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; batch_no?: string; expiry_date?: string; mfg_date?: string };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; batch_no?: string; expiry_date?: string; mfg_date?: string; bonus_qty?: number };
 
 type Draft = {
   open: boolean;
@@ -637,11 +637,12 @@ function Page() {
             cost: +effCost.toFixed(4),
             line_total: effLineTotal,
             // Pharmacy business type only — complete_purchase() treats these
-            // as optional (defaults to NULL exactly as before) when absent,
+            // as optional (defaults to NULL/0 exactly as before) when absent,
             // so this is a no-op for grocery tenants.
             ...(l.batch_no ? { batch_no: l.batch_no } : {}),
             ...(l.expiry_date ? { expiry_date: l.expiry_date } : {}),
             ...(l.mfg_date ? { mfg_date: l.mfg_date } : {}),
+            ...(l.bonus_qty ? { bonus_qty: l.bonus_qty } : {}),
           };
         });
       })(),
@@ -653,7 +654,7 @@ function Page() {
         // 1. Get original items to calculate stock deltas
         const { data: origItems, error: fetchErr } = await supabase
           .from("purchase_items")
-          .select("product_id,qty")
+          .select("product_id,qty,bonus_qty")
           .eq("purchase_id", editingId);
         if (fetchErr) throw fetchErr;
 
@@ -684,7 +685,7 @@ function Page() {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
           const currentStock = Number(p?.stock ?? 0);
-          await supabase.from("products").update({ stock: currentStock - Number(it.qty) }).eq("id", it.product_id);
+          await supabase.from("products").update({ stock: currentStock - Number(it.qty) - Number((it as any).bonus_qty ?? 0) }).eq("id", it.product_id);
         }
 
         // 4. Replace items (carry tenant_id from the parent purchase so RLS accepts the insert)
@@ -709,6 +710,7 @@ function Page() {
           batch_no: it.batch_no ?? null,
           expiry_date: it.expiry_date ?? null,
           mfg_date: it.mfg_date ?? null,
+          bonus_qty: it.bonus_qty ?? 0,
         }));
         const { error: insErr } = await supabase.from("purchase_items").insert(newItems);
         if (insErr) throw insErr;
@@ -718,7 +720,7 @@ function Page() {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
           const currentStock = Number(p?.stock ?? 0);
-          await supabase.from("products").update({ stock: currentStock + Number(it.qty) }).eq("id", it.product_id);
+          await supabase.from("products").update({ stock: currentStock + Number(it.qty) + Number((it as any).bonus_qty ?? 0) }).eq("id", it.product_id);
         }
 
       } else {
@@ -995,8 +997,11 @@ function Page() {
                           // once on the purchase header (see submit()), not baked into cost_price.
                           const taxShare = discountedSubtotal > 0 ? taxAmt * (lineAfterBillDisc / discountedSubtotal) : 0;
                           const effCost = qty > 0 ? lineAfterBillDisc / qty : cost;
+                          const bonusQty = Number(l.bonus_qty || 0);
                           const newAvg = hasProduct
-                            ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
+                            ? (oldStock > 0
+                                ? (oldStock * oldCost + qty * effCost) / (oldStock + qty + bonusQty)
+                                : (qty + bonusQty) > 0 ? (qty * effCost) / (qty + bonusQty) : effCost)
                             : effCost;
                           const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
                           const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
@@ -1036,6 +1041,16 @@ function Page() {
                                       onChange={(e) => setLine(i, { expiry_date: e.target.value })}
                                       title={t('purchases.expiry_date_title', 'Expiry date')}
                                       className="h-6 text-[11px] px-1.5"
+                                    />
+                                    <Input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      value={l.bonus_qty ?? ""}
+                                      onChange={(e) => setLine(i, { bonus_qty: Number(e.target.value) })}
+                                      placeholder={t('purchases.bonus_qty_placeholder', 'Bonus qty')}
+                                      title={t('purchases.bonus_qty_title', 'Free/bonus units from a distributor scheme (e.g. 10+1) — added to stock at zero cost')}
+                                      className="h-6 w-20 text-[11px] px-1.5"
                                     />
                                   </div>
                                 )}

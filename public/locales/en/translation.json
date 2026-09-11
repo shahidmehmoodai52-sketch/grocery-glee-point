@@ -1007,6 +1007,8 @@
     "subtitle": "Record stock received from suppliers",
     "batch_no_placeholder": "Batch #",
     "expiry_date_title": "Expiry date",
+    "bonus_qty_placeholder": "Bonus qty",
+    "bonus_qty_title": "Free/bonus units from a distributor scheme (e.g. 10+1) — added to stock at zero cost",
     "drafts_count": "Drafts ({{count}})",
     "resume_draft_title": "Resume Draft",
     "no_supplier": "No Supplier",
