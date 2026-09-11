@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Search, Trash2, ShoppingCart, Loader2, Printer, Pill, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +93,7 @@ async function searchPharmacyProducts(term: string): Promise<ProductRow[]> {
 }
 
 export function PharmacyPOSPage() {
+  const { t } = useTranslation();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
 
@@ -110,18 +112,18 @@ export function PharmacyPOSPage() {
     if (!term) { setResults([]); return; }
     let cancelled = false;
     setSearching(true);
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         const rows = await searchPharmacyProducts(term);
         if (!cancelled) setResults(rows);
       } catch (e: any) {
-        if (!cancelled) toast.error(e?.message ?? "Search failed");
+        if (!cancelled) toast.error(e?.message ?? t('pharmacy_pos.search_failed', 'Search failed'));
       } finally {
         if (!cancelled) setSearching(false);
       }
     }, 250);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [search]);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [search, t]);
 
   // Near-expiry / expired batch count — a pharmacy-specific alert grocery
   // doesn't need. Read-only, uses the existing product_batch_status view.
@@ -170,8 +172,8 @@ export function PharmacyPOSPage() {
   const hasScheduledItem = cart.some((l) => l.prescription_required);
 
   const checkout = async () => {
-    if (cart.length === 0) return toast.error("Cart is empty");
-    if (cart.some((l) => l.qty <= 0)) return toast.error("Every line needs a quantity greater than 0");
+    if (cart.length === 0) return toast.error(t('pharmacy_pos.toast_cart_empty', 'Cart is empty'));
+    if (cart.some((l) => l.qty <= 0)) return toast.error(t('pharmacy_pos.toast_qty_required', 'Every line needs a quantity greater than 0'));
     setCheckingOut(true);
     try {
       const payload: CompleteSalePayload = {
@@ -185,7 +187,7 @@ export function PharmacyPOSPage() {
         items: cart.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price, cost: l.cost })),
       };
       const { sale, offline } = await completeSaleOfflineAware(payload, { tendered: paid === "" ? total : Number(paid) });
-      toast.success(offline ? "Sale saved offline — will sync automatically" : "Sale completed");
+      toast.success(offline ? t('pharmacy_pos.toast_saved_offline', 'Sale saved offline — will sync automatically') : t('pharmacy_pos.toast_sale_completed', 'Sale completed'));
       setLastSale(sale);
       clearCart();
       setDiscount(0);
@@ -194,7 +196,7 @@ export function PharmacyPOSPage() {
         printInvoiceDirect(sale as any, settings as any, "sale");
       }
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not complete sale");
+      toast.error(e?.message ?? t('pharmacy_pos.toast_checkout_failed', 'Could not complete sale'));
     } finally {
       setCheckingOut(false);
     }
@@ -206,7 +208,7 @@ export function PharmacyPOSPage() {
       {(expiryAlertQ.data ?? 0) > 0 && (
         <div className="no-print flex items-center gap-2 bg-amber-500/10 border-b border-amber-500/30 text-amber-900 dark:text-amber-200 px-3 py-1.5 text-xs">
           <AlertTriangle className="h-3.5 w-3.5" />
-          {expiryAlertQ.data} batch{expiryAlertQ.data === 1 ? "" : "es"} expired or expiring soon — check Expiry & waste.
+          {t('pharmacy_pos.expiry_alert', { count: expiryAlertQ.data ?? 0 })}
         </div>
       )}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-3 p-3">
@@ -219,19 +221,21 @@ export function PharmacyPOSPage() {
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search medicine, generic/salt name, SKU or scan barcode…"
+              placeholder={t('pharmacy_pos.search_placeholder', 'Search medicine, generic/salt name, SKU or scan barcode…')}
               className="pl-9 h-11 text-base"
             />
             {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
           <Card className="flex-1 min-h-0 overflow-y-auto p-0 divide-y">
             {results.length === 0 && search.trim() && !searching && (
-              <div className="p-6 text-center text-sm text-muted-foreground">No medicines match "{search}".</div>
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                {t('pharmacy_pos.no_matches', 'No medicines match "{{search}}".', { search })}
+              </div>
             )}
             {results.length === 0 && !search.trim() && (
               <div className="p-6 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
                 <Pill className="h-8 w-8 opacity-30" />
-                Start typing a medicine or generic/salt name to search.
+                {t('pharmacy_pos.search_hint', 'Start typing a medicine or generic/salt name to search.')}
               </div>
             )}
             {results.map((p) => (
@@ -244,15 +248,16 @@ export function PharmacyPOSPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium truncate">{p.name}</span>
                     {p.pharmacy?.prescription_required && (
-                      <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">Rx</Badge>
+                      <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">{t('pharmacy_pos.badge_rx', 'Rx')}</Badge>
                     )}
                     {p.track_batches && (
-                      <Badge variant="outline" className="text-[10px]">FEFO</Badge>
+                      <Badge variant="outline" className="text-[10px]">{t('pharmacy_pos.badge_fefo', 'FEFO')}</Badge>
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {[p.pharmacy?.generic_name, p.pharmacy?.strength, p.pharmacy?.dosage_form].filter(Boolean).join(" · ") || (p.sku ? `SKU ${p.sku}` : p.barcode ?? "")}
-                    {` · stock ${fmtQty(p.stock)} ${p.unit ?? ""}`}
+                    {[p.pharmacy?.generic_name, p.pharmacy?.strength, p.pharmacy?.dosage_form].filter(Boolean).join(" · ") ||
+                      (p.sku ? t('pharmacy_pos.sku_prefix', 'SKU {{sku}}', { sku: p.sku }) : p.barcode ?? "")}
+                    {" · "}{t('pharmacy_pos.stock_inline', 'stock {{qty}} {{unit}}', { qty: fmtQty(p.stock), unit: p.unit ?? "" })}
                   </div>
                 </div>
                 <div className="text-right shrink-0 font-semibold">{fmtMoney(p.sell_price, sym)}</div>
@@ -265,19 +270,25 @@ export function PharmacyPOSPage() {
         <div className="flex flex-col min-h-0 gap-2">
           <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="p-3 border-b flex items-center gap-2 font-medium">
-              <ShoppingCart className="h-4 w-4" /> Cart
-              {hasScheduledItem && <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive ml-auto">Contains Rx item</Badge>}
+              <ShoppingCart className="h-4 w-4" /> {t('pharmacy_pos.cart_heading', 'Cart')}
+              {hasScheduledItem && (
+                <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive ml-auto">
+                  {t('pharmacy_pos.badge_contains_rx', 'Contains Rx item')}
+                </Badge>
+              )}
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto divide-y">
               {cart.length === 0 && (
-                <div className="p-6 text-center text-sm text-muted-foreground">Cart is empty — search and select a medicine.</div>
+                <div className="p-6 text-center text-sm text-muted-foreground">
+                  {t('pharmacy_pos.cart_empty', 'Cart is empty — search and select a medicine.')}
+                </div>
               )}
               {cart.map((l) => (
                 <div key={l.product_id} className="px-3 py-2 flex items-center gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{l.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {l.generic_name ?? ""} {l.prescription_required && <span className="text-destructive">· Rx</span>}
+                      {l.generic_name ?? ""} {l.prescription_required && <span className="text-destructive">· {t('pharmacy_pos.badge_rx', 'Rx')}</span>}
                     </div>
                   </div>
                   <Input
@@ -293,24 +304,24 @@ export function PharmacyPOSPage() {
               ))}
             </div>
             <div className="border-t p-3 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{fmtMoney(subtotal, sym)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t('pharmacy_pos.subtotal_label', 'Subtotal')}</span><span>{fmtMoney(subtotal, sym)}</span></div>
               <div className="flex justify-between items-center">
-                <Label className="text-muted-foreground">Discount</Label>
+                <Label className="text-muted-foreground">{t('common.discount', 'Discount')}</Label>
                 <Input type="number" step="0.01" value={discount || ""} onChange={(e) => setDiscount(Number(e.target.value))} className="h-7 w-24 text-right" placeholder="0" />
               </div>
-              {taxAmt > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{fmtMoney(taxAmt, sym)}</span></div>}
-              <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{fmtMoney(total, sym)}</span></div>
+              {taxAmt > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{t('purchase_returns.tax', 'Tax')}</span><span>{fmtMoney(taxAmt, sym)}</span></div>}
+              <div className="flex justify-between font-semibold text-base"><span>{t('pharmacy_pos.total_label', 'Total')}</span><span>{fmtMoney(total, sym)}</span></div>
               <div className="flex justify-between items-center">
-                <Label className="text-muted-foreground">Paid (cash)</Label>
+                <Label className="text-muted-foreground">{t('pharmacy_pos.paid_cash_label', 'Paid (cash)')}</Label>
                 <Input type="number" step="0.01" value={paid} onChange={(e) => setPaid(e.target.value === "" ? "" : Number(e.target.value))} className="h-7 w-24 text-right" placeholder={String(total)} />
               </div>
               <Button className="w-full h-10" disabled={checkingOut || cart.length === 0} onClick={checkout}>
                 {checkingOut ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
-                Checkout
+                {t('pharmacy_pos.checkout_button', 'Checkout')}
               </Button>
               {lastSale && (
                 <Button variant="outline" className="w-full h-9" onClick={() => settings && printInvoiceDirect(lastSale, settings as any, "sale")}>
-                  <Printer className="h-4 w-4 mr-2" /> Reprint last receipt
+                  <Printer className="h-4 w-4 mr-2" /> {t('pharmacy_pos.reprint_button', 'Reprint last receipt')}
                 </Button>
               )}
             </div>
