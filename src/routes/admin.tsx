@@ -124,6 +124,7 @@ type TenantRow = {
   slug: string | null;
   status: string;
   plan: string | null;
+  business_type: string;
   owner_id: string | null;
   owner_name: string | null;
   owner_email: string | null;
@@ -1165,6 +1166,7 @@ function TenantsTab() {
           <TableHeader>
             <TableRow>
               <TableHead>Shop</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Owner</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Plan</TableHead>
@@ -1178,10 +1180,10 @@ function TenantsTab() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={10} className="py-4"><TableSkeleton rows={5} columns={9} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="py-4"><TableSkeleton rows={5} columns={9} /></TableCell></TableRow>
             )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="py-8">
+              <TableRow><TableCell colSpan={11} className="py-8">
                 <EmptyState title="No shops found" description="Try a different search or filter" icon={Store} />
               </TableCell></TableRow>
             )}
@@ -1192,6 +1194,11 @@ function TenantsTab() {
                 <TableCell>
                   <div className="font-medium">{t.name}</div>
                   <div className="text-[10px] text-muted-foreground font-mono">{t.id.slice(0, 8)}</div>
+                </TableCell>
+                <TableCell>
+                  <span className="capitalize text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    {t.business_type || "grocery"}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">{t.owner_name || "—"}</div>
