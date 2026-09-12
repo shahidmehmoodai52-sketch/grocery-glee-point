@@ -456,6 +456,8 @@
     "search_hint": "Start typing a medicine or generic/salt name to search.",
     "badge_rx": "Rx",
     "badge_fefo": "FEFO",
+    "badge_expired_stock": "EXPIRED STOCK",
+    "confirm_expired_sale": "WARNING: all remaining stock of {{names}} is EXPIRED. Sell anyway?",
     "sku_prefix": "SKU {{sku}}",
     "stock_inline": "stock {{qty}} {{unit}}",
     "cart_heading": "Cart",

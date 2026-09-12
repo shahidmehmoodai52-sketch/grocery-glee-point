@@ -94,6 +94,10 @@ type ProductRow = {
   sell_price: number; cost_price: number; stock: number; unit: string | null;
   category: string | null; tax_rate: number | null; track_batches: boolean | null;
   pharmacy?: PharmacyDetail | null;
+  /** true only when this product has batch stock and every batch of it is
+   *  past its expiry date — not set for untracked products or ones with no
+   *  batches at all. Drives the "expired stock" warning below. */
+  allBatchesExpired?: boolean;
 };
 
 type Line = {
@@ -107,6 +111,9 @@ type Line = {
   // only and never itself sent anywhere.
   pack_size: string | null; units_per_pack: number;
   unit_mode: "base" | "pack";
+  /** See ProductRow.allBatchesExpired — carried onto the cart line so the
+   *  checkout confirmation can warn even if the search result is gone. */
+  allBatchesExpired?: boolean;
 };
 
 /** Pharmacy-only product search: brand name / SKU / barcode, plus generic
@@ -158,6 +165,31 @@ async function searchPharmacyProducts(term: string): Promise<ProductRow[]> {
     }
   }
 
+  // Flag products whose entire remaining batch stock is past expiry — well-
+  // known pharmacy POS systems (PioneerRx, PrimeRx, etc.) treat this as
+  // "don't sell as if it were good stock" by default; product_batch_status
+  // already excludes depleted/inactive batches, so a product showing up
+  // here with every row 'expired' genuinely has nothing sellable left.
+  const trackedIds = Array.from(merged.values()).filter((p) => p.track_batches).map((p) => p.id);
+  if (trackedIds.length) {
+    const { data: batchRows } = await supabase
+      .from("product_batch_status" as any)
+      .select("product_id,expiry_status")
+      .in("product_id", trackedIds);
+    const statusesByProduct = new Map<string, string[]>();
+    for (const r of (batchRows ?? []) as any[]) {
+      const arr = statusesByProduct.get(r.product_id) ?? [];
+      arr.push(r.expiry_status);
+      statusesByProduct.set(r.product_id, arr);
+    }
+    for (const p of merged.values()) {
+      const statuses = statusesByProduct.get(p.id);
+      if (statuses && statuses.length > 0 && statuses.every((s) => s === "expired")) {
+        p.allBatchesExpired = true;
+      }
+    }
+  }
+
   return Array.from(merged.values());
 }
 
@@ -169,6 +201,10 @@ export function PharmacyPOSPage() {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<ProductRow[]>([]);
   const [searching, setSearching] = useState(false);
+  // Keyboard-driven result selection — lets a scanner/keyboard-only cashier
+  // add items without ever touching the mouse (type/scan, Enter adds the
+  // highlighted match, ready for the next scan immediately).
+  const [highlightIdx, setHighlightIdx] = useState(0);
   const [cart, setCart, clearCart] = usePersistentState<Line[]>("pharmacy-pos-cart", []);
   const [discount, setDiscount] = useState(0);
   const [paid, setPaid] = useState<number | "">("");
@@ -186,7 +222,7 @@ export function PharmacyPOSPage() {
     const timer = setTimeout(async () => {
       try {
         const rows = await searchPharmacyProducts(term);
-        if (!cancelled) setResults(rows);
+        if (!cancelled) { setResults(rows); setHighlightIdx(0); }
       } catch (e: any) {
         if (!cancelled) toast.error(e?.message ?? t('pharmacy_pos.search_failed', 'Search failed'));
       } finally {
@@ -376,11 +412,13 @@ export function PharmacyPOSPage() {
         pack_size: p.pharmacy?.pack_size?.trim() || null,
         units_per_pack: Number(p.pharmacy?.units_per_pack ?? 0),
         unit_mode: "base",
+        allBatchesExpired: p.allBatchesExpired,
       };
       return [...prev, line];
     });
     setSearch("");
     setResults([]);
+    setHighlightIdx(0);
     searchInputRef.current?.focus();
   };
 
@@ -406,6 +444,13 @@ export function PharmacyPOSPage() {
   const checkout = async () => {
     if (cart.length === 0) return toast.error(t('pharmacy_pos.toast_cart_empty', 'Cart is empty'));
     if (cart.some((l) => l.qty <= 0)) return toast.error(t('pharmacy_pos.toast_qty_required', 'Every line needs a quantity greater than 0'));
+    const expiredLines = cart.filter((l) => l.allBatchesExpired);
+    if (expiredLines.length > 0) {
+      const names = expiredLines.map((l) => l.name).join(", ");
+      if (!confirm(t('pharmacy_pos.confirm_expired_sale', 'WARNING: all remaining stock of {{names}} is EXPIRED. Sell anyway?', { names }))) {
+        return;
+      }
+    }
     const paidAmount = paid === "" ? total : Number(paid);
     if (paidAmount < total && !customerId) {
       return toast.error(t('pharmacy_pos.toast_select_customer_for_credit', 'Select a customer to sell on credit — walk-in sales must be paid in full'));
@@ -460,6 +505,22 @@ export function PharmacyPOSPage() {
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setHighlightIdx((i) => Math.min(i + 1, results.length - 1));
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setHighlightIdx((i) => Math.max(i - 1, 0));
+                } else if (e.key === "Enter") {
+                  e.preventDefault();
+                  const pick = results[highlightIdx] ?? results[0];
+                  if (pick) addToCart(pick);
+                } else if (e.key === "Escape" && search) {
+                  e.preventDefault();
+                  setSearch("");
+                }
+              }}
               placeholder={t('pharmacy_pos.search_placeholder', 'Search medicine, generic/salt name, SKU or scan barcode…')}
               className="pl-9 h-11 text-base"
             />
@@ -477,11 +538,15 @@ export function PharmacyPOSPage() {
                 {t('pharmacy_pos.search_hint', 'Start typing a medicine or generic/salt name to search.')}
               </div>
             )}
-            {results.map((p) => (
+            {results.map((p, idx) => (
               <button
                 key={p.id}
                 onClick={() => addToCart(p)}
-                className="w-full text-left px-4 py-2.5 hover:bg-accent/40 flex items-center justify-between gap-3 transition"
+                onMouseEnter={() => setHighlightIdx(idx)}
+                className={cn(
+                  "w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition",
+                  idx === highlightIdx ? "bg-accent/60" : "hover:bg-accent/40",
+                )}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -494,7 +559,11 @@ export function PharmacyPOSPage() {
                         {p.pharmacy.drug_schedule}
                       </Badge>
                     )}
-                    {p.track_batches && (
+                    {p.allBatchesExpired ? (
+                      <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive bg-destructive/10">
+                        {t('pharmacy_pos.badge_expired_stock', 'EXPIRED STOCK')}
+                      </Badge>
+                    ) : p.track_batches && (
                       <Badge variant="outline" className="text-[10px]">{t('pharmacy_pos.badge_fefo', 'FEFO')}</Badge>
                     )}
                   </div>
@@ -566,6 +635,9 @@ export function PharmacyPOSPage() {
                       {l.generic_name ?? ""}
                       {l.prescription_required && <span className="text-destructive"> · {t('pharmacy_pos.badge_rx', 'Rx')}</span>}
                       {l.drug_schedule && <span className="text-amber-600"> · {l.drug_schedule}</span>}
+                      {l.allBatchesExpired && (
+                        <span className="text-destructive font-semibold"> · {t('pharmacy_pos.badge_expired_stock', 'EXPIRED STOCK')}</span>
+                      )}
                     </div>
                     {hasPack && (
                       <div className="flex gap-1 mt-1">
