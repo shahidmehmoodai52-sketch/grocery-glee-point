@@ -2503,6 +2503,7 @@
     "paid": "Paid",
     "change": "Change",
     "note_label": "Note:",
+    "prescription_ref_label": "Rx #:",
     "you_saved": "★ You saved {{amount}} today! ★",
     "refunded_via": "Refunded via {{method}}",
     "paid_by": "Paid by {{method}}",
