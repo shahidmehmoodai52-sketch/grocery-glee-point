@@ -236,14 +236,18 @@ function Page() {
   // Customer discounts settle the ledger without cash — a real cost, so they
   // come off profit the same way a return does.
   const discountTotal = Number(stats?.discount_total || 0);
-  const profit = salesProfit - returnsLoss - expensesTotal - discountTotal + incentiveTotal;
+  // A supplier-given discount is money saved — added to profit like an
+  // incentive (opposite of a customer discount, which is a cost).
+  const supplierDiscountTotal = Number(stats?.supplier_discount_total || 0);
+  const profit = salesProfit - returnsLoss - expensesTotal - discountTotal + incentiveTotal + supplierDiscountTotal;
 
   const prevSalesProfit = Number(prevStats?.sales_total || 0) - Number(prevStats?.sales_cost || 0) - Number(prevStats?.sales_tax || 0);
   const prevReturnsLoss = Number(prevStats?.returns_total || 0) - Number(prevStats?.returns_cost || 0);
   const prevExpensesTotal = Number(prevStats?.expenses_total || 0);
   const prevIncentiveTotal = Number(prevStats?.incentive_total || 0);
   const prevDiscountTotal = Number(prevStats?.discount_total || 0);
-  const prevProfit = prevSalesProfit - prevReturnsLoss - prevExpensesTotal - prevDiscountTotal + prevIncentiveTotal;
+  const prevSupplierDiscountTotal = Number(prevStats?.supplier_discount_total || 0);
+  const prevProfit = prevSalesProfit - prevReturnsLoss - prevExpensesTotal - prevDiscountTotal + prevIncentiveTotal + prevSupplierDiscountTotal;
 
   const purchTotal = Number(stats?.purchases_total || 0);
   const prevPurchTotal = Number(prevStats?.purchases_total || 0);
