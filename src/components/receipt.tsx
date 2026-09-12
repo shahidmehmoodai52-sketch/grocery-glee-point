@@ -57,6 +57,10 @@ export type ReceiptInvoice = {
   payment_method?: string;
   refund_method?: string;
   isPurchase?: boolean;
+  /** Pharmacy-only, optional — a prescription number/reference captured
+   *  at checkout. Absent for grocery sales and for pharmacy sales with
+   *  no scheduled/Rx item, so this renders nothing by default. */
+  prescription_ref?: string | null;
 };
 
 type Props = {
@@ -508,6 +512,13 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
           </>
         )}
       </div>
+
+      {invoice.prescription_ref && (
+        <div className="mt-2 border border-dashed border-black p-1.5 text-[10.5px]">
+          <span className="font-bold uppercase tracking-wider text-[9px]">{t('receipt.prescription_ref_label', 'Rx #:')} </span>
+          {invoice.prescription_ref}
+        </div>
+      )}
 
       {invoice.note && (
         <div className="mt-2 border border-dashed border-black p-1.5 text-[10.5px] whitespace-pre-line">

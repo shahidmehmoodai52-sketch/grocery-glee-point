@@ -113,6 +113,8 @@ export function buildPreviewLine(
     qty: Number(item.qty ?? 1) || 1,
     cost: Number(selected?.cost_price ?? item.unit_cost ?? 0) || Number(item.unit_cost ?? 0) || 0,
     discount: Number(item.discount ?? 0) || 0,
+    batch_no: item.batch_no ?? null,
+    expiry_date: item.expiry_date ?? null,
   };
 }
 

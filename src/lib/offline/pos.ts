@@ -169,6 +169,10 @@ export interface CompleteSalePayload {
   digital_received_amount?: number | null;
   digital_account_id?: string | null;
   cash_back_amount?: number | null;
+  /** Pharmacy business type only — a reference number, photo caption, or
+   *  note tied to the invoice (not a full e-prescription workflow). Optional
+   *  everywhere else; complete_sale() defaults it to NULL when absent. */
+  prescription_ref?: string | null;
   items: Array<{ product_id: string | null; name: string; qty: number; price: number; cost: number }>;
 }
 
@@ -272,6 +276,7 @@ export async function completeSaleOfflineAware(payload: CompleteSalePayload, met
     cost_total,
     status: paid >= total ? "completed" : "credit",
     note: payload.note,
+    prescription_ref: payload.prescription_ref ?? null,
     created_at: now,
     updated_at: now,
     // Audit payload required for standalone offline reconciliation.

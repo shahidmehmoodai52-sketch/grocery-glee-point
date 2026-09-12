@@ -41,8 +41,8 @@ export const ADMIN_PERMS = [
   },
   {
     key: "shops.manage",
-    label: "Change shop plan & feature overrides",
-    description: "Assign a shop's plan and set per-shop feature flag overrides. Does not include deletion or password resets.",
+    label: "Change shop plan, business type & feature overrides",
+    description: "Assign a shop's plan, business type (e.g. grocery ↔ pharmacy), and set per-shop feature flag overrides. Does not include deletion or password resets.",
     group: "Shop management",
   },
   {

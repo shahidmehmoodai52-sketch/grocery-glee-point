@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePriceVisibility } from "@/hooks/use-price-visibility";
+import { useBusinessType } from "@/hooks/use-tenant";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { usePersistentState } from "@/hooks/use-persistent-state";
@@ -34,8 +35,25 @@ type ProductForm = {
   cost_price: number; sell_price: number; stock: number; tax_rate: number; is_active: boolean; low_stock_threshold: number;
   preferred_supplier_id: string;
   batch_no: string; expiry_date: string; rack_location: string; allow_negative_stock: boolean;
+  track_batches: boolean;
+  // Pharmacy business-type only — not columns on `products`, saved to
+  // pharmacy_product_details separately (see save()).
+  generic_name: string; strength: string; dosage_form: string; manufacturer: string;
+  drug_schedule: string; prescription_required: boolean;
+  // Unit-of-measure conversion: `unit` above stays the canonical/base unit
+  // every qty in this app is already stored and reported in (e.g.
+  // "tablet") — nothing else changes. pack_size/units_per_pack just let
+  // purchases/POS optionally enter quantity in a bulk pack (e.g. "Strip"
+  // of 10) and convert to base units client-side before hitting the same
+  // qty-based RPCs, so no backend/report code needs to know this exists.
+  pack_size: string; units_per_pack: number;
 };
-const empty: ProductForm = { name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true };
+const empty: ProductForm = {
+  name: "", sku: "", barcode: "", barcodes_text: "", category: "", unit: "pcs", cost_price: 0, sell_price: 0, stock: 0, tax_rate: 0, is_active: true, low_stock_threshold: 5, preferred_supplier_id: "", batch_no: "", expiry_date: "", rack_location: "", allow_negative_stock: true,
+  track_batches: false,
+  generic_name: "", strength: "", dosage_form: "", manufacturer: "", drug_schedule: "", prescription_required: false,
+  pack_size: "", units_per_pack: 0,
+};
 
 const PAGE_SIZE = 50;
 
@@ -61,13 +79,17 @@ function ProductsPage() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const { data: priceVisibility } = usePriceVisibility();
+  const businessType = useBusinessType();
+  const isPharmacy = businessType === "pharmacy";
   const sym = settings?.currency_symbol ?? "Rs";
   const showCost = priceVisibility?.showCost ?? true;
   const showSell = priceVisibility?.showSell ?? true;
-  const tableColCount = 5 + (showCost ? 1 : 0) + (showSell ? 1 : 0);
+  const tableColCount = 6 + (showCost ? 1 : 0) + (showSell ? 1 : 0) + (isPharmacy ? 1 : 0);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounced(search.trim(), 250);
   const [category, setCategory] = useState("all");
+  const [rackFilter, setRackFilter] = useState("all");
+  const [manufacturerFilter, setManufacturerFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortAsc, setSortAsc] = useState(true);
@@ -77,7 +99,7 @@ function ProductsPage() {
   const [generatingBarcode, setGeneratingBarcode] = useState(false);
   const [labelProduct, setLabelProduct] = useState<BarcodeLabelProduct | null>(null);
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, category, stockFilter, sortKey, sortAsc]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, category, rackFilter, manufacturerFilter, stockFilter, sortKey, sortAsc]);
 
   // Suggest the next sequential SKU when opening the dialog to add a NEW
   // product (never for editing an existing one, and never overwriting a
@@ -98,13 +120,30 @@ function ProductsPage() {
 
   // ---- Server-side paginated list ------------------------------------------
   // Never pull the whole catalogue: one page of rows + an exact count.
-  const listKey = ["products", "list", { q: debouncedSearch, category, stockFilter, sortKey, sortAsc, page }] as const;
+  const listKey = ["products", "list", { q: debouncedSearch, category, rackFilter, manufacturerFilter, stockFilter, sortKey, sortAsc, page }] as const;
   const { data: listData, isLoading, isFetching } = useQuery({
     queryKey: listKey,
     placeholderData: keepPreviousData,
     staleTime: 15_000,
     queryFn: async () => {
       const from = (page - 1) * PAGE_SIZE;
+
+      // Manufacturer lives on pharmacy_product_details, not products, so a
+      // manufacturer filter resolves to a product-id list first (same
+      // separate-query-then-merge pattern PharmacyPOSPage's search already
+      // uses for this table, rather than a PostgREST embed).
+      let manufacturerIds: string[] | null = null;
+      if (isPharmacy && manufacturerFilter !== "all") {
+        const { data: pd } = await supabase
+          .from("pharmacy_product_details" as any)
+          .select("product_id")
+          .eq("manufacturer", manufacturerFilter);
+        manufacturerIds = ((pd ?? []) as any[]).map((r) => r.product_id);
+        if (manufacturerIds.length === 0) {
+          return { rows: [] as any[], total: 0 };
+        }
+      }
+
       let q = supabase
         .from("products")
         .select("*", { count: "exact" })
@@ -117,13 +156,26 @@ function ProductsPage() {
         q = q.or(`name.ilike.%${term}%,sku.ilike.${term}%,barcode.ilike.${term}%`);
       }
       if (category !== "all") q = q.eq("category", category);
+      if (rackFilter !== "all") q = rackFilter === "__none__" ? q.is("rack_location", null) : q.eq("rack_location", rackFilter);
+      if (manufacturerIds) q = q.in("id", manufacturerIds);
       if (stockFilter === "out") q = q.lte("stock", 0);
       if (stockFilter === "in") q = q.gt("stock", 0);
       if (stockFilter === "low") q = q.gt("stock", 0).lte("stock", 5);
 
       const { data, error, count } = await q;
       if (error) throw error;
-      return { rows: (data ?? []) as any[], total: count ?? 0 };
+      const rows = (data ?? []) as any[];
+
+      if (isPharmacy && rows.length) {
+        const { data: details } = await supabase
+          .from("pharmacy_product_details" as any)
+          .select("product_id,manufacturer")
+          .in("product_id", rows.map((r) => r.id));
+        const byId = new Map(((details ?? []) as any[]).map((d) => [d.product_id, d.manufacturer]));
+        for (const r of rows) r.manufacturer = byId.get(r.id) ?? null;
+      }
+
+      return { rows, total: count ?? 0 };
     },
   });
   const pageRows = listData?.rows ?? [];
@@ -149,6 +201,29 @@ function ProductsPage() {
     queryFn: async () => {
       const { data } = await supabase.from("products").select("category").not("category", "is", null).limit(2000);
       return Array.from(new Set((data ?? []).map((r: any) => r.category).filter(Boolean))).sort() as string[];
+    },
+  });
+
+  const { data: racks = [] } = useQuery({
+    queryKey: ["products", "racks"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("rack_location").not("rack_location", "is", null).limit(2000);
+      return Array.from(new Set((data ?? []).map((r: any) => r.rack_location).filter(Boolean))).sort() as string[];
+    },
+  });
+
+  const { data: manufacturers = [] } = useQuery({
+    queryKey: ["products", "manufacturers"],
+    enabled: isPharmacy,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("pharmacy_product_details" as any)
+        .select("manufacturer")
+        .not("manufacturer", "is", null)
+        .limit(2000);
+      return Array.from(new Set((data ?? []).map((r: any) => r.manufacturer).filter(Boolean))).sort() as string[];
     },
   });
 
@@ -190,9 +265,14 @@ function ProductsPage() {
     if (!form.name) return toast.error(t('products.name_required', 'Name is required'));
     const allBarcodes = parseBarcodes(form.barcodes_text);
     const primary = form.barcode?.trim() || allBarcodes[0] || null;
-    const { barcodes_text: _bt, stock: rawStock, ...rest } = form;
+    const {
+      barcodes_text: _bt, stock: rawStock,
+      generic_name, strength, dosage_form, manufacturer, drug_schedule, prescription_required,
+      pack_size, units_per_pack,
+      ...rest
+    } = form;
     const newStock = roundToTillixQty(Number(rawStock));
-    const payload = { ...rest, sku: form.sku || null, barcode: primary || null, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null, batch_no: form.batch_no || null, expiry_date: form.expiry_date || null, rack_location: form.rack_location || null, allow_negative_stock: form.allow_negative_stock };
+    const payload = { ...rest, sku: form.sku || null, barcode: primary || null, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null, batch_no: form.batch_no || null, expiry_date: form.expiry_date || null, rack_location: form.rack_location || null, allow_negative_stock: form.allow_negative_stock, track_batches: form.track_batches };
     let productId = form.id;
     if (form.id) {
       // Update all non-stock fields directly
@@ -237,6 +317,24 @@ function ProductsPage() {
         const { error: bcErr } = await supabase.from("product_barcodes").insert(rows);
         if (bcErr) return toast.error(bcErr.message);
       }
+
+      if (isPharmacy) {
+        const { error: pdErr } = await supabase.from("pharmacy_product_details" as any).upsert(
+          {
+            product_id: productId,
+            generic_name: generic_name || null,
+            strength: strength || null,
+            dosage_form: dosage_form || null,
+            manufacturer: manufacturer || null,
+            drug_schedule: drug_schedule || null,
+            prescription_required,
+            pack_size: pack_size || null,
+            units_per_pack: units_per_pack > 0 ? units_per_pack : null,
+          } as any,
+          { onConflict: "product_id" },
+        );
+        if (pdErr) return toast.error(pdErr.message);
+      }
     }
     toast.success(form.id ? t('products.product_updated', 'Product updated') : t('products.product_added', 'Product added'));
     clearOpen();
@@ -257,6 +355,15 @@ function ProductsPage() {
   const edit = async (p: any) => {
     const { data: bcs } = await supabase.from("product_barcodes").select("barcode").eq("product_id", p.id);
     const list = (bcs ?? []).map((b: any) => b.barcode).filter((b: string) => b && b !== p.barcode);
+    let pharmacyDetails: any = null;
+    if (isPharmacy) {
+      const { data } = await supabase
+        .from("pharmacy_product_details" as any)
+        .select("*")
+        .eq("product_id", p.id)
+        .maybeSingle();
+      pharmacyDetails = data;
+    }
     setForm({
       id: p.id, name: p.name, sku: p.sku ?? "", barcode: p.barcode ?? "",
       barcodes_text: list.join("\n"),
@@ -269,6 +376,15 @@ function ProductsPage() {
       expiry_date: p.expiry_date ?? "",
       rack_location: p.rack_location ?? "",
       allow_negative_stock: !!p.allow_negative_stock,
+      track_batches: !!p.track_batches,
+      generic_name: pharmacyDetails?.generic_name ?? "",
+      strength: pharmacyDetails?.strength ?? "",
+      dosage_form: pharmacyDetails?.dosage_form ?? "",
+      manufacturer: pharmacyDetails?.manufacturer ?? "",
+      drug_schedule: pharmacyDetails?.drug_schedule ?? "",
+      prescription_required: !!pharmacyDetails?.prescription_required,
+      pack_size: pharmacyDetails?.pack_size ?? "",
+      units_per_pack: Number(pharmacyDetails?.units_per_pack ?? 0),
     });
     setOpen(true);
   };
@@ -361,6 +477,75 @@ function ProductsPage() {
                     </div>
                   </label>
                 </div>
+                {isPharmacy && (
+                  <div className="col-span-2 rounded-md border p-3 space-y-3 bg-muted/30">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {t('products.pharmacy_details_heading', 'Pharmacy details')}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>{t('products.generic_name_label', 'Generic / salt name')}</Label>
+                        <Input value={form.generic_name} onChange={(e) => setForm({ ...form, generic_name: e.target.value })} placeholder={t('products.generic_name_placeholder', 'e.g. Amoxicillin')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.strength_label', 'Strength')}</Label>
+                        <Input value={form.strength} onChange={(e) => setForm({ ...form, strength: e.target.value })} placeholder={t('products.strength_placeholder', 'e.g. 500mg')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.dosage_form_label', 'Dosage form')}</Label>
+                        <Input value={form.dosage_form} onChange={(e) => setForm({ ...form, dosage_form: e.target.value })} placeholder={t('products.dosage_form_placeholder', 'e.g. Tablet, Syrup, Injection')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.manufacturer_label', 'Manufacturer')}</Label>
+                        <Input value={form.manufacturer} onChange={(e) => setForm({ ...form, manufacturer: e.target.value })} />
+                      </div>
+                      <div className="col-span-2">
+                        <Label>{t('products.drug_schedule_label', 'Drug schedule / controlled category')}</Label>
+                        <Input value={form.drug_schedule} onChange={(e) => setForm({ ...form, drug_schedule: e.target.value })} placeholder={t('products.drug_schedule_placeholder', 'Leave blank for regular OTC medicines')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.pack_size_label', 'Pack name (optional)')}</Label>
+                        <Input value={form.pack_size} onChange={(e) => setForm({ ...form, pack_size: e.target.value })} placeholder={t('products.pack_size_placeholder', 'e.g. Strip, Box')} />
+                      </div>
+                      <div>
+                        <Label>{t('products.units_per_pack_label', 'Units per pack')}</Label>
+                        <Input type="number" step="1" min="0" value={form.units_per_pack || ""} onChange={(e) => setForm({ ...form, units_per_pack: Number(e.target.value) })} placeholder={t('products.units_per_pack_placeholder', 'e.g. 10')} />
+                      </div>
+                    </div>
+                    {form.pack_size && form.units_per_pack > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('products.pack_conversion_hint', '1 {{pack}} = {{count}} {{unit}} — purchases and POS can enter quantity either way.', { pack: form.pack_size, count: form.units_per_pack, unit: form.unit || 'unit' })}
+                      </p>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <input
+                        id="prescription-required"
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        checked={form.prescription_required}
+                        onChange={(e) => setForm({ ...form, prescription_required: e.target.checked })}
+                      />
+                      <label htmlFor="prescription-required" className="text-sm cursor-pointer">
+                        {t('products.prescription_required_label', 'Prescription required to sell')}
+                      </label>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <input
+                        id="track-batches"
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        checked={form.track_batches}
+                        onChange={(e) => setForm({ ...form, track_batches: e.target.checked })}
+                      />
+                      <label htmlFor="track-batches" className="text-sm cursor-pointer">
+                        <div className="font-medium">{t('products.track_batches_label', 'Track batches & expiry (FEFO)')}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t('products.track_batches_desc', 'Purchases with a batch/expiry date will create a batch, and sales will automatically consume the batch closest to expiring first.')}
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>{t('products.hide_keep_draft', 'Hide (keep draft)')}</Button>
@@ -385,6 +570,23 @@ function ProductsPage() {
               {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={rackFilter} onValueChange={setRackFilter}>
+            <SelectTrigger className="w-[170px]"><SelectValue placeholder={t('products.rack_filter_label', 'Rack')} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('products.all_racks', 'All racks')}</SelectItem>
+              {racks.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              <SelectItem value="__none__">{t('products.no_rack_assigned', 'No rack assigned')}</SelectItem>
+            </SelectContent>
+          </Select>
+          {isPharmacy && (
+            <Select value={manufacturerFilter} onValueChange={setManufacturerFilter}>
+              <SelectTrigger className="w-[190px]"><SelectValue placeholder={t('products.manufacturer_filter_label', 'Company')} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('products.all_manufacturers', 'All companies')}</SelectItem>
+                {manufacturers.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -432,6 +634,8 @@ function ProductsPage() {
               <SortHead k="name">{t('common.name', 'Name')}</SortHead>
               <SortHead k="sku">{t('pos.qa_sku', 'SKU')}</SortHead>
               <SortHead k="category">{t('pos.qa_category', 'Category')}</SortHead>
+              <TableHead>{t('products.rack_filter_label', 'Rack')}</TableHead>
+              {isPharmacy && <TableHead>{t('products.manufacturer_filter_label', 'Company')}</TableHead>}
               {showCost && <SortHead k="cost_price" className="text-right">{t('pos.cost', 'Cost')}</SortHead>}
               {showSell && <SortHead k="sell_price" className="text-right">{t('products.price_label', 'Price')}</SortHead>}
               <SortHead k="stock" className="text-right">{t('pos.stock', 'Stock')}</SortHead>
@@ -452,6 +656,8 @@ function ProductsPage() {
                 <TableCell className="font-medium">{p.name}</TableCell>
                 <TableCell className="text-muted-foreground">{p.sku ?? "—"}</TableCell>
                 <TableCell>{p.category ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{p.rack_location ?? "—"}</TableCell>
+                {isPharmacy && <TableCell className="text-muted-foreground">{p.manufacturer ?? "—"}</TableCell>}
                 {showCost && <TableCell className="text-right">{fmtMoney(p.cost_price, sym)}</TableCell>}
                 {showSell && <TableCell className="text-right font-medium">{fmtMoney(p.sell_price, sym)}</TableCell>}
                 <TableCell className="text-right">

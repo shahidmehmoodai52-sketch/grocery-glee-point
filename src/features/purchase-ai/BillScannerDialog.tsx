@@ -128,6 +128,8 @@ export interface ImportedPurchase {
     discount: number;
     barcode: string | null;
     item_code: string | null;
+    batch_no?: string | null;
+    expiry_date?: string | null;
   }[];
   date: string | null;
   note: string;
@@ -137,9 +139,14 @@ export interface ImportedPurchase {
 export function PurchaseBillScannerButton({
   suppliers,
   onImport,
+  isPharmacy,
 }: {
   suppliers: { id: string; name: string }[];
   onImport: (result: ImportedPurchase) => void;
+  /** Asks the AI to also read batch/expiry off the bill and shows editable
+   *  fields for them in the review table. Omitted/false for grocery — the
+   *  extraction call itself stays byte-identical to before. */
+  isPharmacy?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
@@ -199,7 +206,7 @@ export function PurchaseBillScannerButton({
     setError("");
     try {
       const images = await Promise.all(pages.map(fileToDataUrl));
-      const bill = await extract({ data: { images } });
+      const bill = await extract({ data: { images, extractBatchExpiry: !!isPharmacy } });
       setExtracted(bill);
 
       const [prodRes, bcRes] = await Promise.all([
@@ -345,6 +352,7 @@ export function PurchaseBillScannerButton({
         discount: l.discount,
         barcode: l.barcode,
         item_code: l.sku,
+        ...(isPharmacy ? { batch_no: l.batch_no ?? null, expiry_date: l.expiry_date ?? null } : {}),
       })),
       date: extracted?.invoice_date ?? null,
       note: extracted?.invoice_number ? `Invoice #${extracted.invoice_number}` : "",
@@ -472,6 +480,16 @@ export function PurchaseBillScannerButton({
                 </div>
               )}
 
+              {isPharmacy && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    Batch # and expiry dates below are read by AI and can be wrong or missing — double-check every
+                    line against the physical bill before confirming, especially expiry dates.
+                  </div>
+                </div>
+              )}
+
               <div className="border rounded-md overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -515,6 +533,23 @@ export function PurchaseBillScannerButton({
                                   resolveScan(idx, e.currentTarget.value);
                                   e.currentTarget.value = "";
                                 }}
+                              />
+                            </div>
+                          )}
+                          {isPharmacy && (
+                            <div className="mt-1.5 flex gap-1">
+                              <input
+                                value={l.batch_no ?? ""}
+                                onChange={(e) => patchLine(idx, { batch_no: e.target.value })}
+                                placeholder="Batch #"
+                                className="w-full h-6 rounded border bg-background px-1.5 text-[11px]"
+                              />
+                              <input
+                                type="date"
+                                value={l.expiry_date ?? ""}
+                                onChange={(e) => patchLine(idx, { expiry_date: e.target.value })}
+                                title="Expiry date — verify against the physical bill"
+                                className="h-6 rounded border bg-background px-1.5 text-[11px]"
                               />
                             </div>
                           )}
