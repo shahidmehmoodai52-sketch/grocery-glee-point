@@ -191,6 +191,33 @@ function to production via Lovable, then have the user paste the
 function's URL + verify token into Meta's App Dashboard → WhatsApp →
 Configuration → Webhooks.
 
+## 6. Auth emails still sent via Supabase's default service, not Tillix-branded (pending — not started)
+
+User noticed the "Confirm your email address" signup email arrives from Supabase's
+generic built-in sender ("...powered by Supabase ⚡" footer), not from Tillix.
+
+This is entirely Supabase Dashboard configuration — nothing in this repo controls
+it (`supabase/config.toml` has no `[auth.email]` section, and there's no MCP tool
+available here to change Auth email templates or SMTP settings). Two separate
+dashboard changes are needed, both by the user:
+
+1. **Branding/wording**: Supabase Dashboard → Authentication → Emails → Templates
+   → edit "Confirm signup" (and the other templates: Magic Link, Reset Password,
+   Change Email, Invite) to Tillix-branded subject/body text.
+2. **Sender address** (the more important half — not just cosmetic): Authentication
+   → Emails → SMTP Settings → connect a custom SMTP provider (e.g. Resend,
+   SendGrid, Brevo, Zoho Mail, or tillix.co's own mail) so the "From" becomes
+   something like `no-reply@tillix.co` instead of Supabase's shared address.
+
+   Confirmed via Supabase's own docs: the built-in (no custom SMTP) email service
+   is rate-limited and explicitly "best-effort... for production use, you should
+   consider configuring a custom SMTP server." With real shops signing up live,
+   this isn't just a branding gap — if enough signups land in the same hour, some
+   owners simply won't get their confirmation email. Worth prioritizing the SMTP
+   setup over the template wording for that reason.
+
+User said: address this later, left pending for now.
+
 ## Also noted (informational, no action needed)
 - Root `.env` is committed to the repo with Supabase URL + anon/publishable key
   only (no service-role/secret key) — not a critical leak, but best practice
