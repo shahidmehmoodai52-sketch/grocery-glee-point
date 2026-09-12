@@ -395,7 +395,7 @@ function Page() {
       </Dialog>
 
       <AddPaymentDialog open={addPayOpen} onOpenChange={setAddPayOpen} party="customer" partyId={id} party_name={customer?.name} defaultAmount={payDefault} />
-      <AddDiscountDialog open={addDiscountOpen} onOpenChange={setAddDiscountOpen} partyId={id} party_name={customer?.name} defaultAmount={payDefault} />
+      <AddDiscountDialog open={addDiscountOpen} onOpenChange={setAddDiscountOpen} party="customer" partyId={id} party_name={customer?.name} defaultAmount={payDefault} />
       <EditPaymentDialog open={!!editPayment} onOpenChange={(o) => !o && setEditPayment(null)} payment={editPayment} />
       <EditEntryDialog open={!!editEntry} onOpenChange={(o) => !o && setEditEntry(null)} entity={editEntry?.entity ?? null} entry={editEntry?.entry ?? null} />
 

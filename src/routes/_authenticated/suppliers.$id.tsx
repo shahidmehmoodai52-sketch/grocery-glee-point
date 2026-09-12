@@ -17,7 +17,7 @@ import { printDocument } from "@/components/receipt";
 
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
-import { AddPaymentDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
+import { AddPaymentDialog, AddDiscountDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger } from "@/lib/customer-ledger";
 import type { LedgerEntry as Entry } from "@/lib/supplier-ledger";
 
@@ -34,6 +34,7 @@ function Page() {
   const [to, setTo] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [addPayOpen, setAddPayOpen] = useState(false);
+  const [addDiscountOpen, setAddDiscountOpen] = useState(false);
   const [payDefault, setPayDefault] = useState(0);
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
@@ -72,8 +73,8 @@ function Page() {
       return (data ?? []).map((row: any) => ({
         id: row.id ?? undefined,
         date: row.occurred_at,
-        type: row.entry_type === "return" ? "return" : row.entry_type === "purchase" ? "purchase" : row.entry_type === "incentive" ? "incentive" : "payment",
-        entity: row.entry_type === "purchase" ? "purchase" : row.entry_type === "return" ? "purchase_return" : row.entry_type === "payment" ? "payment" : undefined,
+        type: row.entry_type === "return" ? "return" : row.entry_type === "purchase" ? "purchase" : row.entry_type === "incentive" ? "incentive" : row.entry_type === "discount" ? "discount" : "payment",
+        entity: row.entry_type === "purchase" ? "purchase" : row.entry_type === "return" ? "purchase_return" : (row.entry_type === "payment" || row.entry_type === "discount") ? "payment" : undefined,
         ref: row.reference,
         note: row.note ?? "",
         debit: Number(row.debit || 0),
@@ -159,6 +160,9 @@ function Page() {
           }}><FileDown className="h-4 w-4 mr-2" />{t('customers.pdf', 'PDF')}</Button>
           <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />{t('ledger.add_payment', 'Add payment')}
+          </Button>
+          <Button variant="outline" onClick={() => { setPayDefault(0); setAddDiscountOpen(true); }}>
+            <Gift className="h-4 w-4 mr-1" />{t('ledger.add_discount', 'Add discount')}
           </Button>
         </div>
       </div>
@@ -258,16 +262,17 @@ function Page() {
                     onClick={(e) => {
                       if ((e.target as HTMLElement).closest("button")) return;
                       if (isPurchase) return toggle(x.id!);
-                      if (x.entity === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
+                      if (x.entity === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.type === "discount" ? "discount" : x.ref, note: x.note, created_at: x.date });
                       if (x.entity && x.id) return setEditEntry({ entity: x.entity as Exclude<LedgerEntity, "payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
                     }}
                   >
                     <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleDateString()}</TableCell>
                     <TableCell>
                       {x.type !== "purchase" && (
-                        <Badge variant={x.type === "return" ? "secondary" : "outline"} className="capitalize">
+                        <Badge variant={x.type === "return" ? "secondary" : "outline"} className={`capitalize ${x.type === "discount" ? "border-warning/50 text-warning" : ""}`}>
                           {x.type === "return" ? t('suppliers.entry_type_return', 'return')
                             : x.type === "incentive" ? t('suppliers.entry_type_incentive', 'incentive')
+                            : x.type === "discount" ? t('suppliers.entry_type_discount', 'discount')
                             : x.type === "payment" ? t('suppliers.entry_type_payment', 'payment')
                             : x.type}
                         </Badge>
@@ -299,7 +304,7 @@ function Page() {
                           </Button>
                         )}
                         {x.entity === "payment" && x.id && (
-                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date })}>
+                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.credit, method: x.type === "discount" ? "discount" : x.ref, note: x.note, created_at: x.date })}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                         )}
@@ -371,6 +376,7 @@ function Page() {
       </Card>
 
       <AddPaymentDialog open={addPayOpen} onOpenChange={setAddPayOpen} party="supplier" partyId={id} party_name={supplier?.name} defaultAmount={payDefault} />
+      <AddDiscountDialog open={addDiscountOpen} onOpenChange={setAddDiscountOpen} party="supplier" partyId={id} party_name={supplier?.name} />
       <EditPaymentDialog open={!!editPayment} onOpenChange={(o) => !o && setEditPayment(null)} payment={editPayment} />
       <EditEntryDialog open={!!editEntry} onOpenChange={(o) => !o && setEditEntry(null)} entity={editEntry?.entity ?? null} entry={editEntry?.entry ?? null} />
     </div>

@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/purchases")({ component: P
 
 const PURCHASE_LIST_LIMIT = 2000;
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; batch_no?: string; expiry_date?: string; mfg_date?: string; bonus_qty?: number; pack_size?: string | null; units_per_pack?: number; pack_qty?: number };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; batch_no?: string; expiry_date?: string; mfg_date?: string; bonus_qty?: number; pack_size?: string | null; units_per_pack?: number; pack_qty?: number; stock_override?: number | null };
 
 type Draft = {
   open: boolean;
@@ -745,6 +745,25 @@ function Page() {
 
       } else {
         // --- New Purchase Flow ---
+        // Apply any manual stock corrections first (e.g. a physical count
+        // done while receiving this purchase) so complete_purchase's own
+        // stock and weighted-average-cost math starts from the corrected
+        // baseline instead of the possibly-wrong system value. Each
+        // correction is its own audited 'adjustment' movement — this
+        // purchase's own qty is still recorded separately as a 'purchase'
+        // movement, so the audit trail shows both changes distinctly.
+        for (const l of items) {
+          if (!l.product_id) continue;
+          const oldStock = Number(l.old_stock ?? 0);
+          if (l.stock_override == null || Number(l.stock_override) === oldStock) continue;
+          const { error: adjErr } = await supabase.rpc("adjust_product_stock", {
+            _product_id: l.product_id,
+            _new_stock: Number(l.stock_override),
+            _reason: "Stock correction during purchase entry",
+          });
+          if (adjErr) throw new Error(`${t('purchases.stock_correction_failed', 'Stock correction failed for {{name}}', { name: l.name })}: ${adjErr.message}`);
+        }
+
         const { error, data } = await supabase.rpc("complete_purchase", { payload });
         if (error) throw error;
         
@@ -1046,7 +1065,28 @@ function Page() {
                                 />
                                 {(l.item_code || l.barcode) && (
                                   <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                                    {l.item_code ? t('purchases.code_prefix', 'Code {{code}}', { code: l.item_code }) : t('purchases.bc_short', 'BC {{barcode}}', { barcode: l.barcode })} · {t('purchases.stock_inline', 'stock {{qty}}', { qty: oldStock })}
+                                    {l.item_code ? t('purchases.code_prefix', 'Code {{code}}', { code: l.item_code }) : t('purchases.bc_short', 'BC {{barcode}}', { barcode: l.barcode })}
+                                  </div>
+                                )}
+                                {hasProduct && (
+                                  <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <span>{t('purchases.stock_label', 'Stock')}</span>
+                                    <Input
+                                      type="number"
+                                      step="0.001"
+                                      value={l.stock_override ?? oldStock}
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        setLine(i, { stock_override: v === "" ? null : Number(v) });
+                                      }}
+                                      className="h-5 w-14 px-1 text-[10px]"
+                                      title={t('purchases.stock_correction_title', "Correct current stock here if it doesn't match what you physically counted — the correction is recorded before this purchase's quantity is added")}
+                                    />
+                                    {Number(l.stock_override ?? oldStock) !== oldStock && (
+                                      <span className="text-amber-600 whitespace-nowrap">
+                                        {t('purchases.stock_was', '(was {{qty}})', { qty: oldStock })}
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                                 {isPharmacy && (

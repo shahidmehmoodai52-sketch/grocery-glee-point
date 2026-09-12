@@ -220,14 +220,17 @@ export function AddPaymentDialog({
   );
 }
 
-/** Waives part of what a customer owes — settles the ledger like a payment,
- *  but no cash actually comes in (no cash account, no cash_transactions
- *  row) and it's tracked separately so it can be subtracted from profit. */
+/** Waives part of what a party owes — settles the ledger like a payment, but
+ *  no cash actually moves (no cash account, no cash_transactions row) and
+ *  it's tracked separately (method='discount') so reports can treat it
+ *  correctly: a customer discount is a cost (subtracted from profit), while
+ *  a supplier discount is money saved (added to profit) — same mechanism,
+ *  opposite direction, decided by `party`. */
 export function AddDiscountDialog({
-  open, onOpenChange, partyId, party_name, defaultAmount = 0, onDone,
+  open, onOpenChange, party, partyId, party_name, defaultAmount = 0, onDone,
 }: {
   open: boolean; onOpenChange: (o: boolean) => void;
-  partyId: string; party_name?: string;
+  party: Party; partyId: string; party_name?: string;
   defaultAmount?: number; onDone?: () => void;
 }) {
   const { t } = useTranslation();
@@ -251,7 +254,7 @@ export function AddDiscountDialog({
     let error: any = null;
     try {
       const res = await supabase.rpc("record_payment", {
-        p_party_type: "customer", p_party_id: partyId, p_amount: amount, p_method: "discount", p_note: note || "",
+        p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: "discount", p_note: note || "",
       });
       error = res.error;
       if (!error && when && res.data) {
@@ -285,7 +288,9 @@ export function AddDiscountDialog({
           <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div><Label>{t('common.note', 'Note')}</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('ledger.discount_placeholder', 'e.g. Rounded off / goodwill discount')} /></div>
           <p className="text-[11px] text-muted-foreground">
-            {t('ledger.discount_note', 'No cash moves — this reduces what the customer owes and comes off profit in Reports & Dashboard. Nothing changes in Cash Flow.')}
+            {party === "supplier"
+              ? t('ledger.discount_note_supplier', 'No cash moves — this reduces what we owe the supplier and is added to profit in Reports & Dashboard. Nothing changes in Cash Flow.')
+              : t('ledger.discount_note', 'No cash moves — this reduces what the customer owes and comes off profit in Reports & Dashboard. Nothing changes in Cash Flow.')}
           </p>
         </div>
         <DialogFooter>

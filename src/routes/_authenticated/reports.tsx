@@ -911,6 +911,10 @@ function Page() {
   // Supplier target incentives never touch the purchase bill — they're pure
   // bonus income, added straight to net profit.
   const incentiveTotal = Number(summaryStats.incentive_total || 0);
+  // A supplier-given discount is money the shop effectively saved — added to
+  // profit the same way an incentive is (opposite of a customer discount,
+  // which is a cost).
+  const supplierDiscountTotal = Number(summaryStats.supplier_discount_total || 0);
   // Kept identical to the Dashboard "Profit" tile (dashboard.tsx) on purpose —
   // both must always show the same bottom-line number. Gross profit above is
   // deliberately a narrower sales-margin figure (revenue − cost only); tax
@@ -925,7 +929,7 @@ function Page() {
   // is 40, not the full 240 refunded.
   const returnsCost = Number(summaryStats.returns_cost || 0);
   const returnsProfitLoss = returnsTotal - returnsCost;
-  const netProfit = grossProfit - taxCollected - returnsProfitLoss - expensesPeriod - discountTotal + incentiveTotal;
+  const netProfit = grossProfit - taxCollected - returnsProfitLoss - expensesPeriod - discountTotal + incentiveTotal + supplierDiscountTotal;
   const grossRevenue = revenue;
   const netOfReturns = revenue - returnsTotal;
   const creditOut = Number(summaryStats.credit_sales_total || 0);
@@ -1195,6 +1199,9 @@ function Page() {
                 <Row label={t('reports.row_total_purchases_period', 'Total purchases (period)')} value={fmtMoney(totalPurchases, sym)} muted onClick={openPurchases} />
                 {incentiveTotal > 0 && (
                   <Row label={t('reports.row_supplier_incentives', 'Supplier incentives')} value={`+${fmtMoney(incentiveTotal, sym)}`} onClick={openPurchases} />
+                )}
+                {supplierDiscountTotal > 0 && (
+                  <Row label={t('reports.row_supplier_discounts', 'Supplier discounts')} value={`+${fmtMoney(supplierDiscountTotal, sym)}`} muted />
                 )}
                 <Row label={t('reports.row_net_profit', 'Net profit')} value={fmtMoney(netProfit, sym)} bold accent onClick={() => openInvoices(t('reports.drill_net_profit_title', 'Net profit basis · all invoices'), allSales as any[])} />
 
