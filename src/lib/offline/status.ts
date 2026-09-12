@@ -7,21 +7,23 @@ import { db } from "./db";
 // Probing the direct URL falsely marks users offline where supabase.co is blocked.
 const PROXY_URL = (import.meta.env.VITE_SUPABASE_PROXY_URL ?? 'https://aged-truth-688d.shahidmehmoodai52.workers.dev') as string;
 const DIRECT_URL = (process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
-const SUPABASE_URL = PROXY_URL || DIRECT_URL;
 const SUPABASE_KEY = (process.env.SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
 
-/** Real connectivity probe — navigator.onLine only reflects the network
- *  interface, not actual reachability (Windows/Chrome NCSI can report
- *  offline even when the internet works fine). This hits our own
- *  Supabase REST endpoint with a short timeout as ground truth. */
-async function probeConnectivity(): Promise<boolean> {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return navigator.onLine;
+// Try the Cloudflare Worker proxy first (client.ts's primary path), but fall
+// back to the direct Supabase URL if it doesn't answer. Some networks block
+// one path but not the other (an ISP blocking supabase.co is why the proxy
+// exists; a different network blocking *.workers.dev is just as real) — a
+// probe that only ever tries one path permanently mislabels those users
+// "Offline" even though the app itself could still reach Supabase directly.
+const CANDIDATE_URLS = Array.from(new Set([PROXY_URL, DIRECT_URL].filter(Boolean)));
+
+async function probeOne(url: string): Promise<boolean> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 5000);
   try {
     // Lightweight GET instead of HEAD — some proxies/CDNs reject HEAD or
     // return misleading statuses while authenticated GET works fine.
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+    const res = await fetch(`${url}/rest/v1/`, {
       method: "GET",
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
       signal: ctrl.signal,
@@ -33,6 +35,18 @@ async function probeConnectivity(): Promise<boolean> {
   } finally {
     clearTimeout(t);
   }
+}
+
+/** Real connectivity probe — navigator.onLine only reflects the network
+ *  interface, not actual reachability (Windows/Chrome NCSI can report
+ *  offline even when the internet works fine). This hits our own
+ *  Supabase REST endpoint(s) with a short timeout as ground truth. */
+async function probeConnectivity(): Promise<boolean> {
+  if (!SUPABASE_KEY || CANDIDATE_URLS.length === 0) return navigator.onLine;
+  for (const url of CANDIDATE_URLS) {
+    if (await probeOne(url)) return true;
+  }
+  return false;
 }
 
 let consecutiveFailures = 0;
