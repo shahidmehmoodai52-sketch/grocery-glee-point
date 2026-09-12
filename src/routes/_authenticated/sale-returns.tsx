@@ -55,6 +55,10 @@ type ItemRow = {
   price: number;
   max?: number; // original sold qty (when from an invoice)
   selected: boolean;
+  /** Original per-unit sale price before the invoice's discount share was
+   *  subtracted (only set when loaded from an invoice). Lets the UI show
+   *  what changed instead of silently altering the price. */
+  original_price?: number;
 };
 
 async function enrichReturnRow(row: any) {
@@ -155,35 +159,47 @@ function Page() {
         },
       }),
   });
+  // Bounded on purpose: this shop can have tens of thousands of historical
+  // sales (with even more line items). Loading the entire history — as this
+  // used to do via fetchAllRows, with every sale_item embedded — was slow
+  // enough to error out just opening this page. Default to recent invoices;
+  // typing an invoice number searches the server instead of widening the
+  // client-side fetch. The picked invoice's own items (and discount) are
+  // fetched separately, on demand, in the effect below.
+  const [debouncedInvoiceSearch, setDebouncedInvoiceSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedInvoiceSearch(invoiceSearch.trim()), 250);
+    return () => clearTimeout(t);
+  }, [invoiceSearch]);
   const { data: sales = [] } = useQuery({
-    queryKey: ["sales-for-return"],
-    queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "sales",
-        cloud: async () =>
-          await fetchAllRows<any>((from: number, to: number) =>
-            supabase
-              .from("sales")
-              .select(
-                "id,invoice_no,customer_id,expense_person_id,total,created_at,customers(name),expense_persons(name),sale_items(*)",
-              )
-              .order("created_at", { ascending: false })
-              .range(from, to),
-          ),
-        local: async () => {
-          const rows = await offlineDb().sales.orderBy("created_at").reverse().toArray();
+    queryKey: ["sales-for-return", debouncedInvoiceSearch, partyType],
+    queryFn: async () => {
+      const q = debouncedInvoiceSearch;
+      try {
+        let query = supabase
+          .from("sales")
+          .select(
+            "id,invoice_no,customer_id,expense_person_id,total,discount,created_at,customers(name),expense_persons(name)",
+          )
+          .order("created_at", { ascending: false })
+          .limit(q ? 50 : 150);
+        if (partyType === "staff") query = query.not("expense_person_id", "is", null);
+        if (q) query = query.ilike("invoice_no", `%${q}%`);
+        const { data, error } = await query;
+        if (error) throw error;
+        return data ?? [];
+      } catch (error) {
+        void error;
+        // Offline / network failure — fall back to whatever recent sales
+        // are already in the local mirror (no server-side search offline).
+        try {
+          const rows = await offlineDb().sales.orderBy("created_at").reverse().limit(150).toArray();
           return await Promise.all(rows.map(enrichSaleRow));
-        },
-        cache: async (rows) => {
-          try {
-            await offlineDb().sales.bulkPut(rows as any[]);
-            const items = (rows as any[]).flatMap((r) => r.sale_items ?? []);
-            if (items.length) await offlineDb().sale_items.bulkPut(items);
-          } catch (error) {
-            void error;
-          }
-        },
-      }),
+        } catch {
+          return [];
+        }
+      }
+    },
   });
   const [date, setDate] = useState(today);
   const { data: customers = [] } = useQuery({
@@ -251,26 +267,79 @@ function Page() {
     },
   });
 
-  // Load items from selected invoice — pre-checked, editable qty capped at sold qty
+  // Load items from selected invoice — pre-checked, editable qty capped at sold
+  // qty. Fetched on demand per invoice (not from the bounded list above,
+  // which no longer embeds sale_items) so picking any invoice — recent or
+  // searched — always gets its real items regardless of the list's cap.
+  const [itemsLoading, setItemsLoading] = useState(false);
   useEffect(() => {
     if (saleId === "none") {
       setItems([]);
       return;
     }
-    const s = sales.find((x: any) => x.id === saleId);
-    if (!s) return;
-    setCustomer(s.customer_id ?? "none");
-    setItems(
-      (s.sale_items ?? []).map((it: any) => ({
-        product_id: it.product_id,
-        name: it.name,
-        qty: Number(it.qty),
-        price: Number(it.price),
-        max: Number(it.qty),
-        selected: true,
-      })),
-    );
-  }, [saleId, sales]);
+    let cancelled = false;
+    (async () => {
+      setItemsLoading(true);
+      let fullSale: any = null;
+      try {
+        const { data, error } = await supabase
+          .from("sales")
+          .select("id,customer_id,discount,sale_items(*)")
+          .eq("id", saleId)
+          .maybeSingle();
+        if (error) throw error;
+        fullSale = data;
+      } catch (error) {
+        void error;
+        try {
+          const local = await offlineDb().sales.get(saleId);
+          if (local) {
+            const localItems = await offlineDb().sale_items.where("sale_id").equals(saleId).toArray();
+            fullSale = { ...local, sale_items: localItems };
+          }
+        } catch {
+          // ignore — handled by fullSale staying null below
+        }
+      }
+      if (cancelled) return;
+      setItemsLoading(false);
+      if (!fullSale) return;
+      setCustomer(fullSale.customer_id ?? "none");
+      const allItems: any[] = fullSale.sale_items ?? [];
+      const originalSubtotal = allItems.reduce(
+        (s, it) => s + Number(it.qty) * Number(it.price),
+        0,
+      );
+      const saleDiscount = Number(fullSale.discount || 0);
+      setItems(
+        allItems.map((it) => {
+          const raw = Number(it.price);
+          const qty = Number(it.qty);
+          // sale_items never stored a per-line discount — only the bill's
+          // total discount was saved on the sale header. Reconstruct each
+          // item's share of it by value, the same proportional approach
+          // purchases.tsx already uses for its own bill-discount split, so
+          // e.g. a 10rs item that had a 2rs discount at sale time returns
+          // at 8rs instead of the full 10.
+          const share = originalSubtotal > 0 ? ((qty * raw) / originalSubtotal) * saleDiscount : 0;
+          const perUnitDiscount = qty > 0 ? share / qty : 0;
+          const effectivePrice = Math.max(0, +(raw - perUnitDiscount).toFixed(2));
+          return {
+            product_id: it.product_id,
+            name: it.name,
+            qty,
+            price: effectivePrice,
+            original_price: effectivePrice !== raw ? raw : undefined,
+            max: qty,
+            selected: true,
+          };
+        }),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [saleId]);
 
   // Auto-refund the full selected total when items/tax change
   const subtotal = useMemo(
@@ -524,6 +593,14 @@ function Page() {
                     {new Date(selectedSale.created_at).toLocaleString()} · {t('sales.th_total', 'Total')}{" "}
                     {fmtMoney(selectedSale.total, sym)} ·{" "}
                     {selectedSale.customers?.name ?? selectedSale.expense_persons?.name ?? t('common.walk_in', 'Walk-in')}
+                    {Number(selectedSale.discount || 0) > 0 && (
+                      <>
+                        {" "}·{" "}
+                        <span className="text-amber-600">
+                          {t('sale_returns.invoice_discount_was', 'Invoice discount: {{amount}} (already applied below)', { amount: fmtMoney(selectedSale.discount, sym) })}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -610,9 +687,11 @@ function Page() {
                           colSpan={6}
                           className="text-center text-muted-foreground py-4 text-sm"
                         >
-                          {saleId === "none"
-                            ? t('sale_returns.add_items_below', 'Add items below')
-                            : t('sale_returns.pick_invoice_to_load', 'Pick an invoice to load its items')}
+                          {itemsLoading
+                            ? t('sale_returns.loading_items', 'Loading invoice items…')
+                            : saleId === "none"
+                              ? t('sale_returns.add_items_below', 'Add items below')
+                              : t('sale_returns.pick_invoice_to_load', 'Pick an invoice to load its items')}
                         </TableCell>
                       </TableRow>
                     )}
@@ -658,6 +737,11 @@ function Page() {
                             onChange={(e) => setItem(i, { price: Number(e.target.value) })}
                             className="h-8"
                           />
+                          {l.original_price != null && (
+                            <div className="mt-0.5 text-[10px] text-amber-600" title={t('sale_returns.discount_hint_title', "This invoice had a discount — the return price already accounts for this item's share of it. Edit it directly if it should be different.")}>
+                              {t('sale_returns.was_price', 'was {{amount}} — discount applied', { amount: fmtMoney(l.original_price, sym) })}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {fmtMoney(l.qty * l.price, sym)}
