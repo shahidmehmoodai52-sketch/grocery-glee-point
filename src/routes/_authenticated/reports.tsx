@@ -415,6 +415,233 @@ function GenericWiseReport({
   );
 }
 
+/** Same shape as GenericWiseReport, grouped by products.rack_location
+ *  instead of the generic/salt name — available for every business type
+ *  since rack_location is a plain products column, not pharmacy-only. */
+function RackWiseReport({
+  sales,
+  saleReturns,
+  currencySymbol,
+  search,
+}: {
+  sales: any[];
+  saleReturns: any[];
+  currencySymbol: string;
+  search: string;
+}) {
+  const { t } = useTranslation();
+
+  const { data: rackByProduct = new Map<string, string>() } = useQuery({
+    queryKey: ["report-product-racks"],
+    queryFn: async () => {
+      const rows = await fetchAll<any>(
+        (fIdx: number, tIdx: number) =>
+          supabase.from("products").select("id,rack_location").range(fIdx, tIdx),
+        1000,
+      );
+      const m = new Map<string, string>();
+      for (const p of rows) if (p.rack_location) m.set(p.id, p.rack_location);
+      return m;
+    },
+  });
+
+  const rackSales = useMemo(() => {
+    const map = new Map<string, { name: string; qty: number; revenue: number; cost: number; profit: number; products: Set<string> }>();
+    const noRack = t('reports.no_rack_assigned', 'No rack assigned');
+    for (const s of sales) {
+      for (const it of (s.sale_items as any[]) ?? []) {
+        const name = (it.product_id && rackByProduct.get(it.product_id)) || noRack;
+        const cur = map.get(name) ?? { name, qty: 0, revenue: 0, cost: 0, profit: 0, products: new Set() };
+        const rev = Number(it.line_total);
+        const cost = Number(it.cost) * Number(it.qty);
+        cur.qty += Number(it.qty); cur.revenue += rev; cur.cost += cost; cur.profit += rev - cost;
+        if (it.product_id) cur.products.add(it.product_id);
+        map.set(name, cur);
+      }
+    }
+    for (const r of saleReturns) {
+      for (const it of (r.sale_return_items as any[]) ?? []) {
+        const name = (it.product_id && rackByProduct.get(it.product_id)) || noRack;
+        const cur = map.get(name);
+        if (!cur) continue;
+        const rev = Number(it.qty) * Number(it.price);
+        const cost = Number(it.qty) * Number(it.cost ?? 0);
+        cur.qty -= Number(it.qty); cur.revenue -= rev; cur.cost -= cost; cur.profit -= rev - cost;
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  }, [sales, saleReturns, rackByProduct, t]);
+
+  const q = search.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!q) return rackSales;
+    return rackSales.filter((g) => g.name.toLowerCase().includes(q));
+  }, [rackSales, q]);
+
+  return (
+    <Card className="p-3">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('reports.th_rack', 'Rack / shelf')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_products', 'Products')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_qty_sold', 'Qty sold')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_revenue', 'Revenue')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_cost', 'Cost')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_profit', 'Profit')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_margin', 'Margin %')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filtered.length === 0 && (
+            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{t('reports.no_data', 'No data')}</TableCell></TableRow>
+          )}
+          {filtered.map((g) => {
+            const margin = g.revenue ? (g.profit / g.revenue) * 100 : 0;
+            return (
+              <TableRow key={g.name}>
+                <TableCell className="font-medium">{g.name}</TableCell>
+                <TableCell className="text-right text-xs text-muted-foreground">{g.products.size}</TableCell>
+                <TableCell className="text-right">{g.qty}</TableCell>
+                <TableCell className="text-right">{fmtMoney(g.revenue, currencySymbol)}</TableCell>
+                <TableCell className="text-right">{fmtMoney(g.cost, currencySymbol)}</TableCell>
+                <TableCell className="text-right text-success font-medium">{fmtMoney(g.profit, currencySymbol)}</TableCell>
+                <TableCell className="text-right">{margin.toFixed(1)}%</TableCell>
+              </TableRow>
+            );
+          })}
+          {filtered.length > 0 && (
+            <TableRow className="bg-muted/50 font-semibold">
+              <TableCell>{t('reports.total_items_label', 'Total ({{count}} items)', { count: filtered.length })}</TableCell>
+              <TableCell />
+              <TableCell className="text-right">{filtered.reduce((a, b) => a + b.qty, 0)}</TableCell>
+              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.revenue, 0), currencySymbol)}</TableCell>
+              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.cost, 0), currencySymbol)}</TableCell>
+              <TableCell className="text-right text-success">{fmtMoney(filtered.reduce((a, b) => a + b.profit, 0), currencySymbol)}</TableCell>
+              <TableCell />
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
+/** Same shape as GenericWiseReport, grouped by manufacturer (pharmacy_product_details) —
+ *  pharmacy-only since manufacturer only exists on that table. */
+function CompanyWiseReport({
+  sales,
+  saleReturns,
+  currencySymbol,
+  search,
+}: {
+  sales: any[];
+  saleReturns: any[];
+  currencySymbol: string;
+  search: string;
+}) {
+  const { t } = useTranslation();
+
+  const { data: pharmacyDetails = [] } = useQuery({
+    queryKey: ["report-pharmacy-details-manufacturer"],
+    queryFn: async () =>
+      await fetchAll<any>(
+        (fIdx: number, tIdx: number) =>
+          supabase.from("pharmacy_product_details" as any).select("product_id,manufacturer").range(fIdx, tIdx),
+        1000,
+      ),
+  });
+
+  const manufacturerByProduct = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const d of pharmacyDetails as any[]) {
+      if (d.manufacturer) m.set(d.product_id, d.manufacturer);
+    }
+    return m;
+  }, [pharmacyDetails]);
+
+  const companySales = useMemo(() => {
+    const map = new Map<string, { name: string; qty: number; revenue: number; cost: number; profit: number; products: Set<string> }>();
+    const noCompany = t('reports.no_manufacturer_assigned', 'No company assigned');
+    for (const s of sales) {
+      for (const it of (s.sale_items as any[]) ?? []) {
+        const name = (it.product_id && manufacturerByProduct.get(it.product_id)) || noCompany;
+        const cur = map.get(name) ?? { name, qty: 0, revenue: 0, cost: 0, profit: 0, products: new Set() };
+        const rev = Number(it.line_total);
+        const cost = Number(it.cost) * Number(it.qty);
+        cur.qty += Number(it.qty); cur.revenue += rev; cur.cost += cost; cur.profit += rev - cost;
+        if (it.product_id) cur.products.add(it.product_id);
+        map.set(name, cur);
+      }
+    }
+    for (const r of saleReturns) {
+      for (const it of (r.sale_return_items as any[]) ?? []) {
+        const name = (it.product_id && manufacturerByProduct.get(it.product_id)) || noCompany;
+        const cur = map.get(name);
+        if (!cur) continue;
+        const rev = Number(it.qty) * Number(it.price);
+        const cost = Number(it.qty) * Number(it.cost ?? 0);
+        cur.qty -= Number(it.qty); cur.revenue -= rev; cur.cost -= cost; cur.profit -= rev - cost;
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  }, [sales, saleReturns, manufacturerByProduct, t]);
+
+  const q = search.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!q) return companySales;
+    return companySales.filter((g) => g.name.toLowerCase().includes(q));
+  }, [companySales, q]);
+
+  return (
+    <Card className="p-3">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('reports.th_company', 'Company / manufacturer')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_products', 'Products')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_qty_sold', 'Qty sold')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_revenue', 'Revenue')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_cost', 'Cost')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_profit', 'Profit')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_margin', 'Margin %')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filtered.length === 0 && (
+            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{t('reports.no_data', 'No data')}</TableCell></TableRow>
+          )}
+          {filtered.map((g) => {
+            const margin = g.revenue ? (g.profit / g.revenue) * 100 : 0;
+            return (
+              <TableRow key={g.name}>
+                <TableCell className="font-medium">{g.name}</TableCell>
+                <TableCell className="text-right text-xs text-muted-foreground">{g.products.size}</TableCell>
+                <TableCell className="text-right">{g.qty}</TableCell>
+                <TableCell className="text-right">{fmtMoney(g.revenue, currencySymbol)}</TableCell>
+                <TableCell className="text-right">{fmtMoney(g.cost, currencySymbol)}</TableCell>
+                <TableCell className="text-right text-success font-medium">{fmtMoney(g.profit, currencySymbol)}</TableCell>
+                <TableCell className="text-right">{margin.toFixed(1)}%</TableCell>
+              </TableRow>
+            );
+          })}
+          {filtered.length > 0 && (
+            <TableRow className="bg-muted/50 font-semibold">
+              <TableCell>{t('reports.total_items_label', 'Total ({{count}} items)', { count: filtered.length })}</TableCell>
+              <TableCell />
+              <TableCell className="text-right">{filtered.reduce((a, b) => a + b.qty, 0)}</TableCell>
+              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.revenue, 0), currencySymbol)}</TableCell>
+              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.cost, 0), currencySymbol)}</TableCell>
+              <TableCell className="text-right text-success">{fmtMoney(filtered.reduce((a, b) => a + b.profit, 0), currencySymbol)}</TableCell>
+              <TableCell />
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
 function StatMini({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
   const colors: Record<string, string> = { success: "text-success", destructive: "text-destructive" };
   return (
@@ -979,6 +1206,8 @@ function Page() {
             <TabsTrigger value="payments">{t('reports.tab_payments', 'Payments')}</TabsTrigger>
             <TabsTrigger value="supplier">{t('reports.tab_supplier', 'Supplier Wise')}</TabsTrigger>
             {isPharmacy && <TabsTrigger value="generic">{t('reports.tab_generic', 'Salt Wise')}</TabsTrigger>}
+            <TabsTrigger value="rack">{t('reports.tab_rack', 'Rack Wise')}</TabsTrigger>
+            {isPharmacy && <TabsTrigger value="company">{t('reports.tab_company', 'Company Wise')}</TabsTrigger>}
           </TabsList>
           {(tab === "invoice" || tab === "product" || tab === "supplier" || tab === "generic") && (
             <Input
@@ -1407,6 +1636,24 @@ function Page() {
         {isPharmacy && (
           <TabsContent value="generic">
             <GenericWiseReport
+              sales={allSales}
+              saleReturns={allSaleReturns}
+              currencySymbol={sym}
+              search={search}
+            />
+          </TabsContent>
+        )}
+        <TabsContent value="rack">
+          <RackWiseReport
+            sales={allSales}
+            saleReturns={allSaleReturns}
+            currencySymbol={sym}
+            search={search}
+          />
+        </TabsContent>
+        {isPharmacy && (
+          <TabsContent value="company">
+            <CompanyWiseReport
               sales={allSales}
               saleReturns={allSaleReturns}
               currencySymbol={sym}

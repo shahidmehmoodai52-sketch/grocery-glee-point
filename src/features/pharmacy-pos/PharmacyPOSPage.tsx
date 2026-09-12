@@ -77,7 +77,7 @@ function CustomerPicker({
   );
 }
 
-const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category,tax_rate,track_batches";
+const PRODUCT_COLUMNS = "id,name,sku,barcode,sell_price,cost_price,stock,unit,category,tax_rate,track_batches,rack_location";
 
 type PharmacyDetail = {
   generic_name: string | null;
@@ -93,6 +93,7 @@ type ProductRow = {
   id: string; name: string; sku: string | null; barcode: string | null;
   sell_price: number; cost_price: number; stock: number; unit: string | null;
   category: string | null; tax_rate: number | null; track_batches: boolean | null;
+  rack_location: string | null;
   pharmacy?: PharmacyDetail | null;
   /** true only when this product has batch stock and every batch of it is
    *  past its expiry date — not set for untracked products or ones with no
@@ -571,6 +572,9 @@ export function PharmacyPOSPage() {
                     {[p.pharmacy?.generic_name, p.pharmacy?.strength, p.pharmacy?.dosage_form].filter(Boolean).join(" · ") ||
                       (p.sku ? t('pharmacy_pos.sku_prefix', 'SKU {{sku}}', { sku: p.sku }) : p.barcode ?? "")}
                     {" · "}{t('pharmacy_pos.stock_inline', 'stock {{qty}} {{unit}}', { qty: fmtQty(p.stock), unit: p.unit ?? "" })}
+                    {!!p.rack_location && (
+                      <> {" · "}<span className="font-medium">{t('pharmacy_pos.rack_inline', 'rack {{rack}}', { rack: p.rack_location })}</span></>
+                    )}
                     {!!p.pharmacy?.units_per_pack && !!p.pharmacy?.pack_size && (
                       <> {" · "}{t('pharmacy_pos.pack_hint', '1 {{pack}} = {{count}} {{unit}}', { pack: p.pharmacy.pack_size, count: p.pharmacy.units_per_pack, unit: p.unit ?? "" })}</>
                     )}
