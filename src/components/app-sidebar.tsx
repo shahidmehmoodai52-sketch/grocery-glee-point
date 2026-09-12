@@ -133,7 +133,7 @@ export function AppSidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="text-sm font-semibold leading-tight">{settings?.store_name ?? "Grocery POS"}</span>
+              <span className="text-sm font-semibold leading-tight">{settings?.store_name ?? "Tillix POS"}</span>
               <span className="text-[11px] text-sidebar-foreground/60">
                 {businessType === "pharmacy"
                   ? t('common.pharmacy_pos', 'Pharmacy POS')

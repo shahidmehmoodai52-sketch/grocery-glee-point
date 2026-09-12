@@ -1,7 +1,12 @@
 # electron-builder config — Windows NSIS + GitHub Releases auto-update feed.
 # Publish flow: set GH_TOKEN env, then `bun run electron:release`. See desktop-docs/RELEASE.md.
+# appId is intentionally left as the original com.mart.grocerypos: at least one
+# shop already has the app installed under this id, and NSIS/electron-updater
+# use it (not productName) to recognize an in-place upgrade vs. a new install.
+# Changing it would make the next release look like a different app on that
+# machine instead of an update.
 appId: com.mart.grocerypos
-productName: Grocery POS
+productName: Tillix POS
 directories:
   output: electron-release
   buildResources: electron/build-resources
@@ -23,15 +28,20 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: "GroceryPOS-Setup-${version}.exe"
+  artifactName: "Tillix-Setup-${version}.exe"
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Grocery POS
+  shortcutName: Tillix POS
 publish:
+  # NOTE: `repo` below must exactly match the live GitHub repo name, or
+  # electron-updater will look in the wrong place and the shop that already
+  # has this app installed will silently stop receiving updates. If/when the
+  # GitHub repo is renamed, update this in the same commit as that rename —
+  # do not change it speculatively ahead of the actual rename.
   - provider: github
     owner: shahidmehmoodai52-sketch
     repo: grocery-glee-point

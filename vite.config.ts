@@ -140,6 +140,13 @@ export default defineConfig({
     // Worker proxy, and other third-party endpoints whose exact origins aren't
     // enumerated anywhere — a wrong CSP would silently break those requests,
     // so that needs its own careful pass, not a rushed addition here.
+    //
+    // @lovable.dev/vite-tanstack-config types this `nitro` option narrowly on
+    // purpose (only preset/output/cloudflare) since Nitro v3 is pre-RC, but it
+    // forwards the object as-is to the real `nitro()` plugin, which does
+    // support routeRules (verified against Nitro's own NitroRouteConfig type
+    // and a production build) — hence the ts-expect-error rather than `any`.
+    // @ts-expect-error -- routeRules is valid for nitro() but not in this wrapper's narrowed type
     routeRules: {
       "/**": {
         headers: {

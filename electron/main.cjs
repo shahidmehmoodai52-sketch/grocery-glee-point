@@ -62,7 +62,7 @@ function createWindow(startUrl) {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
-    title: 'Grocery POS',
+    title: 'Tillix POS',
     backgroundColor: '#0f172a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -93,7 +93,7 @@ app.whenReady().then(async () => {
     createWindow(startUrl);
     if (!IS_DEV) setupAutoUpdater(mainWindow);
   } catch (err) {
-    dialog.showErrorBox('Failed to start Grocery POS', String(err?.message || err));
+    dialog.showErrorBox('Failed to start Tillix POS', String(err?.message || err));
     app.quit();
   }
 });

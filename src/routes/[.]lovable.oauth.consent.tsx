@@ -57,7 +57,7 @@ function ConsentShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-3">
             <Store className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-semibold">Grocery POS</h1>
+          <h1 className="text-2xl font-semibold">Tillix POS</h1>
         </div>
         {children}
       </Card>
@@ -95,7 +95,7 @@ function Consent() {
   return (
     <ConsentShell>
       <h2 className="text-lg font-semibold text-center">
-        Connect {clientName} to your Grocery POS account?
+        Connect {clientName} to your Tillix POS account?
       </h2>
       <p className="mt-2 text-sm text-muted-foreground text-center">
         {clientName} will be able to use this app's tools (search products, view stock and sales) as you.
