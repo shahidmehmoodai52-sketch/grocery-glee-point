@@ -11,9 +11,9 @@
   },
   "mcp": {
     "server": {
-      "name": "grocery-pos-mcp",
+      "name": "tillix-pos-mcp",
       "version": "0.1.0",
-      "title": "Grocery POS"
+      "title": "Tillix POS"
     },
     "tools": [
       {
