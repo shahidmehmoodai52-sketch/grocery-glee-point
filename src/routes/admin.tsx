@@ -32,6 +32,7 @@ import {
   HeartPulse,
   RefreshCw,
   Flag,
+  Database,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -124,6 +125,7 @@ type TenantRow = {
   slug: string | null;
   status: string;
   plan: string | null;
+  business_type: string;
   owner_id: string | null;
   owner_name: string | null;
   owner_email: string | null;
@@ -247,6 +249,7 @@ function AdminPanelPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="health"><HeartPulse className="h-4 w-4 mr-1" />Health</TabsTrigger>
+          <TabsTrigger value="database"><Database className="h-4 w-4 mr-1" />Database</TabsTrigger>
           <TabsTrigger value="billing"><Wallet className="h-4 w-4 mr-1" />Billing</TabsTrigger>
           <TabsTrigger value="flags"><Flag className="h-4 w-4 mr-1" />Feature Flags</TabsTrigger>
         </TabsList>
@@ -260,6 +263,7 @@ function AdminPanelPage() {
         <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
         <TabsContent value="health" className="mt-3"><HealthTab /></TabsContent>
+        <TabsContent value="database" className="mt-3"><DatabaseTab /></TabsContent>
         <TabsContent value="billing" className="mt-3"><BillingTab /></TabsContent>
         <TabsContent value="flags" className="mt-3"><FeatureFlagsTab /></TabsContent>
       </Tabs>
@@ -347,6 +351,154 @@ function HealthTab() {
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+interface DatabaseOverview {
+  db_size_bytes: number;
+  table_count: number;
+  tables: { name: string; size_bytes: number }[];
+  tenant_row_counts: Record<string, number>;
+  generated_at: string;
+}
+
+function fmtBytes(bytes: number): string {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function DatabaseTab() {
+  const queryClient = useQueryClient();
+  const { data: overview, isFetching, isLoading } = useQuery({
+    queryKey: ["admin-database-overview"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_database_overview");
+      if (error) throw error;
+      return data as unknown as DatabaseOverview;
+    },
+    staleTime: 60_000,
+  });
+
+  const { data: tenants = [] } = useQuery({
+    queryKey: ["admin-tenants-for-database"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_tenants");
+      if (error) throw error;
+      return (data as TenantRow[]) ?? [];
+    },
+  });
+
+  if (isLoading) return <TableSkeleton rows={6} columns={4} />;
+  if (!overview) return <EmptyState icon={Database} title="Database overview unavailable" description="Could not load database usage." />;
+
+  const maxTableSize = overview.tables[0]?.size_bytes || 1;
+  const rows = tenants
+    .map((t) => ({ tenant: t, rows: overview.tenant_row_counts[t.id] ?? 0 }))
+    .sort((a, b) => b.rows - a.rows);
+  const maxTenantRows = rows[0]?.rows || 1;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Total database size" value={fmtBytes(overview.db_size_bytes)} icon={Database} />
+        <StatCard label="Tables" value={overview.table_count} icon={Package} />
+        <StatCard label="Shops" value={tenants.length} icon={Store} />
+        <div className="flex items-center">
+          <Button
+            variant="outline" size="sm" disabled={isFetching}
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["admin-database-overview"] });
+              queryClient.invalidateQueries({ queryKey: ["admin-tenants-for-database"] });
+            }}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      <Card className="p-4">
+        <div className="font-medium mb-3">Largest tables</div>
+        <div className="space-y-1.5">
+          {overview.tables.map((tb) => (
+            <div key={tb.name} className="flex items-center gap-2 text-sm">
+              <span className="w-48 truncate font-mono text-xs text-muted-foreground">{tb.name}</span>
+              <div className="flex-1 h-2 rounded bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary/60"
+                  style={{ width: `${Math.max(2, (tb.size_bytes / maxTableSize) * 100)}%` }}
+                />
+              </div>
+              <span className="w-16 text-right text-xs text-muted-foreground">{fmtBytes(tb.size_bytes)}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-medium">Usage per shop</div>
+          <span className="text-xs text-muted-foreground">
+            Row counts across every table, as a proxy for database footprint — not an exact byte
+            measurement per shop.
+          </span>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Shop</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Rows (approx. usage)</TableHead>
+              <TableHead>Last activity</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 && (
+              <TableRow><TableCell colSpan={5} className="py-8">
+                <EmptyState icon={Store} title="No shops yet" description="No tenant data to show." />
+              </TableCell></TableRow>
+            )}
+            {rows.map(({ tenant: t, rows: rowCount }) => {
+              const health = tenantHealthWarning(t);
+              return (
+                <TableRow key={t.id}>
+                  <TableCell className="font-medium">{t.name}</TableCell>
+                  <TableCell>
+                    <span className="capitalize text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      {t.business_type || "grocery"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="min-w-[160px]">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 rounded bg-muted overflow-hidden max-w-[120px]">
+                        <div
+                          className="h-full bg-primary/60"
+                          style={{ width: `${Math.max(2, (rowCount / maxTenantRows) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground">{rowCount.toLocaleString()}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {t.last_activity_at ? new Date(t.last_activity_at).toLocaleDateString() : "—"}
+                  </TableCell>
+                  <TableCell>
+                    {health ? (
+                      <span className="text-xs text-amber-600 dark:text-amber-400" title={health}>{health}</span>
+                    ) : (
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400">Healthy</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 }
@@ -1165,6 +1317,7 @@ function TenantsTab() {
           <TableHeader>
             <TableRow>
               <TableHead>Shop</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Owner</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Plan</TableHead>
@@ -1178,10 +1331,10 @@ function TenantsTab() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={10} className="py-4"><TableSkeleton rows={5} columns={9} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="py-4"><TableSkeleton rows={5} columns={9} /></TableCell></TableRow>
             )}
             {!isLoading && filtered.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="py-8">
+              <TableRow><TableCell colSpan={11} className="py-8">
                 <EmptyState title="No shops found" description="Try a different search or filter" icon={Store} />
               </TableCell></TableRow>
             )}
@@ -1192,6 +1345,11 @@ function TenantsTab() {
                 <TableCell>
                   <div className="font-medium">{t.name}</div>
                   <div className="text-[10px] text-muted-foreground font-mono">{t.id.slice(0, 8)}</div>
+                </TableCell>
+                <TableCell>
+                  <span className="capitalize text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    {t.business_type || "grocery"}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">{t.owner_name || "—"}</div>
@@ -2424,6 +2582,7 @@ type LibraryRow = {
   category: string | null;
   unit: string | null;
   status: "pending" | "approved" | "rejected";
+  business_type: string;
   default_sell_price: number;
   default_cost_price: number;
   contributed_by_tenant: string | null;
@@ -2457,7 +2616,7 @@ function LibraryTab() {
     queryFn: async () => {
       let q = supabase
         .from("global_products")
-        .select("id, name, barcode, item_code, category, unit, status, default_sell_price, default_cost_price, contributed_by_tenant, created_at", { count: "exact" })
+        .select("id, name, barcode, item_code, category, unit, status, business_type, default_sell_price, default_cost_price, contributed_by_tenant, created_at", { count: "exact" })
         .order("created_at", { ascending: false });
       if (status !== "all") q = q.eq("status", status);
       if (debouncedSearch) {
@@ -2581,7 +2740,10 @@ function LibraryTab() {
             {filtered.map((r) => (
               <TableRow key={r.id}>
                 <TableCell>
-                  <div className="font-medium">{r.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">{r.name}</span>
+                    <span className="capitalize text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">{r.business_type}</span>
+                  </div>
                   <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()} · {r.unit ?? "pcs"}</div>
                 </TableCell>
                 <TableCell className="text-xs font-mono">

@@ -26,12 +26,13 @@ import { fetchAll } from "@/lib/supabase-page";
 import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 import { PurchaseBillScannerButton, type ImportedPurchase } from "@/features/purchase-ai/BillScannerDialog";
 import { QuickAddProductDialog } from "@/components/quick-add-product-dialog";
+import { useBusinessType } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
 
 const PURCHASE_LIST_LIMIT = 2000;
 
-type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; stock_override?: number | null };
+type Line = { product_id: string | null; name: string; qty: number; cost: number; sale_price?: number; old_sale?: number; discount?: number; old_stock?: number; old_cost?: number; barcode?: string | null; item_code?: string | null; _total?: number | null; batch_no?: string; expiry_date?: string; mfg_date?: string; bonus_qty?: number; pack_size?: string | null; units_per_pack?: number; pack_qty?: number; stock_override?: number | null };
 
 type Draft = {
   open: boolean;
@@ -138,6 +139,7 @@ function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   const today = new Date().toISOString().slice(0,10);
+  const isPharmacy = useBusinessType() === "pharmacy";
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
   // Multiple parked drafts.
@@ -292,6 +294,26 @@ function Page() {
     // focus the name field instead of cost.
     const target = product ? "cost" : "name";
     focusCell(target as any, newIndex);
+
+    // Pharmacy-only, best-effort: look up pack size/conversion so the row
+    // can offer "receive by pack" entry. Fire-and-forget — if this is slow
+    // or fails, the line just doesn't get pack conversion, nothing else
+    // about the purchase flow depends on it.
+    if (isPharmacy && product) {
+      supabase
+        .from("pharmacy_product_details" as any)
+        .select("pack_size,units_per_pack")
+        .eq("product_id", product.id)
+        .maybeSingle()
+        .then(({ data }: any) => {
+          if (!data?.pack_size || !data?.units_per_pack) return;
+          setLines((ls) => ls.map((l, idx) =>
+            idx === newIndex && l.product_id === product.id
+              ? { ...l, pack_size: data.pack_size, units_per_pack: Number(data.units_per_pack) }
+              : l,
+          ));
+        });
+    }
   };
   const addFromSearch = async () => {
     const term = entrySearch.trim();
@@ -633,7 +655,14 @@ function Page() {
             name: l.name,
             qty: l.qty,
             cost: +effCost.toFixed(4),
-            line_total: effLineTotal
+            line_total: effLineTotal,
+            // Pharmacy business type only — complete_purchase() treats these
+            // as optional (defaults to NULL/0 exactly as before) when absent,
+            // so this is a no-op for grocery tenants.
+            ...(l.batch_no ? { batch_no: l.batch_no } : {}),
+            ...(l.expiry_date ? { expiry_date: l.expiry_date } : {}),
+            ...(l.mfg_date ? { mfg_date: l.mfg_date } : {}),
+            ...(l.bonus_qty ? { bonus_qty: l.bonus_qty } : {}),
           };
         });
       })(),
@@ -645,7 +674,7 @@ function Page() {
         // 1. Get original items to calculate stock deltas
         const { data: origItems, error: fetchErr } = await supabase
           .from("purchase_items")
-          .select("product_id,qty")
+          .select("product_id,qty,bonus_qty")
           .eq("purchase_id", editingId);
         if (fetchErr) throw fetchErr;
 
@@ -676,7 +705,7 @@ function Page() {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
           const currentStock = Number(p?.stock ?? 0);
-          await supabase.from("products").update({ stock: currentStock - Number(it.qty) }).eq("id", it.product_id);
+          await supabase.from("products").update({ stock: currentStock - Number(it.qty) - Number((it as any).bonus_qty ?? 0) }).eq("id", it.product_id);
         }
 
         // 4. Replace items (carry tenant_id from the parent purchase so RLS accepts the insert)
@@ -690,14 +719,18 @@ function Page() {
         const { error: delErr } = await supabase.from("purchase_items").delete().eq("purchase_id", editingId);
         if (delErr) throw delErr;
 
-        const newItems = payload.items.map(it => ({
+        const newItems = payload.items.map((it: any) => ({
           purchase_id: editingId,
           tenant_id: parentPurchase?.tenant_id,
           product_id: it.product_id,
           name: it.name,
           qty: it.qty,
           cost: it.cost,
-          line_total: it.line_total
+          line_total: it.line_total,
+          batch_no: it.batch_no ?? null,
+          expiry_date: it.expiry_date ?? null,
+          mfg_date: it.mfg_date ?? null,
+          bonus_qty: it.bonus_qty ?? 0,
         }));
         const { error: insErr } = await supabase.from("purchase_items").insert(newItems);
         if (insErr) throw insErr;
@@ -707,7 +740,7 @@ function Page() {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
           const currentStock = Number(p?.stock ?? 0);
-          await supabase.from("products").update({ stock: currentStock + Number(it.qty) }).eq("id", it.product_id);
+          await supabase.from("products").update({ stock: currentStock + Number(it.qty) + Number((it as any).bonus_qty ?? 0) }).eq("id", it.product_id);
         }
 
       } else {
@@ -815,6 +848,8 @@ function Page() {
         discount: l.discount,
         barcode: l.barcode,
         item_code: l.item_code,
+        ...(l.batch_no ? { batch_no: l.batch_no } : {}),
+        ...(l.expiry_date ? { expiry_date: l.expiry_date } : {}),
       })),
     });
   };
@@ -856,7 +891,7 @@ function Page() {
             </Dialog>
           )}
         <Button onClick={startNewPurchase}><Plus className="h-4 w-4 mr-2" />{t('purchases.new_purchase', 'New purchase')}</Button>
-        <PurchaseBillScannerButton suppliers={suppliers} onImport={importScannedPurchase} />
+        <PurchaseBillScannerButton suppliers={suppliers} onImport={importScannedPurchase} isPharmacy={isPharmacy} />
         <Dialog open={open} onOpenChange={(v) => { if (!v) hideKeepDraft(); else setOpen(true); }}>
           <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] p-0 flex flex-col gap-0">
             <DialogHeader className="px-6 py-2 border-b shrink-0">
@@ -1003,8 +1038,11 @@ function Page() {
                           // once on the purchase header (see submit()), not baked into cost_price.
                           const taxShare = discountedSubtotal > 0 ? taxAmt * (lineAfterBillDisc / discountedSubtotal) : 0;
                           const effCost = qty > 0 ? lineAfterBillDisc / qty : cost;
+                          const bonusQty = Number(l.bonus_qty || 0);
                           const newAvg = hasProduct
-                            ? (oldStock > 0 ? (oldStock * oldCost + qty * effCost) / (oldStock + qty) : effCost)
+                            ? (oldStock > 0
+                                ? (oldStock * oldCost + qty * effCost) / (oldStock + qty + bonusQty)
+                                : (qty + bonusQty) > 0 ? (qty * effCost) / (qty + bonusQty) : effCost)
                             : effCost;
                           const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
                           const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
@@ -1049,6 +1087,33 @@ function Page() {
                                         {t('purchases.stock_was', '(was {{qty}})', { qty: oldStock })}
                                       </span>
                                     )}
+                                  </div>
+                                )}
+                                {isPharmacy && (
+                                  <div className="mt-1 flex gap-1">
+                                    <Input
+                                      value={l.batch_no ?? ""}
+                                      onChange={(e) => setLine(i, { batch_no: e.target.value })}
+                                      placeholder={t('purchases.batch_no_placeholder', 'Batch #')}
+                                      className="h-6 text-[11px] px-1.5"
+                                    />
+                                    <Input
+                                      type="date"
+                                      value={l.expiry_date ?? ""}
+                                      onChange={(e) => setLine(i, { expiry_date: e.target.value })}
+                                      title={t('purchases.expiry_date_title', 'Expiry date')}
+                                      className="h-6 text-[11px] px-1.5"
+                                    />
+                                    <Input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      value={l.bonus_qty ?? ""}
+                                      onChange={(e) => setLine(i, { bonus_qty: Number(e.target.value) })}
+                                      placeholder={t('purchases.bonus_qty_placeholder', 'Bonus qty')}
+                                      title={t('purchases.bonus_qty_title', 'Free/bonus units from a distributor scheme (e.g. 10+1) — added to stock at zero cost')}
+                                      className="h-6 w-20 text-[11px] px-1.5"
+                                    />
                                   </div>
                                 )}
                               </TableCell>
@@ -1113,6 +1178,25 @@ function Page() {
                                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusSearch(); } }}
                                   className="h-8 text-right text-sm"
                                 />
+                                {isPharmacy && !!l.units_per_pack && (
+                                  <div className="mt-0.5 flex items-center justify-end gap-1">
+                                    <Input
+                                      type="number"
+                                      step="0.001"
+                                      min="0"
+                                      value={l.pack_qty ?? ""}
+                                      placeholder="0"
+                                      onChange={(e) => {
+                                        const packQty = Number(e.target.value);
+                                        const perPack = Number(l.units_per_pack || 0);
+                                        setLine(i, { pack_qty: packQty, qty: +(packQty * perPack).toFixed(4) });
+                                      }}
+                                      title={t('purchases.pack_qty_title', 'Enter quantity in packs/boxes — auto-converts to {{unit}}', { unit: l.pack_size || t('purchases.base_unit', 'base units') })}
+                                      className="h-6 w-16 text-[11px] px-1.5 text-right"
+                                    />
+                                    <span className="text-[10px] text-muted-foreground">{t('purchases.pack_qty_suffix', '× {{pack}}', { pack: l.pack_size || t('purchases.pack_word', 'pack') })}</span>
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell className="text-right text-xs text-muted-foreground">
                                 {hasProduct ? fmtMoney(oldCost, sym) : "—"}

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -28,6 +28,7 @@ import { fetchAll } from "@/lib/supabase-page";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { useEarliestDataDate } from "@/lib/earliest-date";
 import { cn } from "@/lib/utils";
+import { useBusinessType } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
 
@@ -64,6 +65,25 @@ function Page() {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
+  const isPharmacy = useBusinessType() === "pharmacy";
+  const navigate = useNavigate();
+
+  // Pharmacy-only: near-expiry/expired batch count, read-only, uses the
+  // existing product_batch_status view (same query as the pharmacy POS
+  // header alert). Grocery tenants never run this query.
+  const { data: expiringBatchCount = 0 } = useQuery({
+    queryKey: ["dash-pharmacy-expiry-count"],
+    enabled: isPharmacy,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("product_batch_status" as any)
+        .select("id", { count: "exact", head: true })
+        .in("expiry_status", ["expired", "critical", "expiring_soon"]);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    staleTime: 5 * 60_000,
+  });
 
   // Default range = shop's first ever transaction → today, so historical data is
   // never hidden behind a narrow default. Explicit user selection always wins.
@@ -439,6 +459,12 @@ function Page() {
           icon={Package} label={t('dashboard.kpi_inventory_value', 'Inventory value')} value={fmtMoney(inventoryValue, sym)}
           sub={t('dashboard.kpi_active_skus_sub', '{{count}} active SKUs', { count: products.length })} tone="info"
         />
+        {isPharmacy && (
+          <Kpi onClick={() => navigate({ to: "/expiry" } as any)}
+            icon={AlertTriangle} label={t('dashboard.kpi_expiring_batches', 'Expiring batches')} value={String(expiringBatchCount)}
+            sub={t('dashboard.kpi_expiring_batches_sub', 'Expired or expiring soon')} tone="warning"
+          />
+        )}
       </div>
 
 

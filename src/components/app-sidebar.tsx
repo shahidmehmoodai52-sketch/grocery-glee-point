@@ -14,7 +14,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
+import { useBusinessType } from "@/hooks/use-tenant";
 import { OfflineStatusBadge } from "@/components/offline-status";
+
+// Business-type-specific label overrides, keyed by route url. The route set
+// itself stays identical across business types for now — only wording
+// changes — so grocery tenants (the file-untouched default) see exactly
+// what they always have.
+const PHARMACY_TITLE_OVERRIDES: Record<string, { titleKey: string; title: string }> = {
+  "/products": { titleKey: "common.products_pharmacy", title: "Medicines" },
+};
 
 
 type Item = { titleKey: string; title: string; url: string; icon: any; perm: string; adminOnly?: boolean; search?: Record<string, any> };
@@ -78,6 +87,7 @@ export function AppSidebar() {
   const { data: settings } = useSettings();
   const { isAdmin, can } = usePermissions();
   const { isSuperAdmin } = useSuperAdmin();
+  const businessType = useBusinessType();
   const visibleGroups = groups
     .map((g) => ({ ...g, items: g.items.filter((it) => (it.adminOnly ? isAdmin : can(it.perm))) }))
     .filter((g) => g.items.length > 0);
@@ -124,7 +134,11 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="flex flex-col">
               <span className="text-sm font-semibold leading-tight">{settings?.store_name ?? "Tillix POS"}</span>
-              <span className="text-[11px] text-sidebar-foreground/60">{t('common.point_of_sale', 'Point of Sale')}</span>
+              <span className="text-[11px] text-sidebar-foreground/60">
+                {businessType === "pharmacy"
+                  ? t('common.pharmacy_pos', 'Pharmacy POS')
+                  : t('common.point_of_sale', 'Point of Sale')}
+              </span>
             </div>
           )}
         </div>
@@ -136,7 +150,8 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {g.items.map((item) => {
-                  const label = t(item.titleKey, item.title);
+                  const override = businessType === "pharmacy" ? PHARMACY_TITLE_OVERRIDES[item.url] : undefined;
+                  const label = override ? t(override.titleKey, override.title) : t(item.titleKey, item.title);
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={label}>

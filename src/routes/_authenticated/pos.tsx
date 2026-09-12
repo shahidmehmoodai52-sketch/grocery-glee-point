@@ -95,10 +95,39 @@ import { enqueueWrite } from "@/lib/offline/sync";
 import { useTranslation } from "react-i18next";
 import { isOfflineNow } from "@/lib/offline/session";
 import { getLocalPrinterSettings } from "@/lib/offline/printer-settings";
+import { useBusinessType } from "@/hooks/use-tenant";
+import { lazy, Suspense } from "react";
+
+// Lazy-loaded rather than a static top-level import: a static import would
+// bundle PharmacyPOSPage's module graph into this file, so any build-time
+// problem there could break the grocery POS bundle too. Lazy-loading keeps
+// pharmacy POS a separate chunk that only ever loads for pharmacy tenants —
+// grocery tenants' bundle is unaffected by it existing at all.
+const PharmacyPOSPage = lazy(() =>
+  import("@/features/pharmacy-pos/PharmacyPOSPage").then((m) => ({ default: m.PharmacyPOSPage })),
+);
 
 export const Route = createFileRoute("/_authenticated/pos")({
-  component: POSPage,
+  component: POSRouteEntry,
 });
+
+// Business-type branch point: grocery tenants hit the exact same POSPage
+// component as before (nothing below this changes for them). Pharmacy
+// tenants get a separate, purpose-built page — pos.tsx's checkout/search/
+// cart logic is a ~5,000-line monolith with no seams to parametrize safely,
+// so a parallel component is the lower-risk way to add a pharmacy POS
+// without touching code every existing grocery shop depends on.
+function POSRouteEntry() {
+  const businessType = useBusinessType();
+  if (businessType === "pharmacy") {
+    return (
+      <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+        <PharmacyPOSPage />
+      </Suspense>
+    );
+  }
+  return <POSPage />;
+}
 
 type CartItem = {
   product_id: string | null;

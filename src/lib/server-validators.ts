@@ -65,6 +65,10 @@ export const extractPurchaseBillInput = z.object({
     .array(z.string().startsWith("data:image/", "Expected an image data URL").max(8_000_000, "Image is too large"))
     .min(1, "At least one page is required")
     .max(8, "Up to 8 pages per bill"),
+  // Pharmacy tenants only — asks the extractor to also read batch numbers
+  // and expiry dates off the bill. Omitted/false leaves the prompt and
+  // schema byte-identical to before for every other caller.
+  extractBatchExpiry: z.boolean().optional(),
 });
 
 /** Turns zod issues into a single user-friendly message. */

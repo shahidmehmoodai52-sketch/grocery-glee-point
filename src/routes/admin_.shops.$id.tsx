@@ -70,6 +70,7 @@ function ShopDetailPage() {
 type TenantDetail = {
   tenant: {
     id: string; name: string; slug: string | null; status: string; plan: string | null;
+    business_type?: string | null;
     owner_id: string | null; created_at: string; library_approved?: boolean;
   };
   members: Array<{ user_id: string; role: string; joined_at: string; full_name: string | null; email: string | null }>;
@@ -468,8 +469,80 @@ function OverviewTab({ detail }: { detail: TenantDetail }) {
         </div>
       </Card>
 
+      <BusinessTypeCard tenantId={t.id} currentType={t.business_type ?? "grocery"} />
       <LibraryCategoryAccessCard tenantId={t.id} libraryApproved={!!t.library_approved} />
     </div>
+  );
+}
+
+const BUSINESS_TYPE_LABEL: Record<string, string> = { grocery: "Grocery", pharmacy: "Pharmacy" };
+
+function BusinessTypeCard({ tenantId, currentType }: { tenantId: string; currentType: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [nextType, setNextType] = useState(currentType);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("admin_set_tenant_business_type", {
+        _tenant_id: tenantId,
+        _business_type: nextType,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Business type updated");
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
+      qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+      qc.invalidateQueries({ queryKey: ["admin-database-overview"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="p-4 flex items-center justify-between">
+      <div>
+        <div className="text-xs text-muted-foreground">Business type</div>
+        <div className="text-lg font-semibold">{BUSINESS_TYPE_LABEL[currentType] ?? currentType}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">
+          Controls which POS layout and product fields this shop's staff see.
+        </div>
+      </div>
+      <Button size="sm" variant="outline" onClick={() => { setNextType(currentType); setOpen(true); }}>
+        Change
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Change business type</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="space-y-1.5">
+              <Label>Business type</Label>
+              <Select value={nextType} onValueChange={setNextType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grocery">Grocery</SelectItem>
+                  <SelectItem value="pharmacy">Pharmacy</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5">
+              This only changes which POS layout and product fields this shop's staff see going
+              forward — it does not delete, convert, or retag any existing products, purchases,
+              or sales. Existing products keep working; pharmacy-only fields (generic name,
+              batch/expiry, etc.) simply won't be filled in until edited.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={() => save.mutate()} disabled={save.isPending || nextType === currentType}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }
 
