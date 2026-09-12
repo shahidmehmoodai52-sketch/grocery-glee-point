@@ -192,6 +192,7 @@
   },
   "common": {
     "logout": "Sign out",
+    "loading": "Loading…",
     "dashboard": "Dashboard",
     "pos": "POS",
     "products": "Products",
@@ -1417,6 +1418,9 @@
     "th_generic_name": "Generic / salt name",
     "th_rack": "Rack / shelf",
     "th_company": "Company / manufacturer",
+    "th_qty_on_hand": "Qty on hand",
+    "th_stock_value": "Stock value",
+    "stock_snapshot_note": "Current stock on hand — a live snapshot, not affected by the date range above.",
     "th_products": "Products",
     "no_generic_assigned": "No generic name assigned",
     "no_rack_assigned": "No rack assigned",

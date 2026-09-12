@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtQty } from "@/lib/format";
 import { printDocument } from "@/components/receipt";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
@@ -415,110 +415,79 @@ function GenericWiseReport({
   );
 }
 
-/** Same shape as GenericWiseReport, grouped by products.rack_location
- *  instead of the generic/salt name — available for every business type
- *  since rack_location is a plain products column, not pharmacy-only. */
-function RackWiseReport({
-  sales,
-  saleReturns,
-  currencySymbol,
-  search,
-}: {
-  sales: any[];
-  saleReturns: any[];
-  currencySymbol: string;
-  search: string;
-}) {
+/** Current stock on hand grouped by rack/shelf — a snapshot for physical
+ *  stock-takes ("what's actually sitting in rack A-3 right now"), not a
+ *  sales-in-period report, so it deliberately ignores the date range above
+ *  and queries products directly. Available for every business type since
+ *  rack_location is a plain products column, not pharmacy-only. */
+function RackWiseReport({ currencySymbol, search }: { currencySymbol: string; search: string }) {
   const { t } = useTranslation();
 
-  const { data: rackByProduct = new Map<string, string>() } = useQuery({
-    queryKey: ["report-product-racks"],
-    queryFn: async () => {
-      const rows = await fetchAll<any>(
+  const { data: products, isLoading } = useQuery({
+    queryKey: ["report-stock-by-rack"],
+    queryFn: async () =>
+      await fetchAll<any>(
         (fIdx: number, tIdx: number) =>
-          supabase.from("products").select("id,rack_location").range(fIdx, tIdx),
+          supabase.from("products").select("id,stock,cost_price,rack_location").eq("is_active", true).range(fIdx, tIdx),
         1000,
-      );
-      const m = new Map<string, string>();
-      for (const p of rows) if (p.rack_location) m.set(p.id, p.rack_location);
-      return m;
-    },
+      ),
   });
 
-  const rackSales = useMemo(() => {
-    const map = new Map<string, { name: string; qty: number; revenue: number; cost: number; profit: number; products: Set<string> }>();
+  const rackStock = useMemo(() => {
+    const map = new Map<string, { name: string; products: number; qty: number; value: number }>();
     const noRack = t('reports.no_rack_assigned', 'No rack assigned');
-    for (const s of sales) {
-      for (const it of (s.sale_items as any[]) ?? []) {
-        const name = (it.product_id && rackByProduct.get(it.product_id)) || noRack;
-        const cur = map.get(name) ?? { name, qty: 0, revenue: 0, cost: 0, profit: 0, products: new Set() };
-        const rev = Number(it.line_total);
-        const cost = Number(it.cost) * Number(it.qty);
-        cur.qty += Number(it.qty); cur.revenue += rev; cur.cost += cost; cur.profit += rev - cost;
-        if (it.product_id) cur.products.add(it.product_id);
-        map.set(name, cur);
-      }
+    for (const p of products ?? []) {
+      const name = p.rack_location || noRack;
+      const cur = map.get(name) ?? { name, products: 0, qty: 0, value: 0 };
+      cur.products += 1;
+      cur.qty += Number(p.stock ?? 0);
+      cur.value += Number(p.stock ?? 0) * Number(p.cost_price ?? 0);
+      map.set(name, cur);
     }
-    for (const r of saleReturns) {
-      for (const it of (r.sale_return_items as any[]) ?? []) {
-        const name = (it.product_id && rackByProduct.get(it.product_id)) || noRack;
-        const cur = map.get(name);
-        if (!cur) continue;
-        const rev = Number(it.qty) * Number(it.price);
-        const cost = Number(it.qty) * Number(it.cost ?? 0);
-        cur.qty -= Number(it.qty); cur.revenue -= rev; cur.cost -= cost; cur.profit -= rev - cost;
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [sales, saleReturns, rackByProduct, t]);
+    return Array.from(map.values()).sort((a, b) => b.value - a.value);
+  }, [products, t]);
 
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
-    if (!q) return rackSales;
-    return rackSales.filter((g) => g.name.toLowerCase().includes(q));
-  }, [rackSales, q]);
+    if (!q) return rackStock;
+    return rackStock.filter((g) => g.name.toLowerCase().includes(q));
+  }, [rackStock, q]);
 
   return (
     <Card className="p-3">
+      <p className="text-xs text-muted-foreground mb-2">
+        {t('reports.stock_snapshot_note', 'Current stock on hand — a live snapshot, not affected by the date range above.')}
+      </p>
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>{t('reports.th_rack', 'Rack / shelf')}</TableHead>
             <TableHead className="text-right">{t('reports.th_products', 'Products')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_qty_sold', 'Qty sold')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_revenue', 'Revenue')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_cost', 'Cost')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_profit', 'Profit')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_margin', 'Margin %')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_qty_on_hand', 'Qty on hand')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_stock_value', 'Stock value')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.length === 0 && (
-            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{t('reports.no_data', 'No data')}</TableCell></TableRow>
+          {isLoading && (
+            <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">{t('common.loading', 'Loading…')}</TableCell></TableRow>
           )}
-          {filtered.map((g) => {
-            const margin = g.revenue ? (g.profit / g.revenue) * 100 : 0;
-            return (
-              <TableRow key={g.name}>
-                <TableCell className="font-medium">{g.name}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{g.products.size}</TableCell>
-                <TableCell className="text-right">{g.qty}</TableCell>
-                <TableCell className="text-right">{fmtMoney(g.revenue, currencySymbol)}</TableCell>
-                <TableCell className="text-right">{fmtMoney(g.cost, currencySymbol)}</TableCell>
-                <TableCell className="text-right text-success font-medium">{fmtMoney(g.profit, currencySymbol)}</TableCell>
-                <TableCell className="text-right">{margin.toFixed(1)}%</TableCell>
-              </TableRow>
-            );
-          })}
+          {!isLoading && filtered.length === 0 && (
+            <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">{t('reports.no_data', 'No data')}</TableCell></TableRow>
+          )}
+          {filtered.map((g) => (
+            <TableRow key={g.name}>
+              <TableCell className="font-medium">{g.name}</TableCell>
+              <TableCell className="text-right text-xs text-muted-foreground">{g.products}</TableCell>
+              <TableCell className="text-right">{fmtQty(g.qty)}</TableCell>
+              <TableCell className="text-right">{fmtMoney(g.value, currencySymbol)}</TableCell>
+            </TableRow>
+          ))}
           {filtered.length > 0 && (
             <TableRow className="bg-muted/50 font-semibold">
               <TableCell>{t('reports.total_items_label', 'Total ({{count}} items)', { count: filtered.length })}</TableCell>
-              <TableCell />
-              <TableCell className="text-right">{filtered.reduce((a, b) => a + b.qty, 0)}</TableCell>
-              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.revenue, 0), currencySymbol)}</TableCell>
-              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.cost, 0), currencySymbol)}</TableCell>
-              <TableCell className="text-right text-success">{fmtMoney(filtered.reduce((a, b) => a + b.profit, 0), currencySymbol)}</TableCell>
-              <TableCell />
+              <TableCell className="text-right">{filtered.reduce((a, b) => a + b.products, 0)}</TableCell>
+              <TableCell className="text-right">{fmtQty(filtered.reduce((a, b) => a + b.qty, 0))}</TableCell>
+              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.value, 0), currencySymbol)}</TableCell>
             </TableRow>
           )}
         </TableBody>
@@ -527,22 +496,24 @@ function RackWiseReport({
   );
 }
 
-/** Same shape as GenericWiseReport, grouped by manufacturer (pharmacy_product_details) —
- *  pharmacy-only since manufacturer only exists on that table. */
-function CompanyWiseReport({
-  sales,
-  saleReturns,
-  currencySymbol,
-  search,
-}: {
-  sales: any[];
-  saleReturns: any[];
-  currencySymbol: string;
-  search: string;
-}) {
+/** Current stock on hand grouped by manufacturer/company — same live-
+ *  snapshot design as RackWiseReport, for company-wise stock-takes and
+ *  distributor-return decisions. Pharmacy-only since manufacturer only
+ *  exists on pharmacy_product_details. */
+function CompanyWiseReport({ currencySymbol, search }: { currencySymbol: string; search: string }) {
   const { t } = useTranslation();
 
-  const { data: pharmacyDetails = [] } = useQuery({
+  const { data: products } = useQuery({
+    queryKey: ["report-stock-by-company-products"],
+    queryFn: async () =>
+      await fetchAll<any>(
+        (fIdx: number, tIdx: number) =>
+          supabase.from("products").select("id,stock,cost_price").eq("is_active", true).range(fIdx, tIdx),
+        1000,
+      ),
+  });
+
+  const { data: pharmacyDetails } = useQuery({
     queryKey: ["report-pharmacy-details-manufacturer"],
     queryFn: async () =>
       await fetchAll<any>(
@@ -551,89 +522,71 @@ function CompanyWiseReport({
         1000,
       ),
   });
+  const isLoading = !products || !pharmacyDetails;
 
   const manufacturerByProduct = useMemo(() => {
     const m = new Map<string, string>();
-    for (const d of pharmacyDetails as any[]) {
+    for (const d of pharmacyDetails ?? []) {
       if (d.manufacturer) m.set(d.product_id, d.manufacturer);
     }
     return m;
   }, [pharmacyDetails]);
 
-  const companySales = useMemo(() => {
-    const map = new Map<string, { name: string; qty: number; revenue: number; cost: number; profit: number; products: Set<string> }>();
+  const companyStock = useMemo(() => {
+    const map = new Map<string, { name: string; products: number; qty: number; value: number }>();
     const noCompany = t('reports.no_manufacturer_assigned', 'No company assigned');
-    for (const s of sales) {
-      for (const it of (s.sale_items as any[]) ?? []) {
-        const name = (it.product_id && manufacturerByProduct.get(it.product_id)) || noCompany;
-        const cur = map.get(name) ?? { name, qty: 0, revenue: 0, cost: 0, profit: 0, products: new Set() };
-        const rev = Number(it.line_total);
-        const cost = Number(it.cost) * Number(it.qty);
-        cur.qty += Number(it.qty); cur.revenue += rev; cur.cost += cost; cur.profit += rev - cost;
-        if (it.product_id) cur.products.add(it.product_id);
-        map.set(name, cur);
-      }
+    for (const p of products ?? []) {
+      const name = manufacturerByProduct.get(p.id) || noCompany;
+      const cur = map.get(name) ?? { name, products: 0, qty: 0, value: 0 };
+      cur.products += 1;
+      cur.qty += Number(p.stock ?? 0);
+      cur.value += Number(p.stock ?? 0) * Number(p.cost_price ?? 0);
+      map.set(name, cur);
     }
-    for (const r of saleReturns) {
-      for (const it of (r.sale_return_items as any[]) ?? []) {
-        const name = (it.product_id && manufacturerByProduct.get(it.product_id)) || noCompany;
-        const cur = map.get(name);
-        if (!cur) continue;
-        const rev = Number(it.qty) * Number(it.price);
-        const cost = Number(it.qty) * Number(it.cost ?? 0);
-        cur.qty -= Number(it.qty); cur.revenue -= rev; cur.cost -= cost; cur.profit -= rev - cost;
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [sales, saleReturns, manufacturerByProduct, t]);
+    return Array.from(map.values()).sort((a, b) => b.value - a.value);
+  }, [products, manufacturerByProduct, t]);
 
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
-    if (!q) return companySales;
-    return companySales.filter((g) => g.name.toLowerCase().includes(q));
-  }, [companySales, q]);
+    if (!q) return companyStock;
+    return companyStock.filter((g) => g.name.toLowerCase().includes(q));
+  }, [companyStock, q]);
 
   return (
     <Card className="p-3">
+      <p className="text-xs text-muted-foreground mb-2">
+        {t('reports.stock_snapshot_note', 'Current stock on hand — a live snapshot, not affected by the date range above.')}
+      </p>
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>{t('reports.th_company', 'Company / manufacturer')}</TableHead>
             <TableHead className="text-right">{t('reports.th_products', 'Products')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_qty_sold', 'Qty sold')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_revenue', 'Revenue')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_cost', 'Cost')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_profit', 'Profit')}</TableHead>
-            <TableHead className="text-right">{t('reports.th_margin', 'Margin %')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_qty_on_hand', 'Qty on hand')}</TableHead>
+            <TableHead className="text-right">{t('reports.th_stock_value', 'Stock value')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.length === 0 && (
-            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">{t('reports.no_data', 'No data')}</TableCell></TableRow>
+          {isLoading && (
+            <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">{t('common.loading', 'Loading…')}</TableCell></TableRow>
           )}
-          {filtered.map((g) => {
-            const margin = g.revenue ? (g.profit / g.revenue) * 100 : 0;
-            return (
-              <TableRow key={g.name}>
-                <TableCell className="font-medium">{g.name}</TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{g.products.size}</TableCell>
-                <TableCell className="text-right">{g.qty}</TableCell>
-                <TableCell className="text-right">{fmtMoney(g.revenue, currencySymbol)}</TableCell>
-                <TableCell className="text-right">{fmtMoney(g.cost, currencySymbol)}</TableCell>
-                <TableCell className="text-right text-success font-medium">{fmtMoney(g.profit, currencySymbol)}</TableCell>
-                <TableCell className="text-right">{margin.toFixed(1)}%</TableCell>
-              </TableRow>
-            );
-          })}
+          {!isLoading && filtered.length === 0 && (
+            <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">{t('reports.no_data', 'No data')}</TableCell></TableRow>
+          )}
+          {filtered.map((g) => (
+            <TableRow key={g.name}>
+              <TableCell className="font-medium">{g.name}</TableCell>
+              <TableCell className="text-right text-xs text-muted-foreground">{g.products}</TableCell>
+              <TableCell className="text-right">{fmtQty(g.qty)}</TableCell>
+              <TableCell className="text-right">{fmtMoney(g.value, currencySymbol)}</TableCell>
+            </TableRow>
+          ))}
           {filtered.length > 0 && (
             <TableRow className="bg-muted/50 font-semibold">
               <TableCell>{t('reports.total_items_label', 'Total ({{count}} items)', { count: filtered.length })}</TableCell>
-              <TableCell />
-              <TableCell className="text-right">{filtered.reduce((a, b) => a + b.qty, 0)}</TableCell>
-              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.revenue, 0), currencySymbol)}</TableCell>
-              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.cost, 0), currencySymbol)}</TableCell>
-              <TableCell className="text-right text-success">{fmtMoney(filtered.reduce((a, b) => a + b.profit, 0), currencySymbol)}</TableCell>
-              <TableCell />
+              <TableCell className="text-right">{filtered.reduce((a, b) => a + b.products, 0)}</TableCell>
+              <TableCell className="text-right">{fmtQty(filtered.reduce((a, b) => a + b.qty, 0))}</TableCell>
+              <TableCell className="text-right">{fmtMoney(filtered.reduce((a, b) => a + b.value, 0), currencySymbol)}</TableCell>
             </TableRow>
           )}
         </TableBody>
@@ -1644,21 +1597,11 @@ function Page() {
           </TabsContent>
         )}
         <TabsContent value="rack">
-          <RackWiseReport
-            sales={allSales}
-            saleReturns={allSaleReturns}
-            currencySymbol={sym}
-            search={search}
-          />
+          <RackWiseReport currencySymbol={sym} search={search} />
         </TabsContent>
         {isPharmacy && (
           <TabsContent value="company">
-            <CompanyWiseReport
-              sales={allSales}
-              saleReturns={allSaleReturns}
-              currencySymbol={sym}
-              search={search}
-            />
+            <CompanyWiseReport currencySymbol={sym} search={search} />
           </TabsContent>
         )}
       </Tabs>
