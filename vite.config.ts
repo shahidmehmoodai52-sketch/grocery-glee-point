@@ -132,11 +132,22 @@ export default defineConfig({
       mirrorServiceWorker(),
     ],
   },
-  ...(nitroPreset
-    ? {
-        nitro: {
-          preset: nitroPreset,
+  nitro: {
+    ...(nitroPreset ? { preset: nitroPreset } : {}),
+    // Baseline security headers on every response, regardless of which Nitro
+    // preset ends up building this (cloudflare-module by default, node-server
+    // for Electron). No CSP here: this app calls out to Supabase, a Cloudflare
+    // Worker proxy, and other third-party endpoints whose exact origins aren't
+    // enumerated anywhere — a wrong CSP would silently break those requests,
+    // so that needs its own careful pass, not a rushed addition here.
+    routeRules: {
+      "/**": {
+        headers: {
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
+          "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
         },
-      }
-    : {}),
+      },
+    },
+  },
 });

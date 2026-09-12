@@ -20,6 +20,14 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Env vars — .env is currently tracked intentionally (holds only the public
+# Supabase anon key), but is gitignored going forward as a safety net: if it's
+# ever regenerated locally with a real secret (e.g. a service-role key added
+# for local testing), that change won't be silently swept into a commit.
+.env
+.env.local
+.env.*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
