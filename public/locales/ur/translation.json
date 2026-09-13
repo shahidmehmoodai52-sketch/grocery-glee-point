@@ -2424,6 +2424,7 @@
     "end_marker": "اختتام"
   },
   "low_stock": {
+    "button_label": "سٹاک الرٹس",
     "out_of_stock_count": "{{count}} سٹاک ختم",
     "low_stock_count": "{{count}} کم سٹاک",
     "hide": "چھپائیں",
