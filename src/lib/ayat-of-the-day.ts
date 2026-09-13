@@ -5,13 +5,41 @@
 // and cached for the day, so this feature can never introduce a
 // transcription error into scripture; the API is the single source of truth
 // for the actual wording.
+// 30 references so a full month cycles without repeats. Kept to themes of
+// honest trade, fulfilling contracts, trustworthiness, hard work, patience,
+// and gratitude — each picked for being short and a single self-contained
+// ayah (no surrounding context needed to make sense on its own).
 const BUSINESS_AYAT_REFS: { surah: number; ayah: number }[] = [
+  { surah: 17, ayah: 34 }, // Al-Isra — fulfill every commitment
   { surah: 17, ayah: 35 }, // Al-Isra — give full measure, weigh with an even balance
+  { surah: 5, ayah: 1 }, // Al-Ma'idah — fulfill [all] contracts
   { surah: 55, ayah: 9 }, // Ar-Rahman — establish weight in justice
   { surah: 26, ayah: 181 }, // Ash-Shu'ara — give full measure
   { surah: 26, ayah: 182 }, // Ash-Shu'ara — weigh with an even balance
-  { surah: 9, ayah: 119 }, // At-Tawbah — be with the truthful
+  { surah: 26, ayah: 183 }, // Ash-Shu'ara — do not deprive people of their due
   { surah: 4, ayah: 29 }, // An-Nisa — trade by mutual consent, don't consume others' wealth unjustly
+  { surah: 9, ayah: 119 }, // At-Tawbah — be with the truthful
+  { surah: 16, ayah: 91 }, // An-Nahl — fulfill the covenant of Allah
+  { surah: 83, ayah: 1 }, // Al-Mutaffifin — woe to the defrauders
+  { surah: 33, ayah: 70 }, // Al-Ahzab — speak words of appropriate justice
+  { surah: 2, ayah: 42 }, // Al-Baqarah — do not mix truth with falsehood
+  { surah: 62, ayah: 10 }, // Al-Jumu'ah — disperse and seek from Allah's bounty
+  { surah: 53, ayah: 39 }, // An-Najm — man gets only what he strives for
+  { surah: 2, ayah: 153 }, // Al-Baqarah — seek help through patience and prayer
+  { surah: 94, ayah: 5 }, // Ash-Sharh — with hardship comes ease
+  { surah: 94, ayah: 6 }, // Ash-Sharh — with hardship comes ease (repeated)
+  { surah: 14, ayah: 7 }, // Ibrahim — if you are grateful, I will increase you
+  { surah: 65, ayah: 3 }, // At-Talaq — provides from where he does not expect
+  { surah: 4, ayah: 58 }, // An-Nisa — render trusts to whom due, judge with justice
+  { surah: 16, ayah: 90 }, // An-Nahl — Allah orders justice and good conduct
+  { surah: 2, ayah: 168 }, // Al-Baqarah — eat what is lawful and good
+  { surah: 2, ayah: 188 }, // Al-Baqarah — do not consume wealth unjustly or by bribery
+  { surah: 23, ayah: 8 }, // Al-Mu'minun — attentive to their trusts and promises
+  { surah: 3, ayah: 92 }, // Aal-e-Imran — righteousness through spending what you love
+  { surah: 104, ayah: 1 }, // Al-Humazah — woe to every scorner who [only] hoards wealth
+  { surah: 41, ayah: 34 }, // Fussilat — repel evil with what is better
+  { surah: 3, ayah: 159 }, // Aal-e-Imran — gentleness in dealing with people
+  { surah: 17, ayah: 26 }, // Al-Isra — give the relative his right, and do not squander wastefully
 ];
 
 export interface DailyAyat {
