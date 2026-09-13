@@ -2424,6 +2424,7 @@
     "end_marker": "النهاية"
   },
   "low_stock": {
+    "button_label": "تنبيهات المخزون",
     "out_of_stock_count": "{{count}} نفد من المخزون",
     "low_stock_count": "{{count}} مخزون منخفض",
     "hide": "إخفاء",
