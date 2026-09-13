@@ -2424,6 +2424,7 @@
     "end_marker": "fin"
   },
   "low_stock": {
+    "button_label": "Alertas de stock",
     "out_of_stock_count": "{{count}} agotado",
     "low_stock_count": "{{count}} bajo stock",
     "hide": "Ocultar",

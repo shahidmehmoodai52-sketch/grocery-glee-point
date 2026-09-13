@@ -1,16 +1,17 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, XCircle, X, ChevronDown, ChevronUp, Plus, Check } from "lucide-react";
+import { AlertTriangle, XCircle, X, Plus, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { fmtQty, fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { useSettings } from "@/hooks/use-settings";
-import { fetchAll } from "@/lib/supabase-page";
+import { cn } from "@/lib/utils";
 
 const DISMISS_KEY = "low-stock-dismissed-v1";
 
@@ -126,15 +127,14 @@ function AlertRow({
   );
 }
 
-export function LowStockAlerts() {
+export function LowStockButton() {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState<Record<string, string>>(() =>
     typeof window !== "undefined" ? readDismissed() : {},
   );
-  const [lowHidden, setLowHidden] = useState(false);
 
   const { data = [] } = useQuery({
     queryKey: ["low-stock-alerts"],
@@ -172,11 +172,7 @@ export function LowStockAlerts() {
   }, [data]);
 
   const activeOOS = outOfStock.filter((p) => dismissed[p.id] !== p.updated_at);
-  const activeLow = lowHidden ? [] : lowStock.filter((p) => dismissed[p.id] !== p.updated_at);
-
-  useEffect(() => {
-    if (activeOOS.length === 0 && activeLow.length === 0) setExpanded(false);
-  }, [activeOOS.length, activeLow.length]);
+  const activeLow = lowStock.filter((p) => dismissed[p.id] !== p.updated_at);
 
   const dismissOne = (p: Row) => {
     const next = { ...dismissed, [p.id]: p.updated_at };
@@ -189,48 +185,49 @@ export function LowStockAlerts() {
     for (const p of [...outOfStock, ...lowStock]) next[p.id] = p.updated_at;
     setDismissed(next);
     writeDismissed(next);
+    setOpen(false);
   };
 
-  if (activeOOS.length === 0 && activeLow.length === 0) return null;
+  const total = activeOOS.length + activeLow.length;
+  if (total === 0) return null;
   const primary = activeOOS.length > 0;
 
   return (
-    <div className={`no-print relative z-[500] rounded-md ${primary ? "bg-destructive/10" : "bg-amber-500/10"}`}>
-      <div className="px-2 py-1 flex items-center gap-2 flex-wrap">
-        {primary
-          ? <XCircle className="h-4 w-4 text-destructive shrink-0" />
-          : <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />}
-        <div className="text-xs flex-1 min-w-0 truncate">
-          {activeOOS.length > 0 && <span className="font-medium text-destructive">{t('low_stock.out_of_stock_count', '{{count}} out of stock', { count: activeOOS.length })}</span>}
-          {activeOOS.length > 0 && activeLow.length > 0 && <span className="mx-2 text-muted-foreground">·</span>}
-          {activeLow.length > 0 && <span className="text-amber-700 dark:text-amber-400 font-medium">{t('low_stock.low_stock_count', '{{count}} low stock', { count: activeLow.length })}</span>}
-        </div>
-        <Button size="sm" variant="ghost" onClick={() => setExpanded((v) => !v)} className="h-7">
-          {expanded ? <><ChevronUp className="h-3 w-3 mr-1" /> {t('low_stock.hide', 'Hide')}</> : <><ChevronDown className="h-3 w-3 mr-1" /> {t('low_stock.view', 'View')}</>}
-        </Button>
-        <Button size="sm" variant="outline" onClick={dismissAll} className="h-7">{t('low_stock.dismiss_all', 'Dismiss all')}</Button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         <Button
           size="sm"
-          variant="ghost"
-          onClick={() => { dismissAll(); setLowHidden(true); }}
-          className="h-7"
-          title={t('low_stock.hide_alert_bar', 'Hide alert bar')}
+          variant="outline"
+          className={cn(
+            "no-print h-8 gap-1.5",
+            primary ? "border-destructive/40 text-destructive" : "border-amber-500/40 text-amber-700 dark:text-amber-400",
+          )}
         >
-          <X className="h-3 w-3" />
+          {primary ? <XCircle className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+          <span className="hidden sm:inline">{t('low_stock.button_label', 'Stock alerts')}</span>
+          <Badge variant={primary ? "destructive" : "outline"} className="h-4 min-w-4 px-1 text-[10px]">
+            {total}
+          </Badge>
         </Button>
-      </div>
-
-      {expanded && (
-        <div className={`absolute left-0 right-0 top-full mt-1 z-[999] rounded-md border bg-popover shadow-2xl ${primary ? "border-destructive/30" : "border-amber-500/30"} px-3 pb-3 pt-2 max-h-80 overflow-auto space-y-1`}>
-
-          {activeOOS.map((p) => (
-            <AlertRow key={p.id} p={p} kind="oos" sym={sym} onDismiss={() => dismissOne(p)} />
-          ))}
-          {activeLow.map((p) => (
-            <AlertRow key={p.id} p={p} kind="low" sym={sym} onDismiss={() => dismissOne(p)} />
-          ))}
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-96 max-h-96 overflow-auto p-2 space-y-1">
+        <div className="flex items-center justify-between px-1 pb-1">
+          <div className="text-xs">
+            {activeOOS.length > 0 && <span className="font-medium text-destructive">{t('low_stock.out_of_stock_count', '{{count}} out of stock', { count: activeOOS.length })}</span>}
+            {activeOOS.length > 0 && activeLow.length > 0 && <span className="mx-2 text-muted-foreground">·</span>}
+            {activeLow.length > 0 && <span className="text-amber-700 dark:text-amber-400 font-medium">{t('low_stock.low_stock_count', '{{count}} low stock', { count: activeLow.length })}</span>}
+          </div>
+          <Button size="sm" variant="ghost" onClick={dismissAll} className="h-6 px-2 text-xs">
+            <X className="h-3 w-3 mr-1" /> {t('low_stock.dismiss_all', 'Dismiss all')}
+          </Button>
         </div>
-      )}
-    </div>
+        {activeOOS.map((p) => (
+          <AlertRow key={p.id} p={p} kind="oos" sym={sym} onDismiss={() => dismissOne(p)} />
+        ))}
+        {activeLow.map((p) => (
+          <AlertRow key={p.id} p={p} kind="low" sym={sym} onDismiss={() => dismissOne(p)} />
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -264,6 +264,25 @@
   }
 }
 
+/* Ayat-of-the-day header ticker: content is rendered twice back-to-back and
+ * scrolled exactly half its track width, so the loop has no visible seam. */
+.ayat-ticker-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: ayat-ticker-scroll 40s linear infinite;
+}
+.ayat-ticker-item {
+  padding-inline-end: 3rem;
+  font-size: 0.8125rem;
+}
+@keyframes ayat-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ayat-ticker-track { animation: none; }
+}
+
 /* Wide, full-page document printing (ledgers, item-wise breakdowns, reports)
  * — distinct from the thermal-receipt printing above. `.print-area` (used by
  * printReceipt()) is hard-locked to 80mm/58mm receipt width, which clips a

@@ -22,7 +22,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { maybeRunDaily } from "@/lib/backup";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { RouteGuard } from "@/components/route-guard";
-import { LowStockAlerts } from "@/components/low-stock-alerts";
+import { LowStockButton } from "@/components/low-stock-alerts";
+import { AyatTicker } from "@/components/ayat-ticker";
 import { useSettings } from "@/hooks/use-settings";
 import { setDefaultCurrencySymbol } from "@/lib/format";
 import { PendingBanner } from "@/components/pending-banner";
@@ -125,9 +126,8 @@ function Layout() {
 
             <header className="relative z-[500] h-12 flex items-center border-b bg-card/50 backdrop-blur px-2 no-print gap-2">
               <SidebarTrigger />
-              <div className="flex-1 min-w-0">
-                <LowStockAlerts />
-              </div>
+              <AyatTicker />
+              <LowStockButton />
               <LanguageSelect className="mr-1" />
               <OfflineStatusBadge className="mr-1" />
               <Button variant="outline" size="sm" onClick={() => handleSignOut(false)} className="gap-2">

@@ -2424,6 +2424,7 @@
     "end_marker": "slutt"
   },
   "low_stock": {
+    "button_label": "Lagervarsler",
     "out_of_stock_count": "{{count}} utsolgt",
     "low_stock_count": "{{count}} lav beholdning",
     "hide": "Skjul",
