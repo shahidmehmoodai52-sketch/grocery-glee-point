@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, ArrowLeft, ShoppingCart, Pill } from "lucide-react";
+import { Loader2, ArrowLeft, ShoppingCart, Pill, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +63,11 @@ function AuthPage() {
 
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // Set once signUp() succeeds but Supabase requires email confirmation
+  // before issuing a session — shows the "check your email" screen instead
+  // of the registration form.
+  const [pendingConfirmEmail, setPendingConfirmEmail] = useState<string | null>(null);
+  const [resendBusy, setResendBusy] = useState(false);
   
   // Track field-specific errors
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -74,12 +79,59 @@ function AuthPage() {
   useEffect(() => {
     (async () => {
       const user = await getUserAllowOffline();
-      if (user) {
-        void goToApp();
+      if (!user) return;
+
+      // A user who just confirmed their email via the link in their inbox
+      // lands back here WITH a session but, until now, nothing ever
+      // finished registering their shop — signUp() couldn't call
+      // register_shop earlier because there was no session yet to attribute
+      // it to. If registration details were stashed on signup (see
+      // handleFinishRegister) and this user still has no shop, finish it
+      // now, transparently, instead of dropping them into an app with no
+      // tenant at all.
+      try {
+        const meta = user.user_metadata as Record<string, unknown> | undefined;
+        const pendingName = typeof meta?.pending_shop_name === "string" ? meta.pending_shop_name : "";
+        if (pendingName) {
+          const { data: tenantId } = await supabase.rpc("current_tenant_id");
+          if (!tenantId) {
+            const { error: rpcErr } = await supabase.rpc("register_shop" as any, {
+              _name: pendingName,
+              _phone: (meta?.pending_shop_phone as string) ?? "",
+              _address: (meta?.pending_shop_address as string) ?? "",
+              _city: (meta?.pending_shop_city as string) ?? "",
+              _business_type: (meta?.pending_shop_business_type as string) ?? "grocery",
+            } as any);
+            if (!rpcErr) {
+              toast.success("Email confirmed — your shop is ready! Your 7-day free trial has started.");
+              // Best effort: clear the stashed details now that they're applied.
+              void supabase.auth.updateUser({
+                data: {
+                  pending_shop_name: null, pending_shop_phone: null,
+                  pending_shop_address: null, pending_shop_city: null, pending_shop_business_type: null,
+                },
+              });
+            }
+          }
+        }
+      } catch {
+        // Never block sign-in on this — worst case the user lands in the
+        // app without a shop and can retry registration.
       }
+
+      void goToApp();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goToApp]);
+
+  const resendConfirmation = async () => {
+    if (!pendingConfirmEmail) return;
+    setResendBusy(true);
+    const { error } = await supabase.auth.resend({ type: "signup", email: pendingConfirmEmail });
+    setResendBusy(false);
+    if (error) toast.error(error.message);
+    else toast.success("Confirmation email sent again.");
+  };
 
   const showErr = (msg: string) => { 
     setFormError(msg); 
@@ -224,20 +276,34 @@ function AuthPage() {
         password: regPwd,
         options: {
           emailRedirectTo: `${window.location.origin}/auth`,
-          data: { full_name: fullName.trim() || undefined },
+          data: {
+            full_name: fullName.trim() || undefined,
+            // Stashed here (not localStorage) so it survives the round trip
+            // even if the confirmation link is opened on a different
+            // device/browser than the one used to sign up — the mount
+            // effect above reads it back once a session exists and finishes
+            // registration then.
+            pending_shop_name: shopName.trim(),
+            pending_shop_phone: shopPhone.trim(),
+            pending_shop_address: shopAddress.trim(),
+            pending_shop_city: shopCity.trim(),
+            pending_shop_business_type: shopBusinessType,
+          },
         },
       });
-      if (signUpErr) { 
+      if (signUpErr) {
         setFieldErrors({ regEmail: signUpErr.message });
-        return; 
+        return;
       }
 
       if (!signUpData.session) {
-        const { error: siErr } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: regPwd });
-        if (siErr) { 
-          setFieldErrors({ regEmail: siErr.message });
-          return; 
-        }
+        // Confirmation required: signing in now would just fail with a raw
+        // "Email not confirmed" error, and register_shop needs a real
+        // session to attribute the shop to — neither is possible yet.
+        // Registration finishes automatically once they click the emailed
+        // link (see the mount effect above), so stop here and tell them.
+        setPendingConfirmEmail(cleanEmail);
+        return;
       }
 
       const { error: rpcErr } = await supabase.rpc("register_shop" as any, {
@@ -265,6 +331,7 @@ function AuthPage() {
     setRegPwd(""); setShopName(""); setShopPhone(""); setShopAddress(""); setShopCity(""); setFullName(""); setRegEmail("");
     setShopBusinessType("grocery");
     setFieldErrors({});
+    setPendingConfirmEmail(null);
   };
 
   // Owner and Staff sign-in share formError/fieldErrors — without clearing
@@ -281,6 +348,33 @@ function AuthPage() {
     <div className="min-h-screen w-full bg-gradient-to-br from-background via-secondary to-background flex items-center justify-center p-4">
       <Toaster richColors position="top-right" />
       <Card className="w-full max-w-md p-8">
+        {pendingConfirmEmail ? (
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/40">
+              <MailCheck className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="space-y-1.5">
+              <h1 className="text-xl font-semibold">Check your email</h1>
+              <p className="text-sm text-muted-foreground">
+                We've sent a confirmation link to <strong className="text-foreground">{pendingConfirmEmail}</strong>.
+                Click the link to activate your account — your shop and 7-day free trial will be ready as soon as you do.
+              </p>
+            </div>
+            <div className="w-full space-y-2 pt-2">
+              <Button variant="outline" className="w-full" onClick={resendConfirmation} disabled={resendBusy}>
+                {resendBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Resend email
+              </Button>
+              <button
+                type="button"
+                onClick={() => { setPendingConfirmEmail(null); setMode("signin"); }}
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 justify-center w-full pt-1"
+              >
+                <ArrowLeft className="h-3 w-3" /> Back to sign in
+              </button>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className="flex flex-col items-center text-center mb-6">
           <div className="mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white">
             <img
@@ -618,11 +712,13 @@ function AuthPage() {
                 {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create account & register shop
               </Button>
               <p className="text-[11px] text-muted-foreground text-center">
-                New shops start as <strong>pending</strong> until approved by the developer.
+                Your shop gets instant, full access — no approval needed.
               </p>
             </form>
           </TabsContent>
         </Tabs>
+        </>
+        )}
       </Card>
     </div>
   );
