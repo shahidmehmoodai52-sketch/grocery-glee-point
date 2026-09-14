@@ -1,52 +1,37 @@
 // Network + sync status hook for the offline badge.
 import { useEffect, useState } from "react";
 import { db } from "./db";
+import { supabase } from "@/integrations/supabase/client";
 
-// Resolve the SAME URL the browser Supabase client uses (client.ts):
-// Cloudflare Worker proxy first, direct Supabase URL only as fallback.
-// Probing the direct URL falsely marks users offline where supabase.co is blocked.
-const PROXY_URL = (import.meta.env.VITE_SUPABASE_PROXY_URL ?? 'https://aged-truth-688d.shahidmehmoodai52.workers.dev') as string;
-const DIRECT_URL = (process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL) as string;
-const SUPABASE_KEY = (process.env.SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
-
-// Try the Cloudflare Worker proxy first (client.ts's primary path), but fall
-// back to the direct Supabase URL if it doesn't answer. Some networks block
-// one path but not the other (an ISP blocking supabase.co is why the proxy
-// exists; a different network blocking *.workers.dev is just as real) — a
-// probe that only ever tries one path permanently mislabels those users
-// "Offline" even though the app itself could still reach Supabase directly.
-const CANDIDATE_URLS = Array.from(new Set([PROXY_URL, DIRECT_URL].filter(Boolean)));
-
-async function probeOne(url: string): Promise<boolean> {
+// Earlier versions of this probe hand-built their own fetch() to
+// PROXY_URL/DIRECT_URL with manually-set apikey/Authorization headers —
+// duplicating what client.ts's supabase instance already does, and
+// repeatedly drifting out of sync with it (missing headers, a "direct URL"
+// fallback client.ts never actually uses since its proxy URL always has a
+// non-empty default, a bare /rest/v1/ root path whose behavior through the
+// Cloudflare Worker proxy isn't guaranteed the same as a real resource
+// request). Each drift silently stuck the badge on "Offline" while the app
+// itself was working fine, and got patched separately each time.
+//
+// Routing the probe through the same `supabase` client every real query
+// uses removes that whole class of bug: whatever URL, headers, and auth
+// session real data-fetches use, the probe uses too, automatically. A
+// HEAD request with count-only sends no row data — this is as cheap as
+// the old raw fetch was.
+async function probeConnectivity(): Promise<boolean> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 5000);
   try {
-    // Lightweight GET instead of HEAD — some proxies/CDNs reject HEAD or
-    // return misleading statuses while authenticated GET works fine.
-    const res = await fetch(`${url}/rest/v1/`, {
-      method: "GET",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-      signal: ctrl.signal,
-      cache: "no-store",
-    });
-    return res.ok || res.status === 206;
+    const { error } = await supabase
+      .from("products")
+      .select("id", { head: true, count: "exact" })
+      .abortSignal(ctrl.signal);
+    return !error;
   } catch {
     return false;
   } finally {
     clearTimeout(t);
   }
-}
-
-/** Real connectivity probe — navigator.onLine only reflects the network
- *  interface, not actual reachability (Windows/Chrome NCSI can report
- *  offline even when the internet works fine). This hits our own
- *  Supabase REST endpoint(s) with a short timeout as ground truth. */
-async function probeConnectivity(): Promise<boolean> {
-  if (!SUPABASE_KEY || CANDIDATE_URLS.length === 0) return navigator.onLine;
-  for (const url of CANDIDATE_URLS) {
-    if (await probeOne(url)) return true;
-  }
-  return false;
 }
 
 let consecutiveFailures = 0;
