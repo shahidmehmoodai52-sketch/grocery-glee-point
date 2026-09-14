@@ -132,6 +132,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600&display=swap",
       },
       {
+        // Nastaliq is the calligraphic style Urdu is traditionally set in
+        // (the look readers in Pakistan expect) — distinct from the Naskh
+        // style above, which is for the Arabic ayat text, not the Urdu
+        // translation next to it.
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600&display=swap",
+      },
+      {
         rel: "stylesheet",
         href: appCss,
       },

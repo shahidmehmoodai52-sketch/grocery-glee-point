@@ -292,6 +292,18 @@
   font-family: "Noto Naskh Arabic", "Traditional Arabic", serif;
 }
 
+/* Nastaliq — the traditional Urdu press/calligraphic style — for the
+ * ticker's Urdu translation specifically, same reasoning as .font-arabic
+ * above: left as the system default everywhere else the app's Urdu locale
+ * renders, so only this one ticker changes. Nastaliq needs a slightly
+ * larger size and taller line-height than Naskh/Latin to read cleanly —
+ * its diagonal strokes clip at normal text sizes/line-heights.
+ */
+.font-urdu {
+  font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif;
+  line-height: 2;
+}
+
 /* Wide, full-page document printing (ledgers, item-wise breakdowns, reports)
  * — distinct from the thermal-receipt printing above. `.print-area` (used by
  * printReceipt()) is hard-locked to 80mm/58mm receipt width, which clips a

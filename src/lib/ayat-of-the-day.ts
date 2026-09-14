@@ -42,6 +42,32 @@ const BUSINESS_AYAT_REFS: { surah: number; ayah: number }[] = [
   { surah: 17, ayah: 26 }, // Al-Isra — give the relative his right, and do not squander wastefully
 ];
 
+// English transliteration of each surah name referenced above, for a proper
+// citation next to the ayat (e.g. "Al-Isra 17:35") — standard practice
+// whenever a Quranic verse is quoted. Just chapter names, not scripture
+// text, so no accuracy-of-translation risk the way the ayat text itself has.
+const SURAH_NAMES: Record<number, string> = {
+  2: "Al-Baqarah",
+  3: "Aal-e-Imran",
+  4: "An-Nisa",
+  5: "Al-Ma'idah",
+  9: "At-Tawbah",
+  14: "Ibrahim",
+  16: "An-Nahl",
+  17: "Al-Isra",
+  23: "Al-Mu'minun",
+  26: "Ash-Shu'ara",
+  33: "Al-Ahzab",
+  41: "Fussilat",
+  53: "An-Najm",
+  55: "Ar-Rahman",
+  62: "Al-Jumu'ah",
+  65: "At-Talaq",
+  83: "Al-Mutaffifin",
+  94: "Ash-Sharh",
+  104: "Al-Humazah",
+};
+
 export interface DailyAyat {
   dateKey: string;
   surah: number;
@@ -49,6 +75,8 @@ export interface DailyAyat {
   arabic: string;
   urdu: string;
   english: string;
+  /** e.g. "Al-Isra 17:35" */
+  reference: string;
 }
 
 const CACHE_KEY = "tillix:ayat-of-the-day";
@@ -96,7 +124,16 @@ async function fetchFromApi(ref: { surah: number; ayah: number }): Promise<Daily
     const urdu = editions.find((e) => e?.edition?.identifier === "ur.jalandhry")?.text;
     const english = editions.find((e) => e?.edition?.identifier === "en.sahih")?.text;
     if (!arabic || !urdu || !english) return null;
-    return { dateKey: todayKey(), surah: ref.surah, ayah: ref.ayah, arabic, urdu, english };
+    const surahName = SURAH_NAMES[ref.surah] ?? `Surah ${ref.surah}`;
+    return {
+      dateKey: todayKey(),
+      surah: ref.surah,
+      ayah: ref.ayah,
+      arabic,
+      urdu,
+      english,
+      reference: `${surahName} ${ref.surah}:${ref.ayah}`,
+    };
   } catch {
     return null;
   } finally {
