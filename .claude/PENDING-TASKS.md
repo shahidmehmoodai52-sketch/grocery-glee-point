@@ -218,6 +218,26 @@ dashboard changes are needed, both by the user:
 
 User said: address this later, left pending for now.
 
+**Update (2026-09-14):** the broken registration flow this rate limit was
+partly masking has been fixed separately (see repo history — signUp() no
+longer silently drops the shop when confirmation is required, and shows a
+proper "check your email" screen). Since custom SMTP still isn't set up,
+the user has decided to turn **email confirmation off entirely** for now
+(Supabase Dashboard → Authentication → Sign In / Providers → Email →
+"Confirm email" toggle — another dashboard-only setting, no MCP tool for
+it either) rather than deal with SMTP immediately. Confirmed this needs
+no code changes: `handleFinishRegister` in `src/routes/auth.tsx` already
+branches correctly on whether `signUp()` returns a session or not, so it
+works either way depending on that toggle.
+
+Consequence worth remembering if this comes up again: with confirmation
+off, anyone can register with a typo'd or fake email and get full
+instant access — password reset silently won't reach such an account.
+Acceptable per the user's own call for now; revisit if fake-signups or a
+"can't reset my password" complaint shows up. This SMTP task stays
+pending — re-enable "Confirm email" once SMTP is actually set up, don't
+leave both off/undone indefinitely.
+
 ## Also noted (informational, no action needed)
 - Root `.env` is committed to the repo with Supabase URL + anon/publishable key
   only (no service-role/secret key) — not a critical leak, but best practice
