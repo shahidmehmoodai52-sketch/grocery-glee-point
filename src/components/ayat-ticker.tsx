@@ -32,13 +32,16 @@ function TickerContent({ ayat, quote, hidden }: { ayat: DailyAyat; quote: string
         {ayat.arabic}
       </span>
       <span className="text-muted-foreground/60">—</span>
-      <span dir="rtl" lang="ur" className="text-foreground/85">
+      <span dir="rtl" lang="ur" className="font-urdu text-base text-foreground/90">
         {ayat.urdu}
       </span>
       <span className="text-muted-foreground/60">—</span>
       <span dir="ltr" lang="en" className="italic text-muted-foreground">
         {ayat.english}
       </span>
+      {ayat.reference && (
+        <span className="text-[10px] text-primary/70 shrink-0">({ayat.reference})</span>
+      )}
       <span className="text-primary/30">•</span>
       <span className="italic text-muted-foreground/90">&ldquo;{quote}&rdquo;</span>
     </span>
@@ -63,7 +66,7 @@ export function AyatTicker() {
 
   return (
     <div
-      className="ayat-ticker-viewport no-print flex-1 min-w-0 overflow-hidden rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5"
+      className="ayat-ticker-viewport no-print flex-1 min-w-0 overflow-hidden rounded-full border border-primary/50 bg-primary/25 px-3 py-1.5"
       aria-label="Ayat of the day"
     >
       <div className="ayat-ticker-track">
