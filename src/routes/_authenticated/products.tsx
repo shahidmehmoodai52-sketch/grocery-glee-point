@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
@@ -403,9 +403,20 @@ function ProductsPage() {
         icon={<Package className="h-5 w-5" />}
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />{t('products.new_product', 'New product')}</Button>
-            </DialogTrigger>
+            <Button
+              onClick={() => {
+                // "Hide (keep draft)" intentionally leaves `form` populated so a
+                // half-filled NEW product survives being hidden and reopened —
+                // but that persistence doesn't distinguish a parked new-product
+                // draft from an abandoned edit session. Only reset when form.id
+                // is set (we were editing something), so a real parked draft
+                // (form.id empty) still resumes exactly as before.
+                if (form.id) setForm(empty);
+                setOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />{t('products.new_product', 'New product')}
+            </Button>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{form.id ? t('products.edit_product', 'Edit product') : t('products.new_product', 'New product')}</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3">
