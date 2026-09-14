@@ -111,7 +111,16 @@ export function buildPreviewLine(
     barcode: selected?.barcode ?? item.barcode ?? null,
     sku: selected?.sku ?? item.sku ?? null,
     qty: Number(item.qty ?? 1) || 1,
-    cost: Number(selected?.cost_price ?? item.unit_cost ?? 0) || Number(item.unit_cost ?? 0) || 0,
+    // `?? 0` alone is wrong here: a matched product's stored cost_price of
+    // exactly 0 (never purchased before, or bulk-imported without a cost)
+    // is not "no value" to `??` — it stops the fallback chain right there,
+    // silently producing a 0-cost line even when the OCR did read a real
+    // price off this bill. Only trust a source that's actually > 0.
+    cost: (() => {
+      const fromProduct = Number(selected?.cost_price ?? 0);
+      const fromOcr = Number(item.unit_cost ?? 0);
+      return fromProduct > 0 ? fromProduct : fromOcr > 0 ? fromOcr : 0;
+    })(),
     discount: Number(item.discount ?? 0) || 0,
     batch_no: item.batch_no ?? null,
     expiry_date: item.expiry_date ?? null,
