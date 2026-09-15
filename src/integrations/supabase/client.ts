@@ -7,8 +7,12 @@ function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
 }
 
-function createSupabaseFetch(supabaseKey: string): typeof fetch {
-  return (input, init) => {
+// proxyUrl/directUrl let REST/Auth calls recover if the Cloudflare Worker
+// proxy itself is the thing failing (rate-limited, out of quota, or down) —
+// see the fallback logic below. Pass directUrl as undefined when there's no
+// real Supabase URL configured to fall back to (nothing to do then).
+function createSupabaseFetch(supabaseKey: string, proxyUrl: string, directUrl: string | undefined): typeof fetch {
+  return async (input, init) => {
     const headers = new Headers(
       typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined,
     );
@@ -23,7 +27,29 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
     }
 
     headers.set('apikey', supabaseKey);
-    return fetch(input, { ...init, headers });
+    const requestInit = { ...init, headers };
+
+    // Fall back once, straight to the real Supabase URL, if the proxy itself
+    // looks unhealthy (unreachable, or answering with a server error / rate
+    // limit) rather than a genuine API error from Supabase. This only helps
+    // shops whose ISP doesn't itself block supabase.co directly — for those
+    // that do, the direct attempt will fail too and the app's existing
+    // offline queue takes over, same as any other outage.
+    const retryDirect = (url: string) => fetch(directUrl + url.slice(proxyUrl.length), requestInit);
+
+    try {
+      const res = await fetch(input, requestInit);
+      if (!directUrl || (res.status < 500 && res.status !== 429)) return res;
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (!url.startsWith(proxyUrl)) return res;
+      const direct = await retryDirect(url);
+      return direct.status < 500 ? direct : res;
+    } catch (err) {
+      if (!directUrl) throw err;
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      if (!url.startsWith(proxyUrl)) throw err;
+      return retryDirect(url);
+    }
   };
 }
 
@@ -35,9 +61,10 @@ function createSupabaseClient() {
   // integration isn't present (e.g. local dev, the Lovable sandbox).
   //
   // Some regions cannot reach supabase.co directly, so production browser
-  // builds route through the public Cloudflare Worker proxy. The direct
-  // Supabase URL remains available as a fallback when the proxy is not
-  // configured or is explicitly disabled.
+  // builds route through the public Cloudflare Worker proxy by default.
+  // DIRECT_URL is also handed to createSupabaseFetch below so REST/Auth
+  // calls can fall back to it if the proxy itself is ever the thing that's
+  // broken (out of its own request quota, down, etc.) — see that function.
   const PROXY_URL = import.meta.env.VITE_SUPABASE_PROXY_URL ?? 'https://aged-truth-688d.shahidmehmoodai52.workers.dev';
   const DIRECT_URL = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
   const SUPABASE_URL = PROXY_URL || DIRECT_URL;
@@ -55,7 +82,7 @@ function createSupabaseClient() {
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: {
-      fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
+      fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY, PROXY_URL, DIRECT_URL !== PROXY_URL ? DIRECT_URL : undefined),
     },
     auth: {
       storage: brokeredPreviewStorage(),
