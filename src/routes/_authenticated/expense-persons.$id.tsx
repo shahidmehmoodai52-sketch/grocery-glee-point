@@ -17,7 +17,7 @@ import { fmtMoney, fmtDate } from "@/lib/format";
 import { Receipt, printReceipt, printDocument } from "@/components/receipt";
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
-import { AddPaymentDialog, EditPaymentDialog } from "@/components/ledger-dialogs";
+import { AddPaymentDialog, type EditingPayment } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger } from "@/lib/customer-ledger";
 
 export const Route = createFileRoute("/_authenticated/expense-persons/$id")({ component: Page });
@@ -34,7 +34,7 @@ function Page() {
   const [to, setTo] = useState("");
   const [addPayOpen, setAddPayOpen] = useState(false);
   const [payDefault, setPayDefault] = useState(0);
-  const [editPayment, setEditPayment] = useState<any>(null);
+  const [editingPayment, setEditingPayment] = useState<EditingPayment | null>(null);
   const [obValue, setObValue] = useState<string>("");
   const [obSaving, setObSaving] = useState(false);
   const [view, setView] = useState<any>(null);
@@ -138,7 +138,7 @@ function Page() {
             const a = document.createElement("a"); a.href = url; a.download = `Ledger-${person?.name?.replace(/\s+/g, "_")}.pdf`; a.click();
             setTimeout(() => URL.revokeObjectURL(url), 5000);
           }}><FileDown className="h-4 w-4 mr-2" />{t('customers.pdf', 'PDF')}</Button>
-          <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
+          <Button onClick={() => { setEditingPayment(null); setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />{t('expenses.pay_staff', 'Pay staff')}
           </Button>
         </div>
@@ -224,7 +224,10 @@ function Page() {
                 key={i}
                 className={`${x.entity === "payment" && x.id ? "cursor-pointer" : ""} ${x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : ""}`}
                 onClick={() => {
-                  if (x.entity === "payment" && x.id) setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
+                  if (x.entity === "payment" && x.id) {
+                    setEditingPayment({ id: x.id, amount: x.credit, method: x.data?.method ?? x.ref, note: x.note, created_at: x.date });
+                    setAddPayOpen(true);
+                  }
                 }}
               >
                 <TableCell className="whitespace-nowrap">{new Date(x.date).toLocaleDateString()}</TableCell>
@@ -279,8 +282,12 @@ function Page() {
         </Table>
       </Card>
 
-      <AddPaymentDialog open={addPayOpen} onOpenChange={setAddPayOpen} party="expense_person" partyId={id} party_name={person?.name} defaultAmount={payDefault} />
-      <EditPaymentDialog open={!!editPayment} onOpenChange={(o) => !o && setEditPayment(null)} payment={editPayment} />
+      <AddPaymentDialog
+        open={addPayOpen}
+        onOpenChange={(o) => { setAddPayOpen(o); if (!o) setEditingPayment(null); }}
+        party="expense_person" partyId={id} party_name={person?.name} defaultAmount={payDefault}
+        editing={editingPayment}
+      />
 
       <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}>
         <DialogContent className="max-w-md">

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,7 +28,15 @@ import { PurchaseBillScannerButton, type ImportedPurchase } from "@/features/pur
 import { QuickAddProductDialog } from "@/components/quick-add-product-dialog";
 import { useBusinessType } from "@/hooks/use-tenant";
 
-export const Route = createFileRoute("/_authenticated/purchases")({ component: Page });
+export const Route = createFileRoute("/_authenticated/purchases")({
+  // Lets other pages (the supplier ledger) deep-link straight into editing
+  // one purchase — e.g. /purchases?edit=<id> — instead of duplicating this
+  // page's full item-editing form elsewhere.
+  validateSearch: (s: Record<string, unknown>): { edit?: string } => ({
+    edit: typeof s.edit === "string" ? s.edit : undefined,
+  }),
+  component: Page,
+});
 
 const PURCHASE_LIST_LIMIT = 2000;
 
@@ -243,6 +251,26 @@ function Page() {
     } as any);
     setShowIncentive(Number(p.incentive_amount || 0) > 0);
   };
+
+  // Deep-link entry point from the supplier ledger: /purchases?edit=<id>.
+  // Fetches fresh rather than looking the id up in the (date-filtered,
+  // possibly-not-yet-loaded) purchases list below, then clears the param so
+  // a later refresh/back-navigation doesn't reopen the same editor.
+  const editParamId = Route.useSearch().edit;
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!editParamId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from("purchases").select("*").eq("id", editParamId).maybeSingle();
+      if (cancelled) return;
+      if (error || !data) { toast.error(t('purchases.could_not_load_for_edit', 'Could not load that purchase.')); return; }
+      await openEdit(data);
+    })();
+    void navigate({ to: "/purchases", search: {}, replace: true });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParamId]);
 
   const handleDeletePurchase = async () => {
     if (!deleteTarget) return;

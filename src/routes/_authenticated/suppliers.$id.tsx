@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ import { printDocument } from "@/components/receipt";
 
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
-import { AddPaymentDialog, AddDiscountDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
+import { AddPaymentDialog, AddDiscountDialog, EditEntryDialog, type LedgerEntity, type EditingPayment } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger } from "@/lib/customer-ledger";
 import type { LedgerEntry as Entry } from "@/lib/supplier-ledger";
 
@@ -36,12 +36,32 @@ function Page() {
   const [addPayOpen, setAddPayOpen] = useState(false);
   const [addDiscountOpen, setAddDiscountOpen] = useState(false);
   const [payDefault, setPayDefault] = useState(0);
-  const [editPayment, setEditPayment] = useState<any>(null);
+  const [editingPayment, setEditingPayment] = useState<EditingPayment | null>(null);
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
   const [obValue, setObValue] = useState<string>("");
   const [obSaving, setObSaving] = useState(false);
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const toggle = (pid: string) => setExpanded((s) => { const n = new Set(s); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
+  // Purchases already have a full item-level editor (purchases.tsx reuses
+  // its own "New purchase" form for editing) — the ledger just deep-links
+  // into it rather than duplicating that form here. Covers the purchase row
+  // itself, its incentive split, and its on-invoice "paid" split, since all
+  // three are really just fields on the one purchases row.
+  const editPurchase = (purchaseId: string) => navigate({ to: "/purchases", search: { edit: purchaseId } });
+
+  const openEditPayment = (x: Entry) => {
+    if (!x.id) return;
+    setEditingPayment({
+      id: x.id,
+      amount: x.credit,
+      method: x.data?.method ?? (x.type === "discount" ? "discount" : x.ref),
+      note: x.note,
+      created_at: x.date,
+    });
+    if (x.type === "discount") setAddDiscountOpen(true);
+    else setAddPayOpen(true);
+  };
 
 
   const { data: purchaseItems = [] } = useQuery({
@@ -158,10 +178,10 @@ function Page() {
             const a = document.createElement("a"); a.href = url; a.download = `Ledger-${supplier?.name?.replace(/\s+/g,"_")}.pdf`; a.click();
             setTimeout(() => URL.revokeObjectURL(url), 5000);
           }}><FileDown className="h-4 w-4 mr-2" />{t('customers.pdf', 'PDF')}</Button>
-          <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
+          <Button onClick={() => { setEditingPayment(null); setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />{t('ledger.add_payment', 'Add payment')}
           </Button>
-          <Button variant="outline" onClick={() => { setPayDefault(0); setAddDiscountOpen(true); }}>
+          <Button variant="outline" onClick={() => { setEditingPayment(null); setPayDefault(0); setAddDiscountOpen(true); }}>
             <Gift className="h-4 w-4 mr-1" />{t('ledger.add_discount', 'Add discount')}
           </Button>
         </div>
@@ -262,7 +282,7 @@ function Page() {
                     onClick={(e) => {
                       if ((e.target as HTMLElement).closest("button")) return;
                       if (isPurchase) return toggle(x.id!);
-                      if (x.entity === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.type === "discount" ? "discount" : x.ref, note: x.note, created_at: x.date });
+                      if (x.entity === "payment" && x.id) return openEditPayment(x);
                       if (x.entity && x.id) return setEditEntry({ entity: x.entity as Exclude<LedgerEntity, "payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
                     }}
                   >
@@ -299,16 +319,26 @@ function Page() {
                     <TableCell className="text-right no-print">
                       <div className="flex justify-end gap-1">
                         {isPurchase && due > 0 && (
-                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>
+                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setEditingPayment(null); setPayDefault(due); setAddPayOpen(true); }}>
                             <DollarSign className="h-3.5 w-3.5 mr-1" />{t('suppliers.pay', 'Pay')}
                           </Button>
                         )}
                         {x.entity === "payment" && x.id && (
-                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.credit, method: x.type === "discount" ? "discount" : x.ref, note: x.note, created_at: x.date })}>
+                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => openEditPayment(x)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                         )}
-                        {x.entity && x.entity !== "payment" && x.id && (
+                        {x.entity === "purchase" && x.id && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={(e) => { e.stopPropagation(); editPurchase(x.id!); }} title={t('suppliers.edit_purchase_tooltip', 'Edit purchase')}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {(x.type === "incentive" || (x.type === "payment" && !x.entity)) && x.data?.purchase_id && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => editPurchase(x.data.purchase_id)} title={t('suppliers.edit_via_purchase_tooltip', 'Edit via the purchase')}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {x.entity && x.entity !== "payment" && x.entity !== "purchase" && x.id && (
                           <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: x.entity as Exclude<LedgerEntity,"payment">, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -375,9 +405,18 @@ function Page() {
         </Table>
       </Card>
 
-      <AddPaymentDialog open={addPayOpen} onOpenChange={setAddPayOpen} party="supplier" partyId={id} party_name={supplier?.name} defaultAmount={payDefault} />
-      <AddDiscountDialog open={addDiscountOpen} onOpenChange={setAddDiscountOpen} party="supplier" partyId={id} party_name={supplier?.name} />
-      <EditPaymentDialog open={!!editPayment} onOpenChange={(o) => !o && setEditPayment(null)} payment={editPayment} />
+      <AddPaymentDialog
+        open={addPayOpen}
+        onOpenChange={(o) => { setAddPayOpen(o); if (!o) setEditingPayment(null); }}
+        party="supplier" partyId={id} party_name={supplier?.name} defaultAmount={payDefault}
+        editing={editingPayment}
+      />
+      <AddDiscountDialog
+        open={addDiscountOpen}
+        onOpenChange={(o) => { setAddDiscountOpen(o); if (!o) setEditingPayment(null); }}
+        party="supplier" partyId={id} party_name={supplier?.name}
+        editing={editingPayment}
+      />
       <EditEntryDialog open={!!editEntry} onOpenChange={(o) => !o && setEditEntry(null)} entity={editEntry?.entity ?? null} entry={editEntry?.entry ?? null} />
     </div>
   );

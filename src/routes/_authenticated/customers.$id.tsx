@@ -19,7 +19,7 @@ import { fetchAll } from "@/lib/supabase-page";
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { Receipt, printReceipt, printDocument } from "@/components/receipt";
-import { AddPaymentDialog, AddDiscountDialog, EditPaymentDialog, EditEntryDialog, type LedgerEntity } from "@/components/ledger-dialogs";
+import { AddPaymentDialog, AddDiscountDialog, EditEntryDialog, type LedgerEntity, type EditingPayment } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger, buildLedgerEntries } from "@/lib/customer-ledger";
 
 export const Route = createFileRoute("/_authenticated/customers/$id")({ component: Page });
@@ -52,7 +52,10 @@ function Page() {
   const [addDiscountOpen, setAddDiscountOpen] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [payDefault, setPayDefault] = useState(0);
-  const [editPayment, setEditPayment] = useState<any>(null);
+  // Editing a payment/discount/cash-out reuses the exact same dialog it was
+  // created in (AddPaymentDialog / AddDiscountDialog) pre-filled from this,
+  // rather than a separate "edit" dialog that could drift out of sync with it.
+  const [editingPayment, setEditingPayment] = useState<EditingPayment | null>(null);
   const [editEntry, setEditEntry] = useState<{ entity: Exclude<LedgerEntity, "payment">; entry: any } | null>(null);
   const [obValue, setObValue] = useState<string>("");
   const [obSaving, setObSaving] = useState(false);
@@ -154,6 +157,26 @@ function Page() {
     owedLabel: "Outstanding (they owe)", advanceLabel: "Advance (credit)",
   });
 
+  const openEditPayment = (x: Entry) => {
+    if (!x.id) return;
+    // The ledger row's derived fields (`ref`, debit/credit) are display
+    // shorthand — pull the real account name and direction from the raw
+    // party_payments row (already loaded, with cash_transactions embedded)
+    // so the edit dialog pre-fills with the actual stored values.
+    const raw = (payments as any[]).find((p) => p.id === x.id);
+    const direction: "in" | "out" = raw?.cash_transactions?.direction === "out" ? "out" : "in";
+    setEditingPayment({
+      id: x.id,
+      amount: x.type === "cash_out" ? x.debit : x.credit,
+      method: raw?.method ?? x.ref,
+      note: x.note,
+      created_at: x.date,
+      direction,
+    });
+    if (x.type === "discount") setAddDiscountOpen(true);
+    else setAddPayOpen(true);
+  };
+
   const voidSale = async (sale: any) => {
     if (!sale) return;
     if (!confirm(t('customers.void_invoice_confirm', 'Void invoice {{no}}?', { no: sale.invoice_no ?? sale.id }))) return;
@@ -196,10 +219,10 @@ function Page() {
           <div><Label className="text-xs">{t('customers.to_label', 'To')}</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" /></div>
           <Button variant="outline" onClick={() => printDocument()}><Printer className="h-4 w-4 mr-2" />{t('common.print', 'Print')}</Button>
           <Button variant="outline" onClick={() => setPdfPrompt(true)}><FileDown className="h-4 w-4 mr-2" />{t('customers.pdf', 'PDF')}</Button>
-          <Button variant="outline" onClick={() => { setPayDefault(Math.max(closing, 0)); setAddDiscountOpen(true); }}>
+          <Button variant="outline" onClick={() => { setEditingPayment(null); setPayDefault(Math.max(closing, 0)); setAddDiscountOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />{t('ledger.add_discount', 'Add discount')}
           </Button>
-          <Button onClick={() => { setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
+          <Button onClick={() => { setEditingPayment(null); setPayDefault(Math.max(closing, 0)); setAddPayOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />{t('ledger.add_payment', 'Add payment')}
           </Button>
         </div>
@@ -283,9 +306,7 @@ function Page() {
                 className={`cursor-pointer ${x.debit > 0 ? "bg-destructive/10 hover:bg-destructive/15" : x.credit > 0 ? "bg-success/10 hover:bg-success/15" : "hover:bg-muted/50"}`}
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest("button")) return;
-                  if (x.type === "payment" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: x.ref, note: x.note, created_at: x.date });
-                  if (x.type === "discount" && x.id) return setEditPayment({ id: x.id, amount: x.credit, method: "discount", note: x.note, created_at: x.date });
-                  if (x.type === "cash_out" && x.id) return setEditPayment({ id: x.id, amount: x.debit, method: "Cash Out", note: x.note, created_at: x.date });
+                  if (["payment", "discount", "cash_out"].includes(x.type) && x.id) return openEditPayment(x);
                   if (x.type && !["payment", "discount", "cash_out"].includes(x.type) && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
                 }}
               >
@@ -327,12 +348,12 @@ function Page() {
                       </>
                     )}
                     {x.type === "sale" && due > 0 && (
-                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setPayDefault(due); setAddPayOpen(true); }}>
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setEditingPayment(null); setPayDefault(due); setAddPayOpen(true); }}>
                         <DollarSign className="h-3.5 w-3.5 mr-1" />{t('customers.pay', 'Pay')}
                       </Button>
                     )}
                     {(x.type === "payment" || x.type === "discount" || x.type === "cash_out") && x.id && (
-                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditPayment({ id: x.id, amount: x.type === "cash_out" ? x.debit : x.credit, method: x.type === "cash_out" ? "Cash Out" : x.type === "discount" ? "discount" : x.ref, note: x.note, created_at: x.date })}>
+                      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => openEditPayment(x)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -394,9 +415,18 @@ function Page() {
         </DialogContent>
       </Dialog>
 
-      <AddPaymentDialog open={addPayOpen} onOpenChange={setAddPayOpen} party="customer" partyId={id} party_name={customer?.name} defaultAmount={payDefault} />
-      <AddDiscountDialog open={addDiscountOpen} onOpenChange={setAddDiscountOpen} party="customer" partyId={id} party_name={customer?.name} defaultAmount={payDefault} />
-      <EditPaymentDialog open={!!editPayment} onOpenChange={(o) => !o && setEditPayment(null)} payment={editPayment} />
+      <AddPaymentDialog
+        open={addPayOpen}
+        onOpenChange={(o) => { setAddPayOpen(o); if (!o) setEditingPayment(null); }}
+        party="customer" partyId={id} party_name={customer?.name} defaultAmount={payDefault}
+        editing={editingPayment}
+      />
+      <AddDiscountDialog
+        open={addDiscountOpen}
+        onOpenChange={(o) => { setAddDiscountOpen(o); if (!o) setEditingPayment(null); }}
+        party="customer" partyId={id} party_name={customer?.name} defaultAmount={payDefault}
+        editing={editingPayment}
+      />
       <EditEntryDialog open={!!editEntry} onOpenChange={(o) => !o && setEditEntry(null)} entity={editEntry?.entity ?? null} entry={editEntry?.entry ?? null} />
 
 

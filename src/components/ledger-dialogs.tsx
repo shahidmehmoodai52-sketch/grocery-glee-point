@@ -99,15 +99,31 @@ function useCashAccounts() {
   });
 }
 
+export interface EditingPayment {
+  id: string;
+  amount: number;
+  method: string;
+  note: string;
+  created_at: string;
+  direction?: "in" | "out" | null;
+}
+
+/** Also doubles as the editor: pass `editing` (an existing party_payments
+ *  row) to pre-fill every field from it and save via update_party_payment
+ *  instead of record_payment. This is deliberate — editing a payment should
+ *  open the exact same form it was created in, not a separate dialog, so
+ *  the two can never drift out of sync (direction, account-preset creation,
+ *  etc. only had to be built once). */
 export function AddPaymentDialog({
-  open, onOpenChange, party, partyId, party_name, defaultAmount = 0, onDone,
+  open, onOpenChange, party, partyId, party_name, defaultAmount = 0, editing, onDone,
 }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   party: Party; partyId: string; party_name?: string;
-  defaultAmount?: number; onDone?: () => void;
+  defaultAmount?: number; editing?: EditingPayment | null; onDone?: () => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const isEditing = !!editing;
   const [amount, setAmount] = useState(defaultAmount);
   const [method, setMethod] = useState("cash");
   const [accountId, setAccountId] = useState("");
@@ -133,7 +149,15 @@ export function AddPaymentDialog({
     ?? sourceOptions[0];
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (editing) {
+      setAmount(Number(editing.amount));
+      setMethod(editing.method || "cash");
+      setAccountId(cashAccounts.find((a: any) => a.name.toLowerCase() === (editing.method || "").toLowerCase())?.id ?? "");
+      setNote(editing.note || "");
+      setWhen(toLocalInputValue(editing.created_at));
+      setDirection(editing.direction === "out" ? "out" : "in");
+    } else {
       setAmount(defaultAmount);
       setMethod(defaultSource?.name ?? "Cash in hand");
       setAccountId(defaultSource?.id ?? "");
@@ -141,7 +165,7 @@ export function AddPaymentDialog({
       setWhen(toLocalInputValue(new Date().toISOString()));
       setDirection("in");
     }
-  }, [open, defaultAmount, cashAccounts.length]);
+  }, [open, editing?.id, defaultAmount, cashAccounts.length]);
 
   const resolveAccount = async () => {
     const selected = sourceOptions.find((a) => a.id === accountId)
@@ -163,23 +187,38 @@ export function AddPaymentDialog({
     setSaving(true);
     let error: any = null;
     try {
-      const account = await resolveAccount();
       const effectiveDirection = party === "customer" ? direction : undefined;
-      const res = await supabase.rpc("record_payment", {
-        p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id ?? undefined,
-        p_direction: effectiveDirection,
-      } as any);
-      error = res.error;
-      if (!error && when && res.data) {
-        const chosen = new Date(when);
-        const nowIso = new Date();
-        if (Math.abs(chosen.getTime() - nowIso.getTime()) > 60_000) {
-          const upd = await supabase.rpc("update_party_payment", {
-            _id: res.data as string, _amount: amount, _method: account.name, _note: note || "",
-            _created_at: chosen.toISOString(), _account_id: account.id ?? undefined,
-            _direction: effectiveDirection,
-          } as any);
-          error = upd.error;
+      if (editing) {
+        // Only resolve/override the account if the user actually touched the
+        // field — an empty accountId here means "leave it as it already is",
+        // and update_party_payment already preserves the existing linked
+        // account when _account_id is omitted.
+        const account = accountId ? await resolveAccount() : null;
+        const upd = await supabase.rpc("update_party_payment", {
+          _id: editing.id, _amount: amount, _method: account?.name ?? editing.method, _note: note || "",
+          _created_at: when ? new Date(when).toISOString() : editing.created_at,
+          _account_id: account?.id ?? undefined,
+          _direction: effectiveDirection,
+        } as any);
+        error = upd.error;
+      } else {
+        const account = await resolveAccount();
+        const res = await supabase.rpc("record_payment", {
+          p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id ?? undefined,
+          p_direction: effectiveDirection,
+        } as any);
+        error = res.error;
+        if (!error && when && res.data) {
+          const chosen = new Date(when);
+          const nowIso = new Date();
+          if (Math.abs(chosen.getTime() - nowIso.getTime()) > 60_000) {
+            const upd = await supabase.rpc("update_party_payment", {
+              _id: res.data as string, _amount: amount, _method: account.name, _note: note || "",
+              _created_at: chosen.toISOString(), _account_id: account.id ?? undefined,
+              _direction: effectiveDirection,
+            } as any);
+            error = upd.error;
+          }
         }
       }
     } catch (e: any) {
@@ -187,20 +226,44 @@ export function AddPaymentDialog({
     }
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(t('ledger.payment_recorded', 'Payment recorded'));
+    toast.success(isEditing ? t('ledger.payment_updated', 'Payment updated') : t('ledger.payment_recorded', 'Payment recorded'));
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
   };
+
+  const remove = async () => {
+    if (!editing) return;
+    if (!confirm(t('ledger.delete_confirm_payment', 'Delete this payment? Balance will be reversed.'))) return;
+    setSaving(true);
+    const { error } = await supabase.rpc("delete_party_payment", { _id: editing.id });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(t('ledger.payment_deleted', 'Payment deleted'));
+    onOpenChange(false);
+    qc.invalidateQueries();
+    onDone?.();
+  };
+
+  const titleKey = isEditing
+    ? (party === "customer" && direction === "out" ? "ledger.edit_cash_given" : "ledger.edit_payment")
+    : (party === "customer" && direction === "out" ? "ledger.give_cash" : "ledger.add_payment");
+  const titleForKey = isEditing
+    ? (party === "customer" && direction === "out" ? "ledger.edit_cash_given_for" : "ledger.edit_payment_for")
+    : (party === "customer" && direction === "out" ? "ledger.give_cash_for" : "ledger.add_payment_for");
+  const titleDefault = isEditing
+    ? (party === "customer" && direction === "out" ? "Edit cash given" : "Edit payment")
+    : (party === "customer" && direction === "out" ? "Give cash" : "Add payment");
+  const titleForDefault = isEditing
+    ? (party === "customer" && direction === "out" ? "Edit cash given — {{name}}" : "Edit payment — {{name}}")
+    : (party === "customer" && direction === "out" ? "Give cash — {{name}}" : "Add payment — {{name}}");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {party === "customer" && direction === "out"
-              ? (party_name ? t('ledger.give_cash_for', 'Give cash — {{name}}', { name: party_name }) : t('ledger.give_cash', 'Give cash'))
-              : (party_name ? t('ledger.add_payment_for', 'Add payment — {{name}}', { name: party_name }) : t('ledger.add_payment', 'Add payment'))}
+            {party_name ? t(titleForKey, titleForDefault, { name: party_name }) : t(titleKey, titleDefault)}
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
@@ -228,7 +291,7 @@ export function AddPaymentDialog({
                 if (selected) setMethod(selected.name);
               }}
             >
-              <SelectTrigger><SelectValue placeholder={t('ledger.choose_source_placeholder', 'Choose Cash, Bank, EasyPaisa…')} /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={isEditing && !accountId ? method : t('ledger.choose_source_placeholder', 'Choose Cash, Bank, EasyPaisa…')} /></SelectTrigger>
               <SelectContent>
                 {sourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
               </SelectContent>
@@ -239,9 +302,14 @@ export function AddPaymentDialog({
           </div>
           <div><Label>{t('common.note', 'Note')}</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
-          <Button onClick={save} disabled={saving}>{saving ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</Button>
+        <DialogFooter className={isEditing ? "justify-between sm:justify-between" : undefined}>
+          {isEditing && (
+            <Button variant="destructive" onClick={remove} disabled={saving}><Trash2 className="h-4 w-4 mr-1" />{t('common.delete', 'Delete')}</Button>
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button onClick={save} disabled={saving}>{saving ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -254,46 +322,63 @@ export function AddPaymentDialog({
  *  correctly: a customer discount is a cost (subtracted from profit), while
  *  a supplier discount is money saved (added to profit) — same mechanism,
  *  opposite direction, decided by `party`. */
+/** Also doubles as the editor — same reasoning as AddPaymentDialog above:
+ *  pass `editing` to pre-fill from an existing discount row and save via
+ *  update_party_payment instead of record_payment. */
 export function AddDiscountDialog({
-  open, onOpenChange, party, partyId, party_name, defaultAmount = 0, onDone,
+  open, onOpenChange, party, partyId, party_name, defaultAmount = 0, editing, onDone,
 }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   party: Party; partyId: string; party_name?: string;
-  defaultAmount?: number; onDone?: () => void;
+  defaultAmount?: number; editing?: EditingPayment | null; onDone?: () => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const isEditing = !!editing;
   const [amount, setAmount] = useState(defaultAmount);
   const [note, setNote] = useState("");
   const [when, setWhen] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (editing) {
+      setAmount(Number(editing.amount));
+      setNote(editing.note || "");
+      setWhen(toLocalInputValue(editing.created_at));
+    } else {
       setAmount(defaultAmount);
       setNote("");
       setWhen(toLocalInputValue(new Date().toISOString()));
     }
-  }, [open, defaultAmount]);
+  }, [open, editing?.id, defaultAmount]);
 
   const save = async () => {
     if (!amount || amount <= 0) return toast.error(t('ledger.amount_positive', 'Amount must be positive'));
     setSaving(true);
     let error: any = null;
     try {
-      const res = await supabase.rpc("record_payment", {
-        p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: "discount", p_note: note || "",
-      });
-      error = res.error;
-      if (!error && when && res.data) {
-        const chosen = new Date(when);
-        const nowIso = new Date();
-        if (Math.abs(chosen.getTime() - nowIso.getTime()) > 60_000) {
-          const upd = await supabase.rpc("update_party_payment", {
-            _id: res.data as string, _amount: amount, _method: "discount", _note: note || "",
-            _created_at: chosen.toISOString(),
-          });
-          error = upd.error;
+      if (editing) {
+        const upd = await supabase.rpc("update_party_payment", {
+          _id: editing.id, _amount: amount, _method: "discount", _note: note || "",
+          _created_at: when ? new Date(when).toISOString() : editing.created_at,
+        });
+        error = upd.error;
+      } else {
+        const res = await supabase.rpc("record_payment", {
+          p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: "discount", p_note: note || "",
+        });
+        error = res.error;
+        if (!error && when && res.data) {
+          const chosen = new Date(when);
+          const nowIso = new Date();
+          if (Math.abs(chosen.getTime() - nowIso.getTime()) > 60_000) {
+            const upd = await supabase.rpc("update_party_payment", {
+              _id: res.data as string, _amount: amount, _method: "discount", _note: note || "",
+              _created_at: chosen.toISOString(),
+            });
+            error = upd.error;
+          }
         }
       }
     } catch (e: any) {
@@ -301,7 +386,20 @@ export function AddDiscountDialog({
     }
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(t('ledger.discount_recorded', 'Discount recorded'));
+    toast.success(isEditing ? t('ledger.discount_updated', 'Discount updated') : t('ledger.discount_recorded', 'Discount recorded'));
+    onOpenChange(false);
+    qc.invalidateQueries();
+    onDone?.();
+  };
+
+  const remove = async () => {
+    if (!editing) return;
+    if (!confirm(t('ledger.delete_confirm_discount', 'Delete this discount? Balance will be reversed.'))) return;
+    setSaving(true);
+    const { error } = await supabase.rpc("delete_party_payment", { _id: editing.id });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(t('ledger.discount_deleted', 'Discount deleted'));
     onOpenChange(false);
     qc.invalidateQueries();
     onDone?.();
@@ -310,7 +408,13 @@ export function AddDiscountDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>{party_name ? t('ledger.add_discount_for', 'Add discount — {{name}}', { name: party_name }) : t('ledger.add_discount', 'Add discount')}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            {isEditing
+              ? (party_name ? t('ledger.edit_discount_for', 'Edit discount — {{name}}', { name: party_name }) : t('ledger.edit_discount', 'Edit discount'))
+              : (party_name ? t('ledger.add_discount_for', 'Add discount — {{name}}', { name: party_name }) : t('ledger.add_discount', 'Add discount'))}
+          </DialogTitle>
+        </DialogHeader>
         <div className="grid gap-3">
           <DateTimeField value={when} onChange={setWhen} />
           <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
@@ -321,107 +425,10 @@ export function AddDiscountDialog({
               : t('ledger.discount_note', 'No cash moves — this reduces what the customer owes and comes off profit in Reports & Dashboard. Nothing changes in Cash Flow.')}
           </p>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
-          <Button onClick={save} disabled={saving}>{saving ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function EditPaymentDialog({
-  open, onOpenChange, payment, onDone,
-}: {
-  open: boolean; onOpenChange: (o: boolean) => void;
-  payment: { id: string; amount: number; method: string; note: string; created_at: string } | null;
-  onDone?: () => void;
-}) {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const [amount, setAmount] = useState(0);
-  const [method, setMethod] = useState("cash");
-  const [accountId, setAccountId] = useState("");
-  const [note, setNote] = useState("");
-  const [when, setWhen] = useState("");
-  const [saving, setSaving] = useState(false);
-  const cashAccountsQ = useCashAccounts();
-  const cashAccounts = cashAccountsQ.data ?? [];
-  const isDiscount = payment?.method === "discount";
-  useEffect(() => {
-    if (payment) {
-      setAmount(Number(payment.amount));
-      setMethod(payment.method || "cash");
-      setAccountId("");
-      setNote(payment.note || "");
-      setWhen(toLocalInputValue(payment.created_at));
-    }
-  }, [payment]);
-
-  const save = async () => {
-    if (!payment) return;
-    if (!amount || amount <= 0) return toast.error(t('ledger.amount_positive', 'Amount must be positive'));
-    setSaving(true);
-    const selected = cashAccounts.find((a: any) => a.id === accountId);
-    const { error } = await supabase.rpc("update_party_payment", {
-      _id: payment.id, _amount: amount, _method: isDiscount ? "discount" : (selected?.name ?? method), _note: note || "",
-      _created_at: when ? new Date(when).toISOString() : payment.created_at,
-      _account_id: isDiscount ? undefined : (accountId || undefined),
-    });
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(isDiscount ? t('ledger.discount_updated', 'Discount updated') : t('ledger.payment_updated', 'Payment updated'));
-    onOpenChange(false);
-    qc.invalidateQueries();
-    onDone?.();
-  };
-
-  const remove = async () => {
-    if (!payment) return;
-    if (!confirm(isDiscount ? t('ledger.delete_confirm_discount', 'Delete this discount? Balance will be reversed.') : t('ledger.delete_confirm_payment', 'Delete this payment? Balance will be reversed.'))) return;
-    setSaving(true);
-    const { error } = await supabase.rpc("delete_party_payment", { _id: payment.id });
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(isDiscount ? t('ledger.discount_deleted', 'Discount deleted') : t('ledger.payment_deleted', 'Payment deleted'));
-    onOpenChange(false);
-    qc.invalidateQueries();
-    onDone?.();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>{isDiscount ? t('ledger.edit_discount', 'Edit discount') : t('ledger.edit_payment', 'Edit payment')}</DialogTitle></DialogHeader>
-        <div className="grid gap-3">
-          <DateTimeField value={when} onChange={setWhen} />
-          <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
-          {isDiscount ? (
-            <p className="text-[11px] text-muted-foreground">
-              {t('ledger.no_cash_account_note', 'No cash account — this is a discount, not a received payment.')}
-            </p>
-          ) : (
-          <div>
-            <Label>{t('ledger.payment_source', 'Payment source')}</Label>
-            <Select
-              value={accountId}
-              onValueChange={(value) => {
-                setAccountId(value);
-                const selected = cashAccounts.find((a: any) => a.id === value);
-                if (selected) setMethod(selected.name);
-              }}
-            >
-              <SelectTrigger><SelectValue placeholder={method || t('ledger.keep_current_source', 'Keep current source')} /></SelectTrigger>
-              <SelectContent>
-                {cashAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+        <DialogFooter className={isEditing ? "justify-between sm:justify-between" : undefined}>
+          {isEditing && (
+            <Button variant="destructive" onClick={remove} disabled={saving}><Trash2 className="h-4 w-4 mr-1" />{t('common.delete', 'Delete')}</Button>
           )}
-          <div><Label>{t('common.note', 'Note')}</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
-        </div>
-        <DialogFooter className="justify-between sm:justify-between">
-          <Button variant="destructive" onClick={remove} disabled={saving}><Trash2 className="h-4 w-4 mr-1" />{t('common.delete', 'Delete')}</Button>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
             <Button onClick={save} disabled={saving}>{saving ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</Button>
