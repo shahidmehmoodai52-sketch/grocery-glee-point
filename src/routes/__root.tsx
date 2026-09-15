@@ -209,8 +209,18 @@ function RootComponent() {
         })();
 
         // Reconnect can fire several `online` events (Wi-Fi flap, VPN, captive
-        // portal). Debounce so only one sync pass runs, and never sooner than
-        // 10s after the previous reconnect-triggered pass.
+        // portal) — and on a genuinely unstable connection (common on the
+        // ISPs this app's Cloudflare proxy exists for), it can keep firing
+        // continuously for hours, `visibilitychange` included since it shares
+        // this same debounced function. Each pass pulls all ~16 mirrored
+        // tables (one request per table), so a 10s floor here meant a flaky
+        // connection produced a full sync roughly every 10 seconds, 24/7 —
+        // measured as the dominant share of a day's Supabase/Cloudflare
+        // request volume on real shops with only a single open tab each.
+        // The periodic 5-minute interval below already provides a steady
+        // baseline resync, so this only needs to catch "just came back
+        // online" reasonably promptly, not instantly — 2 minutes is enough
+        // headroom to stop flapping from turning into a request storm.
         // A backgrounded/suspended tab can miss the Supabase client's internal
         // refresh timer, leaving the access token silently expired — the next
         // request then fails with "JWT expired" instead of just working (this
@@ -222,7 +232,7 @@ function RootComponent() {
         };
 
         let offlineSince: number | null = null;
-        const debouncedReconnectSync = debounceAsync(() => trigger("reconnect"), 2500, 10_000);
+        const debouncedReconnectSync = debounceAsync(() => trigger("reconnect"), 2500, 120_000);
         const onOnline = () => {
           if (offlineSince !== null) {
             logPerf("reconnected", { offlineForMs: Math.round(nowMs() - offlineSince) });
