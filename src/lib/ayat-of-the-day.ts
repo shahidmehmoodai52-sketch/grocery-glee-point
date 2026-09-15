@@ -68,6 +68,13 @@ const SURAH_NAMES: Record<number, string> = {
   104: "Al-Humazah",
 };
 
+/** e.g. "Al-Isra 17:35" — exported so the ticker can always derive a
+ *  reference even from a stale localStorage cache written before this
+ *  field existed (surah/ayah were always present; reference wasn't). */
+export function formatAyatReference(surah: number, ayah: number): string {
+  return `${SURAH_NAMES[surah] ?? `Surah ${surah}`} ${surah}:${ayah}`;
+}
+
 export interface DailyAyat {
   dateKey: string;
   surah: number;
@@ -124,7 +131,6 @@ async function fetchFromApi(ref: { surah: number; ayah: number }): Promise<Daily
     const urdu = editions.find((e) => e?.edition?.identifier === "ur.jalandhry")?.text;
     const english = editions.find((e) => e?.edition?.identifier === "en.sahih")?.text;
     if (!arabic || !urdu || !english) return null;
-    const surahName = SURAH_NAMES[ref.surah] ?? `Surah ${ref.surah}`;
     return {
       dateKey: todayKey(),
       surah: ref.surah,
@@ -132,7 +138,7 @@ async function fetchFromApi(ref: { surah: number; ayah: number }): Promise<Daily
       arabic,
       urdu,
       english,
-      reference: `${surahName} ${ref.surah}:${ref.ayah}`,
+      reference: formatAyatReference(ref.surah, ref.ayah),
     };
   } catch {
     return null;

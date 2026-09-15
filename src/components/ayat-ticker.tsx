@@ -4,7 +4,7 @@
 // short business maxim in the same line.
 import { useEffect, useState } from "react";
 import { BookOpen, CalendarDays } from "lucide-react";
-import { getDailyAyat, type DailyAyat } from "@/lib/ayat-of-the-day";
+import { getDailyAyat, formatAyatReference, type DailyAyat } from "@/lib/ayat-of-the-day";
 import { getQuoteOfTheDay } from "@/lib/quote-of-the-day";
 
 const TODAY_LABEL = new Date().toLocaleDateString(undefined, {
@@ -15,18 +15,26 @@ const TODAY_LABEL = new Date().toLocaleDateString(undefined, {
 });
 
 function TickerContent({ ayat, quote, hidden }: { ayat: DailyAyat; quote: string; hidden?: boolean }) {
+  // Fallback for a cache written before the `reference` field existed —
+  // surah/ayah were always present, so a reference can always be derived.
+  const reference = ayat.reference || formatAyatReference(ayat.surah, ayat.ayah);
   return (
     <span
+      // Pinned ltr regardless of the shop's active UI language: the app
+      // sets <html dir="rtl"> for the Urdu/Arabic locales (see lib/i18n.ts),
+      // which would otherwise reverse this row's flex order (date/quote
+      // swapping to the front, Arabic/Urdu/English visually scrambled) —
+      // exactly the "ayat line reads backwards" issue reported on an Urdu-
+      // locale shop. Each segment below still carries its own dir/lang so
+      // the Arabic/Urdu text itself still shapes and reads correctly.
+      dir="ltr"
       className="ayat-ticker-item inline-flex items-center gap-2.5"
       aria-hidden={hidden || undefined}
     >
       <CalendarDays className="h-3 w-3 shrink-0 text-primary/70" />
       <span className="text-[11px] text-muted-foreground/80 shrink-0">{TODAY_LABEL}</span>
       <span className="text-primary/30">•</span>
-      {/* Ayat first — Arabic, then Urdu translation, then English. Each
-          segment gets its own dir/lang so the browser's bidi algorithm
-          doesn't try to reorder Arabic/Urdu (RTL) against the surrounding
-          LTR page and English text. */}
+      {/* Ayat first — Arabic, then Urdu translation, then English. */}
       <BookOpen className="h-3.5 w-3.5 shrink-0 text-primary" />
       <span dir="rtl" lang="ar" className="font-arabic text-sm font-semibold text-foreground">
         {ayat.arabic}
@@ -39,9 +47,7 @@ function TickerContent({ ayat, quote, hidden }: { ayat: DailyAyat; quote: string
       <span dir="ltr" lang="en" className="italic text-muted-foreground">
         {ayat.english}
       </span>
-      {ayat.reference && (
-        <span className="text-[10px] text-primary/70 shrink-0">({ayat.reference})</span>
-      )}
+      <span className="text-[10px] text-primary/70 shrink-0">({reference})</span>
       <span className="text-primary/30">•</span>
       <span className="italic text-muted-foreground/90">&ldquo;{quote}&rdquo;</span>
     </span>
@@ -66,6 +72,7 @@ export function AyatTicker() {
 
   return (
     <div
+      dir="ltr"
       className="ayat-ticker-viewport no-print flex-1 min-w-0 overflow-hidden rounded-full border border-primary/50 bg-primary/25 px-3 py-1.5"
       aria-label="Ayat of the day"
     >
