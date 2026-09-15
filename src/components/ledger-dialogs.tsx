@@ -114,6 +114,12 @@ export function AddPaymentDialog({
   const [note, setNote] = useState("");
   const [when, setWhen] = useState("");
   const [saving, setSaving] = useState(false);
+  // Only meaningful for customers: a supplier/staff payment is unambiguously
+  // "you paid them". A customer payment could be either direction (money
+  // they gave you, or cash you gave/paid out on their behalf) — this was
+  // previously impossible to express here, silently posting every customer
+  // entry as "received" even when it was actually a cash-out.
+  const [direction, setDirection] = useState<"in" | "out">("in");
   const cashAccountsQ = useCashAccounts();
   const cashAccounts = cashAccountsQ.data ?? [];
   const sourceOptions = [
@@ -133,6 +139,7 @@ export function AddPaymentDialog({
       setAccountId(defaultSource?.id ?? "");
       setNote("");
       setWhen(toLocalInputValue(new Date().toISOString()));
+      setDirection("in");
     }
   }, [open, defaultAmount, cashAccounts.length]);
 
@@ -157,9 +164,11 @@ export function AddPaymentDialog({
     let error: any = null;
     try {
       const account = await resolveAccount();
+      const effectiveDirection = party === "customer" ? direction : undefined;
       const res = await supabase.rpc("record_payment", {
         p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id ?? undefined,
-      });
+        p_direction: effectiveDirection,
+      } as any);
       error = res.error;
       if (!error && when && res.data) {
         const chosen = new Date(when);
@@ -168,7 +177,8 @@ export function AddPaymentDialog({
           const upd = await supabase.rpc("update_party_payment", {
             _id: res.data as string, _amount: amount, _method: account.name, _note: note || "",
             _created_at: chosen.toISOString(), _account_id: account.id ?? undefined,
-          });
+            _direction: effectiveDirection,
+          } as any);
           error = upd.error;
         }
       }
@@ -186,12 +196,30 @@ export function AddPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>{party_name ? t('ledger.add_payment_for', 'Add payment — {{name}}', { name: party_name }) : t('ledger.add_payment', 'Add payment')}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            {party === "customer" && direction === "out"
+              ? (party_name ? t('ledger.give_cash_for', 'Give cash — {{name}}', { name: party_name }) : t('ledger.give_cash', 'Give cash'))
+              : (party_name ? t('ledger.add_payment_for', 'Add payment — {{name}}', { name: party_name }) : t('ledger.add_payment', 'Add payment'))}
+          </DialogTitle>
+        </DialogHeader>
         <div className="grid gap-3">
+          {party === "customer" && (
+            <div>
+              <Label>{t('ledger.direction_label', 'This payment is')}</Label>
+              <Select value={direction} onValueChange={(v) => setDirection(v as "in" | "out")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in">{t('ledger.direction_in', 'Money received from customer')}</SelectItem>
+                  <SelectItem value="out">{t('ledger.direction_out', 'Cash paid to customer')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <DateTimeField value={when} onChange={setWhen} />
           <div><Label>{t('common.amount', 'Amount')}</Label><Input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} /></div>
           <div>
-            <Label>{party === "customer" ? t('ledger.receive_in', 'Receive in') : t('ledger.pay_from', 'Pay from')}</Label>
+            <Label>{party === "customer" ? (direction === "out" ? t('ledger.pay_from', 'Pay from') : t('ledger.receive_in', 'Receive in')) : t('ledger.pay_from', 'Pay from')}</Label>
             <Select
               value={accountId}
               onValueChange={(value) => {
