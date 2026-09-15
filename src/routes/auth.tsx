@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, ArrowLeft, ShoppingCart, Pill, MailCheck } from "lucide-react";
+import { Loader2, ArrowLeft, ShoppingCart, Pill, Store, Shirt, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,7 +59,7 @@ function AuthPage() {
   const [shopPhone, setShopPhone] = useState("");
   const [shopAddress, setShopAddress] = useState("");
   const [shopCity, setShopCity] = useState("");
-  const [shopBusinessType, setShopBusinessType] = useState<"grocery" | "pharmacy">("grocery");
+  const [shopBusinessType, setShopBusinessType] = useState<"grocery" | "pharmacy" | "retail" | "clothing">("grocery");
 
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -633,6 +633,30 @@ function AuthPage() {
                     >
                       <Pill className="h-4 w-4" />
                       Pharmacy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShopBusinessType("retail")}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                        shopBusinessType === "retail"
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-input hover:bg-accent"
+                      }`}
+                    >
+                      <Store className="h-4 w-4" />
+                      Retail Shop
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShopBusinessType("clothing")}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                        shopBusinessType === "clothing"
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-input hover:bg-accent"
+                      }`}
+                    >
+                      <Shirt className="h-4 w-4" />
+                      Clothing
                     </button>
                   </div>
                 </div>

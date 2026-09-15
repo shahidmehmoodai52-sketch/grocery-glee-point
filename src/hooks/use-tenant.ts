@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db } from "@/lib/offline/db";
 
-export type BusinessType = "grocery" | "pharmacy";
+export type BusinessType = "grocery" | "pharmacy" | "retail" | "clothing";
 
 interface TenantInfo {
   id: string;

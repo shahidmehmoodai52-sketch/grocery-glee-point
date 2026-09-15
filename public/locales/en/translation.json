@@ -2564,6 +2564,8 @@
     "business_type_label": "Business type",
     "business_type_grocery": "Grocery",
     "business_type_pharmacy": "Pharmacy",
+    "business_type_retail": "Retail Shop",
+    "business_type_clothing": "Clothing",
     "shop_name_label": "Shop name",
     "shop_name_placeholder": "e.g. Ali General Store",
     "phone_label": "Phone",
