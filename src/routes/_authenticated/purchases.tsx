@@ -1040,8 +1040,8 @@ function Page() {
                           <TableHead className="w-[120px]">{t('pos.qa_purchase_rate', 'Purchase rate')}</TableHead>
                           <TableHead className="w-[120px]">{t('purchases.th_sale_rate', 'Sale rate')}</TableHead>
                           <TableHead className="w-[100px]">{t('customers.th_qty', 'Qty')}</TableHead>
-                          <TableHead className="w-16 text-right">{t('purchases.th_old_avg', 'Old Avg')}</TableHead>
-                          <TableHead className="w-16 text-right">{t('purchases.th_new_avg', 'New Avg')}</TableHead>
+                          <TableHead className="w-16 text-right">{t('purchases.th_old_avg', 'Old Cost')}</TableHead>
+                          <TableHead className="w-16 text-right">{t('purchases.th_new_avg', 'New Cost')}</TableHead>
                           <TableHead className="w-12 text-right">Δ%</TableHead>
                           <TableHead className="w-[90px] text-right">{t('purchase_returns.tax', 'Tax')}</TableHead>
                           <TableHead className="w-[100px] text-right">{t('common.discount', 'Discount')}</TableHead>
@@ -1062,16 +1062,15 @@ function Page() {
                           const billDiscShare = subtotal > 0 ? billDiscountAmt * (lineSub / subtotal) : 0;
                           const lineAfterBillDisc = Math.max(0, lineSub - billDiscShare);
                           // Shown to the user as an informational per-line tax breakdown only —
-                          // NOT folded into effCost/newAvg below, since bill-level tax is saved
-                          // once on the purchase header (see submit()), not baked into cost_price.
+                          // NOT folded into effCost below, since bill-level tax is saved once on
+                          // the purchase header (see submit()), not baked into cost_price.
                           const taxShare = discountedSubtotal > 0 ? taxAmt * (lineAfterBillDisc / discountedSubtotal) : 0;
                           const effCost = qty > 0 ? lineAfterBillDisc / qty : cost;
-                          const bonusQty = Number(l.bonus_qty || 0);
-                          const newAvg = hasProduct
-                            ? (oldStock > 0
-                                ? (oldStock * oldCost + qty * effCost) / (oldStock + qty + bonusQty)
-                                : (qty + bonusQty) > 0 ? (qty * effCost) / (qty + bonusQty) : effCost)
-                            : effCost;
+                          // cost_price becomes exactly this rate on save (complete_purchase no
+                          // longer blends it with whatever stock is already on hand) — this
+                          // preview must match that exactly, not a weighted average, or it would
+                          // show the shop a number that isn't what actually gets saved.
+                          const newAvg = effCost;
                           const delta = hasProduct && oldCost > 0 ? ((newAvg - oldCost) / oldCost) * 100 : 0;
                           const deltaClass = delta > 0 ? "text-destructive" : delta < 0 ? "text-emerald-600" : "text-muted-foreground";
                           const totalDisplay = l._total != null ? l._total : (qty && cost ? +lineGross.toFixed(2) : 0);
