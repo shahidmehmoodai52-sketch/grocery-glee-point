@@ -609,7 +609,7 @@ export function PharmacyPOSPage() {
               )}
             </div>
             <div className="px-3 pt-2">
-              <CustomerPicker customers={customers} value={customerId} onSelect={setCustomerId} sym={sym} t={t} />
+              <CustomerPicker customers={customers} value={customerId} onSelect={setCustomerId} sym={sym} t={t as any} />
             </div>
             {hasScheduledItem && (
               <div className="px-3 pt-2">

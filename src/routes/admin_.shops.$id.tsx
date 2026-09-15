@@ -489,7 +489,7 @@ function BusinessTypeCard({ tenantId, currentType }: { tenantId: string; current
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("admin_set_tenant_business_type", {
+      const { error } = await supabase.rpc("admin_set_tenant_business_type" as any, {
         _tenant_id: tenantId,
         _business_type: nextType,
       });

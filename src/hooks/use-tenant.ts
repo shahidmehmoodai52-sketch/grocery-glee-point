@@ -24,10 +24,10 @@ export function useTenant() {
       readLocalFirst<TenantInfo | null>({
         table: "shops",
         cloud: async () => {
-          const { data, error } = await supabase.rpc("my_tenant");
+          const { data, error } = await supabase.rpc("my_tenant" as any);
           if (error) throw error;
           const row = Array.isArray(data) ? data[0] : data;
-          return (row as TenantInfo) ?? null;
+          return (row as unknown as TenantInfo) ?? null;
         },
         local: async () => {
           const rows = await db().shops.toArray();
