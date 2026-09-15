@@ -61,7 +61,18 @@ function createSupabaseClient() {
       storage: brokeredPreviewStorage(),
       persistSession: true,
       autoRefreshToken: true,
-    }
+    },
+    realtime: {
+      // The realtime websocket connects through the same PROXY_URL as every
+      // other request above. When that proxy can't establish the connection
+      // (e.g. it doesn't forward the WebSocket Upgrade handshake), the
+      // client's default backoff caps out at a 10s retry forever — which
+      // across a handful of open tabs adds up to ~1000 failed connection
+      // attempts/hour, 24/7, even overnight with nobody using the app. Ramp
+      // the backoff up to a 5-minute ceiling instead so a broken connection
+      // stops hammering the proxy while still recovering once it's fixed.
+      reconnectAfterMs: (tries: number) => Math.min(1000 * 2 ** tries, 300_000),
+    },
   });
 }
 
