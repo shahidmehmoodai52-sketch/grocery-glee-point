@@ -663,17 +663,15 @@ function Page() {
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   const isPharmacy = useBusinessType() === "pharmacy";
-  // Default range = shop's first ever transaction → today (never hide history).
+  // Default range = this month (fast to load). Full history is never hidden —
+  // it's one click away via the "All" preset, which still uses earliestData
+  // for the true start date.
   const { data: earliestData } = useEarliestDataDate();
-  const [preset, setPreset] = useState<DatePreset | "custom">("all");
-  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
-  const [toDate, setToDate] = useState<Date | undefined>(new Date());
+  const defaultRange = rangeFor("this_month");
+  const [preset, setPreset] = useState<DatePreset | "custom">("this_month");
+  const [fromDate, setFromDate] = useState<Date | undefined>(new Date(defaultRange.from));
+  const [toDate, setToDate] = useState<Date | undefined>(new Date(defaultRange.to));
   const [userPicked, setUserPicked] = useState(false);
-  useEffect(() => {
-    if (userPicked || !earliestData) return;
-    setFromDate(earliestData);
-    setToDate(new Date());
-  }, [earliestData, userPicked]);
   const from = fromDate ? toISO(fromDate) : "1970-01-01";
   const to = toDate ? toISO(toDate) : today();
   
@@ -719,6 +717,14 @@ function Page() {
   const [expensesPage, setExpensesPage] = useState(0);
   const PAGE_SIZE = 50;
 
+  // get_reports_summary does 5 full aggregate scans over the selected range
+  // server-side (sales, sale_returns, purchase, expenses, party_payments) —
+  // one of the heavier calls on this page. Same 5-minute staleTime as the
+  // "full" queries below, for the same reason: switching tabs or navigating
+  // away and back within that window reuses the already-fetched summary
+  // instead of re-running it.
+  const REPORT_FULL_STALE_TIME = 5 * 60 * 1000;
+
   const { data: summaryStatsRaw } = useQuery({
     queryKey: ["reports-summary", fromTime, toTime],
     queryFn: async () => {
@@ -729,6 +735,7 @@ function Page() {
       if (error) throw error;
       return data;
     },
+    staleTime: REPORT_FULL_STALE_TIME,
   });
   const summaryStats = (summaryStatsRaw as any) || {};
 
@@ -763,12 +770,12 @@ function Page() {
   // at query keys that didn't otherwise exist here.
   // These three "full" queries are the heaviest thing on this page (every
   // sale/return/purchase row, with line items, for the whole selected range
-  // — up to all-time). A 5-minute staleTime means switching away and back to
-  // Reports (or to a different tab within it) within that window reuses the
+  // — up to all-time). REPORT_FULL_STALE_TIME (declared above, also used by
+  // the reports-summary query) means switching away and back to Reports (or
+  // to a different tab within it) within that window reuses the
   // already-fetched data instead of re-downloading it; realtime no longer
   // invalidates these at all (see the comment in use-realtime-sync.ts), so
   // in practice this only truly refetches on an actual date-range change.
-  const REPORT_FULL_STALE_TIME = 5 * 60 * 1000;
 
   const { data: allSales = [] } = useQuery({
     queryKey: ["report-sales-full", fromTime, toTime],
