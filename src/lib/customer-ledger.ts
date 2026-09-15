@@ -70,12 +70,18 @@ export function buildLedgerEntries({
     // Cash Out = money handed to the customer (DEBIT). Discount = balance
     // waived, no cash moved either way. Everything else is a received
     // payment (CREDIT). Discount is identified by its `method` (set by
-    // record_payment when called with p_method: "discount"); Cash Out is
-    // identified ONLY by its note marker — every payment has a linked
-    // cash_transaction_id, so that flag cannot be used.
+    // record_payment when called with p_method: "discount"). Cash Out is
+    // identified from the linked cash_transactions row's own `direction`
+    // ('out') when the query embeds it — the authoritative source, since
+    // that's the same field the Cash Flow page itself is driven by. Falls
+    // back to a note-text guess only for rows with no linked transaction
+    // (or an older query that didn't embed it) — matching only a note that
+    // literally starts with "cash out" used to silently misclassify any
+    // Cash Out entry whose note didn't happen to start that way.
     if (!p.party_type || p.party_type === "customer") {
       const note = String(p.note ?? "");
-      const isCashOut = /^\s*cash\s*out\b/i.test(note);
+      const linkedDirection = p.cash_transactions?.direction as string | undefined;
+      const isCashOut = linkedDirection ? linkedDirection === "out" : /^\s*cash\s*out\b/i.test(note);
       const isDiscount = p.method === "discount";
       entries.push({
         id: p.id,
