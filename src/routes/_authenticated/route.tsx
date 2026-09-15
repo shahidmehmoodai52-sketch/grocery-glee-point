@@ -139,6 +139,7 @@ function Layout() {
             <main className="flex-1 min-w-0 overflow-auto">
               <RouteGuard><Outlet /></RouteGuard>
             </main>
+            <HelpAssistant />
 
           </div>
           <Toaster richColors position="top-right" duration={4000} closeButton />
