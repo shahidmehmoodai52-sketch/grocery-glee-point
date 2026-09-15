@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertOctagon, LogOut, Store, Loader2, Clock, ShoppingCart, Pill } from "lucide-react";
+import { AlertOctagon, LogOut, Store, Loader2, Clock, ShoppingCart, Pill, Shirt } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -156,7 +156,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
-  const [businessType, setBusinessType] = useState<"grocery" | "pharmacy">("grocery");
+  const [businessType, setBusinessType] = useState<"grocery" | "pharmacy" | "retail" | "clothing">("grocery");
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -212,6 +212,24 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
                 }`}
               >
                 <Pill className="h-4 w-4" /> {t('suspended_gate.business_type_pharmacy', 'Pharmacy')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBusinessType("retail")}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  businessType === "retail" ? "border-primary bg-primary/10 text-primary font-medium" : "border-input hover:bg-accent"
+                }`}
+              >
+                <Store className="h-4 w-4" /> {t('suspended_gate.business_type_retail', 'Retail Shop')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBusinessType("clothing")}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  businessType === "clothing" ? "border-primary bg-primary/10 text-primary font-medium" : "border-input hover:bg-accent"
+                }`}
+              >
+                <Shirt className="h-4 w-4" /> {t('suspended_gate.business_type_clothing', 'Clothing')}
               </button>
             </div>
           </div>

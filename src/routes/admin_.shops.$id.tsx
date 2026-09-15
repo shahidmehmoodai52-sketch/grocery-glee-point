@@ -475,7 +475,12 @@ function OverviewTab({ detail }: { detail: TenantDetail }) {
   );
 }
 
-const BUSINESS_TYPE_LABEL: Record<string, string> = { grocery: "Grocery", pharmacy: "Pharmacy" };
+const BUSINESS_TYPE_LABEL: Record<string, string> = {
+  grocery: "Grocery",
+  pharmacy: "Pharmacy",
+  retail: "Retail Shop",
+  clothing: "Clothing",
+};
 
 function BusinessTypeCard({ tenantId, currentType }: { tenantId: string; currentType: string }) {
   const qc = useQueryClient();
@@ -524,6 +529,8 @@ function BusinessTypeCard({ tenantId, currentType }: { tenantId: string; current
                 <SelectContent>
                   <SelectItem value="grocery">Grocery</SelectItem>
                   <SelectItem value="pharmacy">Pharmacy</SelectItem>
+                  <SelectItem value="retail">Retail Shop</SelectItem>
+                  <SelectItem value="clothing">Clothing</SelectItem>
                 </SelectContent>
               </Select>
             </div>
