@@ -927,6 +927,13 @@ function POSPage() {
 
   const searchRef = useRef<HTMLInputElement>(null);
   const paidRef = useRef<HTMLInputElement>(null);
+  // A barcode scanner focused on the Paid field (cursor left there by mistake)
+  // types the whole code then sends Enter, same as it would into search — but
+  // this field completes the sale on Enter, so that used to auto-checkout
+  // with the scanned code standing in as the paid amount. Recorded keystroke
+  // timestamps let Enter tell a machine-speed burst apart from a cashier
+  // actually typing an amount (see the Enter handler below).
+  const paidBurstRef = useRef<{ times: number[]; prevPaid: string }>({ times: [], prevPaid: "" });
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -3471,6 +3478,9 @@ function POSPage() {
                   type="number"
                   step="0.01"
                   value={tab.paid}
+                  onFocus={() => {
+                    paidBurstRef.current = { times: [], prevPaid: tab.paid };
+                  }}
                   onChange={(e) => {
                     const nextValue = e.target.value;
                     const nextRows = [...paymentRows];
@@ -3484,8 +3494,60 @@ function POSPage() {
                     });
                   }}
                   onKeyDown={(e) => {
+                    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                      const times = paidBurstRef.current.times;
+                      times.push(Date.now());
+                      if (times.length > 20) times.shift();
+                      return;
+                    }
                     if (e.key === "Enter") {
                       e.preventDefault();
+                      // A real barcode scanner emits every character within a
+                      // few ms of the next; a cashier typing an amount can't.
+                      // If the keystrokes that just filled this field arrived
+                      // at scanner speed, this Enter is the scan's terminator,
+                      // not a "complete the sale" command — recover the scan
+                      // instead of checking out with the barcode as the paid
+                      // amount.
+                      const times = paidBurstRef.current.times;
+                      // Every consecutive gap (not just the average) must be
+                      // scanner-fast — a human can type a few keys quickly,
+                      // but can't sustain <45ms between every keystroke for
+                      // 4+ characters the way a scanner does.
+                      let isBurst = times.length >= 4;
+                      for (let i = 1; isBurst && i < times.length; i++) {
+                        if (times[i] - times[i - 1] >= 45) isBurst = false;
+                      }
+                      if (isBurst) {
+                        const raw = e.currentTarget.value.trim();
+                        const nextRows = [...paymentRows];
+                        if (nextRows[0]) {
+                          nextRows[0] = { ...nextRows[0], amount: Number(paidBurstRef.current.prevPaid || 0) };
+                        }
+                        setTab({
+                          paid: paidBurstRef.current.prevPaid,
+                          payments: nextRows,
+                          payment_method: nextRows[0]?.method || tab.payment_method || "cash",
+                        });
+                        paidBurstRef.current = { times: [], prevPaid: "" };
+                        const product =
+                          productByBarcode[raw] ?? productByCodeLower[raw.toLowerCase()] ?? null;
+                        if (product) {
+                          addProduct(product);
+                          triggerScanFlash();
+                          toast.warning(
+                            t('pos.scan_in_paid_field_added', 'Cursor was in the Paid field — scanned item added to cart instead of checking out.'),
+                          );
+                        } else {
+                          setSearch(raw);
+                          searchRef.current?.focus();
+                          toast.warning(
+                            t('pos.scan_in_paid_field', 'Cursor was in the Paid field — moved the scan to search instead of checking out.'),
+                          );
+                        }
+                        return;
+                      }
+                      paidBurstRef.current = { times: [], prevPaid: "" };
                       if (submitting) return;
                       handleSale();
                     }

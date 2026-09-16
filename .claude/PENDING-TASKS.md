@@ -29,7 +29,25 @@ None of GitHub/Lovable/Supabase renaming can be done via API/MCP tools available
 Claude — no "rename repository" / "rename project" tool exists in the current
 toolset for any of the three. These are manual dashboard actions by the user.
 
-## 2. Migrate database from Lovable Cloud to personal Supabase (pending — not started)
+## 2. Migrate database from Lovable Cloud to personal Supabase (RESOLVED — confirmed 2026-09-16)
+
+**This migration has since happened** (not documented anywhere when it did). Confirmed
+2026-09-16 via live data: `ubylxunrlzhijkelgxxx` has sales rows created seconds before
+the check (122 sales in the prior 3 hours) — it is the real, current production database,
+not a test copy. Everything below this line is the original (now historical) note from
+when the migration was still pending — kept for context, not current state.
+
+Separately worth flagging: on 2026-09-15 a Lovable-side push reverted the repo's `.env`
+(`SUPABASE_URL`/`SUPABASE_PROJECT_ID`/etc.) back to `rcdewpvkhjlewagyixvk` — the old
+pre-migration Lovable Cloud project — apparently because Lovable's own platform state
+was never told about the cutover. Production itself stayed safe only because Vercel's
+own dashboard-configured `SUPABASE_URL` env var overrides the committed `.env` at
+build/runtime (see `src/integrations/supabase/client.ts`) — this was NOT guaranteed and
+was verified after the fact, not by design. Fixed by restoring `.env` to
+`ubylxunrlzhijkelgxxx`. The user is disconnecting Lovable's GitHub sync separately to
+stop this class of drift from recurring.
+
+Original note, pre-migration:
 
 Current state:
 - Live production DB: Supabase project `rcdewpvkhjlewagyixvk`, managed under
