@@ -386,7 +386,7 @@ export const HELP_TOPICS: HelpTopic[] = [
 const norm = (s: string) =>
   s
     .toLowerCase()
-    .replace(/[^a-z0-9؀-ۿ\s]/g, " ")
+    .replace(/[^a-z0-9\u0600-\u06FF\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 

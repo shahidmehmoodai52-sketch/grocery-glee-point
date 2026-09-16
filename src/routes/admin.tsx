@@ -375,7 +375,7 @@ function DatabaseTab() {
   const { data: overview, isFetching, isLoading } = useQuery({
     queryKey: ["admin-database-overview"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_database_overview");
+      const { data, error } = await supabase.rpc("admin_database_overview" as any);
       if (error) throw error;
       return data as unknown as DatabaseOverview;
     },
@@ -387,7 +387,7 @@ function DatabaseTab() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_tenants");
       if (error) throw error;
-      return (data as TenantRow[]) ?? [];
+      return (data as unknown as TenantRow[]) ?? [];
     },
   });
 
@@ -912,7 +912,7 @@ function DashboardTab({ setActiveTab }: { setActiveTab: (tab: string) => void })
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_tenants");
       if (error) throw error;
-      return (data as TenantRow[]) ?? [];
+      return (data as unknown as TenantRow[]) ?? [];
     },
   });
 
@@ -1195,7 +1195,7 @@ function TenantsTab() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_tenants");
       if (error) throw error;
-      return (data as TenantRow[]) ?? [];
+      return (data as unknown as TenantRow[]) ?? [];
     },
   });
 
@@ -1709,7 +1709,7 @@ function ErrorsTab() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_tenants");
       if (error) throw error;
-      return (data as TenantRow[]) ?? [];
+      return (data as unknown as TenantRow[]) ?? [];
     },
   });
   const tenantMap = useMemo(() => {
@@ -2625,7 +2625,7 @@ function LibraryTab() {
       }
       const { data, error, count } = await q.range(page * pageSize, page * pageSize + pageSize - 1);
       if (error) throw error;
-      return { rows: (data as LibraryRow[]) ?? [], total: count ?? 0 };
+      return { rows: (data as unknown as LibraryRow[]) ?? [], total: count ?? 0 };
     },
   });
   const filtered = libraryPage?.rows ?? [];

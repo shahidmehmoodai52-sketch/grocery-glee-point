@@ -729,7 +729,7 @@ function Page() {
         // but here we are doing manual updates so we just proceed carefully.
         
         // Reverse old stock
-        for (const it of origItems || []) {
+        for (const it of ((origItems ?? []) as any[])) {
           if (!it.product_id) continue;
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
           const currentStock = Number(p?.stock ?? 0);
@@ -760,7 +760,7 @@ function Page() {
           mfg_date: it.mfg_date ?? null,
           bonus_qty: it.bonus_qty ?? 0,
         }));
-        const { error: insErr } = await supabase.from("purchase_items").insert(newItems);
+        const { error: insErr } = await supabase.from("purchase_items").insert(newItems as any);
         if (insErr) throw insErr;
 
         // Apply new stock
