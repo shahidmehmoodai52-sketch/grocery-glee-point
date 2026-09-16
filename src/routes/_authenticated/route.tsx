@@ -32,6 +32,7 @@ import { getUserAllowOffline } from "@/lib/offline/session";
 import { OfflineStatusBadge } from "@/components/offline-status";
 import { clearOfflineDataOnLogout, guardTenantScope } from "@/lib/offline/device";
 import { SuspendedGate } from "@/components/suspended-gate";
+import { HelpAssistant } from "@/components/help-assistant";
 
 
 
@@ -138,6 +139,7 @@ function Layout() {
             <main className="flex-1 min-w-0 overflow-auto">
               <RouteGuard><Outlet /></RouteGuard>
             </main>
+            <HelpAssistant />
 
           </div>
           <Toaster richColors position="top-right" duration={4000} closeButton />
