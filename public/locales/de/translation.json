@@ -187,7 +187,9 @@
       "product": "Produkt",
       "get_started": "Loslegen",
       "follow": "Folgen Sie Tillix",
-      "tagline": "Smart Retail beginnt hier."
+      "tagline": "Smart Retail beginnt hier.",
+      "privacy_policy": "Datenschutzrichtlinie",
+      "terms_of_use": "Nutzungsbedingungen"
     }
   },
   "common": {
