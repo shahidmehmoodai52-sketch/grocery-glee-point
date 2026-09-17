@@ -157,7 +157,12 @@ export function bootOfflineStatus() {
   emit();
   void refreshPendingCount();
   void runConnectivityProbe();
-  setInterval(() => { void runConnectivityProbe(); }, 15000);
+  // Every open tab burns one of these per interval against the Cloudflare
+  // Worker proxy's daily request quota, on top of the "online" and
+  // visibilitychange triggers below — a handful of shops left open all day
+  // add up fast at a short interval (this previously ran at 15s and was a
+  // major contributor to hitting the free-tier 100k/day cap).
+  setInterval(() => { void runConnectivityProbe(); }, 60000);
 }
 
 export function useOfflineStatus(): OfflineStatus {
