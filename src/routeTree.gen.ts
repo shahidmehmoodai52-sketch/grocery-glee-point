@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsOfUseRouteImport } from './routes/terms-of-use'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminLoginRouteImport } from './routes/admin-login'
@@ -53,9 +55,19 @@ import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenti
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
+const TermsOfUseRoute = TermsOfUseRouteImport.update({
+  id: '/terms-of-use',
+  path: '/terms-of-use',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
+  id: '/privacy-policy',
+  path: '/privacy-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -288,7 +300,9 @@ export interface FileRoutesByFullPath {
   '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/terms-of-use': typeof TermsOfUseRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/assets': typeof AuthenticatedAssetsRoute
@@ -332,7 +346,9 @@ export interface FileRoutesByTo {
   '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/terms-of-use': typeof TermsOfUseRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/assets': typeof AuthenticatedAssetsRoute
@@ -378,7 +394,9 @@ export interface FileRoutesById {
   '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/terms-of-use': typeof TermsOfUseRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
@@ -424,7 +442,9 @@ export interface FileRouteTypes {
     | '/admin-login'
     | '/auth'
     | '/mcp'
+    | '/privacy-policy'
     | '/reset-password'
+    | '/terms-of-use'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/assets'
@@ -468,7 +488,9 @@ export interface FileRouteTypes {
     | '/admin-login'
     | '/auth'
     | '/mcp'
+    | '/privacy-policy'
     | '/reset-password'
+    | '/terms-of-use'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/assets'
@@ -513,7 +535,9 @@ export interface FileRouteTypes {
     | '/admin-login'
     | '/auth'
     | '/mcp'
+    | '/privacy-policy'
     | '/reset-password'
+    | '/terms-of-use'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/assets'
@@ -559,7 +583,9 @@ export interface RootRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   AuthRoute: typeof AuthRoute
   McpRoute: typeof McpRoute
+  PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  TermsOfUseRoute: typeof TermsOfUseRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
@@ -570,11 +596,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms-of-use': {
+      id: '/terms-of-use'
+      path: '/terms-of-use'
+      fullPath: '/terms-of-use'
+      preLoaderRoute: typeof TermsOfUseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy-policy': {
+      id: '/privacy-policy'
+      path: '/privacy-policy'
+      fullPath: '/privacy-policy'
+      preLoaderRoute: typeof PrivacyPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -961,7 +1001,9 @@ const rootRouteChildren: RootRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   AuthRoute: AuthRoute,
   McpRoute: McpRoute,
+  PrivacyPolicyRoute: PrivacyPolicyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  TermsOfUseRoute: TermsOfUseRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,

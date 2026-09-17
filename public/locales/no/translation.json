@@ -187,7 +187,9 @@
       "product": "Produkt",
       "get_started": "Kom i gang",
       "follow": "Følg Tillix",
-      "tagline": "Smart detaljhandel starter her."
+      "tagline": "Smart detaljhandel starter her.",
+      "privacy_policy": "Personvernerklæring",
+      "terms_of_use": "Bruksvilkår"
     }
   },
   "common": {

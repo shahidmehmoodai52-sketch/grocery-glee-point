@@ -187,7 +187,9 @@
       "product": "Producto",
       "get_started": "Comenzar",
       "follow": "Sigue a Tillix",
-      "tagline": "El comercio minorista inteligente comienza aquí."
+      "tagline": "El comercio minorista inteligente comienza aquí.",
+      "privacy_policy": "Política de Privacidad",
+      "terms_of_use": "Términos de Uso"
     }
   },
   "common": {
