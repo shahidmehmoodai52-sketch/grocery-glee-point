@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { HelpCircle, Search, ArrowRight, MapPin, Sparkles, X } from "lucide-react";
 
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -94,14 +95,71 @@ export function HelpAssistant() {
       .slice(0, 3);
   }, [currentTopic]);
 
+  // Draggable floating button: position is distance from the viewport's
+  // right/bottom edges (matches the old fixed bottom-4 right-4 default) so it
+  // stays sensible across window sizes, and is remembered per device.
+  const [pos, setPos] = usePersistentState<{ right: number; bottom: number }>(
+    "ask-tillix-pos",
+    { right: 16, bottom: 16 },
+  );
+  const dragBtnRef = useRef<HTMLButtonElement>(null);
+  const dragState = useRef<{ startX: number; startY: number; startRight: number; startBottom: number; moved: boolean } | null>(null);
+  const justDraggedRef = useRef(false);
+
+  const clampPos = (right: number, bottom: number) => {
+    const el = dragBtnRef.current;
+    const w = el?.offsetWidth ?? 56;
+    const h = el?.offsetHeight ?? 56;
+    const maxRight = Math.max(8, window.innerWidth - w - 8);
+    const maxBottom = Math.max(8, window.innerHeight - h - 8);
+    return { right: Math.min(Math.max(right, 8), maxRight), bottom: Math.min(Math.max(bottom, 8), maxBottom) };
+  };
+
+  const onDragPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragState.current = { startX: e.clientX, startY: e.clientY, startRight: pos.right, startBottom: pos.bottom, moved: false };
+  };
+
+  const onDragPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const ds = dragState.current;
+    if (!ds) return;
+    const dx = e.clientX - ds.startX;
+    const dy = e.clientY - ds.startY;
+    // A few px of wobble on a genuine tap/click shouldn't count as a drag.
+    if (!ds.moved && Math.hypot(dx, dy) < 4) return;
+    ds.moved = true;
+    setPos(clampPos(ds.startRight - dx, ds.startBottom - dy));
+  };
+
+  const onDragPointerUp = () => {
+    const ds = dragState.current;
+    dragState.current = null;
+    // Suppress the click that a pointerup normally fires so a drag doesn't
+    // also open the sheet — the click handler below checks `ds.moved`.
+    if (ds?.moved) justDraggedRef.current = true;
+  };
+
+  const onButtonClick = () => {
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false;
+      return;
+    }
+    setOpen(true);
+  };
+
   return (
     <>
       {/* no-print keeps this off POS receipts and any printed page. */}
-      <div className="no-print fixed bottom-4 right-4 z-[400]">
+      <div className="no-print fixed z-[400]" style={{ right: pos.right, bottom: pos.bottom }}>
         <Button
-          onClick={() => setOpen(true)}
-          className="h-11 gap-2 rounded-full pl-3 pr-4 shadow-lg"
-          aria-label="Ask Tillix for help"
+          ref={dragBtnRef}
+          onPointerDown={onDragPointerDown}
+          onPointerMove={onDragPointerMove}
+          onPointerUp={onDragPointerUp}
+          onPointerCancel={onDragPointerUp}
+          onClick={onButtonClick}
+          className="h-11 touch-none select-none gap-2 rounded-full pl-3 pr-4 shadow-lg cursor-grab active:cursor-grabbing"
+          aria-label="Ask Tillix for help — drag to move"
         >
           <HelpCircle className="h-5 w-5" />
           <span className="hidden text-sm font-semibold sm:inline">Ask Tillix</span>
