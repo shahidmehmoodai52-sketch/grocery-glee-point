@@ -1934,9 +1934,10 @@ function POSPage() {
             const subtotalEdited = +tab.items
               .reduce((s, i) => s + Number(i.qty) * Number(i.price), 0)
               .toFixed(2);
-            const discountEdited = +(lineDiscountTotal + discount - charge).toFixed(2);
+            const discountEdited = +(lineDiscountTotal + discount).toFixed(2);
+            const chargeEdited = +Number(charge || 0).toFixed(2);
             const taxEdited = +Number(tax || 0).toFixed(2);
-            const totalEdited = +(subtotalEdited - discountEdited + taxEdited).toFixed(2);
+            const totalEdited = +(subtotalEdited - discountEdited + taxEdited + chargeEdited).toFixed(2);
             const paidEdited = +Math.min(paidNum, totalEdited).toFixed(2);
 
             const existingQueuedCreate = await offlineDb()
@@ -2024,6 +2025,7 @@ function POSPage() {
                   payment_method: paymentMethodLabel,
                   subtotal: subtotalEdited,
                   discount: discountEdited,
+                  charge: chargeEdited,
                   tax: taxEdited,
                   total: totalEdited,
                   paid: paidEdited,
@@ -2049,6 +2051,7 @@ function POSPage() {
                     payment_method: paymentMethodLabel,
                     tax: taxEdited,
                     discount: discountEdited,
+                    charge: chargeEdited,
                     paid: paidEdited,
                     note: tab.note,
                     items,
@@ -2067,6 +2070,7 @@ function POSPage() {
                   _items: items as any,
                   _paid: paidEdited,
                   _discount: discountEdited,
+                  _charge: chargeEdited,
                   _tax: taxEdited,
                 },
               });
@@ -2093,7 +2097,8 @@ function POSPage() {
           _items: items as any,
           // Header figures the cashier just corrected (paid amount, discount, tax).
           _paid: +Math.min(paidNum, total).toFixed(2),
-          _discount: +(lineDiscountTotal + discount - charge).toFixed(2),
+          _discount: +(lineDiscountTotal + discount).toFixed(2),
+          _charge: +charge.toFixed(2),
           _tax: +Number(tax || 0).toFixed(2),
         } as any);
         if (error) throw error;
@@ -2139,8 +2144,8 @@ function POSPage() {
         digital_account_id: isDigitalCashBackMode ? tab.digital_account_id : null,
         cash_back_amount: isDigitalCashBackMode ? digitalCashBackAmount : 0,
         // Combine per-line discounts with cart-level discount so they reach the ledger.
-        // Extra charge is applied as a negative discount so the server total matches.
-        discount: +(lineDiscountTotal + discount - charge).toFixed(2),
+        discount: +(lineDiscountTotal + discount).toFixed(2),
+        charge: +charge.toFixed(2),
         // Change (extra tendered cash) is never recorded — only the bill amount is.
         paid: tenderedAmount,
         note: tab.note,
@@ -2360,6 +2365,7 @@ function POSPage() {
           expense_person_id: sale.expense_person_id,
           payment_method: sale.payment_method,
           discount: sale.discount,
+          charge: sale.charge,
           paid: sale.paid,
           note: sale.note,
           items: saleItems.map((i: any) => ({
