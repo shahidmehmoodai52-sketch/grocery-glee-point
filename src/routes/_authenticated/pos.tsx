@@ -89,6 +89,7 @@ import {
   insertOfflineAware,
   searchProductsLocal,
 } from "@/lib/offline/pos";
+import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
 import { computeSoldQtyByProduct, applyStockDeltas, type SoldLine } from "@/lib/pos-stock-patch";
 import { enqueueWrite } from "@/lib/offline/sync";
@@ -964,8 +965,9 @@ function POSPage() {
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products", "active"],
     queryFn: () =>
-      offlineFirst(
-        () =>
+      readLocalFirst({
+        table: "products",
+        cloud: () =>
           fetchAll<any>((from: number, to: number) =>
             supabase
               .from("products")
@@ -974,12 +976,12 @@ function POSPage() {
               .order("name")
               .range(from, to),
           ),
-        async () =>
+        local: async () =>
           (await offlineDb().products.toArray())
             .filter((p: any) => p.is_active !== false)
             .sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
-        (rows) => cacheProducts(rows),
-      ),
+        cache: (rows) => cacheProducts(rows),
+      }),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1007,14 +1009,15 @@ function POSPage() {
   const { data: extraBarcodes = [] } = useQuery({
     queryKey: ["product_barcodes"],
     queryFn: () =>
-      offlineFirst(
-        () =>
+      readLocalFirst({
+        table: "product_barcodes",
+        cloud: () =>
           fetchAll<any>((from: number, to: number) =>
             supabase.from("product_barcodes").select("id,product_id,barcode").range(from, to),
           ),
-        () => offlineDb().product_barcodes.toArray(),
-        (rows) => cacheProductBarcodes(rows),
-      ),
+        local: () => offlineDb().product_barcodes.toArray(),
+        cache: (rows) => cacheProductBarcodes(rows),
+      }),
     // Feeds the same scan lookup maps as `products` above — same staleTime
     // for the same reason (a fresh mount still refetches; it just doesn't
     // force one on every unrelated realtime tick).

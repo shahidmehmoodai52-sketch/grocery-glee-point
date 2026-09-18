@@ -361,12 +361,33 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
     //    the previous pull is old enough (reconnect flapping is a no-op).
     const changed: string[] = [];
     const skipPull = nowMs() - lastPullAt < PULL_MIN_GAP_MS && flushResult.ok === 0;
+    // products/product_barcodes are the two large catalogue tables (tens of
+    // thousands of rows for a real shop). Every other reason this loop runs —
+    // the 5-minute idle interval, a reconnect/visibility flap, a retry pass —
+    // would otherwise re-request them on the same cadence as small
+    // transactional tables, even though nothing about a sale being pushed
+    // makes the catalogue itself stale. Gate just these two behind the same
+    // freshness TTL the POS page's own local-first reads already use (see
+    // data-access.ts) so a sync pass and a page read never both re-fetch the
+    // same table moments apart, and skip the request entirely when it's
+    // still fresh. Bypassed for a true cold start ("boot", nothing pulled
+    // yet) and for an explicit manual "Sync now" (no reason) so those always
+    // get a real check.
+    const catalogTables = new Set<string>(["products", "product_barcodes"]);
+    const bypassCatalogThrottle = !opts.reason || opts.reason === "boot";
     if (!skipPull) {
       for (let i = 0; i < PULL_TABLES.length; i += PULL_BATCH) {
         await whenIdle(400);
         const batch = PULL_TABLES.slice(i, i + PULL_BATCH);
         for (const t of batch) {
           try {
+            if (catalogTables.has(t) && !bypassCatalogThrottle) {
+              const { isTableFresh } = await import("./data-access");
+              if (await isTableFresh(t)) {
+                await yieldToUI();
+                continue;
+              }
+            }
             const n = await timed(`sync:pull:${t}`, () => pullTable(t));
             if (n > 0) changed.push(t);
             // Mark the local snapshot fresh so the smart data-access layer can

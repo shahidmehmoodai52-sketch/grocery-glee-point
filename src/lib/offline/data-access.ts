@@ -20,7 +20,10 @@ import { offlineFirst } from "./pos";
 import { whenIdle, logPerf } from "./perf";
 import type { MirroredTable } from "./db";
 
-/** Tables that already served their cached snapshot in this browser session. */
+/** Tables that already served their cached snapshot in this browser session.
+ *  Kept only for resetLocalFirstSession()'s sign-out/tenant-switch hook —
+ *  freshness is decided by isFresh() on every read, not by whether this is
+ *  the first read of the session (see readLocalFirst below). */
 const servedFromCache = new Set<string>();
 /** In-flight background revalidations, keyed by table. */
 const revalidating = new Set<string>();
@@ -58,6 +61,14 @@ async function isFresh(table: MirroredTable, ttlMs: number): Promise<boolean> {
   return ts > 0 && Date.now() - ts < ttlMs;
 }
 
+/** Exposed so other subsystems (the sync engine's pull loop) can share this
+ *  same freshness ledger instead of tracking their own — a table stamped
+ *  fresh by either side is fresh for both, so a page read and a background
+ *  sync pass never both re-fetch the same table moments apart. */
+export async function isTableFresh(table: MirroredTable, ttlMs?: number): Promise<boolean> {
+  return isFresh(table, ttlMs ?? DEFAULT_TTL_MS[table] ?? 5 * 60_000);
+}
+
 export interface LocalFirstOptions<T> {
   /** Mirror table this read belongs to (drives freshness + TTL). */
   table: MirroredTable;
@@ -84,9 +95,16 @@ function defaultIsEmpty(data: any): boolean {
 /**
  * Local-first read with background revalidation.
  *
- * Cold start (first read of this table in the session) + a fresh, non-empty
- * local snapshot → return the snapshot immediately and revalidate when the
- * browser is idle. Anything else → normal cloud read via `offlineFirst`.
+ * A fresh (within TTL), non-empty local snapshot → return it immediately, no
+ * network call, and revalidate in the background when the browser is idle
+ * (itself cooled down so back-to-back reads of an already-fresh table —
+ * repeated mounts, window focus, reconnect — can't each kick off their own
+ * background fetch). A stale or empty snapshot → normal cloud read via
+ * `offlineFirst`. This freshness check runs on every read, not just the
+ * first one of the session, so a component that stays mounted for a whole
+ * shift keeps being served from the local mirror for as long as it's
+ * genuinely fresh, instead of falling back to "always hit the cloud" after
+ * its first read.
  */
 export async function readLocalFirst<T>(opts: LocalFirstOptions<T>): Promise<T> {
   const { table, cloud, local, cache } = opts;
@@ -95,14 +113,19 @@ export async function readLocalFirst<T>(opts: LocalFirstOptions<T>): Promise<T> 
 
   const cloudAndCache = async (): Promise<T> => {
     const data = await offlineFirst<T>(cloud, local, cache);
-    if (enabled && !isOffline()) { try { await stampFresh(table); } catch { /* best effort */ } }
+    if (enabled && !isOffline()) {
+      try {
+        await stampFresh(table);
+      } catch {
+        /* best effort */
+      }
+    }
     return data;
   };
 
-  // Offline mirror disabled, offline, or already warmed this session → unchanged path.
+  // Offline mirror disabled or offline → unchanged path.
   if (!enabled || typeof indexedDB === "undefined") return offlineFirst<T>(cloud, local, cache);
   if (isOffline()) return offlineFirst<T>(cloud, local, cache);
-  if (servedFromCache.has(table)) return cloudAndCache();
 
   const ttl = opts.ttlMs ?? DEFAULT_TTL_MS[table] ?? 5 * 60_000;
   let snapshot: T | undefined;
@@ -114,19 +137,27 @@ export async function readLocalFirst<T>(opts: LocalFirstOptions<T>): Promise<T> 
 
   if (snapshot === undefined || empty(snapshot)) return cloudAndCache();
 
-  // Serve the local snapshot now; refresh from the cloud when idle.
+  // Serve the local snapshot now; refresh from the cloud when idle (throttled).
   servedFromCache.add(table);
   logPerf("local-first hit", { table });
-  void revalidate(table, cloudAndCache, opts.onRevalidated);
+  void revalidate(table, cloudAndCache, ttl, opts.onRevalidated);
   return snapshot;
 }
 
 async function revalidate<T>(
   table: MirroredTable,
   fetcher: () => Promise<T>,
+  ttlMs: number,
   onRevalidated?: (data: T) => void,
 ) {
   if (revalidating.has(table)) return;
+  // The freshness stamp was already renewed well inside the TTL window (by
+  // an earlier revalidate, or the read that first warmed it) — skip firing
+  // another background fetch for every single re-read of an already-fresh
+  // table. This still lets freshness self-renew roughly every half-TTL for
+  // as long as something keeps reading the table.
+  const cooldownMs = Math.max(ttlMs / 2, 30_000);
+  if (await isFresh(table, cooldownMs)) return;
   revalidating.add(table);
   try {
     await whenIdle(800);
