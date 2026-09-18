@@ -839,6 +839,7 @@ export type Database = {
       global_products: {
         Row: {
           barcode: string | null
+          business_type: string
           category: string | null
           contributed_by_tenant: string | null
           contributed_by_user: string | null
@@ -859,6 +860,7 @@ export type Database = {
         }
         Insert: {
           barcode?: string | null
+          business_type?: string
           category?: string | null
           contributed_by_tenant?: string | null
           contributed_by_user?: string | null
@@ -879,6 +881,7 @@ export type Database = {
         }
         Update: {
           barcode?: string | null
+          business_type?: string
           category?: string | null
           contributed_by_tenant?: string | null
           contributed_by_user?: string | null
@@ -1479,6 +1482,86 @@ export type Database = {
           },
         ]
       }
+      pharmacy_product_details: {
+        Row: {
+          base_unit: string | null
+          created_at: string
+          dosage_form: string | null
+          drug_schedule: string | null
+          generic_name: string | null
+          id: string
+          manufacturer: string | null
+          pack_size: string | null
+          prescription_required: boolean
+          product_id: string
+          strength: string | null
+          tenant_id: string
+          units_per_pack: number | null
+          updated_at: string
+        }
+        Insert: {
+          base_unit?: string | null
+          created_at?: string
+          dosage_form?: string | null
+          drug_schedule?: string | null
+          generic_name?: string | null
+          id?: string
+          manufacturer?: string | null
+          pack_size?: string | null
+          prescription_required?: boolean
+          product_id: string
+          strength?: string | null
+          tenant_id: string
+          units_per_pack?: number | null
+          updated_at?: string
+        }
+        Update: {
+          base_unit?: string | null
+          created_at?: string
+          dosage_form?: string | null
+          drug_schedule?: string | null
+          generic_name?: string | null
+          id?: string
+          manufacturer?: string | null
+          pack_size?: string | null
+          prescription_required?: boolean
+          product_id?: string
+          strength?: string | null
+          tenant_id?: string
+          units_per_pack?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pharmacy_product_details_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "product_intelligence"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "pharmacy_product_details_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pharmacy_product_details_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "smart_purchase_suggestions"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "pharmacy_product_details_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_barcodes: {
         Row: {
           barcode: string
@@ -1784,6 +1867,7 @@ export type Database = {
       purchase_items: {
         Row: {
           batch_no: string | null
+          bonus_qty: number
           cost: number
           expiry_date: string | null
           id: string
@@ -1797,6 +1881,7 @@ export type Database = {
         }
         Insert: {
           batch_no?: string | null
+          bonus_qty?: number
           cost: number
           expiry_date?: string | null
           id?: string
@@ -1810,6 +1895,7 @@ export type Database = {
         }
         Update: {
           batch_no?: string | null
+          bonus_qty?: number
           cost?: number
           expiry_date?: string | null
           id?: string
@@ -2414,6 +2500,7 @@ export type Database = {
         Row: {
           cashier_id: string | null
           change_due: number
+          charge: number
           cost_total: number
           created_at: string
           customer_id: string | null
@@ -2424,6 +2511,7 @@ export type Database = {
           note: string | null
           paid: number
           payment_method: string
+          prescription_ref: string | null
           status: string
           subtotal: number
           tax: number
@@ -2434,6 +2522,7 @@ export type Database = {
         Insert: {
           cashier_id?: string | null
           change_due?: number
+          charge?: number
           cost_total?: number
           created_at?: string
           customer_id?: string | null
@@ -2444,6 +2533,7 @@ export type Database = {
           note?: string | null
           paid?: number
           payment_method?: string
+          prescription_ref?: string | null
           status?: string
           subtotal?: number
           tax?: number
@@ -2454,6 +2544,7 @@ export type Database = {
         Update: {
           cashier_id?: string | null
           change_due?: number
+          charge?: number
           cost_total?: number
           created_at?: string
           customer_id?: string | null
@@ -2464,6 +2555,7 @@ export type Database = {
           note?: string | null
           paid?: number
           payment_method?: string
+          prescription_ref?: string | null
           status?: string
           subtotal?: number
           tax?: number
@@ -3610,6 +3702,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          business_type: string
           created_at: string
           id: string
           library_approved: boolean
@@ -3625,6 +3718,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          business_type?: string
           created_at?: string
           id?: string
           library_approved?: boolean
@@ -3640,6 +3734,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          business_type?: string
           created_at?: string
           id?: string
           library_approved?: boolean
@@ -4003,6 +4098,10 @@ export type Database = {
       }
     }
     Functions: {
+      _supplier_balance_calc_unchecked: {
+        Args: { p_supplier_id: string }
+        Returns: number
+      }
       active_plan_for_tenant: {
         Args: { _tenant_id: string }
         Returns: {
@@ -4054,6 +4153,7 @@ export type Database = {
         Args: { _flag_key: string; _tenant_id: string }
         Returns: undefined
       }
+      admin_database_overview: { Args: never; Returns: Json }
       admin_delete_tenant: {
         Args: { _confirm: string; _reason?: string; _tenant_id: string }
         Returns: Json
@@ -4113,6 +4213,7 @@ export type Database = {
           _status?: string
         }
         Returns: {
+          business_type: string
           created_at: string
           id: string
           last_activity_at: string
@@ -4162,6 +4263,10 @@ export type Database = {
         Returns: number
       }
       admin_security_summary: { Args: never; Returns: Json }
+      admin_set_tenant_business_type: {
+        Args: { _business_type: string; _tenant_id: string }
+        Returns: undefined
+      }
       admin_set_tenant_expiry: {
         Args: { _expires_at: string; _tenant_id: string }
         Returns: undefined
@@ -4318,6 +4423,10 @@ export type Database = {
       complete_purchase_return: { Args: { payload: Json }; Returns: string }
       complete_sale: { Args: { payload: Json }; Returns: string }
       complete_sale_return: { Args: { payload: Json }; Returns: string }
+      consume_batch_for_purchase_return: {
+        Args: { _product_id: string; _purchase_id: string; _qty: number }
+        Returns: undefined
+      }
       consume_batches_fefo: {
         Args: { _product_id: string; _qty: number }
         Returns: undefined
@@ -4335,6 +4444,7 @@ export type Database = {
         }
         Returns: string
       }
+      cron_recalc_all_supplier_balances: { Args: never; Returns: number }
       current_shift: {
         Args: never
         Returns: {
@@ -4389,6 +4499,17 @@ export type Database = {
         | { Args: { _items: Json; _sale_id: string }; Returns: string }
         | {
             Args: {
+              _discount?: number
+              _items: Json
+              _paid?: number
+              _sale_id: string
+              _tax?: number
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              _charge?: number
               _discount?: number
               _items: Json
               _paid?: number
@@ -4726,6 +4847,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      my_tenant: {
+        Args: never
+        Returns: {
+          business_type: string
+          id: string
+          name: string
+        }[]
+      }
       my_tenant_expires_at: { Args: never; Returns: string }
       my_tenant_status: { Args: never; Returns: string }
       my_trial_info: { Args: never; Returns: Json }
@@ -4796,17 +4925,30 @@ export type Database = {
         }
         Returns: string
       }
-      record_payment: {
-        Args: {
-          p_account_id?: string
-          p_amount: number
-          p_method: string
-          p_note: string
-          p_party_id: string
-          p_party_type: string
-        }
-        Returns: string
-      }
+      record_payment:
+        | {
+            Args: {
+              p_account_id?: string
+              p_amount: number
+              p_method: string
+              p_note: string
+              p_party_id: string
+              p_party_type: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_account_id?: string
+              p_amount: number
+              p_direction?: string
+              p_method: string
+              p_note: string
+              p_party_id: string
+              p_party_type: string
+            }
+            Returns: string
+          }
       record_waste: {
         Args: {
           _batch_id: string
@@ -4818,15 +4960,26 @@ export type Database = {
         }
         Returns: string
       }
-      register_shop: {
-        Args: {
-          _address?: string
-          _city?: string
-          _name: string
-          _phone?: string
-        }
-        Returns: string
-      }
+      register_shop:
+        | {
+            Args: {
+              _address?: string
+              _city?: string
+              _name: string
+              _phone?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              _address?: string
+              _business_type?: string
+              _city?: string
+              _name: string
+              _phone?: string
+            }
+            Returns: string
+          }
       resolve_cash_account: {
         Args: { p_method: string; p_tenant_id: string }
         Returns: string
@@ -4836,6 +4989,10 @@ export type Database = {
         Returns: boolean
       }
       resolve_payment_bucket: { Args: { p_method: string }; Returns: string }
+      restock_batch_fefo: {
+        Args: { _product_id: string; _qty: number }
+        Returns: undefined
+      }
       resume_bill: { Args: { _id: string }; Returns: Json }
       run_health_check: {
         Args: never
@@ -4897,17 +5054,30 @@ export type Database = {
       }
       tenant_timezone: { Args: { p_tenant_id: string }; Returns: string }
       undo_last_sale: { Args: { _sale_id: string }; Returns: Json }
-      update_party_payment: {
-        Args: {
-          _account_id?: string
-          _amount: number
-          _created_at: string
-          _id: string
-          _method: string
-          _note: string
-        }
-        Returns: undefined
-      }
+      update_party_payment:
+        | {
+            Args: {
+              _account_id?: string
+              _amount: number
+              _created_at: string
+              _id: string
+              _method: string
+              _note: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _account_id?: string
+              _amount: number
+              _created_at: string
+              _direction?: string
+              _id: string
+              _method: string
+              _note: string
+            }
+            Returns: undefined
+          }
       url_decode: { Args: { p_text: string }; Returns: string }
       void_sale: { Args: { _reason: string; _sale_id: string }; Returns: Json }
     }

@@ -279,8 +279,8 @@
   font-size: 0.8125rem;
 }
 @keyframes ayat-ticker-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .ayat-ticker-track { animation: none; }
