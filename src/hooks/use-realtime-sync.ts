@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { logPerf, whenIdle } from "@/lib/offline/perf";
+import { db } from "@/lib/offline/db";
 
 
 // Tables → query keys to invalidate when any row changes anywhere in the system.
@@ -177,6 +178,51 @@ const FLUSH_MS = 600;
 // comment on ["products", "active"] in MAP above.
 const PASSIVE_KEYS = new Set<string>([JSON.stringify(["products", "active"])]);
 
+// Applies a single realtime products-table change directly to the POS
+// catalogue's in-memory array and its Dexie mirror, instead of relying on
+// the (deliberately passive, see PASSIVE_KEYS) stale-mark to eventually pull
+// the whole table again. A sale on another till, a price edit, a stock
+// count — each is a one-row change; every open till patches just that row.
+function applyProductRealtimePatch(qc: QueryClient, payload: any) {
+  const isDelete = payload?.eventType === "DELETE";
+  const row = isDelete ? payload?.old : payload?.new;
+  const id = row?.id;
+  if (!id) return;
+
+  // The POS array only ever holds active products (built from an
+  // is_active-filtered read) — a soft-deactivation removes the row from
+  // that array exactly like a real delete would, even though the row
+  // itself still exists server-side.
+  const removedFromActiveList = isDelete || payload?.new?.is_active === false;
+
+  qc.setQueryData(["products", "active"], (old: any[] | undefined) => {
+    if (!Array.isArray(old)) return old;
+    const idx = old.findIndex((p: any) => p.id === id);
+    if (removedFromActiveList) {
+      return idx === -1 ? old : old.filter((p: any) => p.id !== id);
+    }
+    if (idx === -1) return [...old, payload.new];
+    const next = old.slice();
+    next[idx] = { ...next[idx], ...payload.new };
+    return next;
+  });
+
+  // The Dexie mirror holds every product regardless of is_active (matching
+  // what the sync engine's own pullTable() stores there) — only a genuine
+  // DELETE removes the row from it.
+  void (async () => {
+    try {
+      if (isDelete) {
+        await db().products.delete(id);
+      } else if (payload.new) {
+        await db().products.put(payload.new);
+      }
+    } catch {
+      /* best effort — the next sync pull corrects any miss */
+    }
+  })();
+}
+
 function scheduleFlush() {
   if (typeof window === "undefined") return;
   if (flushTimer !== null) return;
@@ -216,7 +262,10 @@ export function useRealtimeSync() {
         ch.on(
           "postgres_changes" as any,
           { event: "*", schema: "public", table, filter: `${filterCol}=eq.${tenantId}` },
-          () => {
+          (payload: any) => {
+            if (table === "products") {
+              for (const c of clients) applyProductRealtimePatch(c, payload);
+            }
             dirty.add(table);
             scheduleFlush();
           },
