@@ -4849,8 +4849,15 @@ function ReprintDialog({
 
   // When the user searches, ask the server across the WHOLE history instead of
   // filtering only the loaded page — otherwise old invoices look missing.
+  //
+  // Deliberately NOT keyed under ["sales", ...]: every completed sale (this
+  // till's own checkout, or any other till's via realtime) invalidates the
+  // ["sales"] prefix, and React Query matches that by prefix — so a key
+  // starting with "sales" here would force this query to refetch (up to 300
+  // rows with nested sale_items/customers/expense_persons joins) on every
+  // single sale anywhere in the shop, even while this dialog sits closed.
   const { data: serverHits = [] } = useQuery({
-    queryKey: ["sales", "reprint-search", term],
+    queryKey: ["pos-reprint", "search", term],
     enabled: open && term.length > 0,
     queryFn: async () => {
       const like = `%${term.replace(/[%_]/g, "")}%`;
@@ -4869,8 +4876,10 @@ function ReprintDialog({
     },
   });
 
+  // Same reasoning as serverHits above — kept off the "sales" prefix so a
+  // sale anywhere in the shop can't force-refetch this closed dialog.
   const { data: sales = [], isFetching } = useQuery({
-    queryKey: ["sales", "reprint", pageSize],
+    queryKey: ["pos-reprint", "list", pageSize],
     enabled: open,
     queryFn: () =>
       offlineFirst(
