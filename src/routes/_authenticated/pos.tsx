@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   Plus,
   X,
@@ -83,11 +83,13 @@ import {
   offlineFirst,
   cacheProducts,
   cacheCustomers,
+  cacheProductBarcodes,
   completeSaleOfflineAware,
   cacheSuppliers,
   insertOfflineAware,
   searchProductsLocal,
 } from "@/lib/offline/pos";
+import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
 import { computeSoldQtyByProduct, applyStockDeltas, type SoldLine } from "@/lib/pos-stock-patch";
 import { enqueueWrite } from "@/lib/offline/sync";
@@ -410,26 +412,20 @@ function parsePaymentMethod(
 
 // After a normal checkout, the cashier already knows exactly which products
 // changed and by how much — there's no need to invalidate + refetch the
-// re-fetching that product from the network just to show the new stock
-// number. This patches the small lazily-known-products cache in place
-// instead, so the screen updates with zero network wait. The realtime sync
-// listener will still separately patch the same product shortly after (it
-// can't tell this change apart from one made by another till), so this is
-// purely an optimization, not a replacement for that backstop — if this
-// patch is ever wrong for any edge case, the realtime patch corrects it
-// moments later.
-function patchProductStockAfterSale(
-  setKnownProducts: (updater: (prev: Record<string, any>) => Record<string, any>) => void,
-  items: SoldLine[],
-) {
+// whole ["products","active"] catalogue (a sequential, paginated reload of
+// potentially several thousand rows) just to show the new stock numbers.
+// This patches the cached catalogue in place instead, so the screen updates
+// with zero network wait. The realtime sync listener will still separately
+// invalidate the same query shortly after (it can't tell this change apart
+// from one made by another till), so this is purely an optimization, not a
+// replacement for that backstop — if this patch is ever wrong for any edge
+// case, the following realtime refetch corrects it moments later.
+function patchProductStockAfterSale(qc: QueryClient, items: SoldLine[]) {
   const soldQtyByProduct = computeSoldQtyByProduct(items);
   if (soldQtyByProduct.size === 0) return;
-  setKnownProducts((prev) => {
-    const patched = applyStockDeltas(Object.values(prev), soldQtyByProduct);
-    const next: Record<string, any> = {};
-    for (const p of patched) next[p.id] = p;
-    return next;
-  });
+  qc.setQueryData(["products", "active"], (old: any[] | undefined) =>
+    Array.isArray(old) ? applyStockDeltas(old, soldQtyByProduct) : old,
+  );
 }
 
 async function searchProducts(term: string) {
@@ -499,77 +495,6 @@ async function searchProductsOnline(q: string) {
   ].forEach(p => merged.set(p.id, p));
 
   return Array.from(merged.values());
-}
-
-/** Exact-code product resolution for a barcode/SKU scan — Dexie first (from
- *  any earlier scan/search this session, or the sync engine's own mirror),
- *  then, only on a genuine local miss, ONE tenant-scoped Supabase lookup
- *  (RLS-scoped by `products`/`product_barcodes`'s own policies, so this can
- *  never reach another tenant's row). Never touches the full catalogue —
- *  this is the targeted replacement for what used to be an in-memory lookup
- *  over a fully preloaded product list. */
-async function lookupProductByCode(raw: string): Promise<any | null> {
-  const code = raw.trim();
-  if (!code) return null;
-  const d = offlineDb();
-  try {
-    const bySku = await d.products.where("sku").equalsIgnoreCase(code).first();
-    if (bySku && bySku.is_active !== false) return bySku;
-    const byBarcode = await d.products.where("barcode").equals(code).first();
-    if (byBarcode && byBarcode.is_active !== false) return byBarcode;
-    const link = await d.product_barcodes.where("barcode").equals(code).first();
-    if (link) {
-      const p = await d.products.get(link.product_id);
-      if (p && p.is_active !== false) return p;
-    }
-  } catch {
-    /* Dexie unavailable — fall through to a network lookup */
-  }
-  if (isOfflineNow()) return null;
-  try {
-    const [bySkuRes, byBarcodeRes] = await Promise.all([
-      supabase
-        .from("products")
-        .select(PRODUCT_COLUMNS)
-        .eq("is_active", true)
-        .eq("sku", code)
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("products")
-        .select(PRODUCT_COLUMNS)
-        .eq("is_active", true)
-        .eq("barcode", code)
-        .limit(1)
-        .maybeSingle(),
-    ]);
-    const hit = bySkuRes.data ?? byBarcodeRes.data;
-    if (hit) {
-      void cacheProducts([hit]);
-      return hit;
-    }
-    const { data: link } = await supabase
-      .from("product_barcodes")
-      .select("product_id")
-      .eq("barcode", code)
-      .limit(1)
-      .maybeSingle();
-    if (link?.product_id) {
-      const { data: prod } = await supabase
-        .from("products")
-        .select(PRODUCT_COLUMNS)
-        .eq("id", link.product_id)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (prod) {
-        void cacheProducts([prod]);
-        return prod;
-      }
-    }
-  } catch {
-    /* network error — caller treats a null result as "not found" */
-  }
-  return null;
 }
 
 // A real barcode scanner "types" every character of a code within a few ms
@@ -865,7 +790,6 @@ function POSPage() {
     } else {
       toast.success(`Added ${product.name}`);
     }
-    rememberProducts([product]);
     addProduct(product);
     setQuickAdd({
       open: false,
@@ -975,7 +899,6 @@ function POSPage() {
         ? `Added "${name}" offline — will sync automatically`
         : `Added "${name}" to catalog`,
     );
-    rememberProducts([data]);
     addProduct(data);
     setQuickAdd({
       open: false,
@@ -1039,124 +962,90 @@ function POSPage() {
     return () => window.removeEventListener("focus", handleFocus);
   }, [refetchAccounts]);
 
-  // Lazily-populated cache of products actually looked at this session —
-  // scanned, shown in a search result, or already added to the cart. This
-  // replaces holding the whole (tens-of-thousands-of-rows) catalogue in
-  // memory: nothing preloads it, it only grows as products are looked up,
-  // and it never triggers a network request by itself.
-  const [knownProducts, setKnownProducts] = useState<Record<string, any>>({});
-  const rememberProducts = (rows: any[]) => {
-    if (!rows.length) return;
-    setKnownProducts((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const r of rows) {
-        if (r?.id && next[r.id] !== r) {
-          next[r.id] = r;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  };
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ["products", "active"],
+    queryFn: () =>
+      readLocalFirst({
+        table: "products",
+        cloud: () =>
+          fetchAll<any>((from: number, to: number) =>
+            supabase
+              .from("products")
+              .select(PRODUCT_COLUMNS)
+              .eq("is_active", true)
+              .order("name")
+              .range(from, to),
+          ),
+        local: async () =>
+          (await offlineDb().products.toArray())
+            .filter((p: any) => p.is_active !== false)
+            .sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
+        cache: (rows) => cacheProducts(rows),
+      }),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Resuming a held bill, restoring an undone sale, or editing an old
-  // invoice loads cart lines by product_id without the cashier scanning
-  // anything — so those ids may not be in `knownProducts` yet. This does
-  // ONE bounded lookup (Dexie first, a single `.in(id, ...)` fallback) for
-  // exactly the handful of products that specific bill references, so
-  // stock/unit/category still display on those lines, without touching the
-  // full catalogue.
-  const hydrateKnownProducts = async (ids: Array<string | null | undefined>) => {
-    const missing = Array.from(new Set(ids.filter((id): id is string => !!id))).filter(
-      (id) => !knownProducts[id],
-    );
-    if (!missing.length) return;
-    try {
-      const local = await offlineDb().products.bulkGet(missing);
-      const found = local.filter((p): p is any => !!p);
-      if (found.length) rememberProducts(found);
-      if (isOfflineNow()) return;
-      const stillMissing = missing.filter((id) => !found.some((p) => p.id === id));
-      if (stillMissing.length) {
-        const { data } = await supabase
-          .from("products")
-          .select(PRODUCT_COLUMNS)
-          .in("id", stillMissing);
-        if (data?.length) rememberProducts(data);
-      }
-    } catch {
-      /* best effort — display-only fallback, cart totals are unaffected */
-    }
-  };
-  const productById = knownProducts;
-  const productsLoading = false;
-
-  // Realtime product changes (a sale on another till, a price edit, a stock
-  // count) only patch a product this page already knows about — see
-  // subscribeProductChanges in use-realtime-sync.ts. A change to a product
-  // we haven't looked up is simply irrelevant here; the next scan/search
-  // for it fetches current data anyway.
-  useEffect(() => {
-    let unsub: (() => void) | undefined;
-    let disposed = false;
-    void import("@/hooks/use-realtime-sync").then(({ subscribeProductChanges }) => {
-      if (disposed) return;
-      unsub = subscribeProductChanges((payload: any) => {
-        const isDelete = payload?.eventType === "DELETE";
-        const row = isDelete ? payload?.old : payload?.new;
-        const id = row?.id;
-        if (!id) return;
-        setKnownProducts((prev) => {
-          if (!(id in prev)) return prev;
-          if (isDelete || payload?.new?.is_active === false) {
-            const next = { ...prev };
-            delete next[id];
-            return next;
-          }
-          return { ...prev, [id]: { ...prev[id], ...payload.new } };
-        });
-      });
-    });
-    return () => {
-      disposed = true;
-      unsub?.();
-    };
-  }, []);
-
-  // The only network path for search: a bounded, debounced, server-side (or,
-  // offline, indexed-local) search — never a full-catalogue scan. `search`
-  // changes on every keystroke of a scan; debouncing means a fast scan fires
-  // one query for the whole scan instead of one per character.
+  // Bridges search while the full catalogue preload below is still in
+  // flight (or, offline, before anything has ever synced locally) — the only
+  // window where `products` is genuinely empty. `searchTerm` changes on
+  // every keystroke of a scan, and this hits the network (or, offline, an
+  // indexed Dexie query) per call, so it's debounced far more conservatively
+  // than the in-memory filter below: without this, a single scan during
+  // that window fired one full round of parallel Supabase queries per
+  // character instead of one for the whole scan.
   const debouncedSearchTerm = useDebounced(searchTerm, 300);
-  const { data: searchResults = [], isFetching: remoteProductsLoading } = useQuery({
+  const { data: remoteProducts = [], isFetching: remoteProductsLoading } = useQuery({
     queryKey: ["products", "pos-search", debouncedSearchTerm],
-    enabled: debouncedSearchTerm.length > 0,
+    enabled: debouncedSearchTerm.length > 0 && products.length === 0,
     queryFn: () => searchProducts(debouncedSearchTerm),
     staleTime: 60 * 1000,
   });
 
-  useEffect(() => {
-    rememberProducts(searchResults);
-  }, [searchResults]);
+  const searchableProducts = useMemo(
+    () => (products.length > 0 ? products : remoteProducts),
+    [products, remoteProducts],
+  );
 
-  // A product's barcodes: its own primary `barcode` plus, only for a row
-  // that was matched via an "extra" barcode during search, the one that
-  // matched (`_matched_barcodes`, set by searchProductsLocal). No separate
-  // full `product_barcodes` table read needed — this is derived per-product
-  // from data already in hand.
-  const getProductBarcodes = (p: any): string[] => {
-    const matched = Array.isArray(p?._matched_barcodes) ? p._matched_barcodes.map(String) : [];
-    return Array.from(new Set([...(p?.barcode ? [String(p.barcode)] : []), ...matched]));
-  };
+  const { data: extraBarcodes = [] } = useQuery({
+    queryKey: ["product_barcodes"],
+    queryFn: () =>
+      readLocalFirst({
+        table: "product_barcodes",
+        cloud: () =>
+          fetchAll<any>((from: number, to: number) =>
+            supabase.from("product_barcodes").select("id,product_id,barcode").range(from, to),
+          ),
+        local: () => offlineDb().product_barcodes.toArray(),
+        cache: (rows) => cacheProductBarcodes(rows),
+      }),
+    // Feeds the same scan lookup maps as `products` above — same staleTime
+    // for the same reason (a fresh mount still refetches; it just doesn't
+    // force one on every unrelated realtime tick).
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // product_id -> array of all barcodes (primary + extras)
+  const barcodesByProduct = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    searchableProducts.forEach((p) => {
+      const matched = Array.isArray(p._matched_barcodes) ? p._matched_barcodes.map(String) : [];
+      m[p.id] = Array.from(new Set([...(p.barcode ? [String(p.barcode)] : []), ...matched]));
+    });
+    extraBarcodes.forEach((b: any) => {
+      if (!m[b.product_id]) m[b.product_id] = [];
+      if (!m[b.product_id].includes(b.barcode)) m[b.product_id].push(b.barcode);
+    });
+    return m;
+  }, [searchableProducts, extraBarcodes]);
 
   const itemCodeLookupBarcodes = useMemo(() => {
     const set = new Set<string>();
-    Object.values(knownProducts).forEach((p: any) => {
-      getProductBarcodes(p).forEach((bc) => set.add(bc));
+    searchableProducts.forEach((p) => {
+      if (p.barcode) set.add(String(p.barcode));
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => set.add(String(bc)));
     });
     return Array.from(set).slice(0, 1000);
-  }, [knownProducts]);
+  }, [searchableProducts, barcodesByProduct]);
 
   const { data: libraryItemCodes = {} } = useQuery({
     queryKey: ["global_products", "item-codes", itemCodeLookupBarcodes.join("|")],
@@ -1198,51 +1087,70 @@ function POSPage() {
 
   const itemCodeByBarcode = useMemo(() => {
     const m: Record<string, string> = { ...libraryItemCodes };
-    Object.values(knownProducts).forEach((p: any) => {
+    searchableProducts.forEach((p) => {
       const sku = cleanItemCode(p.sku);
       if (!sku) return;
-      getProductBarcodes(p).forEach((bc) => {
-        m[bc] = sku;
+      if (p.barcode) m[String(p.barcode)] = sku;
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => {
+        m[String(bc)] = sku;
       });
     });
     return m;
-  }, [knownProducts, libraryItemCodes]);
+  }, [searchableProducts, barcodesByProduct, libraryItemCodes]);
 
   const itemCodeForProduct = (p: any) => {
     const sku = cleanItemCode(p?.sku);
     if (sku) return sku;
-    for (const bc of getProductBarcodes(p)) {
+    // Checks p.barcode then the product's other barcodes directly, skipping
+    // the Set/Array.from dedup pass — this runs per search-result row per
+    // render, and the first matching code wins regardless of duplicates.
+    if (p?.barcode) {
+      const bc = String(p.barcode);
+      const itemCode = cleanItemCode(itemCodeByBarcode[bc]);
+      if (itemCode && itemCode !== bc) return itemCode;
+    }
+    for (const bc of barcodesByProduct[p?.id] ?? []) {
       const itemCode = cleanItemCode(itemCodeByBarcode[bc]);
       if (itemCode && itemCode !== bc) return itemCode;
     }
     return "";
   };
 
-  // Fast-path maps over the SMALL known-products cache — a hit means "we
-  // already looked this up this session," not "this is the only product
-  // with this code." A miss falls through to lookupProductByCode(), which
-  // does one targeted Dexie-then-Supabase lookup (see resolveScanEnter).
+  // Exact-barcode lookup for scan
   const productByBarcode = useMemo(() => {
     const m: Record<string, any> = {};
-    Object.values(knownProducts).forEach((p: any) => {
-      getProductBarcodes(p).forEach((bc) => {
+    searchableProducts.forEach((p) => {
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => {
         m[bc] = p;
       });
     });
     return m;
-  }, [knownProducts]);
+  }, [searchableProducts, barcodesByProduct]);
 
+  // Case-insensitive sku/barcode -> product, so the Enter-key handler's
+  // "exact match" fallback is an O(1) lookup instead of scanning the
+  // (debounced, display-only) `filtered` list — keeping scan-resolution
+  // correctness fully independent of that debounce.
   const productByCodeLower = useMemo(() => {
     const m: Record<string, any> = {};
-    Object.values(knownProducts).forEach((p: any) => {
+    searchableProducts.forEach((p) => {
       const sku = (p.sku ?? "").toLowerCase();
       if (sku) m[sku] = p;
-      getProductBarcodes(p).forEach((bc) => {
-        m[bc.toLowerCase()] = p;
+      (barcodesByProduct[p.id] ?? []).forEach((bc) => {
+        m[String(bc).toLowerCase()] = p;
       });
     });
     return m;
-  }, [knownProducts]);
+  }, [searchableProducts, barcodesByProduct]);
+
+  // O(1) id -> product lookup so cart rows never linear-scan the catalogue.
+  const productById = useMemo(() => {
+    const m: Record<string, any> = {};
+    searchableProducts.forEach((p) => {
+      m[p.id] = p;
+    });
+    return m;
+  }, [searchableProducts]);
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
@@ -1269,29 +1177,38 @@ function POSPage() {
     queryFn: fetchExpensePersons,
   });
 
-  // The dropdown's candidate list is now always the just-fetched, bounded
-  // `searchResults` (see the ["products","pos-search",...] query above) —
-  // never the full catalogue. This re-scores that small set (a handful to a
-  // couple hundred rows, never thousands) so the same relevance ordering
-  // cashiers are used to is preserved, cheaply, without needing a separate
-  // in-memory index over everything. Scored against `debouncedSearchTerm`
-  // (the same string `searchResults` was fetched for) rather than its own
-  // faster debounce, so the list and its sort order are always for the same
-  // query — there's nothing faster to score against until the network
-  // reply itself arrives.
+  // Precomputed once per catalogue/barcode change — lowercasing name/sku/category
+  // and mapping barcodes to lowercase here (instead of inside `filtered`, which
+  // re-runs on every keystroke) means each keystroke only pays for string
+  // compares, not a full re-lowercase-and-remap of the whole catalogue.
+  const searchIndex = useMemo(
+    () =>
+      searchableProducts.map((p) => ({
+        p,
+        name: (p.name ?? "").toLowerCase(),
+        sku: (p.sku ?? "").toLowerCase(),
+        cat: (p.category ?? "").toLowerCase(),
+        bcs: (barcodesByProduct[p.id] ?? []).map((b) => b.toLowerCase()),
+      })),
+    [searchableProducts, barcodesByProduct],
+  );
+
+  // Debounced so a fast barcode scan (search changing on every keystroke)
+  // doesn't re-run this scored/sorted scan-over-the-catalogue and re-render
+  // the dropdown once per character — only once the input settles. Never
+  // used for scan-resolution correctness (see productByCodeLower), only for
+  // the human-facing search dropdown and arrow-key highlighted selection,
+  // both of which already require the dropdown to have rendered first.
+  const debouncedSearch = useDebounced(search, 40);
   const filtered = useMemo(() => {
-    const q = debouncedSearchTerm.toLowerCase();
+    const q = debouncedSearch.trim().replace(/\s+/g, " ").toLowerCase();
     if (!q) return [];
     // Score each product so best matches float to the top.
     // 0 = exact sku/barcode, 1 = sku/barcode prefix, 2 = name prefix,
     // 3 = word-start in name, 4 = name substring, 5 = sku/barcode substring,
     // 6 = category match. Lower is better.
     const scored: { p: any; s: number }[] = [];
-    for (const p of searchResults) {
-      const name = (p.name ?? "").toLowerCase();
-      const sku = (p.sku ?? "").toLowerCase();
-      const cat = (p.category ?? "").toLowerCase();
-      const bcs = getProductBarcodes(p).map((b) => b.toLowerCase());
+    for (const { p, name, sku, cat, bcs } of searchIndex) {
       let s = -1;
       if (sku === q || bcs.includes(q)) s = 0;
       else if (sku.startsWith(q) || bcs.some((b) => b.startsWith(q))) s = 1;
@@ -1309,7 +1226,7 @@ function POSPage() {
     // narrower search term already surfaces the intended match well
     // within this limit.
     return scored.slice(0, 50).map((x) => x.p);
-  }, [searchResults, debouncedSearchTerm]);
+  }, [searchIndex, debouncedSearch]);
 
   // reset highlight whenever the filtered list changes
   useEffect(() => {
@@ -1722,7 +1639,6 @@ function POSPage() {
     };
     setTabs((ts) => [...ts, restored]);
     setActive(restored.id);
-    void hydrateKnownProducts(restoredItems.map((i) => i.product_id));
   };
 
   const loadInvoiceForEdit = (sale: any) => {
@@ -1763,7 +1679,6 @@ function POSPage() {
     };
     setTabs((ts) => [...ts, editTab]);
     setActive(editTab.id);
-    void hydrateKnownProducts(items.map((i) => i.product_id));
     toast.success(`Editing invoice ${sale.invoice_no}`);
   };
 
@@ -1804,7 +1719,6 @@ function POSPage() {
     };
     setTabs((ts) => [...ts, restored]);
     setActive(restored.id);
-    void hydrateKnownProducts(restoredItems.map((i) => i.product_id));
   };
 
   const resumeHeld = async (id: string) => {
@@ -2321,7 +2235,7 @@ function POSPage() {
       closeTab(active);
       // restored badge is cleared implicitly since tab is closed
       void 0;
-      patchProductStockAfterSale(setKnownProducts, tab.items);
+      patchProductStockAfterSale(qc, tab.items);
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["expenses"] });
@@ -2654,15 +2568,29 @@ function POSPage() {
       if (e.key === "Enter" && search.trim()) {
         e.preventDefault();
         const raw = (searchRef.current?.value ?? search).trim();
-        const kbNav = kbNavRef.current;
+        
+        // 1. Exact barcode check — skipped if the user manually navigated
+        // the dropdown with arrow keys, so an arrow-selected item is never overridden.
+        if (!kbNavRef.current) {
+          const exact = productByBarcode[raw];
+          if (exact) {
+            addProduct(exact);
+            setSearch("");
+            triggerScanFlash();
+            searchRef.current?.focus();
+            return;
+          }
+        }
+        
+        // 2. Case-insensitive exact sku/barcode match (e.g. if the scan's
+        // case doesn't match what's stored, so step 1 missed it). Looked up
+        // directly rather than via `filtered`, since `filtered` is debounced
+        // for the dropdown and may not reflect `raw` yet on a fast scan.
+        if (!kbNavRef.current) {
+          const exactFiltered = productByCodeLower[raw.toLowerCase()];
 
-        // 1. Exact barcode/sku check against products already known this
-        // session — skipped if the user manually navigated the dropdown
-        // with arrow keys, so an arrow-selected item is never overridden.
-        if (!kbNav) {
-          const known = productByBarcode[raw] ?? productByCodeLower[raw.toLowerCase()];
-          if (known) {
-            addProduct(known);
+          if (exactFiltered) {
+            addProduct(exactFiltered);
             setSearch("");
             triggerScanFlash();
             searchRef.current?.focus();
@@ -2670,40 +2598,7 @@ function POSPage() {
           }
         }
 
-        // 2. Not known yet this session — one targeted Dexie-then-Supabase
-        // lookup by exact code, so a valid scan for a product that simply
-        // hasn't been seen yet still resolves without waiting on the
-        // debounced search below.
-        if (!kbNav) {
-          void (async () => {
-            const found = await lookupProductByCode(raw);
-            // The cashier may have kept typing/scanning while this was in
-            // flight — only act on it if this is still the live search text.
-            if ((searchRef.current?.value ?? "").trim() !== raw) return;
-            if (found) {
-              rememberProducts([found]);
-              addProduct(found);
-              setSearch("");
-              triggerScanFlash();
-              searchRef.current?.focus();
-              return;
-            }
-            // 3. Highlighted dropdown selection
-            if (filtered.length >= 1) {
-              const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
-              addProduct(pick);
-              setSearch("");
-              searchRef.current?.focus();
-              return;
-            }
-            // 4. Quick add (only if search is not just numbers or common scan length)
-            openQuickAdd(raw);
-          })();
-          return;
-        }
-
-        // Arrow-navigated: skip the exact-match paths entirely, an
-        // arrow-selected item is never overridden.
+        // 3. Highlighted selection
         if (filtered.length >= 1) {
           const pick = filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
           addProduct(pick);
@@ -2711,7 +2606,8 @@ function POSPage() {
           searchRef.current?.focus();
           return;
         }
-
+        
+        // 4. Quick add (only if search is not just numbers or common scan length)
         openQuickAdd(raw);
       }
     };
@@ -2906,39 +2802,30 @@ function POSPage() {
                     }
                     return;
                   }
-                  // Exact match against products already known this session
-                  // — skipped if the user manually navigated the dropdown
-                  // with arrow keys, so an arrow-selected item is never overridden.
+                  // Exact barcode check — skipped if the user manually navigated
+                  // the dropdown with arrow keys, so an arrow-selected item is never overridden.
                   if (!kbNavRef.current) {
-                    const known = productByBarcode[raw] ?? productByCodeLower[raw.toLowerCase()];
-                    if (known) {
-                      addProduct(known);
+                    const exact = productByBarcode[raw];
+                    if (exact) {
+                      addProduct(exact);
                       setSearch("");
                       triggerScanFlash();
                       return;
                     }
-                    // Not known yet this session — one targeted lookup by
-                    // exact code, same reasoning as the global handler above.
-                    void (async () => {
-                      const found = await lookupProductByCode(raw);
-                      if ((searchRef.current?.value ?? "").trim() !== raw) return;
-                      if (found) {
-                        rememberProducts([found]);
-                        addProduct(found);
-                        setSearch("");
-                        triggerScanFlash();
-                        return;
-                      }
-                      if (filtered.length >= 1) {
-                        const pick =
-                          filtered[Math.min(highlight, filtered.length - 1)] ?? filtered[0];
-                        addProduct(pick);
-                        setSearch("");
-                        return;
-                      }
-                      openQuickAdd(raw);
-                    })();
-                    return;
+                  }
+                  
+                  // Double-check case-insensitive exact sku/barcode match —
+                  // looked up directly rather than via the debounced
+                  // `filtered` list, same reasoning as the global handler above.
+                  if (!kbNavRef.current) {
+                    const exactFiltered = productByCodeLower[raw.toLowerCase()];
+
+                    if (exactFiltered) {
+                      addProduct(exactFiltered);
+                      setSearch("");
+                      triggerScanFlash();
+                      return;
+                    }
                   }
 
                   if (filtered.length >= 1) {
@@ -3053,7 +2940,7 @@ function POSPage() {
                       ? "bg-amber-50/60 dark:bg-muted/20"
                       : "bg-white dark:bg-background";
                   const p = it.product_id ? (productById[it.product_id] ?? null) : null;
-                  const bcs = p ? getProductBarcodes(p) : [];
+                  const bcs = p ? (barcodesByProduct[p.id] ?? []) : [];
                   const displayCode = it.code || (p ? itemCodeForProduct(p) : "");
                   const subline = p
                     ? [bcs[0] ? `BC ${bcs[0]}` : null, p.category || null]
@@ -3204,7 +3091,7 @@ function POSPage() {
                         const rate = Number(p.sell_price ?? 0);
                         const pRate = Number(p.cost_price ?? 0);
                         const code = itemCodeForProduct(p) || "—";
-                        const bcs = getProductBarcodes(p);
+                        const bcs = barcodesByProduct[p.id] ?? [];
                         const subline = [bcs[0] ? `BC ${bcs[0]}` : null, p.category || null]
                           .filter(Boolean)
                           .join(" · ");

@@ -16,11 +16,19 @@ import { db } from "@/lib/offline/db";
 // touched is an acceptable tradeoff for not doing that on every scan.
 const MAP: Record<string, string[][]> = {
   products: [
-    // POS's own catalogue is no longer a React Query cache entry at all — it
-    // was replaced by a lazily-populated, component-local cache (see
-    // pos.tsx's `knownProducts`) fed by subscribeProductChanges() below, so
-    // there's no ["products","active"]-shaped key here anymore to invalidate
-    // or mark passive.
+    // ["products", "active"] — POS's own catalogue, feeding the barcode/SKU
+    // lookup maps scanning depends on — is deliberately NOT force-refetched
+    // here (see the PASSIVE_KEYS override below). Every completed sale
+    // ANYWHERE in the shop (any till) updates a product's stock, which is a
+    // `products` row change like any other; forcing every open till to
+    // re-download the full catalogue (thousands of rows for a real shop) and
+    // rebuild its lookup maps on every single sale — its own included — was
+    // showing up as barcode-scan lag, worse the busier the shop got. It's
+    // still marked stale here, so a genuine remount/revisit still refreshes
+    // it; only the eager forced re-download during active scanning is
+    // skipped. Checkout's own optimistic patch (patchProductStockAfterSale)
+    // already keeps this till's own view accurate for its own sales.
+    ["products", "active"],
     ["products", "list"], // admin Products page
     ["products", "counts"],
     ["products", "categories"],
@@ -166,39 +174,38 @@ const FLUSH_MS = 600;
 // Keys that should only be marked stale on a realtime change, never forced to
 // refetch immediately — for data that's expensive to re-download in full and
 // isn't safety-critical to keep millisecond-fresh (the source RPC remains the
-// authority either way).
-const PASSIVE_KEYS = new Set<string>([]);
+// authority either way). Currently just POS's own product catalogue; see the
+// comment on ["products", "active"] in MAP above.
+const PASSIVE_KEYS = new Set<string>([JSON.stringify(["products", "active"])]);
 
-// POS's own product cache is component-local state (pos.tsx's
-// `knownProducts`), not a React Query cache entry, so it can't be reached
-// via qc.setQueryData. Any mounted POS page subscribes here directly and
-// patches its own local cache — a sale on another till, a price edit, a
-// stock count — each is a one-row change; every open till patches just that
-// row, never re-downloads the catalogue.
-type ProductChangeListener = (payload: any) => void;
-const productChangeListeners = new Set<ProductChangeListener>();
-export function subscribeProductChanges(l: ProductChangeListener) {
-  productChangeListeners.add(l);
-  return () => {
-    productChangeListeners.delete(l);
-  };
-}
-
-// Applies a single realtime products-table change to the Dexie mirror and
-// notifies any subscribed POS page of the change (see subscribeProductChanges).
-function applyProductRealtimePatch(payload: any) {
+// Applies a single realtime products-table change directly to the POS
+// catalogue's in-memory array and its Dexie mirror, instead of relying on
+// the (deliberately passive, see PASSIVE_KEYS) stale-mark to eventually pull
+// the whole table again. A sale on another till, a price edit, a stock
+// count — each is a one-row change; every open till patches just that row.
+function applyProductRealtimePatch(qc: QueryClient, payload: any) {
   const isDelete = payload?.eventType === "DELETE";
   const row = isDelete ? payload?.old : payload?.new;
   const id = row?.id;
   if (!id) return;
 
-  for (const l of productChangeListeners) {
-    try {
-      l(payload);
-    } catch {
-      /* a listener error must not break others */
+  // The POS array only ever holds active products (built from an
+  // is_active-filtered read) — a soft-deactivation removes the row from
+  // that array exactly like a real delete would, even though the row
+  // itself still exists server-side.
+  const removedFromActiveList = isDelete || payload?.new?.is_active === false;
+
+  qc.setQueryData(["products", "active"], (old: any[] | undefined) => {
+    if (!Array.isArray(old)) return old;
+    const idx = old.findIndex((p: any) => p.id === id);
+    if (removedFromActiveList) {
+      return idx === -1 ? old : old.filter((p: any) => p.id !== id);
     }
-  }
+    if (idx === -1) return [...old, payload.new];
+    const next = old.slice();
+    next[idx] = { ...next[idx], ...payload.new };
+    return next;
+  });
 
   // The Dexie mirror holds every product regardless of is_active (matching
   // what the sync engine's own pullTable() stores there) — only a genuine
@@ -257,7 +264,7 @@ export function useRealtimeSync() {
           { event: "*", schema: "public", table, filter: `${filterCol}=eq.${tenantId}` },
           (payload: any) => {
             if (table === "products") {
-              applyProductRealtimePatch(payload);
+              for (const c of clients) applyProductRealtimePatch(c, payload);
             }
             dirty.add(table);
             scheduleFlush();
