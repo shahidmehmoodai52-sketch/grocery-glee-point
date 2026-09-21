@@ -1193,7 +1193,9 @@
     "yesterday": "Yesterday",
     "this_week": "This week",
     "this_month": "This month",
-    "custom_range": "Custom range"
+    "custom_range": "Custom range",
+    "edit_requires_internet": "Editing a purchase needs an internet connection — try again once reconnected.",
+    "delete_requires_internet": "Deleting a purchase needs an internet connection — try again once reconnected."
   },
   "settings": {
     "title": "Store & receipt settings",

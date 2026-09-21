@@ -95,6 +95,12 @@ const QUEUE_PRIORITY: Record<string, number> = {
   complete_purchase_return: 55,
   inventory_movements: 60,
   adjust_product_stock: 60,
+  // Purchases run after any stock correction queued for the same items
+  // (priority 60 above) so the received qty adds on top of the corrected
+  // baseline once both replay, matching the online call order.
+  purchases: 65,
+  purchase_items: 66,
+  complete_purchase: 65,
   record_damage: 60,
   record_waste: 60,
   expenses: 70,
