@@ -2228,7 +2228,20 @@ function POSPage() {
           ? `Sale ${patchedSale?.invoice_no} saved offline — will sync when online`
           : `Sale ${patchedSale?.invoice_no} saved`,
         {
-          action: { label: "Print", onClick: () => printInvoiceDirect(patchedSale, settings) },
+          action: {
+            label: "Print",
+            onClick: async () => {
+              const localPrinter = await getLocalPrinterSettings();
+              printInvoiceDirect(patchedSale, {
+                ...settings,
+                printer_name: localPrinter.printer_name,
+                paper_width: localPrinter.paper_width,
+                direct_print_enabled: localPrinter.direct_print_enabled,
+                print_copies: localPrinter.print_copies,
+                cash_drawer_kick: localPrinter.cash_drawer_kick,
+              });
+            },
+          },
           duration: 5000,
         },
       );
@@ -2253,7 +2266,9 @@ function POSPage() {
           ...settings,
           printer_name: localPrinter.printer_name,
           paper_width: localPrinter.paper_width,
-          direct_print_enabled: localPrinter.direct_print_enabled
+          direct_print_enabled: localPrinter.direct_print_enabled,
+          print_copies: localPrinter.print_copies,
+          cash_drawer_kick: localPrinter.cash_drawer_kick,
         }, "sale");
         setTimeout(() => searchRef.current?.focus(), 50);
       } else {
@@ -4742,7 +4757,9 @@ function PrintPromptDialog({
       ...settings.data,
       printer_name: localPrinter.printer_name,
       paper_width: localPrinter.paper_width,
-      direct_print_enabled: localPrinter.direct_print_enabled
+      direct_print_enabled: localPrinter.direct_print_enabled,
+      print_copies: localPrinter.print_copies,
+      cash_drawer_kick: localPrinter.cash_drawer_kick,
     }, "sale");
     onYes();
   };
@@ -4820,8 +4837,20 @@ function InvoiceDialog({ invoice, settings, onClose }: any) {
             {t('pos.close', 'Close')}
           </Button>
           <Button
-            onClick={() => {
-              printInvoiceDirect(invoice, settings, "sale");
+            onClick={async () => {
+              const localPrinter = await getLocalPrinterSettings();
+              printInvoiceDirect(
+                invoice,
+                {
+                  ...settings,
+                  printer_name: localPrinter.printer_name,
+                  paper_width: localPrinter.paper_width,
+                  direct_print_enabled: localPrinter.direct_print_enabled,
+                  print_copies: localPrinter.print_copies,
+                  cash_drawer_kick: localPrinter.cash_drawer_kick,
+                },
+                "sale",
+              );
             }}
           >
             <Printer className="h-4 w-4 mr-2" />
@@ -5035,7 +5064,15 @@ function ReprintDialog({
                               /* audit-only */
                             }
                           }
-                          printInvoiceDirect(s, settings);
+                          const localPrinter = await getLocalPrinterSettings();
+                          printInvoiceDirect(s, {
+                            ...settings,
+                            printer_name: localPrinter.printer_name,
+                            paper_width: localPrinter.paper_width,
+                            direct_print_enabled: localPrinter.direct_print_enabled,
+                            print_copies: localPrinter.print_copies,
+                            cash_drawer_kick: localPrinter.cash_drawer_kick,
+                          });
                           onOpenChange(false);
                         }}
                         title={t('pos.reprint_invoice_tooltip', 'Reprint invoice')}

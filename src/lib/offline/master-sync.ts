@@ -143,14 +143,30 @@ async function syncDeviceSettings(tenantId: string | null) {
       }],
       { tenantId },
     );
-    await printerSettingsRepo.replaceAll(
-      [{
+    // printer_name and direct_print_enabled are per-device settings, only
+    // ever edited locally (admin.tsx's Printer tab) — this projection only
+    // ever supplies the shop-wide fields (header/footer text, logo,
+    // print-prompt behavior). Must merge onto the existing local row rather
+    // than replaceAll (clear + rewrite), or every sync pass would silently
+    // wipe the device's own printer name and Direct Print toggle back to
+    // their defaults. paper_width is settable at both levels (a shop-wide
+    // default here, a per-device override in admin.tsx) — only seed it from
+    // the tenant default when this device hasn't been given its own value,
+    // so a deliberate per-device choice survives future syncs too.
+    const existingPrinter = (await printerSettingsRepo.get("printer")) ?? ({} as any);
+    await printerSettingsRepo.upsert(
+      {
+        ...existingPrinter,
         id: "printer",
         ...pick([
-          "receipt_width", "printer_name", "print_logo", "receipt_footer",
-          "receipt_header", "pos_print_prompt_enabled", "pos_print_prompt_default",
+          "print_logo",
+          "receipt_footer",
+          "receipt_header",
+          "pos_print_prompt_enabled",
+          "pos_print_prompt_default",
         ]),
-      }],
+        paper_width: existingPrinter.paper_width ?? (settings as any).paper_width,
+      },
       { tenantId },
     );
   });
