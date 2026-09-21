@@ -135,6 +135,10 @@ class PosOfflineDB extends Dexie {
   payment_methods!: Table<any, string>;
   barcode_settings!: Table<any, string>;
   printer_settings!: Table<any, string>;
+  // v6 — offline snapshot of the current user's computed permissions/role,
+  // so route-guard doesn't collapse a real user to the bare fallback perms
+  // on a cold offline boot (only "my-access" itself writes this table).
+  my_access!: Table<any, string>;
   _sync_state!: Table<SyncState, string>;
   _queue!: Table<QueuedWrite, number>;
   _meta!: Table<MetaRow, string>;
@@ -216,6 +220,11 @@ class PosOfflineDB extends Dexie {
       purchase_returns: "id, return_no, supplier_id, purchase_id, created_at",
       purchase_return_items: "id, return_id, product_id",
     });
+    // v6 — single-row snapshot of usePermissions()'s computed result, so it
+    // can go through the same readLocalFirst() pattern store_settings uses.
+    this.version(6).stores({
+      my_access: "id",
+    });
   }
 }
 
@@ -241,7 +250,7 @@ export const MIRRORED_TABLES = [
   "products", "product_barcodes", "customers", "suppliers",
   "sales", "sale_items", "sale_returns", "sale_return_items",
   "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses", "held_bills",
-  "cash_accounts", "store_settings", "user_roles",
+  "cash_accounts", "store_settings", "user_roles", "my_access",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];

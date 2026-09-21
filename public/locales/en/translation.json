@@ -1303,7 +1303,9 @@
     "offline_footer_note": "POS billing, product lookup and past invoices work offline. Reports, admin panel and payments still need internet.",
     "phase_idle": "idle",
     "phase_syncing": "syncing",
-    "phase_error": "error"
+    "phase_error": "error",
+    "offline_cannot_save": "You're offline — settings changes need a connection. Reconnect and try again.",
+    "offline_save_hint": "You're offline — reconnect to save changes."
   },
   "shifts": {
     "status_open": "Open",
