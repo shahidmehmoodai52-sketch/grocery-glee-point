@@ -872,11 +872,78 @@ function PrinterSettingsTab() {
             <div className="flex flex-col justify-end space-y-2">
                <Label className="flex items-center justify-between gap-3 rounded border p-2 text-sm">
                 <span>One-Click Direct Print</span>
-                <Switch 
-                  checked={!!settings.direct_print_enabled} 
-                  onCheckedChange={(v) => save({ direct_print_enabled: v })} 
+                <Switch
+                  checked={!!settings.direct_print_enabled}
+                  onCheckedChange={(v) => save({ direct_print_enabled: v })}
                 />
               </Label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Copies</Label>
+              <Input
+                type="number"
+                min={1}
+                max={5}
+                value={settings.print_copies ?? 1}
+                onChange={(e) =>
+                  save({ print_copies: Math.max(1, Math.min(5, Number(e.target.value) || 1)) })
+                }
+              />
+              <p className="text-[11px] text-muted-foreground">
+                How many copies print per receipt. Only applies to Direct Print — the browser's
+                own print dialog lets you pick copies there.
+              </p>
+            </div>
+
+            <div className="flex flex-col justify-end space-y-2">
+              <Label className="flex items-center justify-between gap-3 rounded border p-2 text-sm">
+                <span>Open Cash Drawer</span>
+                <Switch
+                  checked={!!settings.cash_drawer_kick}
+                  onCheckedChange={(v) => save({ cash_drawer_kick: v })}
+                />
+              </Label>
+              <p className="text-[11px] text-muted-foreground">
+                Experimental — sends the standard drawer-open signal before printing. Whether it
+                actually works depends on your printer; if it doesn't, check that printer's own
+                driver settings for a built-in "open drawer" option instead.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Receipt Text Size</Label>
+              <Select
+                value={String(settings.font_scale ?? 100)}
+                onValueChange={(v) => save({ font_scale: Number(v) })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="90">Small (90%)</SelectItem>
+                  <SelectItem value="100">Normal (100%)</SelectItem>
+                  <SelectItem value="115">Large (115%)</SelectItem>
+                  <SelectItem value="130">Extra large (130%)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Side Margin</Label>
+              <Select
+                value={String(settings.receipt_margin_mm ?? 2.5)}
+                onValueChange={(v) => save({ receipt_margin_mm: Number(v) })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Narrow (1mm)</SelectItem>
+                  <SelectItem value="2.5">Normal (2.5mm)</SelectItem>
+                  <SelectItem value="4">Wide (4mm)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

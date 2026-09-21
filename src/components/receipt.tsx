@@ -27,6 +27,10 @@ export type ReceiptSettings = {
   // Local direct print settings
   printer_name?: string | null;
   direct_print_enabled?: boolean | null;
+  print_copies?: number | null;
+  cash_drawer_kick?: boolean | null;
+  font_scale?: number | null;
+  receipt_margin_mm?: number | null;
 };
 
 export type ReceiptInvoice = {
@@ -125,9 +129,42 @@ function setReceiptPrintPageSize(
   `;
 }
 
-async function tryDirectPrint(options: { printerName?: string | null; silent?: boolean } = {}): Promise<boolean> {
+/** Best-effort ESC/POS "kick cash drawer" pulse (the standard DLE/ESC pin-2
+ *  pulse command most generic thermal receipt printers recognize). Whether
+ *  this actually opens the drawer depends entirely on the printer/OS driver
+ *  passing raw bytes through instead of rasterizing them like normal text —
+ *  many Windows GDI drivers won't. If it doesn't work on a given printer,
+ *  check that printer's own driver properties for a built-in "open drawer on
+ *  print" option instead — several thermal-printer drivers offer this
+ *  independently of the app. */
+const CASH_DRAWER_KICK_SEQUENCE = "\x1B\x70\x00\x19\xFA";
+
+function tryCashDrawerKick() {
+  if (typeof document === "undefined") return;
+  try {
+    const el = document.createElement("span");
+    el.setAttribute("aria-hidden", "true");
+    el.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;";
+    el.textContent = CASH_DRAWER_KICK_SEQUENCE;
+    document.body.appendChild(el);
+    window.setTimeout(() => el.remove(), 3000);
+  } catch {
+    /* best effort only */
+  }
+}
+
+async function tryDirectPrint(
+  options: {
+    printerName?: string | null;
+    silent?: boolean;
+    copies?: number | null;
+    cashDrawerKick?: boolean;
+  } = {},
+): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  
+
+  if (options.cashDrawerKick) tryCashDrawerKick();
+
   const getPrintApi = () => {
     const win = window as Window & typeof globalThis & {
       pos?: { print?: (options?: Record<string, unknown>) => Promise<boolean> | boolean };
@@ -138,6 +175,7 @@ async function tryDirectPrint(options: { printerName?: string | null; silent?: b
 
   const printApi = getPrintApi();
   const hasBridge = typeof printApi === "function";
+  const copies = Math.max(1, Math.floor(options.copies ?? 1));
 
   if (hasBridge) {
     const attempts = 3;
@@ -147,6 +185,7 @@ async function tryDirectPrint(options: { printerName?: string | null; silent?: b
           silent: options.silent !== false,
           printBackground: true,
           deviceName: options.printerName || undefined,
+          copies,
         });
         if (result !== false) return true;
       } catch (err) {
@@ -178,7 +217,9 @@ export function printReceipt(sourceElement?: HTMLElement | null, settings?: Rece
   if (!source) {
     void tryDirectPrint({
       printerName: settings?.printer_name,
-      silent: settings?.direct_print_enabled === true
+      silent: settings?.direct_print_enabled === true,
+      copies: settings?.print_copies,
+      cashDrawerKick: settings?.cash_drawer_kick === true,
     }).then((printed) => {
       if (!printed) toast.error("Print failed — check the printer connection and try again.");
     });
@@ -220,7 +261,9 @@ export function printReceipt(sourceElement?: HTMLElement | null, settings?: Rece
   requestAnimationFrame(() => {
     void tryDirectPrint({
       printerName: settings?.printer_name,
-      silent: settings?.direct_print_enabled === true
+      silent: settings?.direct_print_enabled === true,
+      copies: settings?.print_copies,
+      cashDrawerKick: settings?.cash_drawer_kick === true,
     }).then((printed) => {
       // Direct printing silently gives up rather than popping a native dialog
       // mid-shift (see tryDirectPrint) — so the cashier must be told when it
@@ -302,6 +345,8 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
   const { t } = useTranslation();
   const sym = "";
   const width = settings?.paper_width === "58mm" ? "58mm" : "80mm";
+  const marginMm = settings?.receipt_margin_mm ?? 2.5;
+  const fontScale = settings?.font_scale ?? 100;
   const date = invoice.created_at ? new Date(invoice.created_at) : new Date();
   const isReturn = kind !== "sale";
   const docNo = invoice.return_no ?? invoice.invoice_no ?? "—";
@@ -359,13 +404,18 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
               width,
               maxWidth: width,
               boxSizing: "border-box",
-              padding: "2mm 2.5mm 1.5mm",
+              padding: `2mm ${marginMm}mm 1.5mm`,
               fontFamily: "'Helvetica Neue', Helvetica, Arial, 'Segoe UI', sans-serif",
               fontSize: "12px",
               lineHeight: 1.25,
               fontWeight: 600,
               overflow: "hidden",
               WebkitFontSmoothing: "antialiased",
+              // `zoom` (not `transform: scale`) so the browser actually
+              // re-lays-out text/wrapping at the scaled size — both the web
+              // preview and the Electron print path render on Chromium,
+              // where `zoom` is well supported.
+              ...(fontScale !== 100 ? { zoom: fontScale / 100 } : {}),
             }
           : undefined
       }

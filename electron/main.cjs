@@ -114,11 +114,13 @@ ipcMain.handle('pos:check-updates', () => checkForUpdatesNow());
 ipcMain.handle('pos:print', async (_event, options = {}) => {
   const target = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getFocusedWindow();
   if (!target) return false;
+  const copies = Math.max(1, Math.floor(Number(options.copies) || 1));
   return await new Promise((resolve) => {
     target.webContents.print({
       silent: options.silent ?? true,
       printBackground: options.printBackground ?? true,
       deviceName: options.deviceName,
+      copies,
     }, (success) => resolve(Boolean(success)));
   });
 });
