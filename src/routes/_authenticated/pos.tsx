@@ -2089,6 +2089,59 @@ function POSPage() {
             qc.invalidateQueries({ queryKey: ["expenses"] });
             qc.invalidateQueries({ queryKey: ["expense_persons"] });
             refetchHeld?.();
+
+            // Same post-edit print prompt as new-sale completion.
+            const customerRowEdit = tab.customer_id
+              ? (customers as any[]).find((c: any) => c.id === tab.customer_id)
+              : null;
+            const staffPersonEdit = tab.expense_person_id
+              ? (persons as any[]).find((p: any) => p.id === tab.expense_person_id)
+              : null;
+            const editedInvoice = {
+              id: saleId,
+              invoice_no: tab.editing_invoice_no ?? undefined,
+              created_at: nowIso,
+              customer_id: tab.customer_id ?? null,
+              customers: customerRowEdit ? { name: customerRowEdit.name } : null,
+              expense_person_id: tab.expense_person_id ?? null,
+              expense_persons: staffPersonEdit ? { name: staffPersonEdit.name } : null,
+              sale_items: tab.items.map((i, idx) => ({
+                id: `local-${idx}`,
+                name: i.name,
+                qty: i.qty,
+                price: i.price,
+                line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
+              })),
+              subtotal: subtotalEdited,
+              tax: taxEdited,
+              discount: discountEdited,
+              charge: chargeEdited,
+              total: totalEdited,
+              paid: paidEdited,
+              change_due: 0,
+              note: tab.note,
+              payment_method: paymentMethodLabel,
+            };
+            const localPrinterEdit = await getLocalPrinterSettings();
+            if (localPrinterEdit.pos_print_prompt_enabled) {
+              setPrintAsk(editedInvoice);
+            } else if (localPrinterEdit.pos_print_prompt_default === "yes") {
+              printInvoiceDirect(
+                editedInvoice,
+                {
+                  ...settings,
+                  printer_name: localPrinterEdit.printer_name,
+                  paper_width: localPrinterEdit.paper_width,
+                  direct_print_enabled: localPrinterEdit.direct_print_enabled,
+                  print_copies: localPrinterEdit.print_copies,
+                  cash_drawer_kick: localPrinterEdit.cash_drawer_kick,
+                },
+                "sale",
+              );
+              setTimeout(() => searchRef.current?.focus(), 50);
+            } else {
+              setTimeout(() => searchRef.current?.focus(), 50);
+            }
           } catch (e: any) {
             toast.error(e?.message ?? "Could not update invoice offline");
           }
@@ -2128,6 +2181,61 @@ function POSPage() {
         qc.invalidateQueries({ queryKey: ["expenses"] });
         qc.invalidateQueries({ queryKey: ["expense_persons"] });
         refetchHeld?.();
+
+        // Same post-edit print prompt as new-sale completion.
+        {
+          const customerRowEdit = tab.customer_id
+            ? (customers as any[]).find((c: any) => c.id === tab.customer_id)
+            : null;
+          const staffPersonEdit = tab.expense_person_id
+            ? (persons as any[]).find((p: any) => p.id === tab.expense_person_id)
+            : null;
+          const editedInvoice = {
+            id: tab.editing_sale_id,
+            invoice_no: tab.editing_invoice_no ?? undefined,
+            created_at: new Date().toISOString(),
+            customer_id: tab.customer_id ?? null,
+            customers: customerRowEdit ? { name: customerRowEdit.name } : null,
+            expense_person_id: tab.expense_person_id ?? null,
+            expense_persons: staffPersonEdit ? { name: staffPersonEdit.name } : null,
+            sale_items: tab.items.map((i, idx) => ({
+              id: `local-${idx}`,
+              name: i.name,
+              qty: i.qty,
+              price: i.price,
+              line_total: Math.max(Number(i.qty) * Number(i.price) - Number(i.disc || 0), 0),
+            })),
+            subtotal,
+            tax,
+            discount: +(lineDiscountTotal + discount).toFixed(2),
+            charge: +charge.toFixed(2),
+            total,
+            paid: +Math.min(paidNum, total).toFixed(2),
+            change_due: +change.toFixed(2),
+            note: tab.note,
+            payment_method: paymentMethodLabel,
+          };
+          const localPrinterEdit = await getLocalPrinterSettings();
+          if (localPrinterEdit.pos_print_prompt_enabled) {
+            setPrintAsk(editedInvoice);
+          } else if (localPrinterEdit.pos_print_prompt_default === "yes") {
+            printInvoiceDirect(
+              editedInvoice,
+              {
+                ...settings,
+                printer_name: localPrinterEdit.printer_name,
+                paper_width: localPrinterEdit.paper_width,
+                direct_print_enabled: localPrinterEdit.direct_print_enabled,
+                print_copies: localPrinterEdit.print_copies,
+                cash_drawer_kick: localPrinterEdit.cash_drawer_kick,
+              },
+              "sale",
+            );
+            setTimeout(() => searchRef.current?.focus(), 50);
+          } else {
+            setTimeout(() => searchRef.current?.focus(), 50);
+          }
+        }
         return;
       }
 
