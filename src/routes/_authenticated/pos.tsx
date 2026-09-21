@@ -3821,11 +3821,19 @@ function POSPage() {
                           {product.sku ?? "—"} · {product.barcode ?? "—"}
                         </div>
                       </div>
-                      <div className="ml-3 shrink-0 text-right">
-                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          {t('pos.stock', 'Stock')}
+                      <div className="ml-3 shrink-0 text-right space-y-1">
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            {t('pos.rate', 'Rate')}
+                          </div>
+                          <div className="font-semibold">{fmtMoney(product.sell_price ?? 0, sym)}</div>
                         </div>
-                        <div className="font-semibold">{fmtQty(product.stock ?? 0)}</div>
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            {t('pos.stock', 'Stock')}
+                          </div>
+                          <div className="font-semibold">{fmtQty(product.stock ?? 0)}</div>
+                        </div>
                       </div>
                     </button>
                   ))}
