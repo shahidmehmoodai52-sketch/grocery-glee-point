@@ -180,9 +180,22 @@ function setBarcodePrintPageSize(styleEl: HTMLStyleElement, widthMm: number) {
         margin: 0 !important;
         padding: 0 !important;
       }
-      html.barcode-printing .barcode-print-root {   width: ${widthMm}mm !important;   margin: 0 !important;   padding: 0 !important; } html.barcode-printing .barcode-label {   break-inside: avoid;   page-break-inside: avoid; } html.barcode-printing svg {   max-width: 100% !important;   height: auto !important;   display: block !important; }
-        width: ${widthMm}mm !important;
-      }
+      html.barcode-printing .barcode-print-root {
+  width: ${widthMm}mm !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.barcode-printing .barcode-label {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+html.barcode-printing svg {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+}
     }
   `;
 }
