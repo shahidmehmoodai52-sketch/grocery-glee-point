@@ -111,7 +111,7 @@ function BarcodeSvg({ value }: { value: string }) {
         format: "CODE128",
         displayValue: true,
         fontSize: 11,
-        height: 34,
+        height: 40, width: 2,
         margin: 2,
       });
     } catch {
