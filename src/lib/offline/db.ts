@@ -130,6 +130,11 @@ class PosOfflineDB extends Dexie {
   expenses!: Table<any, string>;
   held_bills!: Table<any, string>;
   cash_accounts!: Table<any, string>;
+  // v7 — customer/supplier ledger payments + the cash-transaction rows they
+  // link to (for the "cash out" vs "payment" distinction), so
+  // customers.$id.tsx's ledger can be built from the local mirror.
+  party_payments!: Table<any, string>;
+  cash_transactions!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   // v3 master-data tables
@@ -231,6 +236,13 @@ class PosOfflineDB extends Dexie {
     this.version(6).stores({
       my_access: "id",
     });
+    // v7 — party_payments (customer/supplier ledger payments) + cash_transactions
+    // (the linked row that tells a payment apart from a "cash out"), so the
+    // customer ledger page can build its entries from the local mirror.
+    this.version(7).stores({
+      party_payments: "id, party_type, party_id, created_at, [party_type+party_id]",
+      cash_transactions: "id, account_id, direction, created_at, updated_at",
+    });
   }
 }
 
@@ -257,6 +269,7 @@ export const MIRRORED_TABLES = [
   "sales", "sale_items", "sale_returns", "sale_return_items",
   "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses", "held_bills",
   "cash_accounts", "store_settings", "user_roles", "my_access",
+  "party_payments", "cash_transactions",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];

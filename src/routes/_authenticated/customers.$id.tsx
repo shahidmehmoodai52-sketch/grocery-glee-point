@@ -15,6 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
 
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
@@ -63,29 +65,73 @@ function Page() {
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
-    queryFn: async () => (await supabase.from("customers").select("*").eq("id", id).maybeSingle()).data,
+    queryFn: () =>
+      readLocalFirst<any>({
+        table: "customers",
+        cloud: async () => (await supabase.from("customers").select("*").eq("id", id).maybeSingle()).data,
+        local: async () => (await offlineDb().customers.get(id)) ?? null,
+        isEmpty: (row) => !row,
+      }),
   });
   const { data: sales = [] } = useQuery({
     queryKey: ["customer-sales", id],
-    queryFn: async () => await fetchAll<any>((f, t) => 
-      supabase.from("sales")
-        .select("id,invoice_no,subtotal,tax,discount,total,paid,change_due,payment_method,status,created_at,note,sale_items(id,name,qty,price,line_total)")
-        .eq("customer_id", id).order("created_at", { ascending: true }).range(f, t)
-    ),
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "sales",
+        cloud: () =>
+          fetchAll<any>((f, t) =>
+            supabase.from("sales")
+              .select("id,invoice_no,subtotal,tax,discount,total,paid,change_due,payment_method,status,created_at,note,sale_items(id,name,qty,price,line_total)")
+              .eq("customer_id", id).order("created_at", { ascending: true }).range(f, t)
+          ),
+        local: async () => {
+          const rows = await offlineDb().sales.where("customer_id").equals(id).sortBy("created_at");
+          return Promise.all(
+            rows.map(async (row: any) => ({
+              ...row,
+              sale_items: await offlineDb().sale_items.where("sale_id").equals(row.id).toArray(),
+            })),
+          );
+        },
+      }),
   });
   const { data: payments = [] } = useQuery({
     queryKey: ["customer-payments", id],
-    queryFn: async () => await fetchAll<any>((f, t) => 
-      supabase.from("party_payments").select("id,amount,method,note,created_at,cash_transaction_id,cash_transactions(direction)")
-        .eq("party_type", "customer").eq("party_id", id).order("created_at", { ascending: true }).range(f, t)
-    ),
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "party_payments",
+        cloud: () =>
+          fetchAll<any>((f, t) =>
+            supabase.from("party_payments").select("id,amount,method,note,created_at,cash_transaction_id,cash_transactions(direction)")
+              .eq("party_type", "customer").eq("party_id", id).order("created_at", { ascending: true }).range(f, t)
+          ),
+        local: async () => {
+          const rows = await offlineDb()
+            .party_payments.where("[party_type+party_id]")
+            .equals(["customer", id])
+            .sortBy("created_at");
+          return Promise.all(
+            rows.map(async (row: any) => {
+              if (!row.cash_transaction_id) return row;
+              const tx = await offlineDb().cash_transactions.get(row.cash_transaction_id);
+              return tx ? { ...row, cash_transactions: { direction: tx.direction } } : row;
+            }),
+          );
+        },
+      }),
   });
   const { data: returns = [] } = useQuery({
     queryKey: ["customer-returns", id],
-    queryFn: async () => await fetchAll<any>((f, t) => 
-      supabase.from("sale_returns").select("id,return_no,total,refund_amount,created_at,note")
-        .eq("customer_id", id).order("created_at", { ascending: true }).range(f, t)
-    ),
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "sale_returns",
+        cloud: () =>
+          fetchAll<any>((f, t) =>
+            supabase.from("sale_returns").select("id,return_no,total,refund_amount,created_at,note")
+              .eq("customer_id", id).order("created_at", { ascending: true }).range(f, t)
+          ),
+        local: () => offlineDb().sale_returns.where("customer_id").equals(id).sortBy("created_at"),
+      }),
   });
 
   const entries: Entry[] = useMemo(() => {
