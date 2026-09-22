@@ -142,7 +142,7 @@ export function LabelSheet({ product, qty, size }: { product: BarcodeLabelProduc
             justifyContent: "center",
             overflow: "visible",
             boxSizing: "border-box",
-            padding: "1mm",
+            padding: "1.5mm",
           }}
         >
           {product.businessName && (
