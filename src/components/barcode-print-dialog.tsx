@@ -112,7 +112,7 @@ function BarcodeSvg({ value }: { value: string }) {
         displayValue: true,
         fontSize: 11,
         height: 40, width: 2,
-        margin: 2,
+        margin: 8,
       });
     } catch {
       // Value the symbology can't encode (shouldn't happen for CODE128) — leave the SVG blank.
