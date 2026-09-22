@@ -1846,7 +1846,8 @@
     "restoring": "Decrypting...",
     "toast_restore_success": "Backup decrypted",
     "toast_restore_failed": "Could not decrypt file",
-    "included_encrypted_note": "When encryption is on, the file is saved as .tlxbak instead — use \"Restore from backup\" above to decrypt it before opening in Excel."
+    "included_encrypted_note": "When encryption is on, the file is saved as .tlxbak instead — use \"Restore from backup\" above to decrypt it before opening in Excel.",
+    "page_desc_offline_note": "Works offline too, using the data already synced to this PC."
   },
   "assets": {
     "page_title": "Shop Assets",

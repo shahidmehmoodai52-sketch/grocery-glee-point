@@ -17,7 +17,6 @@ import {
   setAutoEnabled, setBackupTime, isSupported, type BackupStatus,
   setEncryptionEnabled, getRecoveryKeyBase64, decryptBackupFile,
 } from "@/lib/backup";
-import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/backup")({
   component: BackupPage,
@@ -119,11 +118,11 @@ function BackupPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <NeedsInternetBanner section={t('backup.page_title', 'Auto Backup')} />
       <div>
         <h1 className="text-2xl font-semibold">{t('backup.page_title', 'Auto Backup')}</h1>
         <p className="text-sm text-muted-foreground">
           {t('backup.page_desc', 'Pick a folder on this PC. The full database is exported to an Excel file there — automatically once a day, and any time you press Backup now. Files stay on your PC even if Windows is reinstalled (use a Drive / OneDrive / external disk folder for safest results).')}
+          {' '}{t('backup.page_desc_offline_note', 'Works offline too, using the data already synced to this PC.')}
         </p>
       </div>
 

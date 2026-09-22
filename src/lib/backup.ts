@@ -1,5 +1,6 @@
 import { get, set, del } from "idb-keyval";
 import { supabase } from "@/integrations/supabase/client";
+import { db as offlineDb, MIRRORED_TABLES } from "./offline/db";
 import {
   BACKUP_FILE_EXTENSION,
   decryptBackupWithDeviceKey,
@@ -147,7 +148,23 @@ async function verifyPermission(handle: FileSystemDirectoryHandle): Promise<bool
   return false;
 }
 
+function isOffline() {
+  return typeof navigator !== "undefined" && !navigator.onLine;
+}
+
+// Most of backup's tables are also mirrored locally for the offline POS —
+// read from there instead of failing outright when there's no connection.
+// A couple (expense_persons, profiles) aren't mirrored; those simply come
+// back empty offline rather than blocking the whole backup.
 async function fetchAll(table: string): Promise<any[]> {
+  if (isOffline()) {
+    if ((MIRRORED_TABLES as readonly string[]).includes(table)) {
+      const rows = await (offlineDb() as any)[table].toArray();
+      return rows.filter((r: any) => r?._deleted !== 1);
+    }
+    return [];
+  }
+
   const out: any[] = [];
   const PAGE = 1000;
   let from = 0;
