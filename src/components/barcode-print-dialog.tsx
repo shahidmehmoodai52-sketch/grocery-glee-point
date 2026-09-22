@@ -140,7 +140,7 @@ export function LabelSheet({ product, qty, size }: { product: BarcodeLabelProduc
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            overflow: "hidden",
+            overflow: "visible",
             boxSizing: "border-box",
             padding: "1mm",
           }}
@@ -150,7 +150,7 @@ export function LabelSheet({ product, qty, size }: { product: BarcodeLabelProduc
               {product.businessName}
             </div>
           )}
-          <div style={{ fontSize: "8px", fontWeight: 600, textAlign: "center", lineHeight: 1.1, maxHeight: "2.2em", overflow: "hidden", width: "100%" }}>
+          <div style={{ fontSize: "8px", fontWeight: 600, textAlign: "center", lineHeight: 1.1, maxHeight: "2.2em", overflow: "visible", width: "100%" }}>
             {product.name}{product.size ? ` ${product.size}` : ""}
           </div>
           {dateLine && (
