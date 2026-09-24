@@ -1,7 +1,7 @@
 // Settings card — shows offline/sync status. Offline mode is always on:
 // the app auto-caches data and auto-syncs when internet returns.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { HardDrive, WifiOff, RefreshCw, Trash2, CheckCircle2 } from "lucide-react";
@@ -31,6 +31,16 @@ export function OfflineModeCard() {
   const [busy, setBusy] = useState<null | "sync" | "wipe">(null);
   const [intervalDraft, setIntervalDraft] = useState<string>(String(s.syncIntervalMinutes));
   const supported = typeof indexedDB !== "undefined";
+
+  // s.syncIntervalMinutes can change after this component's first render —
+  // most commonly, bootOfflineStatus() hydrating the saved value from
+  // localStorage hasn't finished yet when this card mounts. Re-sync the
+  // draft whenever the underlying value changes; this never fires while the
+  // user is mid-edit, since typing only changes intervalDraft, not
+  // s.syncIntervalMinutes (that updates on blur/commit).
+  useEffect(() => {
+    setIntervalDraft(String(s.syncIntervalMinutes));
+  }, [s.syncIntervalMinutes]);
 
   const commitIntervalDraft = () => {
     const n = Number(intervalDraft);
