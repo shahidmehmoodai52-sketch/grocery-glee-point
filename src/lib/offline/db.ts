@@ -93,14 +93,44 @@ const QUEUE_PRIORITY: Record<string, number> = {
   purchase_returns: 55,
   purchase_return_items: 56,
   complete_purchase_return: 55,
+  // A batch created offline must replay before any damage/waste record that
+  // references it by batch_id (priority 60 below).
+  product_batches: 58,
+  create_product_batch: 58,
   inventory_movements: 60,
   adjust_product_stock: 60,
+  // Purchases run after any stock correction queued for the same items
+  // (priority 60 above) so the received qty adds on top of the corrected
+  // baseline once both replay, matching the online call order.
+  purchases: 65,
+  purchase_items: 66,
+  complete_purchase: 65,
   record_damage: 60,
   record_waste: 60,
   expenses: 70,
   cash_transactions: 70,
   record_payment: 70,
   record_cash_event: 70,
+  asset_categories: 70,
+  assets: 71,
+  // A shift must be open before priority-40 sales replay so shift_report()
+  // has something to attribute them to; close/emergency-close/approve must
+  // run only after every financial item for that shift (sales through
+  // asset writes, priority <=71) has already replayed, so the server's own
+  // shift_report() aggregation — computed fresh when the RPC executes —
+  // sees the shift's real totals instead of a partial replay.
+  shift_sessions: 5,
+  open_shift: 5,
+  close_shift: 75,
+  emergency_close_shift: 75,
+  approve_shift: 78,
+  // operations.tsx — independent audit/task/note tables, no cross-item
+  // ordering requirement against each other. set_checklist_item only needs
+  // to run after open_shift (5) so the shift it references exists.
+  shift_notes: 70,
+  shift_tasks: 70,
+  manager_handovers: 70,
+  set_checklist_item: 72,
 };
 
 /** Priority for a queued write, derived from its table / RPC name. */
@@ -124,6 +154,37 @@ class PosOfflineDB extends Dexie {
   expenses!: Table<any, string>;
   held_bills!: Table<any, string>;
   cash_accounts!: Table<any, string>;
+  // v7 — customer/supplier ledger payments + the cash-transaction rows they
+  // link to (for the "cash out" vs "payment" distinction), so
+  // customers.$id.tsx's ledger can be built from the local mirror.
+  party_payments!: Table<any, string>;
+  cash_transactions!: Table<any, string>;
+  product_batches!: Table<any, string>;
+  inventory_damages!: Table<any, string>;
+  inventory_waste!: Table<any, string>;
+  asset_categories!: Table<any, string>;
+  assets!: Table<any, string>;
+  // v9 — cached snapshot of the product_intelligence / smart_purchase_suggestions
+  // views (see version(9) below for why these aren't in the periodic pull loop).
+  product_intelligence!: Table<any, string>;
+  smart_purchase_suggestions!: Table<any, string>;
+  // v10 — shift sessions, so shifts.tsx can open/close/report offline.
+  shift_sessions!: Table<any, string>;
+  // v11 — operations.tsx's per-shift operational tables (cash drawer,
+  // tasks, notes, reprint/void audit, closing checklist, manager handover).
+  cash_drawer_events!: Table<any, string>;
+  shift_notes!: Table<any, string>;
+  shift_tasks!: Table<any, string>;
+  receipt_reprints!: Table<any, string>;
+  sale_voids!: Table<any, string>;
+  shift_checklist!: Table<any, string>;
+  manager_handovers!: Table<any, string>;
+  // v12 — pharmacy_product_details, so reports.tsx's generic/company-wise
+  // pharmacy reports work offline too.
+  pharmacy_product_details!: Table<any, string>;
+  // v13 — stock_count_sessions, for operations.tsx's owner-dashboard
+  // alerts/recommendations (pending stock counts).
+  stock_count_sessions!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   // v3 master-data tables
@@ -135,6 +196,10 @@ class PosOfflineDB extends Dexie {
   payment_methods!: Table<any, string>;
   barcode_settings!: Table<any, string>;
   printer_settings!: Table<any, string>;
+  // v6 — offline snapshot of the current user's computed permissions/role,
+  // so route-guard doesn't collapse a real user to the bare fallback perms
+  // on a cold offline boot (only "my-access" itself writes this table).
+  my_access!: Table<any, string>;
   _sync_state!: Table<SyncState, string>;
   _queue!: Table<QueuedWrite, number>;
   _meta!: Table<MetaRow, string>;
@@ -216,6 +281,83 @@ class PosOfflineDB extends Dexie {
       purchase_returns: "id, return_no, supplier_id, purchase_id, created_at",
       purchase_return_items: "id, return_id, product_id",
     });
+    // v6 — single-row snapshot of usePermissions()'s computed result, so it
+    // can go through the same readLocalFirst() pattern store_settings uses.
+    this.version(6).stores({
+      my_access: "id",
+    });
+    // v7 — party_payments (customer/supplier ledger payments) + cash_transactions
+    // (the linked row that tells a payment apart from a "cash out"), so the
+    // customer ledger page can build its entries from the local mirror.
+    this.version(7).stores({
+      party_payments: "id, party_type, party_id, created_at, [party_type+party_id]",
+      cash_transactions: "id, account_id, direction, created_at, updated_at",
+    });
+    // v8 — expiry/batch, damage/waste, and shop-asset tables, so expiry.tsx
+    // and assets.tsx get the same offline read/write support purchases and
+    // sale-returns already have. `days_remaining`/`expiry_status` aren't
+    // mirrored directly (they're server-computed from `expiry_date` and are
+    // date-relative, so a cached value would go stale) — expiry.tsx
+    // recomputes them locally from `expiry_date` + store_settings instead.
+    this.version(8).stores({
+      product_batches: "id, product_id, expiry_date, status, created_at, updated_at",
+      inventory_damages: "id, product_id, batch_id, created_at",
+      inventory_waste: "id, product_id, batch_id, created_at",
+      asset_categories: "id, name, created_at, updated_at",
+      assets: "id, category_id, created_at, updated_at",
+    });
+    // v9 — product_intelligence / smart_purchase_suggestions snapshot cache.
+    // Both views have no created_at/updated_at column at all (every column is
+    // computed relative to now()/CURRENT_DATE — velocity, ABC class, days
+    // remaining, health score…), so there's no watermark for the periodic
+    // pull engine to use, and a full-table pull on every sync tick would be
+    // the exact DB-load regression this offline effort exists to avoid. So
+    // these are deliberately NOT in sync.ts's PULL_TABLES — intelligence.tsx's
+    // own readLocalFirst() read warms this cache on each successful online
+    // load (via its `cache` callback) and serves it, TTL-bound, when offline
+    // or between visits. That's a cached snapshot of the server's own
+    // precomputed numbers, not a client-side reimplementation of them.
+    this.version(9).stores({
+      product_intelligence: "product_id, tenant_id",
+      smart_purchase_suggestions: "product_id, tenant_id, supplier_id",
+    });
+    // v10 — shift_sessions, plus a cashier_id/user_id index on sales /
+    // sale_returns / expenses so shift_report()'s aggregation (receipts,
+    // cash-in, refunds, expenses for one cashier's shift window) can be
+    // recomputed locally without a full-table scan. The RPC's own
+    // shift_report() is still what actually gets persisted when the
+    // queued open/close call replays — this is only a local preview.
+    this.version(10).stores({
+      shift_sessions:
+        "id, cashier_id, tenant_id, status, business_date, opened_at, closed_at, created_at, updated_at, [cashier_id+status]",
+      sales: "id, invoice_no, customer_id, cashier_id, created_at, updated_at",
+      sale_returns: "id, return_no, customer_id, user_id, created_at, updated_at",
+      expenses: "id, user_id, created_at, updated_at",
+    });
+    // v11 — operations.tsx's per-shift operational tables. None of these
+    // have an updated_at column (all insert-only or admin-edited rarely
+    // enough that a created_at watermark is fine), matching the FULL_PULL-
+    // free / created_at-watermark default the sync engine already applies
+    // to any table not listed in HAS_UPDATED_AT.
+    this.version(11).stores({
+      cash_drawer_events: "id, shift_id, tenant_id, user_id, created_at",
+      shift_notes: "id, shift_id, tenant_id, created_at",
+      shift_tasks: "id, tenant_id, status, created_at, updated_at",
+      receipt_reprints: "id, sale_id, tenant_id, created_at",
+      sale_voids: "id, tenant_id, created_at",
+      shift_checklist: "id, shift_id, tenant_id, [shift_id+item_key]",
+      manager_handovers: "id, tenant_id, from_user, to_user, created_at",
+    });
+    // v12 — pharmacy_product_details, for reports.tsx's generic-name and
+    // manufacturer/company-wise pharmacy reports.
+    this.version(12).stores({
+      pharmacy_product_details: "id, product_id, tenant_id, updated_at",
+    });
+    // v13 — stock_count_sessions, for operations.tsx's owner-dashboard
+    // alerts/recommendations tabs.
+    this.version(13).stores({
+      stock_count_sessions: "id, tenant_id, status, created_at, updated_at",
+    });
   }
 }
 
@@ -241,7 +383,13 @@ export const MIRRORED_TABLES = [
   "products", "product_barcodes", "customers", "suppliers",
   "sales", "sale_items", "sale_returns", "sale_return_items",
   "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses", "held_bills",
-  "cash_accounts", "store_settings", "user_roles",
+  "cash_accounts", "store_settings", "user_roles", "my_access",
+  "party_payments", "cash_transactions",
+  "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
+  "product_intelligence", "smart_purchase_suggestions", "shift_sessions",
+  "cash_drawer_events", "shift_notes", "shift_tasks", "receipt_reprints",
+  "sale_voids", "shift_checklist", "manager_handovers",
+  "pharmacy_product_details", "stock_count_sessions",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];

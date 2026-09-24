@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link, Outlet, redirect } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ShieldCheck,
@@ -33,6 +33,8 @@ import {
   RefreshCw,
   Flag,
   Database,
+  KeyRound,
+  Upload,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -230,6 +232,9 @@ function AdminPanelPage() {
           {isSuperAdmin && (
             <TabsTrigger value="staff"><UserCog className="h-4 w-4 mr-1" />Admin staff</TabsTrigger>
           )}
+          {isSuperAdmin && (
+            <TabsTrigger value="backups"><KeyRound className="h-4 w-4 mr-1" />Backups</TabsTrigger>
+          )}
           <TabsTrigger value="security" className={securityAlert ? alertTabClass : okTabClass}>
             <ShieldAlert className="h-4 w-4 mr-1" />
             Security
@@ -259,6 +264,9 @@ function AdminPanelPage() {
         <TabsContent value="printers" className="mt-3"><PrinterSettingsTab /></TabsContent>
         {isSuperAdmin && (
           <TabsContent value="staff" className="mt-3"><AdminStaffTab /></TabsContent>
+        )}
+        {isSuperAdmin && (
+          <TabsContent value="backups" className="mt-3"><BackupRecoveryTab /></TabsContent>
         )}
         <TabsContent value="security" className="mt-3"><SecurityTab /></TabsContent>
         <TabsContent value="errors" className="mt-3"><ErrorsTab /></TabsContent>
@@ -3038,6 +3046,96 @@ function AdminStaffTab() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// Recovers a shop's local backup (src/routes/_authenticated/backup.tsx) when
+// they've lost their own recovery key. Only the small RSA-OAEP-wrapped
+// content key is sent to the server (admin-unwrap-backup-key edge function,
+// holding Tillix's private key as a secret) -- decryption of the actual
+// file happens here, client-side, once the server hands back the unwrapped
+// key. Every successful recovery is written to admin_action_log with the
+// admin's identity and reason.
+function BackupRecoveryTab() {
+  const [file, setFile] = useState<File | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const runRecovery = async (reason: string) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const { extractAdminWrappedKeyFromFile } = await import("@/lib/backup");
+      const { decryptBackupWithContentKey } = await import("@/lib/backup-crypto");
+      const wrappedKeyBase64 = await extractAdminWrappedKeyFromFile(file);
+
+      const { data, error } = await supabase.functions.invoke("admin-unwrap-backup-key", {
+        body: { wrappedKeyBase64, reason, fileName: file.name },
+      });
+      if (error) throw error;
+      if (!data?.key) throw new Error(data?.error ?? "Could not recover this backup");
+
+      const container = await file.arrayBuffer();
+      const plain = await decryptBackupWithContentKey(container, data.key);
+      const blob = new Blob([plain], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.name.replace(/\.tlxbak$/i, "") + ".xlsx";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      toast.success("Backup recovered");
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not recover this backup");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <Card className="p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <KeyRound className="h-5 w-5" /> Recover a shop's backup
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            For a shop that lost its own recovery key. Upload their encrypted <code>.tlxbak</code> backup
+            file — only the small wrapped key inside it is sent to the server, never the shop's actual
+            data. Every recovery is logged with your identity and reason.
+          </p>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm flex items-center gap-1.5"><Upload className="h-4 w-4" /> Backup file</Label>
+          <Input
+            ref={fileInputRef}
+            type="file"
+            accept=".tlxbak"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        <Button onClick={() => setConfirmOpen(true)} disabled={!file || busy} className="gap-2">
+          <KeyRound className="h-4 w-4" /> {busy ? "Recovering..." : "Recover this backup"}
+        </Button>
+      </Card>
+
+      <TypedConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Recover a shop's backup"
+        description={`Recovering "${file?.name ?? "this file"}" is logged permanently with your identity and the reason below.`}
+        requireReason
+        confirmLabel="Recover"
+        isLoading={busy}
+        onConfirm={runRecovery}
+      />
     </div>
   );
 }

@@ -1,6 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db } from "@/lib/offline/db";
+
+type MyAccess = { isAdmin: boolean; isSuperAdmin: boolean; perms: Set<string>; tenantStatus: string | null };
 
 export const ALL_PERMS = [
   { key: "dashboard", label: "Dashboard" },
@@ -32,29 +36,55 @@ const PENDING_PERMS = new Set(["pos", "sales", "dashboard", "library"]);
 
 export function usePermissions() {
   const { user, loading: authLoading } = useAuth();
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["my-access", user?.id],
     enabled: !!user?.id,
-    queryFn: async () => {
-      const [rolesRes, permsRes, statusRes] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", user!.id),
-        supabase.from("user_permissions").select("perm").eq("user_id", user!.id),
-        supabase.rpc("my_tenant_status"),
-      ]);
-      if (rolesRes.error) throw rolesRes.error;
-      if (permsRes.error) throw permsRes.error;
-      const { data: tenantMemberships, error: tenantMembershipsError } = await supabase
-        .from("tenant_members")
-        .select("role")
-        .eq("user_id", user!.id);
-      if (tenantMembershipsError) throw tenantMembershipsError;
-      const isTenantAdmin = (tenantMemberships ?? []).some((m) => m.role === "owner" || m.role === "admin");
-      const isAdmin = isTenantAdmin || (rolesRes.data ?? []).some((r) => r.role === "admin");
-      const isSuperAdmin = (rolesRes.data ?? []).some((r) => r.role === "super_admin");
-      const granted = new Set((permsRes.data ?? []).map((p) => p.perm));
-      const tenantStatus = (statusRes.data as string | null) ?? null;
-      return { isAdmin, isSuperAdmin, perms: granted, tenantStatus };
-    },
+    queryFn: () =>
+      readLocalFirst<MyAccess>({
+        table: "my_access",
+        cloud: async () => {
+          const [rolesRes, permsRes, statusRes] = await Promise.all([
+            supabase.from("user_roles").select("role").eq("user_id", user!.id),
+            supabase.from("user_permissions").select("perm").eq("user_id", user!.id),
+            supabase.rpc("my_tenant_status"),
+          ]);
+          if (rolesRes.error) throw rolesRes.error;
+          if (permsRes.error) throw permsRes.error;
+          const { data: tenantMemberships, error: tenantMembershipsError } = await supabase
+            .from("tenant_members")
+            .select("role")
+            .eq("user_id", user!.id);
+          if (tenantMembershipsError) throw tenantMembershipsError;
+          const isTenantAdmin = (tenantMemberships ?? []).some((m) => m.role === "owner" || m.role === "admin");
+          const isAdmin = isTenantAdmin || (rolesRes.data ?? []).some((r) => r.role === "admin");
+          const isSuperAdmin = (rolesRes.data ?? []).some((r) => r.role === "super_admin");
+          const granted = new Set((permsRes.data ?? []).map((p) => p.perm));
+          const tenantStatus = (statusRes.data as string | null) ?? null;
+          return { isAdmin, isSuperAdmin, perms: granted, tenantStatus };
+        },
+        local: async () => {
+          const row = await db().my_access.get("me");
+          if (!row) return null as unknown as MyAccess;
+          return {
+            isAdmin: row.isAdmin,
+            isSuperAdmin: row.isSuperAdmin,
+            tenantStatus: row.tenantStatus,
+            perms: new Set<string>(row.perms ?? []),
+          };
+        },
+        cache: async (data) => {
+          await db().my_access.put({
+            id: "me",
+            isAdmin: data.isAdmin,
+            isSuperAdmin: data.isSuperAdmin,
+            tenantStatus: data.tenantStatus,
+            perms: Array.from(data.perms),
+          });
+        },
+        isEmpty: (data) => !data,
+        onRevalidated: (fresh) => qc.setQueryData(["my-access", user?.id], fresh),
+      }),
   });
   const isAdmin = q.data?.isAdmin ?? false;
   const isSuperAdmin = q.data?.isSuperAdmin ?? false;

@@ -183,23 +183,63 @@ function RootComponent() {
 
     (async () => {
       try {
-        const { bootOfflineStatus, getOfflineStatus } = await import("@/lib/offline/status");
+        const {
+          bootOfflineStatus,
+          getOfflineStatus,
+          getSyncMode,
+          getSyncIntervalMinutes,
+          subscribeOfflineStatus,
+        } = await import("@/lib/offline/status");
         const { runSync, recoverInterruptedQueue, scheduleRetryPass } = await import("@/lib/offline/sync");
         const { registerAppShellSW } = await import("@/lib/offline/register-sw");
         const { debounceAsync, logPerf, nowMs, whenIdle } = await import("@/lib/offline/perf");
+        const { requestPersistentStorage } = await import("@/lib/offline/device");
         if (disposed) return;
         bootOfflineStatus();
         void registerAppShellSW();
+        void requestPersistentStorage();
         // Resume any upload interrupted by a crash / power failure, then arm
         // the backoff timer for items still waiting on a retry window.
         await recoverInterruptedQueue();
         void scheduleRetryPass();
 
+        // In "manual"/"scheduled" sync mode the user has deliberately chosen
+        // to hold data on this device until an explicit "Sync now" or the
+        // scheduled timer below fires — every automatic trigger (boot,
+        // reconnect, interval, visibility) becomes a no-op, same as being
+        // offline. "realtime" (the default) keeps today's always-on behavior.
         const trigger = (reason: string) => {
           const s = getOfflineStatus();
           if (!s.enabled || !s.online) return;
+          if (getSyncMode() !== "realtime") return;
           void runSync({ silent: true, reason });
         };
+
+        // Scheduled mode's own timer, independent of the gate above —
+        // re-armed whenever the user changes the mode/interval in Settings
+        // instead of only picking up the new value on next app launch.
+        let scheduledTimer: number | null = null;
+        let armedMode: string | null = null;
+        let armedIntervalMinutes: number | null = null;
+        const armScheduledTimer = () => {
+          const mode = getSyncMode();
+          const minutes = getSyncIntervalMinutes();
+          if (mode === armedMode && minutes === armedIntervalMinutes) return;
+          armedMode = mode;
+          armedIntervalMinutes = minutes;
+          if (scheduledTimer !== null) {
+            window.clearInterval(scheduledTimer);
+            scheduledTimer = null;
+          }
+          if (mode !== "scheduled") return;
+          scheduledTimer = window.setInterval(() => {
+            const s = getOfflineStatus();
+            if (!s.enabled || !s.online || getSyncMode() !== "scheduled") return;
+            void runSync({ silent: true, reason: "scheduled" });
+          }, minutes * 60_000);
+        };
+        armScheduledTimer();
+        const unsubscribeSyncSettings = subscribeOfflineStatus(() => armScheduledTimer());
 
         // Boot sync waits for the first idle window so the POS shell paints and
         // becomes interactive before any network/IndexedDB work starts.
@@ -261,6 +301,8 @@ function RootComponent() {
           window.removeEventListener("offline", onOffline);
           document.removeEventListener("visibilitychange", onVisible);
           window.clearInterval(interval);
+          if (scheduledTimer !== null) window.clearInterval(scheduledTimer);
+          unsubscribeSyncSettings();
         };
         if (disposed) cleanup();
       } catch {/* SSR / unsupported */}

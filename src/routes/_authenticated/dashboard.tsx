@@ -29,6 +29,17 @@ import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { useEarliestDataDate } from "@/lib/earliest-date";
 import { cn } from "@/lib/utils";
 import { useBusinessType } from "@/hooks/use-tenant";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
+import { offlineFirst } from "@/lib/offline/pos";
+import {
+  computeLocalReportsSummary,
+  computeLocalDashboardTimeseries,
+  computeLocalTopSellingItems,
+  computeLocalLowStockProducts,
+  computeLocalInventoryValue,
+  resolveTenantTimezone,
+} from "@/lib/offline/analytics";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Page });
 
@@ -74,14 +85,31 @@ function Page() {
   const { data: expiringBatchCount = 0 } = useQuery({
     queryKey: ["dash-pharmacy-expiry-count"],
     enabled: isPharmacy,
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("product_batch_status" as any)
-        .select("id", { count: "exact", head: true })
-        .in("expiry_status", ["expired", "critical", "expiring_soon"]);
-      if (error) throw error;
-      return count ?? 0;
-    },
+    queryFn: () =>
+      offlineFirst<number>(
+        async () => {
+          const { count, error } = await supabase
+            .from("product_batch_status" as any)
+            .select("id", { count: "exact", head: true })
+            .in("expiry_status", ["expired", "critical", "expiring_soon"]);
+          if (error) throw error;
+          return count ?? 0;
+        },
+        async () => {
+          const criticalDays = Number((settings as any)?.critical_days ?? 7);
+          const expiringSoonDays = Number((settings as any)?.expiring_soon_days ?? 30);
+          const rows = (await offlineDb().product_batches.toArray()).filter(
+            (b: any) => b._deleted !== 1 && Number(b.qty_remaining) > 0 && b.status === "active" && b.expiry_date,
+          );
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          let count = 0;
+          for (const b of rows as any[]) {
+            const days = Math.round((new Date(`${b.expiry_date}T00:00:00`).getTime() - today.getTime()) / 86_400_000);
+            if (days <= expiringSoonDays) count++;
+          }
+          return count;
+        },
+      ),
     staleTime: 5 * 60_000,
   });
 
@@ -127,104 +155,147 @@ function Page() {
 
   const { data: dashboardTimeseries = [] } = useQuery({
     queryKey: ["dash-timeseries", fromISO, toISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_dashboard_timeseries", {
-        p_from_date: fromISO,
-        p_to_date: toISO
-      });
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await supabase.rpc("get_dashboard_timeseries", { p_from_date: fromISO, p_to_date: toISO });
+          if (error) throw error;
+          return data || [];
+        },
+        () => computeLocalDashboardTimeseries(fromISO, toISO),
+      ),
   });
 
   const { data: topItems = [] } = useQuery({
     queryKey: ["dash-top-items-rpc", fromISO, toISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_top_selling_items", {
-        p_from_date: fromISO,
-        p_to_date: toISO,
-        p_limit: 6
-      });
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await supabase.rpc("get_top_selling_items", { p_from_date: fromISO, p_to_date: toISO, p_limit: 6 });
+          if (error) throw error;
+          return data || [];
+        },
+        () => computeLocalTopSellingItems(fromISO, toISO, 6),
+      ),
   });
 
   const { data: lowStock = [] } = useQuery({
     queryKey: ["dash-low-stock-rpc"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_low_stock_products", {
-        p_threshold: 5,
-        p_limit: 6
-      });
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await supabase.rpc("get_low_stock_products", { p_threshold: 5, p_limit: 6 });
+          if (error) throw error;
+          return data || [];
+        },
+        () => computeLocalLowStockProducts(5, 6),
+      ),
   });
 
   const { data: inventoryValue = 0 } = useQuery({
     queryKey: ["dash-inventory-value-rpc"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_inventory_value");
-      if (error) throw error;
-      return Number(data || 0);
-    },
+    queryFn: () =>
+      offlineFirst<number>(
+        async () => {
+          const { data, error } = await supabase.rpc("get_inventory_value");
+          if (error) throw error;
+          return Number(data || 0);
+        },
+        () => computeLocalInventoryValue(),
+      ),
   });
 
   const { data: stats } = useQuery({
     queryKey: ["dash-stats-v2", fromISO, toISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_reports_summary", {
-        p_from_date: fromISO,
-        p_to_date: toISO
-      });
-      if (error) throw error;
-      return data as any;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await supabase.rpc("get_reports_summary", { p_from_date: fromISO, p_to_date: toISO });
+          if (error) throw error;
+          return data;
+        },
+        () => computeLocalReportsSummary(fromISO, toISO, resolveTenantTimezone(settings)),
+      ),
   });
 
   const { data: prevStats } = useQuery({
     queryKey: ["dash-stats-prev-v2", prevFromISO, prevToISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_reports_summary", {
-        p_from_date: prevFromISO,
-        p_to_date: prevToISO
-      });
-      if (error) throw error;
-      return data as any;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await supabase.rpc("get_reports_summary", { p_from_date: prevFromISO, p_to_date: prevToISO });
+          if (error) throw error;
+          return data;
+        },
+        () => computeLocalReportsSummary(prevFromISO, prevToISO, resolveTenantTimezone(settings)),
+      ),
   });
 
   const { data: sales = [] } = useQuery({
     queryKey: ["dash-sales-detail", fromISO, toISO],
-    queryFn: async () =>
-      (await supabase.from("sales").select("total,cost_total,tax,created_at,paid,payment_method,status,invoice_no")
-        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          (await supabase.from("sales").select("total,cost_total,tax,created_at,paid,payment_method,status,invoice_no")
+            .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+        async () =>
+          (await offlineDb().sales.where("created_at").between(fromISO, toISO, true, true).toArray()).filter(
+            (r: any) => r._deleted !== 1,
+          ),
+      ),
     enabled: !!detailKey && ["revenue", "invoices", "net", "profit", "credit"].includes(detailKey),
   });
   const { data: purchases = [] } = useQuery({
     queryKey: ["dash-purchases-detail", fromISO, toISO],
-    queryFn: async () =>
-      (await supabase.from("purchases").select("total,paid,created_at")
-        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          (await supabase.from("purchases").select("total,paid,created_at")
+            .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+        async () =>
+          (await offlineDb().purchases.where("created_at").between(fromISO, toISO, true, true).toArray()).filter(
+            (r: any) => r._deleted !== 1,
+          ),
+      ),
     enabled: detailKey === "purch",
   });
   const { data: saleReturns = [] } = useQuery({
     queryKey: ["dash-sale-returns-detail", fromISO, toISO],
-    queryFn: async () =>
-      (await supabase.from("sale_returns").select("total,subtotal,refund_amount,created_at,sale_return_items(qty,cost)")
-        .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          (await supabase.from("sale_returns").select("total,subtotal,refund_amount,created_at,sale_return_items(qty,cost)")
+            .gte("created_at", fromISO).lte("created_at", toISO)).data ?? [],
+        async () => {
+          const rows = (await offlineDb().sale_returns.where("created_at").between(fromISO, toISO, true, true).toArray()).filter(
+            (r: any) => r._deleted !== 1,
+          );
+          return Promise.all(
+            rows.map(async (r: any) => ({
+              ...r,
+              sale_return_items: (await offlineDb().sale_return_items.where("return_id").equals(r.id).toArray()).map(
+                (it: any) => ({ qty: it.qty, cost: it.cost }),
+              ),
+            })),
+          );
+        },
+      ),
     enabled: !!detailKey && ["returns", "profit", "net"].includes(detailKey),
   });
   const { data: products = [] } = useQuery({
     queryKey: ["dash-products-detail"],
-    queryFn: async () =>
-      fetchAll<any>((from: number, to: number) =>
-        supabase
-          .from("products")
-          .select("id,name,stock,sell_price,cost_price,is_active")
-          .eq("is_active", true)
-          .range(from, to),
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          fetchAll<any>((from: number, to: number) =>
+            supabase
+              .from("products")
+              .select("id,name,stock,sell_price,cost_price,is_active")
+              .eq("is_active", true)
+              .range(from, to),
+          ),
+        async () =>
+          (await offlineDb().products.toArray()).filter((p: any) => p._deleted !== 1 && p.is_active),
       ),
     enabled: detailKey === "inventory",
   });

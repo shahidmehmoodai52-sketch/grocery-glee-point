@@ -21,6 +21,9 @@ import { completePurchaseReturnOfflineAware } from "@/lib/offline/purchase-retur
 import { fetchAll } from "@/lib/supabase-page";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { cn } from "@/lib/utils";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
+import { offlineFirst, cacheSuppliers } from "@/lib/offline/pos";
 
 export const Route = createFileRoute("/_authenticated/purchase-returns")({ component: Page });
 
@@ -105,8 +108,28 @@ function Page() {
 
   const { data: returns = [] } = useQuery({
     queryKey: ["purchase-returns"],
-    queryFn: async () =>
-      await fetchAll<any>((from, to) => supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)),
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "purchase_returns",
+        cloud: () =>
+          fetchAll<any>((from, to) =>
+            supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)
+          ),
+        local: async () => {
+          const rows = await offlineDb().purchase_returns.orderBy("created_at").reverse().toArray();
+          return Promise.all(
+            rows.map(async (row: any) => {
+              const purchase_return_items = await offlineDb().purchase_return_items.where("return_id").equals(row.id).toArray();
+              let suppliersField = row.suppliers;
+              if (!suppliersField && row.supplier_id) {
+                const s = await offlineDb().suppliers.get(row.supplier_id);
+                if (s) suppliersField = { name: s.name };
+              }
+              return { ...row, purchase_return_items, suppliers: suppliersField ?? null };
+            }),
+          );
+        },
+      }),
   });
 
   const [debouncedPurchaseSearch, setDebouncedPurchaseSearch] = useState(purchaseSearch);
@@ -117,19 +140,39 @@ function Page() {
 
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases-for-return", debouncedPurchaseSearch],
-    queryFn: async () => {
-      let q = supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).limit(50);
-      if (debouncedPurchaseSearch) {
-        q = q.ilike("invoice_no", `%${debouncedPurchaseSearch}%`);
-      }
-      const { data } = await q;
-      return data ?? [];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "purchases",
+        cloud: async () => {
+          let q = supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).limit(50);
+          if (debouncedPurchaseSearch) {
+            q = q.ilike("invoice_no", `%${debouncedPurchaseSearch}%`);
+          }
+          const { data } = await q;
+          return data ?? [];
+        },
+        local: async () => {
+          const rows = await offlineDb().purchases.orderBy("created_at").reverse().toArray();
+          const term = debouncedPurchaseSearch.trim().toLowerCase();
+          const filtered = term ? rows.filter((p: any) => (p.invoice_no ?? "").toLowerCase().includes(term)) : rows;
+          const top = filtered.slice(0, 50);
+          return Promise.all(
+            top.map(async (row: any) => ({
+              ...row,
+              purchase_items: await offlineDb().purchase_items.where("purchase_id").equals(row.id).toArray(),
+            })),
+          );
+        },
+      }),
   });
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
-    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+    queryFn: async () => offlineFirst<any[]>(
+      async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+      async () => (await offlineDb().suppliers.orderBy("name").toArray()).map((s: any) => ({ id: s.id, name: s.name })),
+      cacheSuppliers,
+    ),
   });
 
   const { data: cashAccounts = [] } = useQuery({
@@ -151,6 +194,17 @@ function Page() {
     staleTime: 30_000,
     queryFn: async () => {
       const term = debouncedEntrySearch.trim();
+      const online = typeof navigator === "undefined" || navigator.onLine;
+      if (!online) {
+        const t = term.toLowerCase();
+        const rows = await offlineDb().products.toArray();
+        return rows
+          .filter((p: any) =>
+            (p.name ?? "").toLowerCase().includes(t) ||
+            (p.sku ?? "").toLowerCase().includes(t) ||
+            (p.barcode ?? "").toLowerCase().includes(t))
+          .slice(0, 20);
+      }
       const { data } = await supabase.from("products")
         .select("id,name,sku,barcode,cost_price,sell_price,stock")
         .or(`name.ilike.%${term}%,sku.ilike.%${term}%,barcode.ilike.%${term}%`)

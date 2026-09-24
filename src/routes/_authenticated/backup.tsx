@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { FolderOpen, HardDriveDownload, ShieldCheck, AlertTriangle, RefreshCw, Clock } from "lucide-react";
+import {
+  FolderOpen, HardDriveDownload, ShieldCheck, AlertTriangle, RefreshCw, Clock,
+  Lock, KeyRound, Copy, Upload,
+} from "lucide-react";
 import {
   getStatus, pickBackupFolder, clearBackupFolder, runBackup,
   setAutoEnabled, setBackupTime, isSupported, type BackupStatus,
+  setEncryptionEnabled, getRecoveryKeyBase64, decryptBackupFile,
 } from "@/lib/backup";
-import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 
 export const Route = createFileRoute("/_authenticated/backup")({
   component: BackupPage,
@@ -26,6 +29,13 @@ function BackupPage() {
   const [busy, setBusy] = useState(false);
   const supported = isSupported();
   const inIframe = typeof window !== "undefined" && window.self !== window.top;
+
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [revealingKey, setRevealingKey] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreKeyInput, setRestoreKeyInput] = useState("");
+  const [restoring, setRestoring] = useState(false);
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = async () => setStatus(await getStatus());
   useEffect(() => { refresh(); }, []);
@@ -57,14 +67,62 @@ function BackupPage() {
   const unlink = async () => { await clearBackupFolder(); toast.message(t('backup.toast_folder_unlinked', 'Folder unlinked')); await refresh(); };
   const onTimeChange = async (v: string) => { await setBackupTime(v); await refresh(); };
 
+  const toggleEncrypt = async (v: boolean) => {
+    await setEncryptionEnabled(v);
+    await refresh();
+  };
+
+  const revealKey = async () => {
+    setRevealingKey(true);
+    try {
+      setRevealedKey(await getRecoveryKeyBase64());
+    } catch (e: any) {
+      toast.error(e?.message ?? t('backup.toast_key_reveal_failed', 'Could not read recovery key'));
+    } finally {
+      setRevealingKey(false);
+    }
+  };
+
+  const copyKey = async () => {
+    if (!revealedKey) return;
+    try {
+      await navigator.clipboard.writeText(revealedKey);
+      toast.success(t('backup.toast_key_copied', 'Recovery key copied'));
+    } catch {
+      toast.error(t('backup.toast_key_copy_failed', 'Could not copy — select and copy manually'));
+    }
+  };
+
+  const runRestore = async () => {
+    if (!restoreFile) return;
+    setRestoring(true);
+    try {
+      const blob = await decryptBackupFile(restoreFile, restoreKeyInput.trim() || undefined);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = restoreFile.name.replace(/\.tlxbak$/i, "") + ".xlsx";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      toast.success(t('backup.toast_restore_success', 'Backup decrypted'));
+      setRestoreFile(null);
+      setRestoreKeyInput("");
+      if (restoreFileInputRef.current) restoreFileInputRef.current.value = "";
+    } catch (e: any) {
+      toast.error(e?.message ?? t('backup.toast_restore_failed', 'Could not decrypt file'));
+    } finally {
+      setRestoring(false);
+    }
+  };
+
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <NeedsInternetBanner section={t('backup.page_title', 'Auto Backup')} />
       <div>
         <h1 className="text-2xl font-semibold">{t('backup.page_title', 'Auto Backup')}</h1>
         <p className="text-sm text-muted-foreground">
           {t('backup.page_desc', 'Pick a folder on this PC. The full database is exported to an Excel file there — automatically once a day, and any time you press Backup now. Files stay on your PC even if Windows is reinstalled (use a Drive / OneDrive / external disk folder for safest results).')}
+          {' '}{t('backup.page_desc_offline_note', 'Works offline too, using the data already synced to this PC.')}
         </p>
       </div>
 
@@ -170,12 +228,90 @@ function BackupPage() {
         </CardContent>
       </Card>
 
+      {status?.hasHandle && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" /> {t('backup.encrypt_section_title', 'Encryption')}</CardTitle>
+            <CardDescription>{t('backup.encrypt_section_desc', 'Protect the backup file in case it leaves this PC (e.g. on a USB drive).')}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between border-t pt-4 first:border-t-0 first:pt-0">
+              <div className="space-y-0.5">
+                <Label className="text-sm">{t('backup.encrypt_toggle_label', 'Encrypt backups')}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t('backup.encrypt_toggle_desc', 'New backups are saved as an encrypted .tlxbak file instead of a plain .xlsx — unreadable to anyone without the key.')}
+                </p>
+              </div>
+              <Switch checked={!!status?.encryptEnabled} onCheckedChange={toggleEncrypt} />
+            </div>
+
+            {status?.encryptEnabled && (
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm flex items-center gap-1.5"><KeyRound className="h-4 w-4" /> {t('backup.recovery_key_label', 'Recovery key')}</Label>
+                  {!revealedKey ? (
+                    <Button variant="outline" size="sm" onClick={revealKey} disabled={revealingKey}>
+                      {revealingKey ? t('backup.revealing_key', 'Loading...') : t('backup.reveal_key_button', 'Reveal recovery key')}
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={() => setRevealedKey(null)}>
+                      {t('backup.hide_key_button', 'Hide')}
+                    </Button>
+                  )}
+                </div>
+                {revealedKey && (
+                  <div className="flex items-center gap-2">
+                    <Input readOnly value={revealedKey} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+                    <Button variant="outline" size="icon" onClick={copyKey}><Copy className="h-4 w-4" /></Button>
+                  </div>
+                )}
+                <div className="flex items-start gap-2 text-xs text-warning">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>{t('backup.recovery_key_warning', "Save this somewhere safe outside this PC — you'll need it to open old backup files if this PC is lost or its data is cleared. If you lose it, Tillix support can still help recover a backup through a secure, logged process.")}</div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Upload className="h-5 w-5" /> {t('backup.restore_section_title', 'Restore from backup')}</CardTitle>
+          <CardDescription>{t('backup.restore_section_desc', 'Decrypt a .tlxbak file back into a normal Excel file.')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-sm">{t('backup.restore_file_label', 'Backup file')}</Label>
+            <Input
+              ref={restoreFileInputRef}
+              type="file"
+              accept=".tlxbak"
+              onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">{t('backup.restore_key_label', 'Recovery key (only needed on a different PC)')}</Label>
+            <Input
+              value={restoreKeyInput}
+              onChange={(e) => setRestoreKeyInput(e.target.value)}
+              placeholder={t('backup.restore_key_placeholder', 'Paste recovery key if restoring elsewhere')}
+              className="font-mono text-xs"
+            />
+          </div>
+          <Button onClick={runRestore} disabled={!restoreFile || restoring} className="gap-2">
+            <HardDriveDownload className="h-4 w-4" /> {restoring ? t('backup.restoring', 'Decrypting...') : t('backup.restore_button', 'Decrypt & Download')}
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t('backup.included_title', "What's included")}</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           {t('backup.included_desc_prefix', 'Products & barcodes, customers, suppliers, sales & items, sale returns, purchases & items, purchase returns, expenses & persons, payments, store settings, user roles. Each goes to its own sheet in a single dated ')}<code>.xlsx</code>{t('backup.included_desc_mid', ' file (e.g. ')}<code>pos-backup-20260629-1430.xlsx</code>{t('backup.included_desc_suffix', ').')}
+          {' '}{t('backup.included_encrypted_note', "When encryption is on, the file is saved as .tlxbak instead — use \"Restore from backup\" above to decrypt it before opening in Excel.")}
         </CardContent>
       </Card>
     </div>

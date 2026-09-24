@@ -8,8 +8,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { db, MIRRORED_TABLES, queuePriority, type MirroredTable } from "./db";
 import {
-  getOfflineStatus, markSyncStart, markSyncDone, markSyncError, refreshPendingCount,
+  getOfflineStatus,
+  markSyncStart,
+  markSyncDone,
+  markSyncError,
+  refreshPendingCount,
   setSyncProgress,
+  getSyncMode,
 } from "./status";
 import { getDeviceId, getMeta } from "./device";
 import { logPerf, nowMs, timed, whenIdle, yieldToUI } from "./perf";
@@ -21,6 +26,12 @@ const PULL_TABLES: MirroredTable[] = [
   "store_settings", "user_roles", "cash_accounts", "held_bills",
   "sales", "sale_items", "sale_returns", "sale_return_items",
   "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses",
+  "party_payments", "cash_transactions",
+  "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
+  "shift_sessions",
+  "cash_drawer_events", "shift_notes", "shift_tasks", "receipt_reprints",
+  "sale_voids", "shift_checklist", "manager_handovers",
+  "pharmacy_product_details", "stock_count_sessions",
 ];
 
 const PAGE = 1000;
@@ -42,7 +53,11 @@ async function setWatermark(table: string, ts: string, id: string | null = null)
 // Only these tables actually have an `updated_at` column in the cloud schema.
 // The rest must fall back to `created_at` for the incremental watermark, otherwise
 // PostgREST returns 42703 "column ... does not exist" and the sync fails loudly.
-const HAS_UPDATED_AT = new Set<string>(["products", "expenses", "store_settings"]);
+const HAS_UPDATED_AT = new Set<string>([
+  "products", "expenses", "store_settings", "cash_transactions",
+  "product_batches", "asset_categories", "assets", "shift_sessions", "shift_tasks",
+  "pharmacy_product_details", "stock_count_sessions",
+]);
 /** Tables with neither timestamp usable as a watermark → always full pull (small). */
 const FULL_PULL = new Set<string>([
   "store_settings", "user_roles", "cash_accounts",
@@ -483,8 +498,11 @@ export async function enqueueWrite(item: {
     priority: queuePriority(item.table),
   });
   await refreshPendingCount();
-  // A write created while online should leave immediately.
-  if (getOfflineStatus().online) void scheduleRetryPass(0);
+  // A write created while online should leave immediately — but only in
+  // "realtime" sync mode. In "manual"/"scheduled" mode the item stays
+  // queued until the user presses "Sync now" or the scheduled timer fires,
+  // exactly like being offline (see isEffectivelyOffline()).
+  if (getOfflineStatus().online && getSyncMode() === "realtime") void scheduleRetryPass(0);
   return id as number;
 }
 

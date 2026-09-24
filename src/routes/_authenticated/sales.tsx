@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtDate } from "@/lib/format";
 import { Receipt, printReceipt } from "@/components/receipt";
@@ -42,6 +44,30 @@ const displayPaymentMethod = (value: string | null | undefined) => {
     .filter(Boolean);
   return methods.length ? methods.join(" + ") : "cash";
 };
+
+// Local mirror rows are flat (pullTable does `select("*")`, no joins) — join
+// in the same fields the cloud query embeds, matching sale-returns.tsx's
+// enrichSaleRow/enrichReturnRow pattern for its own local-first reads.
+async function enrichLocalSaleRow(row: any) {
+  row.sale_items = await offlineDb().sale_items.where("sale_id").equals(row.id).toArray();
+  if (row.customer_id) {
+    const c = await offlineDb().customers.get(row.customer_id);
+    if (c) row.customers = { name: c.name };
+  }
+  return row;
+}
+async function enrichLocalReturnRow(row: any) {
+  row.sale_return_items = await offlineDb().sale_return_items.where("return_id").equals(row.id).toArray();
+  if (row.customer_id) {
+    const c = await offlineDb().customers.get(row.customer_id);
+    if (c) row.customers = { name: c.name };
+  }
+  if (row.sale_id) {
+    const s = await offlineDb().sales.get(row.sale_id);
+    if (s) row.sales = { invoice_no: s.invoice_no };
+  }
+  return row;
+}
 
 function Page() {
   const { t } = useTranslation();
@@ -99,13 +125,39 @@ function Page() {
 
   const { data: allSales = [] } = useQuery({
     queryKey: ["sales", window.startIso, window.endIso],
-    queryFn: rangedQuery("sales", "*, customers(name), sale_items(*)"),
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "sales",
+        cloud: rangedQuery("sales", "*, customers(name), sale_items(*)"),
+        local: async () => {
+          if (!window.startIso || !window.endIso) return [];
+          const rows = await offlineDb()
+            .sales.where("created_at")
+            .between(window.startIso, window.endIso, true, true)
+            .reverse()
+            .toArray();
+          return Promise.all(rows.slice(0, 1000).map(enrichLocalSaleRow));
+        },
+      }),
     staleTime: 30_000,
   });
 
   const { data: allReturns = [] } = useQuery({
     queryKey: ["sale-returns-on-sales", window.startIso, window.endIso],
-    queryFn: rangedQuery("sale_returns", "*, customers(name), sale_return_items(*), sales(invoice_no)"),
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "sale_returns",
+        cloud: rangedQuery("sale_returns", "*, customers(name), sale_return_items(*), sales(invoice_no)"),
+        local: async () => {
+          if (!window.startIso || !window.endIso) return [];
+          const rows = await offlineDb()
+            .sale_returns.where("created_at")
+            .between(window.startIso, window.endIso, true, true)
+            .reverse()
+            .sortBy("created_at");
+          return Promise.all(rows.slice(0, 1000).map(enrichLocalReturnRow));
+        },
+      }),
     staleTime: 30_000,
   });
 

@@ -22,12 +22,83 @@ import { printDocument } from "@/components/receipt";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
 import { useEarliestDataDate } from "@/lib/earliest-date";
-import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { fetchAll } from "@/lib/supabase-page";
 import { useBusinessType } from "@/hooks/use-tenant";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
+import { offlineFirst } from "@/lib/offline/pos";
+import { computeLocalReportsSummary, resolveTenantTimezone } from "@/lib/offline/analytics";
 
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: Page });
+
+/** Local-mirror equivalent of the `sales` + `sale_items` + `customers(name)`
+ *  join every query on this page uses — same shape as sales.tsx's
+ *  enrichLocalSaleRow, scoped to the fields reports.tsx actually reads. */
+async function enrichLocalSales(
+  fromISO: string,
+  toISO: string,
+  opts?: { excludeVoided?: boolean; onlyCompleted?: boolean },
+) {
+  let rows = (await offlineDb().sales.where("created_at").between(fromISO, toISO, true, true).toArray()).filter(
+    (r: any) => r._deleted !== 1,
+  );
+  if (opts?.excludeVoided) rows = rows.filter((r: any) => r.status !== "voided");
+  if (opts?.onlyCompleted) rows = rows.filter((r: any) => r.status === "completed");
+  rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+  return Promise.all(
+    rows.map(async (r: any) => {
+      const items = await offlineDb().sale_items.where("sale_id").equals(r.id).toArray();
+      const c = r.customer_id ? await offlineDb().customers.get(r.customer_id) : null;
+      return {
+        id: r.id,
+        invoice_no: r.invoice_no,
+        subtotal: r.subtotal,
+        tax: r.tax,
+        discount: r.discount,
+        total: r.total,
+        cost_total: r.cost_total,
+        paid: r.paid,
+        status: r.status,
+        created_at: r.created_at,
+        payment_method: r.payment_method,
+        customers: c ? { name: c.name } : null,
+        sale_items: (items as any[]).map((it: any) => ({
+          name: it.name, qty: it.qty, price: it.price, cost: it.cost, line_total: it.line_total, product_id: it.product_id,
+        })),
+      };
+    }),
+  );
+}
+
+/** Local-mirror equivalent of the `sale_returns` + `sale_return_items` +
+ *  `customers(name)` join. */
+async function enrichLocalSaleReturns(fromISO: string, toISO: string) {
+  const rows = (await offlineDb().sale_returns.where("created_at").between(fromISO, toISO, true, true).toArray()).filter(
+    (r: any) => r._deleted !== 1,
+  );
+  rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+  return Promise.all(
+    rows.map(async (r: any) => {
+      const items = await offlineDb().sale_return_items.where("return_id").equals(r.id).toArray();
+      const c = r.customer_id ? await offlineDb().customers.get(r.customer_id) : null;
+      return {
+        id: r.id,
+        return_no: r.return_no,
+        total: r.total,
+        subtotal: r.subtotal,
+        tax: r.tax,
+        refund_amount: r.refund_amount,
+        refund_method: r.refund_method,
+        created_at: r.created_at,
+        customers: c ? { name: c.name } : null,
+        sale_return_items: (items as any[]).map((it: any) => ({
+          name: it.name, qty: it.qty, price: it.price, cost: it.cost, product_id: it.product_id,
+        })),
+      };
+    }),
+  );
+}
 
 function SupplierWiseReport({
   sales,
@@ -49,18 +120,24 @@ function SupplierWiseReport({
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["report-suppliers"],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
-      supabase.from("suppliers").select("id,name").order("name").range(fIdx, tIdx),
-      1000
-    ),
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => await fetchAll<any>((fIdx: number, tIdx: number) =>
+          supabase.from("suppliers").select("id,name").order("name").range(fIdx, tIdx), 1000),
+        async () => (await offlineDb().suppliers.orderBy("name").toArray()).filter((s: any) => s._deleted !== 1)
+          .map((s: any) => ({ id: s.id, name: s.name })),
+      ),
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ["report-products-minimal"],
-    queryFn: async () => await fetchAll<any>((fIdx: number, tIdx: number) => 
-      supabase.from("products").select("id,name,category,stock,sell_price,cost_price,preferred_supplier_id").range(fIdx, tIdx),
-      1000
-    ),
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => await fetchAll<any>((fIdx: number, tIdx: number) =>
+          supabase.from("products").select("id,name,category,stock,sell_price,cost_price,preferred_supplier_id").range(fIdx, tIdx), 1000),
+        async () => (await offlineDb().products.toArray()).filter((p: any) => p._deleted !== 1)
+          .map((p: any) => ({ id: p.id, name: p.name, category: p.category, stock: p.stock, sell_price: p.sell_price, cost_price: p.cost_price, preferred_supplier_id: p.preferred_supplier_id })),
+      ),
   });
 
 
@@ -317,11 +394,16 @@ function GenericWiseReport({
 
   const { data: pharmacyDetails = [] } = useQuery({
     queryKey: ["report-pharmacy-details"],
-    queryFn: async () =>
-      await fetchAll<any>(
-        (fIdx: number, tIdx: number) =>
-          supabase.from("pharmacy_product_details" as any).select("product_id,generic_name").range(fIdx, tIdx),
-        1000,
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          await fetchAll<any>(
+            (fIdx: number, tIdx: number) =>
+              supabase.from("pharmacy_product_details" as any).select("product_id,generic_name").range(fIdx, tIdx),
+            1000,
+          ),
+        async () => (await offlineDb().pharmacy_product_details.toArray()).filter((d: any) => d._deleted !== 1)
+          .map((d: any) => ({ product_id: d.product_id, generic_name: d.generic_name })),
       ),
   });
 
@@ -425,11 +507,16 @@ function RackWiseReport({ currencySymbol, search }: { currencySymbol: string; se
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["report-stock-by-rack"],
-    queryFn: async () =>
-      await fetchAll<any>(
-        (fIdx: number, tIdx: number) =>
-          supabase.from("products").select("id,stock,cost_price,rack_location").eq("is_active", true).range(fIdx, tIdx),
-        1000,
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          await fetchAll<any>(
+            (fIdx: number, tIdx: number) =>
+              supabase.from("products").select("id,stock,cost_price,rack_location").eq("is_active", true).range(fIdx, tIdx),
+            1000,
+          ),
+        async () => (await offlineDb().products.toArray()).filter((p: any) => p._deleted !== 1 && p.is_active)
+          .map((p: any) => ({ id: p.id, stock: p.stock, cost_price: p.cost_price, rack_location: p.rack_location })),
       ),
   });
 
@@ -505,21 +592,31 @@ function CompanyWiseReport({ currencySymbol, search }: { currencySymbol: string;
 
   const { data: products } = useQuery({
     queryKey: ["report-stock-by-company-products"],
-    queryFn: async () =>
-      await fetchAll<any>(
-        (fIdx: number, tIdx: number) =>
-          supabase.from("products").select("id,stock,cost_price").eq("is_active", true).range(fIdx, tIdx),
-        1000,
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          await fetchAll<any>(
+            (fIdx: number, tIdx: number) =>
+              supabase.from("products").select("id,stock,cost_price").eq("is_active", true).range(fIdx, tIdx),
+            1000,
+          ),
+        async () => (await offlineDb().products.toArray()).filter((p: any) => p._deleted !== 1 && p.is_active)
+          .map((p: any) => ({ id: p.id, stock: p.stock, cost_price: p.cost_price })),
       ),
   });
 
   const { data: pharmacyDetails } = useQuery({
     queryKey: ["report-pharmacy-details-manufacturer"],
-    queryFn: async () =>
-      await fetchAll<any>(
-        (fIdx: number, tIdx: number) =>
-          supabase.from("pharmacy_product_details" as any).select("product_id,manufacturer").range(fIdx, tIdx),
-        1000,
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          await fetchAll<any>(
+            (fIdx: number, tIdx: number) =>
+              supabase.from("pharmacy_product_details" as any).select("product_id,manufacturer").range(fIdx, tIdx),
+            1000,
+          ),
+        async () => (await offlineDb().pharmacy_product_details.toArray()).filter((d: any) => d._deleted !== 1)
+          .map((d: any) => ({ product_id: d.product_id, manufacturer: d.manufacturer })),
       ),
   });
   const isLoading = !products || !pharmacyDetails;
@@ -727,37 +824,46 @@ function Page() {
 
   const { data: summaryStatsRaw } = useQuery({
     queryKey: ["reports-summary", fromTime, toTime],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_reports_summary", {
-        p_from_date: fromTime,
-        p_to_date: toTime
-      });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await supabase.rpc("get_reports_summary", { p_from_date: fromTime, p_to_date: toTime });
+          if (error) throw error;
+          return data;
+        },
+        () => computeLocalReportsSummary(fromTime, toTime, resolveTenantTimezone(settings)),
+      ),
     staleTime: REPORT_FULL_STALE_TIME,
   });
   const summaryStats = (summaryStatsRaw as any) || {};
 
   const { data: salesPaged = { data: [], count: 0 }, isLoading: salesLoading } = useQuery({
     queryKey: ["report-sales-paged", fromTime, toTime, salesPage, tab],
-    queryFn: async () => {
-      const q = supabase.from("sales")
-        .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)", { count: "exact" })
-        .gte("created_at", fromTime)
-        .lte("created_at", toTime);
+    queryFn: () =>
+      offlineFirst<{ data: any[]; count: number }>(
+        async () => {
+          const q = supabase.from("sales")
+            .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)", { count: "exact" })
+            .gte("created_at", fromTime)
+            .lte("created_at", toTime);
 
-      if (tab === "sales") {
-        q.eq("status", "completed");
-      }
+          if (tab === "sales") {
+            q.eq("status", "completed");
+          }
 
-      q.order("created_at", { ascending: false })
-        .range(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE - 1);
-      
-      const { data, count, error } = await q;
-      if (error) throw error;
-      return { data: data || [], count: count || 0 };
-    },
+          q.order("created_at", { ascending: false })
+            .range(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE - 1);
+
+          const { data, count, error } = await q;
+          if (error) throw error;
+          return { data: data || [], count: count || 0 };
+        },
+        async () => {
+          const rows = await enrichLocalSales(fromTime, toTime, { onlyCompleted: tab === "sales" });
+          const page = rows.slice(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE);
+          return { data: page, count: rows.length };
+        },
+      ),
   });
   const sales = salesPaged.data;
 
@@ -779,33 +885,41 @@ function Page() {
 
   const { data: allSales = [] } = useQuery({
     queryKey: ["report-sales-full", fromTime, toTime],
-    queryFn: async () =>
-      await fetchAll<any>((fIdx: number, tIdx: number) =>
-        supabase
-          .from("sales")
-          .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
-          .gte("created_at", fromTime)
-          .lte("created_at", toTime)
-          .neq("status", "voided")
-          .order("created_at", { ascending: false })
-          .range(fIdx, tIdx),
-        1000,
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          await fetchAll<any>((fIdx: number, tIdx: number) =>
+            supabase
+              .from("sales")
+              .select("id,invoice_no,subtotal,tax,discount,total,cost_total,paid,status,created_at,payment_method,customers(name),sale_items(name,qty,price,cost,line_total,product_id)")
+              .gte("created_at", fromTime)
+              .lte("created_at", toTime)
+              .neq("status", "voided")
+              .order("created_at", { ascending: false })
+              .range(fIdx, tIdx),
+            1000,
+          ),
+        () => enrichLocalSales(fromTime, toTime, { excludeVoided: true }),
       ),
     staleTime: REPORT_FULL_STALE_TIME,
   });
 
   const { data: allSaleReturns = [] } = useQuery({
     queryKey: ["report-sale-returns", fromTime, toTime],
-    queryFn: async () =>
-      await fetchAll<any>((fIdx: number, tIdx: number) =>
-        supabase
-          .from("sale_returns")
-          .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
-          .gte("created_at", fromTime)
-          .lte("created_at", toTime)
-          .order("created_at", { ascending: false })
-          .range(fIdx, tIdx),
-        1000,
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          await fetchAll<any>((fIdx: number, tIdx: number) =>
+            supabase
+              .from("sale_returns")
+              .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)")
+              .gte("created_at", fromTime)
+              .lte("created_at", toTime)
+              .order("created_at", { ascending: false })
+              .range(fIdx, tIdx),
+            1000,
+          ),
+        () => enrichLocalSaleReturns(fromTime, toTime),
       ),
     staleTime: REPORT_FULL_STALE_TIME,
   });
@@ -814,80 +928,134 @@ function Page() {
   // drill-down needs every purchase in the period, not just one page of it.
   const { data: allPurchases = [] } = useQuery({
     queryKey: ["report-purchases-full", fromTime, toTime],
-    queryFn: async () =>
-      await fetchAll<any>((fIdx: number, tIdx: number) =>
-        supabase
-          .from("purchases")
-          .select("subtotal,tax,total,paid,created_at")
-          .gte("created_at", fromTime)
-          .lte("created_at", toTime)
-          .order("created_at", { ascending: false })
-          .range(fIdx, tIdx),
-        1000,
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () =>
+          await fetchAll<any>((fIdx: number, tIdx: number) =>
+            supabase
+              .from("purchases")
+              .select("subtotal,tax,total,paid,created_at")
+              .gte("created_at", fromTime)
+              .lte("created_at", toTime)
+              .order("created_at", { ascending: false })
+              .range(fIdx, tIdx),
+            1000,
+          ),
+        async () => {
+          const rows = (await offlineDb().purchases.where("created_at").between(fromTime, toTime, true, true).toArray())
+            .filter((r: any) => r._deleted !== 1);
+          rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+          return rows.map((r: any) => ({ subtotal: r.subtotal, tax: r.tax, total: r.total, paid: r.paid, created_at: r.created_at }));
+        },
       ),
     staleTime: REPORT_FULL_STALE_TIME,
   });
 
   const { data: purchasesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-purchases-paged", fromTime, toTime, purchasesPage],
-    queryFn: async () => {
-      const { data, count, error } = await supabase.from("purchases")
-        .select("subtotal,tax,total,paid,created_at", { count: "exact" })
-        .gte("created_at", fromTime)
-        .lte("created_at", toTime)
-        .order("created_at", { ascending: false })
-        .range(purchasesPage * PAGE_SIZE, (purchasesPage + 1) * PAGE_SIZE - 1);
-      if (error) throw error;
-      return { data: data || [], count: count || 0 };
-    },
+    queryFn: () =>
+      offlineFirst<{ data: any[]; count: number }>(
+        async () => {
+          const { data, count, error } = await supabase.from("purchases")
+            .select("subtotal,tax,total,paid,created_at", { count: "exact" })
+            .gte("created_at", fromTime)
+            .lte("created_at", toTime)
+            .order("created_at", { ascending: false })
+            .range(purchasesPage * PAGE_SIZE, (purchasesPage + 1) * PAGE_SIZE - 1);
+          if (error) throw error;
+          return { data: data || [], count: count || 0 };
+        },
+        async () => {
+          const rows = (await offlineDb().purchases.where("created_at").between(fromTime, toTime, true, true).toArray())
+            .filter((r: any) => r._deleted !== 1);
+          rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+          const mapped = rows.map((r: any) => ({ subtotal: r.subtotal, tax: r.tax, total: r.total, paid: r.paid, created_at: r.created_at }));
+          return { data: mapped.slice(purchasesPage * PAGE_SIZE, (purchasesPage + 1) * PAGE_SIZE), count: mapped.length };
+        },
+      ),
   });
   const purchases = purchasesPaged.data;
 
   const { data: expensesPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-expenses-paged", range.from, range.to, expensesPage],
-    queryFn: async () => {
-      const { data, count, error } = await supabase.from("expenses")
-        .select("amount,category,expense_date", { count: "exact" })
-        .gte("expense_date", fromTime.split("T")[0])
-        .lte("expense_date", toTime.split("T")[0])
-        .order("expense_date", { ascending: false })
-        .range(expensesPage * PAGE_SIZE, (expensesPage + 1) * PAGE_SIZE - 1);
-      if (error) throw error;
-      return { data: data || [], count: count || 0 };
-    },
+    queryFn: () =>
+      offlineFirst<{ data: any[]; count: number }>(
+        async () => {
+          const { data, count, error } = await supabase.from("expenses")
+            .select("amount,category,expense_date", { count: "exact" })
+            .gte("expense_date", fromTime.split("T")[0])
+            .lte("expense_date", toTime.split("T")[0])
+            .order("expense_date", { ascending: false })
+            .range(expensesPage * PAGE_SIZE, (expensesPage + 1) * PAGE_SIZE - 1);
+          if (error) throw error;
+          return { data: data || [], count: count || 0 };
+        },
+        async () => {
+          const fromDate = fromTime.split("T")[0];
+          const toDate = toTime.split("T")[0];
+          const rows = (await offlineDb().expenses.toArray()).filter((r: any) => {
+            const d = String(r.expense_date ?? "").slice(0, 10);
+            return r._deleted !== 1 && d >= fromDate && d <= toDate;
+          });
+          rows.sort((a: any, b: any) => String(b.expense_date).localeCompare(String(a.expense_date)));
+          const mapped = rows.map((r: any) => ({ amount: r.amount, category: r.category, expense_date: r.expense_date }));
+          return { data: mapped.slice(expensesPage * PAGE_SIZE, (expensesPage + 1) * PAGE_SIZE), count: mapped.length };
+        },
+      ),
   });
   const expenses = expensesPaged.data;
 
   const { data: partyPayments = [] } = useQuery({
     queryKey: ["report-party-payments-paged", fromTime, toTime],
-    queryFn: async () => {
-      // No FK-based embed here: party_payments has no FK to customers/suppliers,
-      // so PostgREST embedding fails (PGRST200). Resolve names client-side.
-      // Discounts are recorded as party_payments (method: "discount") so they
-      // settle the customer ledger, but no cash actually moves — they don't
-      // belong in a page about payment channels/cash flow.
-      const base = supabase.from("party_payments")
-        .select("id,party_type,party_id,amount,method,note,created_at")
-        .neq("method", "discount")
-        .gte("created_at", fromTime)
-        .lte("created_at", toTime)
-        .order("created_at", { ascending: false });
-      const rows = await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
-      if (!rows.length) return rows;
-      const custIds = [...new Set(rows.filter(r => r.party_type === "customer").map(r => r.party_id).filter(Boolean))];
-      const supIds = [...new Set(rows.filter(r => r.party_type !== "customer").map(r => r.party_id).filter(Boolean))];
-      const [custRes, supRes] = await Promise.all([
-        custIds.length ? supabase.from("customers").select("id,name").in("id", custIds) : Promise.resolve({ data: [] as any[] }),
-        supIds.length ? supabase.from("suppliers").select("id,name").in("id", supIds) : Promise.resolve({ data: [] as any[] }),
-      ]);
-      const cMap = new Map((custRes.data ?? []).map((c: any) => [c.id, c.name]));
-      const sMap = new Map((supRes.data ?? []).map((s: any) => [s.id, s.name]));
-      return rows.map((r) => ({
-        ...r,
-        customers: r.party_type === "customer" ? { name: cMap.get(r.party_id) ?? null } : null,
-        suppliers: r.party_type !== "customer" ? { name: sMap.get(r.party_id) ?? null } : null,
-      }));
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          // No FK-based embed here: party_payments has no FK to customers/suppliers,
+          // so PostgREST embedding fails (PGRST200). Resolve names client-side.
+          // Discounts are recorded as party_payments (method: "discount") so they
+          // settle the customer ledger, but no cash actually moves — they don't
+          // belong in a page about payment channels/cash flow.
+          const base = supabase.from("party_payments")
+            .select("id,party_type,party_id,amount,method,note,created_at")
+            .neq("method", "discount")
+            .gte("created_at", fromTime)
+            .lte("created_at", toTime)
+            .order("created_at", { ascending: false });
+          const rows = await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+          if (!rows.length) return rows;
+          const custIds = [...new Set(rows.filter(r => r.party_type === "customer").map(r => r.party_id).filter(Boolean))];
+          const supIds = [...new Set(rows.filter(r => r.party_type !== "customer").map(r => r.party_id).filter(Boolean))];
+          const [custRes, supRes] = await Promise.all([
+            custIds.length ? supabase.from("customers").select("id,name").in("id", custIds) : Promise.resolve({ data: [] as any[] }),
+            supIds.length ? supabase.from("suppliers").select("id,name").in("id", supIds) : Promise.resolve({ data: [] as any[] }),
+          ]);
+          const cMap = new Map((custRes.data ?? []).map((c: any) => [c.id, c.name]));
+          const sMap = new Map((supRes.data ?? []).map((s: any) => [s.id, s.name]));
+          return rows.map((r) => ({
+            ...r,
+            customers: r.party_type === "customer" ? { name: cMap.get(r.party_id) ?? null } : null,
+            suppliers: r.party_type !== "customer" ? { name: sMap.get(r.party_id) ?? null } : null,
+          }));
+        },
+        async () => {
+          const rows = (await offlineDb().party_payments.where("created_at").between(fromTime, toTime, true, true).toArray())
+            .filter((r: any) => r._deleted !== 1 && r.method !== "discount");
+          rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+          return Promise.all(
+            rows.map(async (r: any) => {
+              const isCustomer = r.party_type === "customer";
+              const name = r.party_id
+                ? (isCustomer ? (await offlineDb().customers.get(r.party_id))?.name : (await offlineDb().suppliers.get(r.party_id))?.name)
+                : null;
+              return {
+                id: r.id, party_type: r.party_type, party_id: r.party_id, amount: r.amount, method: r.method, note: r.note, created_at: r.created_at,
+                customers: isCustomer ? { name: name ?? null } : null,
+                suppliers: !isCustomer ? { name: name ?? null } : null,
+              };
+            }),
+          );
+        },
+      ),
   });
 
 
@@ -895,16 +1063,23 @@ function Page() {
 
   const { data: saleReturnsPaged = { data: [], count: 0 } } = useQuery({
     queryKey: ["report-sale-returns-paged", fromTime, toTime, saleReturnsPage],
-    queryFn: async () => {
-      const { data, count, error } = await supabase.from("sale_returns")
-        .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)", { count: "exact" })
-        .gte("created_at", fromTime)
-        .lte("created_at", toTime)
-        .order("created_at", { ascending: false })
-        .range(saleReturnsPage * PAGE_SIZE, (saleReturnsPage + 1) * PAGE_SIZE - 1);
-      if (error) throw error;
-      return { data: data || [], count: count || 0 };
-    },
+    queryFn: () =>
+      offlineFirst<{ data: any[]; count: number }>(
+        async () => {
+          const { data, count, error } = await supabase.from("sale_returns")
+            .select("id,return_no,total,subtotal,tax,refund_amount,refund_method,created_at,customers(name),sale_return_items(name,qty,price,cost,product_id)", { count: "exact" })
+            .gte("created_at", fromTime)
+            .lte("created_at", toTime)
+            .order("created_at", { ascending: false })
+            .range(saleReturnsPage * PAGE_SIZE, (saleReturnsPage + 1) * PAGE_SIZE - 1);
+          if (error) throw error;
+          return { data: data || [], count: count || 0 };
+        },
+        async () => {
+          const rows = await enrichLocalSaleReturns(fromTime, toTime);
+          return { data: rows.slice(saleReturnsPage * PAGE_SIZE, (saleReturnsPage + 1) * PAGE_SIZE), count: rows.length };
+        },
+      ),
   });
   const saleReturns = saleReturnsPaged.data;
   const revenue = Number(summaryStats.sales_total || 0);
@@ -1092,12 +1267,12 @@ function Page() {
 
   return (
     <div className="p-6 space-y-4">
-      <NeedsInternetBanner section={t('reports.title', 'Reports')} />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{t('reports.title', 'Reports')}</h1>
           <p className="text-sm text-muted-foreground">
             {t('reports.subtitle', 'Sales, profit, invoice & product breakdowns')} · {presetLabel}
+            {' '}{t('reports.subtitle_offline_note', '· Works offline too, using the data already synced to this device.')}
           </p>
         </div>
         <div className="flex items-center gap-2 no-print">

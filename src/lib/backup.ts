@@ -1,10 +1,22 @@
 import { get, set, del } from "idb-keyval";
 import { supabase } from "@/integrations/supabase/client";
+import { db as offlineDb, MIRRORED_TABLES } from "./offline/db";
+import {
+  BACKUP_FILE_EXTENSION,
+  decryptBackupWithDeviceKey,
+  encryptBackup,
+  exportDeviceKeyToBase64,
+  extractAdminWrappedKey,
+  generateDeviceKey,
+  importDeviceKeyFromBase64,
+} from "./backup-crypto";
 
 const DIR_KEY = "backup_dir_handle";
 const LAST_KEY = "backup_last_run";
 const ENABLED_KEY = "backup_auto_enabled";
 const TIME_KEY = "backup_time"; // "HH:MM" 24h, local time
+const DEVICE_KEY_KEY = "backup_device_key";
+const ENCRYPT_ENABLED_KEY = "backup_encrypt_enabled";
 
 const TABLES = [
   "store_settings", "products", "product_barcodes", "customers", "suppliers",
@@ -20,6 +32,7 @@ export type BackupStatus = {
   autoEnabled: boolean;
   backupTime: string; // "HH:MM"
   permission: "granted" | "prompt" | "denied" | "unknown";
+  encryptEnabled: boolean;
 };
 
 export async function getStatus(): Promise<BackupStatus> {
@@ -27,6 +40,7 @@ export async function getStatus(): Promise<BackupStatus> {
   const lastRun = (await get<string>(LAST_KEY)) ?? null;
   const autoEnabled = (await get<boolean>(ENABLED_KEY)) ?? false;
   const backupTime = (await get<string>(TIME_KEY)) ?? "22:00";
+  const encryptEnabled = (await get<boolean>(ENCRYPT_ENABLED_KEY)) ?? false;
   let permission: BackupStatus["permission"] = "unknown";
   if (handle) {
     try {
@@ -41,11 +55,61 @@ export async function getStatus(): Promise<BackupStatus> {
     autoEnabled,
     backupTime,
     permission,
+    encryptEnabled,
   };
 }
 
 export async function setBackupTime(hhmm: string) {
   await set(TIME_KEY, hhmm);
+}
+
+// ---- Encryption ----
+
+export async function isEncryptionEnabled(): Promise<boolean> {
+  return (await get<boolean>(ENCRYPT_ENABLED_KEY)) ?? false;
+}
+
+export async function setEncryptionEnabled(v: boolean) {
+  await set(ENCRYPT_ENABLED_KEY, v);
+}
+
+// Never prompts — generated once and reused silently, so the unattended
+// nightly auto-backup keeps working without any user interaction.
+async function getOrCreateDeviceKey(): Promise<CryptoKey> {
+  const existing = await get<CryptoKey>(DEVICE_KEY_KEY);
+  if (existing) return existing;
+  const key = await generateDeviceKey();
+  await set(DEVICE_KEY_KEY, key);
+  return key;
+}
+
+// For the "Reveal recovery key" UI — the shop's own copy to save externally.
+// Tillix never stores or has access to this specific key; if it's lost, the
+// backup can still be recovered through the separate admin-panel process.
+export async function getRecoveryKeyBase64(): Promise<string> {
+  const key = await getOrCreateDeviceKey();
+  return exportDeviceKeyToBase64(key);
+}
+
+// Decrypts a `.tlxbak` file for the shop, using either the key already
+// stored on this PC or a recovery key pasted in (e.g. restoring on a
+// different PC). Returns a normal downloadable `.xlsx` blob.
+export async function decryptBackupFile(file: File, pastedRecoveryKeyBase64?: string): Promise<Blob> {
+  const container = await file.arrayBuffer();
+  const key = pastedRecoveryKeyBase64
+    ? await importDeviceKeyFromBase64(pastedRecoveryKeyBase64)
+    : await getOrCreateDeviceKey();
+  const plain = await decryptBackupWithDeviceKey(container, key);
+  return new Blob([plain], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
+// Pulls out only the small admin-wrapped key blob from a `.tlxbak` file, for
+// the admin panel's recovery flow — never the shop's actual data.
+export async function extractAdminWrappedKeyFromFile(file: File): Promise<string> {
+  const container = await file.arrayBuffer();
+  return extractAdminWrappedKey(container);
 }
 
 
@@ -84,7 +148,23 @@ async function verifyPermission(handle: FileSystemDirectoryHandle): Promise<bool
   return false;
 }
 
+function isOffline() {
+  return typeof navigator !== "undefined" && !navigator.onLine;
+}
+
+// Most of backup's tables are also mirrored locally for the offline POS —
+// read from there instead of failing outright when there's no connection.
+// A couple (expense_persons, profiles) aren't mirrored; those simply come
+// back empty offline rather than blocking the whole backup.
 async function fetchAll(table: string): Promise<any[]> {
+  if (isOffline()) {
+    if ((MIRRORED_TABLES as readonly string[]).includes(table)) {
+      const rows = await (offlineDb() as any)[table].toArray();
+      return rows.filter((r: any) => r?._deleted !== 1);
+    }
+    return [];
+  }
+
   const out: any[] = [];
   const PAGE = 1000;
   let from = 0;
@@ -143,29 +223,38 @@ export async function buildWorkbookBlob(): Promise<{ blob: Blob; counts: Record<
   return { blob: new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), counts };
 }
 
-function fileName() {
+function fileName(ext: string) {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `pos-backup-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.xlsx`;
+  return `pos-backup-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`;
 }
 
-export async function runBackup(opts: { silent?: boolean } = {}): Promise<{ ok: boolean; file?: string; error?: string; counts?: Record<string, number> }> {
+export async function runBackup(opts: { silent?: boolean } = {}): Promise<{ ok: boolean; file?: string; error?: string; counts?: Record<string, number>; encrypted?: boolean }> {
   const handle = await get<FileSystemDirectoryHandle>(DIR_KEY);
   if (!handle) return { ok: false, error: "No backup folder selected" };
   const granted = await verifyPermission(handle);
   if (!granted) return { ok: false, error: "Permission to write backup folder denied" };
 
   const { blob, counts } = await buildWorkbookBlob();
-  const name = fileName();
+  const encrypted = await isEncryptionEnabled();
+  let outBlob: Blob = blob;
+  let name = fileName("xlsx");
+  if (encrypted) {
+    const deviceKey = await getOrCreateDeviceKey();
+    const plainBytes = await blob.arrayBuffer();
+    outBlob = await encryptBackup(plainBytes, deviceKey);
+    name = fileName(BACKUP_FILE_EXTENSION);
+  }
+
   // @ts-ignore
   const fileHandle = await handle.getFileHandle(name, { create: true });
   // @ts-ignore
   const writable = await fileHandle.createWritable();
-  await writable.write(blob);
+  await writable.write(outBlob);
   await writable.close();
 
   await set(LAST_KEY, new Date().toISOString());
-  return { ok: true, file: name, counts };
+  return { ok: true, file: name, counts, encrypted };
 }
 
 export async function maybeRunDaily(): Promise<void> {

@@ -14,6 +14,27 @@ function uuid(): string {
   return `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/** Asks the browser to mark this origin's storage (IndexedDB, localStorage)
+ *  as "persistent" instead of "best-effort" — the category Chrome/Firefox
+ *  are allowed to silently evict under disk pressure without ever asking
+ *  the user (this is the more common real-world cause of an offline mirror
+ *  going empty, more than someone deliberately clearing site data). It
+ *  cannot stop a user from clearing their own browser data on purpose —
+ *  no site can override that — but it does remove the silent-eviction
+ *  risk, and on Chromium a site with a history of user engagement is
+ *  granted this automatically without even a permission prompt. Safe to
+ *  call every boot: a no-op once already granted. */
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (typeof navigator === "undefined" || !navigator.storage?.persist) return false;
+    const already = await navigator.storage.persisted?.();
+    if (already) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
 /** Stable per-browser device id. Safe to call on every write. */
 export function getDeviceId(): string {
   if (typeof window === "undefined") return "ssr";

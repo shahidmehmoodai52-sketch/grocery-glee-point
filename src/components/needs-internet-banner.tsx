@@ -1,5 +1,5 @@
 // Shown at the top of routes that need internet to function
-// (Reports, Admin, Users, Backup, Import, Intelligence, Library, Shop-admin).
+// (Admin, Users, Import, Library, Shop-admin).
 // Silently hides when the browser is online.
 
 import { WifiOff } from "lucide-react";

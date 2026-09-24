@@ -1,13 +1,27 @@
 // Settings card — shows offline/sync status. Offline mode is always on:
 // the app auto-caches data and auto-syncs when internet returns.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { HardDrive, WifiOff, RefreshCw, Trash2, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useOfflineStatus } from "@/lib/offline/status";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
+  useOfflineStatus,
+  setSyncMode,
+  setSyncIntervalMinutes,
+  type SyncMode,
+} from "@/lib/offline/status";
 import { runSync, wipeLocalMirror } from "@/lib/offline/sync";
 import { db } from "@/lib/offline/db";
 
@@ -15,7 +29,24 @@ export function OfflineModeCard() {
   const { t } = useTranslation();
   const s = useOfflineStatus();
   const [busy, setBusy] = useState<null | "sync" | "wipe">(null);
+  const [intervalDraft, setIntervalDraft] = useState<string>(String(s.syncIntervalMinutes));
   const supported = typeof indexedDB !== "undefined";
+
+  // s.syncIntervalMinutes can change after this component's first render —
+  // most commonly, bootOfflineStatus() hydrating the saved value from
+  // localStorage hasn't finished yet when this card mounts. Re-sync the
+  // draft whenever the underlying value changes; this never fires while the
+  // user is mid-edit, since typing only changes intervalDraft, not
+  // s.syncIntervalMinutes (that updates on blur/commit).
+  useEffect(() => {
+    setIntervalDraft(String(s.syncIntervalMinutes));
+  }, [s.syncIntervalMinutes]);
+
+  const commitIntervalDraft = () => {
+    const n = Number(intervalDraft);
+    if (Number.isFinite(n) && n >= 1) setSyncIntervalMinutes(n);
+    else setIntervalDraft(String(s.syncIntervalMinutes));
+  };
 
   const syncNow = async () => {
     setBusy("sync");
@@ -97,6 +128,71 @@ export function OfflineModeCard() {
         {s.error && (
           <div className="text-xs text-destructive break-words">{t('settings.last_error_label', 'Last error:')} {s.error}</div>
         )}
+
+        <div className="space-y-2 border-t pt-3">
+          <Label className="text-xs font-medium">
+            {t("settings.sync_mode_label", "Sync mode")}
+          </Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={s.syncMode} onValueChange={(v) => setSyncMode(v as SyncMode)}>
+              <SelectTrigger className="w-full sm:w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="realtime">
+                  {t("settings.sync_mode_realtime", "Real-time (default)")}
+                </SelectItem>
+                <SelectItem value="scheduled">
+                  {t("settings.sync_mode_scheduled", "Scheduled — every X minutes")}
+                </SelectItem>
+                <SelectItem value="manual">
+                  {t("settings.sync_mode_manual", "Manual — only when I press Sync now")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {s.syncMode === "scheduled" && (
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  className="h-9 w-20"
+                  value={intervalDraft}
+                  onChange={(e) => setIntervalDraft(e.target.value)}
+                  onBlur={commitIntervalDraft}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {t("settings.sync_mode_minutes", "minutes")}
+                </span>
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            {s.syncMode === "realtime"
+              ? t(
+                  "settings.sync_mode_desc_realtime",
+                  "Every sale/change reaches the cloud immediately when online — the safest choice when this shop runs more than one POS counter.",
+                )
+              : s.syncMode === "scheduled"
+                ? t(
+                    "settings.sync_mode_desc_scheduled",
+                    "Everything is saved on this device first; the cloud is updated automatically every set interval.",
+                  )
+                : t(
+                    "settings.sync_mode_desc_manual",
+                    'Everything is saved on this device first; nothing reaches the cloud until you press "Sync now" below.',
+                  )}
+          </p>
+          {s.syncMode !== "realtime" && (
+            <p className="text-[11px] text-amber-600 leading-relaxed">
+              {t(
+                "settings.sync_mode_multi_counter_warning",
+                "If this shop uses more than one POS counter, stock may go out of sync between counters until a sync happens — use this mode only on a single-counter setup, or sync often.",
+              )}
+            </p>
+          )}
+        </div>
+
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={syncNow} disabled={busy !== null || !s.online}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${busy === "sync" ? "animate-spin" : ""}`} />

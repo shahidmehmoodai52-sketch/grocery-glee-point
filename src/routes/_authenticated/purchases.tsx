@@ -17,11 +17,13 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { usePersistentState } from "@/hooks/use-persistent-state";
-import { offlineFirst, cacheSuppliers, cachePurchases } from "@/lib/offline/pos";
+import { offlineFirst, cacheSuppliers } from "@/lib/offline/pos";
+import { completePurchaseOfflineAware, updateSellPriceOfflineAware, isOffline as isOfflineNow } from "@/lib/offline/purchases";
 import { getLocalPrinterSettings } from "@/lib/offline/printer-settings";
 import { printInvoiceDirect } from "@/components/receipt";
 
 import { db } from "@/lib/offline/db";
+import { readLocalFirst } from "@/lib/offline/data-access";
 import { fetchAll } from "@/lib/supabase-page";
 import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 import { PurchaseBillScannerButton, type ImportedPurchase } from "@/features/purchase-ai/BillScannerDialog";
@@ -80,6 +82,18 @@ const normalizeItemCode = (value: string | null | undefined) => {
 };
 
 const PICKER_COLUMNS = "id,name,sku,barcode,cost_price,sell_price,stock";
+
+// Local mirror rows are flat (pullTable does `select("*")`, no joins) — join
+// in the same fields the cloud query embeds, matching sales.tsx/sale-returns.tsx's
+// enrichLocalSaleRow/enrichReturnRow local-first pattern.
+async function enrichLocalPurchaseRow(row: any) {
+  row.purchase_items = await db().purchase_items.where("purchase_id").equals(row.id).toArray();
+  if (row.supplier_id) {
+    const s = await db().suppliers.get(row.supplier_id);
+    if (s) row.suppliers = { name: s.name };
+  }
+  return row;
+}
 
 function useDebounced<T>(value: T, ms: number) {
   const [v, setV] = useState(value);
@@ -274,6 +288,12 @@ function Page() {
 
   const handleDeletePurchase = async () => {
     if (!deleteTarget) return;
+    // Deleting reverses stock across every item on the purchase — stays
+    // online-only rather than risk a queued reversal landing out of order
+    // against other offline writes for the same products.
+    if (isOfflineNow()) {
+      return toast.error(t('purchases.delete_requires_internet', 'Deleting a purchase needs an internet connection — try again once reconnected.'));
+    }
     setDeleting(true);
     // Use the RPC to ensure atomic stock reversal and financial cleanup
     const { error } = await supabase.rpc("delete_purchase_v2", { _purchase_id: deleteTarget.id });
@@ -483,19 +503,34 @@ function Page() {
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases", dateFilter, filterFrom, filterTo],
     staleTime: 30_000,
-    queryFn: async () => {
+    queryFn: () => {
       const { from, to } = dateFilter === "custom" ? { from: filterFrom, to: filterTo } : getPresetRange(dateFilter);
       const start = from ? new Date(from) : new Date(); start.setHours(0,0,0,0);
       const end = to ? new Date(to) : new Date(); end.setHours(23,59,59,999);
-      
-      const { data, error } = await supabase.from("purchases")
-        .select("*, suppliers(name), purchase_items(*)")
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString())
-        .order("created_at", { ascending: false })
-        .range(0, PURCHASE_LIST_LIMIT - 1);
-      if (error) throw error;
-      return data ?? [];
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
+
+      return readLocalFirst<any[]>({
+        table: "purchases",
+        cloud: async () => {
+          const { data, error } = await supabase.from("purchases")
+            .select("*, suppliers(name), purchase_items(*)")
+            .gte("created_at", startIso)
+            .lte("created_at", endIso)
+            .order("created_at", { ascending: false })
+            .range(0, PURCHASE_LIST_LIMIT - 1);
+          if (error) throw error;
+          return data ?? [];
+        },
+        local: async () => {
+          const rows = await db()
+            .purchases.where("created_at")
+            .between(startIso, endIso, true, true)
+            .reverse()
+            .toArray();
+          return Promise.all(rows.slice(0, PURCHASE_LIST_LIMIT).map(enrichLocalPurchaseRow));
+        },
+      });
     },
   });
 
@@ -699,6 +734,14 @@ function Page() {
     try {
       if (editingId) {
         // --- Edit Flow ---
+        // Unlike a new purchase, this is a multi-step, non-atomic sequence
+        // of raw reads/writes even online — queuing it reliably needs its
+        // own pass, so it stays online-only. Block explicitly rather than
+        // let it fail partway through (which could reverse old stock
+        // without applying the new stock).
+        if (isOfflineNow()) {
+          throw new Error(t('purchases.edit_requires_internet', 'Editing a purchase needs an internet connection — try again once reconnected.'));
+        }
         // 1. Get original items to calculate stock deltas
         const { data: origItems, error: fetchErr } = await supabase
           .from("purchase_items")
@@ -773,28 +816,23 @@ function Page() {
 
       } else {
         // --- New Purchase Flow ---
-        // Apply any manual stock corrections first (e.g. a physical count
-        // done while receiving this purchase) so complete_purchase's own
-        // stock and weighted-average-cost math starts from the corrected
-        // baseline instead of the possibly-wrong system value. Each
-        // correction is its own audited 'adjustment' movement — this
-        // purchase's own qty is still recorded separately as a 'purchase'
-        // movement, so the audit trail shows both changes distinctly.
-        for (const l of items) {
-          if (!l.product_id) continue;
-          const oldStock = Number(l.old_stock ?? 0);
-          if (l.stock_override == null || Number(l.stock_override) === oldStock) continue;
-          const { error: adjErr } = await supabase.rpc("adjust_product_stock", {
-            _product_id: l.product_id,
-            _new_stock: Number(l.stock_override),
-            _reason: "Stock correction during purchase entry",
-          });
-          if (adjErr) throw new Error(`${t('purchases.stock_correction_failed', 'Stock correction failed for {{name}}', { name: l.name })}: ${adjErr.message}`);
-        }
+        // Manual stock corrections (e.g. a physical count done while
+        // receiving this purchase) so complete_purchase's own stock and
+        // weighted-average-cost math starts from the corrected baseline
+        // instead of the possibly-wrong system value. Each correction is
+        // its own audited 'adjustment' movement — this purchase's own qty
+        // is still recorded separately as a 'purchase' movement, so the
+        // audit trail shows both changes distinctly.
+        const corrections = items
+          .filter((l) => l.product_id && l.stock_override != null && Number(l.stock_override) !== Number(l.old_stock ?? 0))
+          .map((l) => ({
+            product_id: l.product_id as string,
+            new_stock: Number(l.stock_override),
+            reason: "Stock correction during purchase entry",
+          }));
 
-        const { error, data } = await supabase.rpc("complete_purchase", { payload });
-        if (error) throw error;
-        
+        await completePurchaseOfflineAware(payload, corrections);
+
         // Invalidate queries early to ensure next fetches get fresh data
         qc.invalidateQueries({ queryKey: ["purchases"] });
         qc.invalidateQueries({ queryKey: ["products"] });
@@ -814,7 +852,7 @@ function Page() {
       (l) => l.product_id && Number(l.sale_price || 0) > 0 && Number(l.sale_price) !== Number(l.old_sale ?? -1),
     );
     for (const l of priceUpdates) {
-      await supabase.from("products").update({ sell_price: Number(l.sale_price) }).eq("id", l.product_id as string);
+      await updateSellPriceOfflineAware(l.product_id as string, Number(l.sale_price));
     }
 
     toast.success(priceUpdates.length ? t('purchases.recorded_with_rates', 'Purchase recorded — stock & sale rates updated') : t('purchases.recorded_stock_updated', 'Purchase recorded, stock updated'));

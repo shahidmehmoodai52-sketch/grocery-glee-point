@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, sampleInvoice } from "@/components/receipt";
 import { OfflineModeCard } from "@/components/offline-mode-card";
+import { useSettings } from "@/hooks/use-settings";
+import { useOfflineStatus } from "@/lib/offline/status";
 import { setDefaultCurrencySymbol } from "@/lib/format";
 import { CurrencySelect } from "@/components/currency-select";
 import { LanguageSelect } from "@/components/language-select/language-select";
@@ -46,14 +48,8 @@ const FIELDS = [
 function Page() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const { data } = useQuery({
-    queryKey: ["store_settings"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("my_store_settings");
-      if (error) throw error;
-      return Array.isArray(data) ? data[0] ?? null : data ?? null;
-    },
-  });
+  const { data } = useSettings();
+  const { online } = useOfflineStatus();
   const [form, setForm] = useState<any>({
     store_name: "", currency: "PKR", currency_symbol: "Rs", tax_rate: 0,
     address: "", phone: "", logo_url: "", tax_id: "",
@@ -74,6 +70,9 @@ function Page() {
 
   const save = async () => {
     if (!data?.id) return toast.error(t('settings.not_ready', 'Store settings not ready — please refresh.'));
+    if (!online) {
+      return toast.error(t('settings.offline_cannot_save', "You're offline — settings changes need a connection. Reconnect and try again."));
+    }
     const payload: any = {};
     for (const k of FIELDS) payload[k] = form[k];
     // RLS ensures we can only update our own tenant's row; scope by id for safety.
@@ -365,7 +364,12 @@ function Page() {
 
           <OfflineModeCard />
 
-          <Button onClick={save}><Save className="h-4 w-4 mr-2" />{t('settings.save_settings', 'Save settings')}</Button>
+          <div className="space-y-1.5">
+            <Button onClick={save} disabled={!online}><Save className="h-4 w-4 mr-2" />{t('settings.save_settings', 'Save settings')}</Button>
+            {!online && (
+              <p className="text-xs text-muted-foreground">{t('settings.offline_save_hint', "You're offline — reconnect to save changes.")}</p>
+            )}
+          </div>
         </div>
 
 
