@@ -182,6 +182,9 @@ class PosOfflineDB extends Dexie {
   // v12 — pharmacy_product_details, so reports.tsx's generic/company-wise
   // pharmacy reports work offline too.
   pharmacy_product_details!: Table<any, string>;
+  // v13 — stock_count_sessions, for operations.tsx's owner-dashboard
+  // alerts/recommendations (pending stock counts).
+  stock_count_sessions!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   // v3 master-data tables
@@ -350,6 +353,11 @@ class PosOfflineDB extends Dexie {
     this.version(12).stores({
       pharmacy_product_details: "id, product_id, tenant_id, updated_at",
     });
+    // v13 — stock_count_sessions, for operations.tsx's owner-dashboard
+    // alerts/recommendations tabs.
+    this.version(13).stores({
+      stock_count_sessions: "id, tenant_id, status, created_at, updated_at",
+    });
   }
 }
 
@@ -381,7 +389,7 @@ export const MIRRORED_TABLES = [
   "product_intelligence", "smart_purchase_suggestions", "shift_sessions",
   "cash_drawer_events", "shift_notes", "shift_tasks", "receipt_reprints",
   "sale_voids", "shift_checklist", "manager_handovers",
-  "pharmacy_product_details",
+  "pharmacy_product_details", "stock_count_sessions",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];

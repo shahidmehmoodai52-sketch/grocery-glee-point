@@ -31,11 +31,17 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import { fetchAll } from "@/lib/supabase-page";
-import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
-import { insertOfflineAware, updateOfflineAware } from "@/lib/offline/pos";
+import { insertOfflineAware, updateOfflineAware, offlineFirst } from "@/lib/offline/pos";
 import { getMeta } from "@/lib/offline/device";
+import {
+  computeLocalMorningDashboard,
+  computeLocalDailySummary,
+  computeLocalOwnerAlerts,
+  computeLocalOwnerRecommendations,
+  computeLocalDailyTimeline,
+} from "@/lib/offline/analytics";
 import {
   resumeHeldBillOfflineAware,
   discardHeldBillOfflineAware,
@@ -127,43 +133,63 @@ function OwnerControlCenter({ settings }: { settings: any }) {
 
   const { data: morning, refetch: refetchMorning } = useQuery({
     queryKey: ["morning-dashboard"],
-    queryFn: async () => {
-      const { data, error } = await sb.rpc("morning_dashboard");
-      if (error) throw error;
-      return data as any;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await sb.rpc("morning_dashboard");
+          if (error) throw error;
+          return data;
+        },
+        () => computeLocalMorningDashboard(),
+      ),
   });
   const { data: today_sum, refetch: refetchToday } = useQuery({
     queryKey: ["daily-summary", today],
-    queryFn: async () => {
-      const { data, error } = await sb.rpc("daily_summary", { _date: today });
-      if (error) throw error;
-      return data as any;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await sb.rpc("daily_summary", { _date: today });
+          if (error) throw error;
+          return data;
+        },
+        () => computeLocalDailySummary(today),
+      ),
   });
   const { data: alerts } = useQuery({
     queryKey: ["owner-alerts"],
-    queryFn: async () => {
-      const { data, error } = await sb.rpc("owner_alerts");
-      if (error) throw error;
-      return (data || []) as any[];
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await sb.rpc("owner_alerts");
+          if (error) throw error;
+          return data || [];
+        },
+        () => computeLocalOwnerAlerts(settings),
+      ),
   });
   const { data: recs } = useQuery({
     queryKey: ["owner-recommendations"],
-    queryFn: async () => {
-      const { data, error } = await sb.rpc("owner_recommendations");
-      if (error) throw error;
-      return (data || {}) as any;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await sb.rpc("owner_recommendations");
+          if (error) throw error;
+          return data || {};
+        },
+        () => computeLocalOwnerRecommendations(),
+      ),
   });
   const { data: timeline } = useQuery({
     queryKey: ["daily-timeline", today],
-    queryFn: async () => {
-      const { data, error } = await sb.rpc("daily_timeline", { _date: today });
-      if (error) throw error;
-      return (data || []) as any[];
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await sb.rpc("daily_timeline", { _date: today });
+          if (error) throw error;
+          return data || [];
+        },
+        () => computeLocalDailyTimeline(today),
+      ),
   });
 
   const todaySum = today_sum || {};
@@ -182,7 +208,6 @@ function OwnerControlCenter({ settings }: { settings: any }) {
 
   return (
     <div className="space-y-4">
-      <NeedsInternetBanner section={t('operations.tab_owner', 'Owner')} />
       {/* Quick actions */}
       <QuickActionsBar />
 
@@ -407,19 +432,27 @@ function BusinessCalendar() {
 
   const { data: summary } = useQuery({
     queryKey: ["daily-summary", selected],
-    queryFn: async () => {
-      const { data, error } = await sb.rpc("daily_summary", { _date: selected });
-      if (error) throw error;
-      return data as any;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await sb.rpc("daily_summary", { _date: selected });
+          if (error) throw error;
+          return data;
+        },
+        () => computeLocalDailySummary(selected),
+      ),
   });
   const { data: timeline } = useQuery({
     queryKey: ["daily-timeline", selected],
-    queryFn: async () => {
-      const { data, error } = await sb.rpc("daily_timeline", { _date: selected });
-      if (error) throw error;
-      return (data || []) as any[];
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await sb.rpc("daily_timeline", { _date: selected });
+          if (error) throw error;
+          return data || [];
+        },
+        () => computeLocalDailyTimeline(selected),
+      ),
   });
 
   const s = summary || {};
@@ -428,7 +461,6 @@ function BusinessCalendar() {
 
   return (
     <div className="space-y-4">
-      <NeedsInternetBanner section={t('operations.tab_calendar', 'Calendar')} />
       <div className="grid md:grid-cols-2 gap-4">
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
