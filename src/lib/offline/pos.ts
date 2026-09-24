@@ -8,13 +8,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { db } from "./db";
 import { getDeviceId, getMeta } from "./device";
-import { getOfflineStatus } from "./status";
+import { getOfflineStatus, isEffectivelyOffline } from "./status";
 import { enqueueWrite } from "./sync";
 import { roundToTillixQty } from "../quantity-rounding";
 
 function isOffline() {
-  if (typeof navigator !== "undefined" && !navigator.onLine) return true;
-  return false;
+  return isEffectivelyOffline();
 }
 
 /** Heuristic: treat fetch/network/timeout/DNS errors as "offline-ish"

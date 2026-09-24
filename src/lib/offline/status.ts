@@ -57,6 +57,16 @@ async function runConnectivityProbe() {
 
 export type SyncPhase = "idle" | "syncing" | "error";
 
+/** How this device decides when to talk to the cloud for reads and writes:
+ *  - "realtime" (default): try the cloud immediately for every read/write,
+ *    fall back to the local mirror only on a genuine network failure.
+ *  - "manual": every read/write goes straight to the local mirror, exactly
+ *    like being offline — even with a live connection. Nothing reaches the
+ *    cloud until the user presses "Sync now".
+ *  - "scheduled": same as "manual", except a background timer on this
+ *    device calls sync automatically every `syncIntervalMinutes`. */
+export type SyncMode = "realtime" | "manual" | "scheduled";
+
 export interface OfflineStatus {
   online: boolean;
   enabled: boolean;
@@ -69,12 +79,40 @@ export interface OfflineStatus {
   progressTotal: number | null;
   /** Human-readable description of the item currently uploading, e.g. "Sale S-023-1042". */
   progressLabel: string | null;
+  syncMode: SyncMode;
+  /** Only meaningful when syncMode === "scheduled". */
+  syncIntervalMinutes: number;
 }
 
 const LS_LAST = "pos_offline_last_synced";
+const LS_SYNC_MODE = "pos_sync_mode";
+const LS_SYNC_INTERVAL = "pos_sync_interval_minutes";
+const DEFAULT_SYNC_INTERVAL_MINUTES = 15;
 
 type Listener = (s: OfflineStatus) => void;
 const listeners = new Set<Listener>();
+
+/** This is a per-device operational preference (how THIS terminal talks to
+ *  the network), not a business setting — so it lives in localStorage, same
+ *  as the device id, rather than in the shared tenant `store_settings` row. */
+function readSyncMode(): SyncMode {
+  try {
+    const v = window.localStorage.getItem(LS_SYNC_MODE);
+    if (v === "manual" || v === "scheduled" || v === "realtime") return v;
+  } catch {
+    /* best effort */
+  }
+  return "realtime";
+}
+function readSyncIntervalMinutes(): number {
+  try {
+    const v = Number(window.localStorage.getItem(LS_SYNC_INTERVAL));
+    if (Number.isFinite(v) && v >= 1) return Math.min(1440, Math.round(v));
+  } catch {
+    /* best effort */
+  }
+  return DEFAULT_SYNC_INTERVAL_MINUTES;
+}
 
 let state: OfflineStatus = {
   online: typeof navigator === "undefined" ? true : navigator.onLine,
@@ -86,6 +124,8 @@ let state: OfflineStatus = {
   progressDone: null,
   progressTotal: null,
   progressLabel: null,
+  syncMode: "realtime",
+  syncIntervalMinutes: DEFAULT_SYNC_INTERVAL_MINUTES,
 };
 
 
@@ -103,6 +143,54 @@ export function setOfflineEnabled(_v: boolean) {
   emit();
 }
 
+export function getSyncMode(): SyncMode {
+  return state.syncMode;
+}
+export function setSyncMode(mode: SyncMode) {
+  try {
+    window.localStorage.setItem(LS_SYNC_MODE, mode);
+  } catch {
+    /* best effort */
+  }
+  state = { ...state, syncMode: mode };
+  emit();
+}
+export function getSyncIntervalMinutes(): number {
+  return state.syncIntervalMinutes;
+}
+export function setSyncIntervalMinutes(minutes: number) {
+  const clamped = Math.min(1440, Math.max(1, Math.round(minutes)));
+  try {
+    window.localStorage.setItem(LS_SYNC_INTERVAL, String(clamped));
+  } catch {
+    /* best effort */
+  }
+  state = { ...state, syncIntervalMinutes: clamped };
+  emit();
+}
+
+/** True when this device should treat every read/write as if there were no
+ *  connection: either there genuinely isn't one, or the user has chosen a
+ *  sync mode ("manual"/"scheduled") that deliberately holds data on this
+ *  device until an explicit or scheduled sync runs. Every offline-aware
+ *  read/write helper in this app funnels through this single check, so
+ *  choosing a non-realtime sync mode changes their behavior automatically
+ *  without touching any of their call sites. */
+export function isEffectivelyOffline(): boolean {
+  const online = typeof navigator === "undefined" ? true : navigator.onLine;
+  if (!online) return true;
+  return state.syncMode !== "realtime";
+}
+
+/** Subscribe to status changes outside a React render (e.g. the boot effect
+ *  in __root.tsx needs to re-arm its scheduled-sync timer when the user
+ *  changes the sync mode/interval in Settings). Returns an unsubscribe fn. */
+export function subscribeOfflineStatus(l: Listener): () => void {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+}
 
 export function setSyncProgress(done: number | null, total: number | null, label: string | null = null) {
   state = { ...state, progressDone: done, progressTotal: total, progressLabel: label };
@@ -144,6 +232,8 @@ export function bootOfflineStatus() {
       enabled: true, // always on
       lastSyncedAt: window.localStorage.getItem(LS_LAST),
       online: navigator.onLine,
+      syncMode: readSyncMode(),
+      syncIntervalMinutes: readSyncIntervalMinutes(),
     };
   } catch {}
 

@@ -11,7 +11,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { db } from "./db";
-import { getOfflineStatus } from "./status";
+import { getOfflineStatus, isEffectivelyOffline } from "./status";
 import { enqueueWrite } from "./sync";
 import { getDeviceId, getMeta } from "./device";
 
@@ -42,7 +42,7 @@ export interface OfflineReturnMeta {
 }
 
 function isOffline() {
-  return typeof navigator !== "undefined" && !navigator.onLine;
+  return isEffectivelyOffline();
 }
 
 function isNetworkError(e: any): boolean {

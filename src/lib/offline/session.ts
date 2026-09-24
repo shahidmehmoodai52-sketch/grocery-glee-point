@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 
 import { supabase } from "@/integrations/supabase/client";
+import { isEffectivelyOffline } from "./status";
 
 const OFFLINE_USER_KEY = "tillix_offline_auth_user";
 
@@ -22,7 +23,7 @@ function readCachedUser(): User | null {
 }
 
 export function isOfflineNow(): boolean {
-  return typeof navigator !== "undefined" && navigator.onLine === false;
+  return isEffectivelyOffline();
 }
 
 export async function getUserAllowOffline(): Promise<User | null> {

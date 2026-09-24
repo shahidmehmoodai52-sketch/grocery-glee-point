@@ -8,8 +8,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { db, MIRRORED_TABLES, queuePriority, type MirroredTable } from "./db";
 import {
-  getOfflineStatus, markSyncStart, markSyncDone, markSyncError, refreshPendingCount,
+  getOfflineStatus,
+  markSyncStart,
+  markSyncDone,
+  markSyncError,
+  refreshPendingCount,
   setSyncProgress,
+  getSyncMode,
 } from "./status";
 import { getDeviceId, getMeta } from "./device";
 import { logPerf, nowMs, timed, whenIdle, yieldToUI } from "./perf";
@@ -493,8 +498,11 @@ export async function enqueueWrite(item: {
     priority: queuePriority(item.table),
   });
   await refreshPendingCount();
-  // A write created while online should leave immediately.
-  if (getOfflineStatus().online) void scheduleRetryPass(0);
+  // A write created while online should leave immediately — but only in
+  // "realtime" sync mode. In "manual"/"scheduled" mode the item stays
+  // queued until the user presses "Sync now" or the scheduled timer fires,
+  // exactly like being offline (see isEffectivelyOffline()).
+  if (getOfflineStatus().online && getSyncMode() === "realtime") void scheduleRetryPass(0);
   return id as number;
 }
 

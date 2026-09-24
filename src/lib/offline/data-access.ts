@@ -14,7 +14,7 @@
 //    Dexie mirror, freshness stamps live in the existing `_meta` store.
 //  * Nothing here touches POS checkout, sale returns, inventory or purchases.
 
-import { getOfflineStatus } from "./status";
+import { getOfflineStatus, isEffectivelyOffline } from "./status";
 import { getMeta, setMeta } from "./device";
 import { offlineFirst } from "./pos";
 import { whenIdle, logPerf } from "./perf";
@@ -42,7 +42,7 @@ const DEFAULT_TTL_MS: Partial<Record<MirroredTable, number>> = {
 };
 
 function isOffline(): boolean {
-  return typeof navigator !== "undefined" && !navigator.onLine;
+  return isEffectivelyOffline();
 }
 
 /** Record that a table was just refreshed from the cloud. */
