@@ -20,6 +20,16 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
 import { printReceipt } from "@/components/receipt";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
+import { offlineFirst } from "@/lib/offline/pos";
+import {
+  computeLocalShiftReport,
+  openShiftOfflineAware,
+  closeShiftOfflineAware,
+  emergencyCloseShiftOfflineAware,
+  approveShiftOfflineAware,
+} from "@/lib/offline/shifts";
 
 export const Route = createFileRoute("/_authenticated/shifts")({ component: Page });
 
@@ -79,46 +89,73 @@ function Page() {
   const currentQ = useQuery({
     queryKey: ["current_shift", user?.id],
     enabled: !!user?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("current_shift");
-      if (error) throw error;
-      return (Array.isArray(data) ? (data[0] ?? null) : (data ?? null)) as ShiftRow | null;
-    },
+    queryFn: () =>
+      readLocalFirst<ShiftRow | null>({
+        table: "shift_sessions",
+        cloud: async () => {
+          const { data, error } = await supabase.rpc("current_shift");
+          if (error) throw error;
+          return (Array.isArray(data) ? (data[0] ?? null) : (data ?? null)) as ShiftRow | null;
+        },
+        local: async () => {
+          if (!user?.id) return null;
+          const rows = (await offlineDb().shift_sessions.where("[cashier_id+status]").equals([user.id, "open"]).toArray())
+            .filter((r: any) => r._deleted !== 1);
+          rows.sort((a: any, b: any) => String(b.opened_at).localeCompare(String(a.opened_at)));
+          return (rows[0] as ShiftRow) ?? null;
+        },
+        isEmpty: (d) => d == null,
+      }),
   });
   const current = currentQ.data;
 
   const listQ = useQuery({
     queryKey: ["shifts_list", isAdmin],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => supabase
-        .from("shift_sessions")
-        .select("*")
-        .order("opened_at", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return (data ?? []) as ShiftRow[];
-    },
+    queryFn: () =>
+      readLocalFirst<ShiftRow[]>({
+        table: "shift_sessions",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => supabase
+            .from("shift_sessions")
+            .select("*")
+            .order("opened_at", { ascending: false })
+            .range(from, to) as any);
+          return (data ?? []) as ShiftRow[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().shift_sessions.toArray()).filter((r: any) => r._deleted !== 1) as ShiftRow[];
+          return rows.sort((a, b) => String(b.opened_at).localeCompare(String(a.opened_at)));
+        },
+      }),
   });
 
   const reportQ = useQuery({
     queryKey: ["shift_report", reportDlg?.shift.id],
     enabled: !!reportDlg?.shift.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("shift_report", { _shift_id: reportDlg!.shift.id });
-      if (error) throw error;
-      return data as any;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await supabase.rpc("shift_report", { _shift_id: reportDlg!.shift.id });
+          if (error) throw error;
+          return data;
+        },
+        async () => ({ shift: reportDlg!.shift, ...(await computeLocalShiftReport(reportDlg!.shift)) }),
+      ),
   });
 
   const liveReportQ = useQuery({
     queryKey: ["shift_report_live", current?.id],
     enabled: !!current?.id,
     refetchInterval: 30_000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("shift_report", { _shift_id: current!.id });
-      if (error) throw error;
-      return data as any;
-    },
+    queryFn: () =>
+      offlineFirst<any>(
+        async () => {
+          const { data, error } = await supabase.rpc("shift_report", { _shift_id: current!.id });
+          if (error) throw error;
+          return data;
+        },
+        async () => ({ shift: current, ...(await computeLocalShiftReport(current!)) }),
+      ),
   });
 
   const refreshAll = () => {
@@ -130,8 +167,16 @@ function Page() {
   const doOpen = async () => {
     const cash = Number(openingCash || 0);
     if (isNaN(cash) || cash < 0) return toast.error(t('shifts.enter_valid_opening_cash', 'Enter a valid opening cash'));
-    const { error } = await supabase.rpc("open_shift", { _opening_cash: cash, _notes: openingNotes || undefined });
-    if (error) return toast.error(t('shifts.could_not_open', "Couldn't open shift"), { description: error.message });
+    try {
+      await openShiftOfflineAware({
+        opening_cash: cash,
+        notes: openingNotes || null,
+        allowMultiple: !!settings?.ops_allow_multiple_shifts,
+        businessDayStartHour: Number((settings as any)?.ops_business_day_start_hour ?? 0),
+      });
+    } catch (e: any) {
+      return toast.error(t('shifts.could_not_open', "Couldn't open shift"), { description: e?.message });
+    }
     toast.success(t('shifts.shift_opened', 'Shift opened'));
     setOpenDlg(false); setOpeningCash(""); setOpeningNotes("");
     refreshAll();
@@ -141,14 +186,18 @@ function Page() {
     if (!closeDlg) return;
     const cash = Number(actualCash);
     if (isNaN(cash) || cash < 0) return toast.error(t('shifts.enter_valid_actual_cash', 'Enter a valid actual cash amount'));
-    const { error } = await supabase.rpc("close_shift", {
-      _shift_id: closeDlg.shift.id,
-      _actual_cash: cash,
-      _closing_notes: closeNotes || undefined,
-      _reason: closeReason || undefined,
-
-    });
-    if (error) return toast.error(t('shifts.could_not_close', "Couldn't close shift"), { description: error.message });
+    try {
+      await closeShiftOfflineAware({
+        shift_id: closeDlg.shift.id,
+        actual_cash: cash,
+        closing_notes: closeNotes || null,
+        reason: closeReason || null,
+        requireManagerApproval: !!settings?.ops_require_manager_approval,
+        isAdmin,
+      });
+    } catch (e: any) {
+      return toast.error(t('shifts.could_not_close', "Couldn't close shift"), { description: e?.message });
+    }
     toast.success(t('shifts.shift_closed', 'Shift closed'));
     setCloseDlg(null); setActualCash(""); setCloseNotes(""); setCloseReason("");
     refreshAll();
@@ -157,18 +206,22 @@ function Page() {
   const doEmergency = async () => {
     if (!emgDlg) return;
     if (!emgReason.trim()) return toast.error(t('shifts.emergency_reason_required', 'Emergency reason is required'));
-    const { error } = await supabase.rpc("emergency_close_shift", {
-      _shift_id: emgDlg.shift.id, _reason: emgReason,
-    });
-    if (error) return toast.error(t('shifts.could_not_emergency_close', "Couldn't emergency-close"), { description: error.message });
+    try {
+      await emergencyCloseShiftOfflineAware({ shift_id: emgDlg.shift.id, reason: emgReason });
+    } catch (e: any) {
+      return toast.error(t('shifts.could_not_emergency_close', "Couldn't emergency-close"), { description: e?.message });
+    }
     toast.success(t('shifts.shift_emergency_closed', 'Shift emergency-closed'));
     setEmgDlg(null); setEmgReason("");
     refreshAll();
   };
 
   const doApprove = async (shift: ShiftRow) => {
-    const { error } = await supabase.rpc("approve_shift", { _shift_id: shift.id });
-    if (error) return toast.error(t('shifts.could_not_approve', "Couldn't approve"), { description: error.message });
+    try {
+      await approveShiftOfflineAware(shift.id);
+    } catch (e: any) {
+      return toast.error(t('shifts.could_not_approve', "Couldn't approve"), { description: e?.message });
+    }
     toast.success(t('shifts.shift_approved', 'Shift approved'));
     refreshAll();
   };

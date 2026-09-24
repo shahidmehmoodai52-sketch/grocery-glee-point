@@ -113,6 +113,17 @@ const QUEUE_PRIORITY: Record<string, number> = {
   record_cash_event: 70,
   asset_categories: 70,
   assets: 71,
+  // A shift must be open before priority-40 sales replay so shift_report()
+  // has something to attribute them to; close/emergency-close/approve must
+  // run only after every financial item for that shift (sales through
+  // asset writes, priority <=71) has already replayed, so the server's own
+  // shift_report() aggregation — computed fresh when the RPC executes —
+  // sees the shift's real totals instead of a partial replay.
+  shift_sessions: 5,
+  open_shift: 5,
+  close_shift: 75,
+  emergency_close_shift: 75,
+  approve_shift: 78,
 };
 
 /** Priority for a queued write, derived from its table / RPC name. */
@@ -150,6 +161,8 @@ class PosOfflineDB extends Dexie {
   // views (see version(9) below for why these aren't in the periodic pull loop).
   product_intelligence!: Table<any, string>;
   smart_purchase_suggestions!: Table<any, string>;
+  // v10 — shift sessions, so shifts.tsx can open/close/report offline.
+  shift_sessions!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   // v3 master-data tables
@@ -286,6 +299,19 @@ class PosOfflineDB extends Dexie {
       product_intelligence: "product_id, tenant_id",
       smart_purchase_suggestions: "product_id, tenant_id, supplier_id",
     });
+    // v10 — shift_sessions, plus a cashier_id/user_id index on sales /
+    // sale_returns / expenses so shift_report()'s aggregation (receipts,
+    // cash-in, refunds, expenses for one cashier's shift window) can be
+    // recomputed locally without a full-table scan. The RPC's own
+    // shift_report() is still what actually gets persisted when the
+    // queued open/close call replays — this is only a local preview.
+    this.version(10).stores({
+      shift_sessions:
+        "id, cashier_id, tenant_id, status, business_date, opened_at, closed_at, created_at, updated_at, [cashier_id+status]",
+      sales: "id, invoice_no, customer_id, cashier_id, created_at, updated_at",
+      sale_returns: "id, return_no, customer_id, user_id, created_at, updated_at",
+      expenses: "id, user_id, created_at, updated_at",
+    });
   }
 }
 
@@ -314,7 +340,7 @@ export const MIRRORED_TABLES = [
   "cash_accounts", "store_settings", "user_roles", "my_access",
   "party_payments", "cash_transactions",
   "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
-  "product_intelligence", "smart_purchase_suggestions",
+  "product_intelligence", "smart_purchase_suggestions", "shift_sessions",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];
