@@ -133,6 +133,70 @@ export async function insertOfflineAware<T extends Record<string, any>>(
   return saveOffline();
 }
 
+/** Generic offline-aware update for a simple table keyed by `id` (no RPC,
+ *  no derived fields) — e.g. assets.tsx's plain CRUD. Not for tables whose
+ *  writes need business logic (stock, balances, etc.) — those go through
+ *  their own dedicated *OfflineAware function instead. */
+export async function updateOfflineAware<T extends Record<string, any>>(
+  table: string,
+  id: string,
+  patch: T,
+): Promise<void> {
+  const enabled = getOfflineStatus().enabled;
+  const offline = isOffline() && enabled;
+
+  const saveOffline = async () => {
+    try {
+      const existing = await (db() as any)[table]?.get(id);
+      await (db() as any)[table]?.put({ ...(existing ?? { id }), ...patch, _sync: "pending" });
+    } catch {}
+    await enqueueWrite({ op: "update", table, payload: { id, ...patch } });
+  };
+
+  if (!offline) {
+    try {
+      const { error } = await supabase.from(table as any).update(patch as any).eq("id", id);
+      if (error) throw error;
+      if (enabled) {
+        try {
+          const existing = await (db() as any)[table]?.get(id);
+          if (existing) await (db() as any)[table]?.put({ ...existing, ...patch });
+        } catch {}
+      }
+      return;
+    } catch (e: any) {
+      if (enabled && isNetworkError(e)) return saveOffline();
+      throw e;
+    }
+  }
+
+  return saveOffline();
+}
+
+/** Generic offline-aware delete for a simple table keyed by `id`. */
+export async function deleteOfflineAware(table: string, id: string): Promise<void> {
+  const enabled = getOfflineStatus().enabled;
+  const offline = isOffline() && enabled;
+
+  const saveOffline = async () => {
+    try { await (db() as any)[table]?.delete(id); } catch {}
+    await enqueueWrite({ op: "delete", table, payload: { id } });
+  };
+
+  if (!offline) {
+    try {
+      const { error } = await supabase.from(table as any).delete().eq("id", id);
+      if (error) throw error;
+      if (enabled) { try { await (db() as any)[table]?.delete(id); } catch {} }
+      return;
+    } catch (e: any) {
+      if (enabled && isNetworkError(e)) return saveOffline();
+      throw e;
+    }
+  }
+
+  return saveOffline();
+}
 
 export async function cacheProductBarcodes(rows: any[]) {
   if (!rows?.length) return;

@@ -22,6 +22,7 @@ const PULL_TABLES: MirroredTable[] = [
   "sales", "sale_items", "sale_returns", "sale_return_items",
   "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses",
   "party_payments", "cash_transactions",
+  "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
 ];
 
 const PAGE = 1000;
@@ -43,7 +44,10 @@ async function setWatermark(table: string, ts: string, id: string | null = null)
 // Only these tables actually have an `updated_at` column in the cloud schema.
 // The rest must fall back to `created_at` for the incremental watermark, otherwise
 // PostgREST returns 42703 "column ... does not exist" and the sync fails loudly.
-const HAS_UPDATED_AT = new Set<string>(["products", "expenses", "store_settings", "cash_transactions"]);
+const HAS_UPDATED_AT = new Set<string>([
+  "products", "expenses", "store_settings", "cash_transactions",
+  "product_batches", "asset_categories", "assets",
+]);
 /** Tables with neither timestamp usable as a watermark → always full pull (small). */
 const FULL_PULL = new Set<string>([
   "store_settings", "user_roles", "cash_accounts",

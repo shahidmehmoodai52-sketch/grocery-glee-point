@@ -93,6 +93,10 @@ const QUEUE_PRIORITY: Record<string, number> = {
   purchase_returns: 55,
   purchase_return_items: 56,
   complete_purchase_return: 55,
+  // A batch created offline must replay before any damage/waste record that
+  // references it by batch_id (priority 60 below).
+  product_batches: 58,
+  create_product_batch: 58,
   inventory_movements: 60,
   adjust_product_stock: 60,
   // Purchases run after any stock correction queued for the same items
@@ -107,6 +111,8 @@ const QUEUE_PRIORITY: Record<string, number> = {
   cash_transactions: 70,
   record_payment: 70,
   record_cash_event: 70,
+  asset_categories: 70,
+  assets: 71,
 };
 
 /** Priority for a queued write, derived from its table / RPC name. */
@@ -135,6 +141,11 @@ class PosOfflineDB extends Dexie {
   // customers.$id.tsx's ledger can be built from the local mirror.
   party_payments!: Table<any, string>;
   cash_transactions!: Table<any, string>;
+  product_batches!: Table<any, string>;
+  inventory_damages!: Table<any, string>;
+  inventory_waste!: Table<any, string>;
+  asset_categories!: Table<any, string>;
+  assets!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   // v3 master-data tables
@@ -243,6 +254,19 @@ class PosOfflineDB extends Dexie {
       party_payments: "id, party_type, party_id, created_at, [party_type+party_id]",
       cash_transactions: "id, account_id, direction, created_at, updated_at",
     });
+    // v8 — expiry/batch, damage/waste, and shop-asset tables, so expiry.tsx
+    // and assets.tsx get the same offline read/write support purchases and
+    // sale-returns already have. `days_remaining`/`expiry_status` aren't
+    // mirrored directly (they're server-computed from `expiry_date` and are
+    // date-relative, so a cached value would go stale) — expiry.tsx
+    // recomputes them locally from `expiry_date` + store_settings instead.
+    this.version(8).stores({
+      product_batches: "id, product_id, expiry_date, status, created_at, updated_at",
+      inventory_damages: "id, product_id, batch_id, created_at",
+      inventory_waste: "id, product_id, batch_id, created_at",
+      asset_categories: "id, name, created_at, updated_at",
+      assets: "id, category_id, created_at, updated_at",
+    });
   }
 }
 
@@ -270,6 +294,7 @@ export const MIRRORED_TABLES = [
   "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses", "held_bills",
   "cash_accounts", "store_settings", "user_roles", "my_access",
   "party_payments", "cash_transactions",
+  "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];

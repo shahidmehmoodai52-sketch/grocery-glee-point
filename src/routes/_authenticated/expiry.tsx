@@ -57,6 +57,9 @@ import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
+import { createBatchOfflineAware, recordDamageOfflineAware, recordWasteOfflineAware } from "@/lib/offline/expiry";
 
 export const Route = createFileRoute("/_authenticated/expiry")({
   component: ExpiryPage,
@@ -95,6 +98,25 @@ const STATUS_META: Record<string, { label: string; classes: string; icon: any }>
 const DAMAGE_TYPES = ["broken", "leaking", "customer_return", "transport", "warehouse", "other"] as const;
 const WASTE_TYPES = ["expired", "damaged", "disposal", "donation", "internal_use"] as const;
 
+// Mirrors product_batch_status's CASE logic exactly — the view's
+// days_remaining/expiry_status are date-relative, so they'd go stale if
+// cached; this recomputes them locally from a freshly-read expiry_date.
+function computeBatchStatus(
+  expiryDate: string | null,
+  criticalDays: number,
+  expiringSoonDays: number,
+): { days_remaining: number | null; expiry_status: Batch["expiry_status"] } {
+  if (!expiryDate) return { days_remaining: null, expiry_status: "no_expiry" };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const exp = new Date(`${expiryDate}T00:00:00`);
+  const days = differenceInDays(exp, today);
+  if (days < 0) return { days_remaining: days, expiry_status: "expired" };
+  if (days <= criticalDays) return { days_remaining: days, expiry_status: "critical" };
+  if (days <= expiringSoonDays) return { days_remaining: days, expiry_status: "expiring_soon" };
+  return { days_remaining: days, expiry_status: "fresh" };
+}
+
 function ExpiryPage() {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
@@ -106,14 +128,54 @@ function ExpiryPage() {
 
   const batchesQ = useQuery({
     queryKey: ["batches-status"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_batch_status" as any)
-        .select("*")
-        .order("expiry_date", { ascending: true, nullsFirst: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as Batch[];
-    },
+    queryFn: () =>
+      readLocalFirst<Batch[]>({
+        table: "product_batches",
+        cloud: async () => {
+          const { data, error } = await supabase
+            .from("product_batch_status" as any)
+            .select("*")
+            .order("expiry_date", { ascending: true, nullsFirst: false });
+          if (error) throw error;
+          return (data ?? []) as unknown as Batch[];
+        },
+        local: async () => {
+          const criticalDays = Number((settings as any)?.critical_days ?? 7);
+          const expiringSoonDays = Number((settings as any)?.expiring_soon_days ?? 30);
+          const rows = (await offlineDb().product_batches.toArray()).filter(
+            (b: any) => Number(b.qty_remaining) > 0 && b.status === "active",
+          );
+          const enriched = await Promise.all(
+            rows.map(async (b: any) => {
+              const p = await offlineDb().products.get(b.product_id);
+              const { days_remaining, expiry_status } = computeBatchStatus(b.expiry_date, criticalDays, expiringSoonDays);
+              return {
+                id: b.id,
+                product_id: b.product_id,
+                product_name: p?.name ?? "",
+                sku: p?.sku ?? null,
+                unit: p?.unit ?? null,
+                batch_no: b.batch_no,
+                purchase_date: b.purchase_date,
+                expiry_date: b.expiry_date,
+                qty_remaining: b.qty_remaining,
+                qty_initial: b.qty_initial,
+                unit_cost: b.unit_cost,
+                value_remaining: Number(b.qty_remaining) * Number(b.unit_cost ?? p?.cost_price ?? 0),
+                supplier_id: b.supplier_id,
+                status: b.status,
+                days_remaining,
+                expiry_status,
+              } as Batch;
+            }),
+          );
+          return enriched.sort((a, b) => {
+            if (a.expiry_date == null) return 1;
+            if (b.expiry_date == null) return -1;
+            return a.expiry_date.localeCompare(b.expiry_date);
+          });
+        },
+      }),
   });
 
   const batches = batchesQ.data ?? [];
@@ -373,6 +435,14 @@ function AddBatchDialog({ onClose }: { onClose: () => void }) {
   const productsQ = useQuery({
     queryKey: ["products-picker", search],
     queryFn: async () => {
+      const online = typeof navigator === "undefined" || navigator.onLine;
+      if (!online) {
+        const t = search.trim().toLowerCase();
+        const rows = await offlineDb().products.toArray();
+        return rows
+          .filter((p: any) => !t || (p.name ?? "").toLowerCase().includes(t) || (p.sku ?? "").toLowerCase().includes(t))
+          .slice(0, 20);
+      }
       let q = supabase.from("products").select("id,name,sku,cost_price,track_batches").eq("is_active", true).limit(20);
       if (search.trim()) q = q.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
       const { data, error } = await q;
@@ -386,18 +456,22 @@ function AddBatchDialog({ onClose }: { onClose: () => void }) {
     const q = Number(qty);
     if (!q || q <= 0) return toast.error(t('expiry.toast_qty_positive', 'Quantity must be positive'));
     setSaving(true);
-    const { error } = await supabase.rpc("create_product_batch" as any, {
-      _product_id: productId,
-      _batch_no: batchNo.trim() || null,
-      _qty: q,
-      _expiry_date: expiry || null,
-      _mfg_date: mfg || null,
-      _unit_cost: cost ? Number(cost) : null,
-      _supplier_id: null,
-      _note: null,
-    });
+    try {
+      await createBatchOfflineAware({
+        product_id: productId,
+        batch_no: batchNo.trim() || null,
+        qty: q,
+        expiry_date: expiry || null,
+        mfg_date: mfg || null,
+        unit_cost: cost ? Number(cost) : null,
+        supplier_id: null,
+        note: null,
+      });
+    } catch (e: any) {
+      setSaving(false);
+      return toast.error(e?.message ?? t('expiry.toast_batch_add_failed', 'Could not add batch'));
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
     toast.success(t('expiry.toast_batch_added', 'Batch added'));
     onClose();
   };
@@ -451,17 +525,21 @@ function BatchActionDialog({ batch, defaultType, onClose }: { batch: Batch; defa
     if (!q || q <= 0) return toast.error(t('expiry.toast_qty_positive', 'Quantity must be positive'));
     if (q > Number(batch.qty_remaining)) return toast.error(t('expiry.toast_only_left', 'Only {{count}} left in batch', { count: batch.qty_remaining }));
     setSaving(true);
-    const rpc = mode === "damage" ? "record_damage" : "record_waste";
-    const { error } = await supabase.rpc(rpc as any, {
-      _product_id: batch.product_id,
-      _qty: q,
-      [mode === "damage" ? "_damage_type" : "_waste_type"]: type,
-      _batch_id: batch.id,
-      _reason: reason || null,
-      _note: null,
-    } as any);
+    const record = mode === "damage" ? recordDamageOfflineAware : recordWasteOfflineAware;
+    try {
+      await record({
+        product_id: batch.product_id,
+        qty: q,
+        type,
+        batch_id: batch.id,
+        reason: reason || null,
+        note: null,
+      });
+    } catch (e: any) {
+      setSaving(false);
+      return toast.error(e?.message ?? t('expiry.toast_dispose_failed', 'Could not record'));
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
     toast.success(mode === "damage" ? t('expiry.toast_damage_recorded', 'Damage recorded') : t('expiry.toast_waste_recorded', 'Waste recorded'));
     onClose();
   };
@@ -509,6 +587,19 @@ function BatchActionDialog({ batch, defaultType, onClose }: { batch: Batch; defa
   );
 }
 
+async function enrichLocalDisposalRows(table: "inventory_damages" | "inventory_waste") {
+  const rows = (await (offlineDb() as any)[table].toArray()) as any[];
+  const enriched = await Promise.all(
+    rows
+      .filter((r) => r._deleted !== 1)
+      .map(async (r) => {
+        const p = await offlineDb().products.get(r.product_id);
+        return { ...r, products: p ? { name: p.name, sku: p.sku, unit: p.unit } : null };
+      }),
+  );
+  return enriched.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 200);
+}
+
 // ----------------- DAMAGE TAB -----------------
 function DamageTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
   const { t } = useTranslation();
@@ -516,15 +607,20 @@ function DamageTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
   const [open, setOpen] = useState(false);
   const q = useQuery({
     queryKey: ["damage-log"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("inventory_damages" as any)
-        .select("*, products(name, sku, unit)")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "inventory_damages",
+        cloud: async () => {
+          const { data, error } = await supabase
+            .from("inventory_damages" as any)
+            .select("*, products(name, sku, unit)")
+            .order("created_at", { ascending: false })
+            .limit(200);
+          if (error) throw error;
+          return (data ?? []) as any[];
+        },
+        local: () => enrichLocalDisposalRows("inventory_damages"),
+      }),
   });
 
   return (
@@ -574,15 +670,20 @@ function WasteTab({ sym, canWrite }: { sym: string; canWrite: boolean }) {
   const [open, setOpen] = useState(false);
   const q = useQuery({
     queryKey: ["waste-log"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("inventory_waste" as any)
-        .select("*, products(name, sku, unit)")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "inventory_waste",
+        cloud: async () => {
+          const { data, error } = await supabase
+            .from("inventory_waste" as any)
+            .select("*, products(name, sku, unit)")
+            .order("created_at", { ascending: false })
+            .limit(200);
+          if (error) throw error;
+          return (data ?? []) as any[];
+        },
+        local: () => enrichLocalDisposalRows("inventory_waste"),
+      }),
   });
 
   return (
@@ -637,6 +738,14 @@ function RecordDialog({ mode, onClose }: { mode: "damage" | "waste"; onClose: ()
   const productsQ = useQuery({
     queryKey: ["products-picker", search],
     queryFn: async () => {
+      const online = typeof navigator === "undefined" || navigator.onLine;
+      if (!online) {
+        const t = search.trim().toLowerCase();
+        const rows = await offlineDb().products.toArray();
+        return rows
+          .filter((p: any) => !t || (p.name ?? "").toLowerCase().includes(t) || (p.sku ?? "").toLowerCase().includes(t))
+          .slice(0, 20);
+      }
       let qb = supabase.from("products").select("id,name,sku,stock,unit").eq("is_active", true).limit(20);
       if (search.trim()) qb = qb.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
       const { data, error } = await qb;
@@ -650,17 +759,21 @@ function RecordDialog({ mode, onClose }: { mode: "damage" | "waste"; onClose: ()
     const n = Number(qty);
     if (!n || n <= 0) return toast.error(t('expiry.toast_qty_positive', 'Quantity must be positive'));
     setSaving(true);
-    const rpc = mode === "damage" ? "record_damage" : "record_waste";
-    const { error } = await supabase.rpc(rpc as any, {
-      _product_id: productId,
-      _qty: n,
-      [mode === "damage" ? "_damage_type" : "_waste_type"]: type,
-      _batch_id: null,
-      _reason: reason || null,
-      _note: null,
-    } as any);
+    try {
+      const record = mode === "damage" ? recordDamageOfflineAware : recordWasteOfflineAware;
+      await record({
+        product_id: productId,
+        qty: n,
+        type,
+        batch_id: null,
+        reason: reason || null,
+        note: null,
+      });
+    } catch (e: any) {
+      setSaving(false);
+      return toast.error(e?.message ?? t('expiry.toast_dispose_failed', 'Could not record entry'));
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
     toast.success(mode === "damage" ? t('expiry.toast_damage_recorded', 'Damage recorded') : t('expiry.toast_waste_recorded', 'Waste recorded'));
     onClose();
   };
@@ -711,15 +824,31 @@ function ReportsTab({ sym }: { sym: string }) {
 
   const q = useQuery({
     queryKey: ["expiry-reports", days],
-    queryFn: async () => {
-      const since = new Date();
-      since.setDate(since.getDate() - Number(days));
-      const [d, w] = await Promise.all([
-        supabase.from("inventory_damages" as any).select("damage_type, qty, total_value").gte("created_at", since.toISOString()),
-        supabase.from("inventory_waste" as any).select("waste_type, qty, total_value").gte("created_at", since.toISOString()),
-      ]);
-      return { damages: (d.data ?? []) as any[], waste: (w.data ?? []) as any[] };
-    },
+    queryFn: () =>
+      readLocalFirst<{ damages: any[]; waste: any[] }>({
+        table: "inventory_damages",
+        cloud: async () => {
+          const since = new Date();
+          since.setDate(since.getDate() - Number(days));
+          const [d, w] = await Promise.all([
+            supabase.from("inventory_damages" as any).select("damage_type, qty, total_value").gte("created_at", since.toISOString()),
+            supabase.from("inventory_waste" as any).select("waste_type, qty, total_value").gte("created_at", since.toISOString()),
+          ]);
+          return { damages: (d.data ?? []) as any[], waste: (w.data ?? []) as any[] };
+        },
+        local: async () => {
+          const since = new Date();
+          since.setDate(since.getDate() - Number(days));
+          const sinceIso = since.toISOString();
+          const damages = ((await offlineDb().inventory_damages.toArray()) as any[]).filter(
+            (r) => r._deleted !== 1 && r.created_at >= sinceIso,
+          );
+          const waste = ((await offlineDb().inventory_waste.toArray()) as any[]).filter(
+            (r) => r._deleted !== 1 && r.created_at >= sinceIso,
+          );
+          return { damages, waste };
+        },
+      }),
   });
 
   const byType = (rows: any[], key: string) => {
