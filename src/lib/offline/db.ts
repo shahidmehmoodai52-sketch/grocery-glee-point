@@ -124,6 +124,13 @@ const QUEUE_PRIORITY: Record<string, number> = {
   close_shift: 75,
   emergency_close_shift: 75,
   approve_shift: 78,
+  // operations.tsx — independent audit/task/note tables, no cross-item
+  // ordering requirement against each other. set_checklist_item only needs
+  // to run after open_shift (5) so the shift it references exists.
+  shift_notes: 70,
+  shift_tasks: 70,
+  manager_handovers: 70,
+  set_checklist_item: 72,
 };
 
 /** Priority for a queued write, derived from its table / RPC name. */
@@ -163,6 +170,15 @@ class PosOfflineDB extends Dexie {
   smart_purchase_suggestions!: Table<any, string>;
   // v10 — shift sessions, so shifts.tsx can open/close/report offline.
   shift_sessions!: Table<any, string>;
+  // v11 — operations.tsx's per-shift operational tables (cash drawer,
+  // tasks, notes, reprint/void audit, closing checklist, manager handover).
+  cash_drawer_events!: Table<any, string>;
+  shift_notes!: Table<any, string>;
+  shift_tasks!: Table<any, string>;
+  receipt_reprints!: Table<any, string>;
+  sale_voids!: Table<any, string>;
+  shift_checklist!: Table<any, string>;
+  manager_handovers!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   // v3 master-data tables
@@ -312,6 +328,20 @@ class PosOfflineDB extends Dexie {
       sale_returns: "id, return_no, customer_id, user_id, created_at, updated_at",
       expenses: "id, user_id, created_at, updated_at",
     });
+    // v11 — operations.tsx's per-shift operational tables. None of these
+    // have an updated_at column (all insert-only or admin-edited rarely
+    // enough that a created_at watermark is fine), matching the FULL_PULL-
+    // free / created_at-watermark default the sync engine already applies
+    // to any table not listed in HAS_UPDATED_AT.
+    this.version(11).stores({
+      cash_drawer_events: "id, shift_id, tenant_id, user_id, created_at",
+      shift_notes: "id, shift_id, tenant_id, created_at",
+      shift_tasks: "id, tenant_id, status, created_at, updated_at",
+      receipt_reprints: "id, sale_id, tenant_id, created_at",
+      sale_voids: "id, tenant_id, created_at",
+      shift_checklist: "id, shift_id, tenant_id, [shift_id+item_key]",
+      manager_handovers: "id, tenant_id, from_user, to_user, created_at",
+    });
   }
 }
 
@@ -341,6 +371,8 @@ export const MIRRORED_TABLES = [
   "party_payments", "cash_transactions",
   "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
   "product_intelligence", "smart_purchase_suggestions", "shift_sessions",
+  "cash_drawer_events", "shift_notes", "shift_tasks", "receipt_reprints",
+  "sale_voids", "shift_checklist", "manager_handovers",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];

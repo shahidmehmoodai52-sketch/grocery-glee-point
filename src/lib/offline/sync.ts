@@ -24,6 +24,8 @@ const PULL_TABLES: MirroredTable[] = [
   "party_payments", "cash_transactions",
   "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
   "shift_sessions",
+  "cash_drawer_events", "shift_notes", "shift_tasks", "receipt_reprints",
+  "sale_voids", "shift_checklist", "manager_handovers",
 ];
 
 const PAGE = 1000;
@@ -47,7 +49,7 @@ async function setWatermark(table: string, ts: string, id: string | null = null)
 // PostgREST returns 42703 "column ... does not exist" and the sync fails loudly.
 const HAS_UPDATED_AT = new Set<string>([
   "products", "expenses", "store_settings", "cash_transactions",
-  "product_batches", "asset_categories", "assets", "shift_sessions",
+  "product_batches", "asset_categories", "assets", "shift_sessions", "shift_tasks",
 ]);
 /** Tables with neither timestamp usable as a watermark → always full pull (small). */
 const FULL_PULL = new Set<string>([

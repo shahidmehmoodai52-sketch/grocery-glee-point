@@ -31,6 +31,17 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import { fetchAll } from "@/lib/supabase-page";
+import { NeedsInternetBanner } from "@/components/needs-internet-banner";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
+import { insertOfflineAware, updateOfflineAware } from "@/lib/offline/pos";
+import { getMeta } from "@/lib/offline/device";
+import {
+  resumeHeldBillOfflineAware,
+  discardHeldBillOfflineAware,
+  recordCashEventOfflineAware,
+  setChecklistItemOfflineAware,
+} from "@/lib/offline/operations";
 
 export const Route = createFileRoute("/_authenticated/operations")({ component: Page });
 
@@ -171,6 +182,7 @@ function OwnerControlCenter({ settings }: { settings: any }) {
 
   return (
     <div className="space-y-4">
+      <NeedsInternetBanner section={t('operations.tab_owner', 'Owner')} />
       {/* Quick actions */}
       <QuickActionsBar />
 
@@ -415,7 +427,9 @@ function BusinessCalendar() {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="grid md:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      <NeedsInternetBanner section={t('operations.tab_calendar', 'Calendar')} />
+      <div className="grid md:grid-cols-2 gap-4">
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <Button size="icon" variant="ghost" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft className="h-4 w-4" /></Button>
@@ -459,6 +473,7 @@ function BusinessCalendar() {
           </div>
         </div>
       </Card>
+      </div>
     </div>
   );
 }
@@ -485,15 +500,22 @@ function CashDrawer({ settings }: { settings: any }) {
 
   const { data: events } = useQuery({
     queryKey: ["cash-events"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
-        .from("cash_drawer_events")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "cash_drawer_events",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => sb
+            .from("cash_drawer_events")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .range(from, to) as any);
+          return data as any[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().cash_drawer_events.toArray()).filter((r: any) => r._deleted !== 1);
+          return rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+        },
+      }),
   });
 
   const submit = async () => {
@@ -502,10 +524,11 @@ function CashDrawer({ settings }: { settings: any }) {
     if (type === "safe_drop" && settings?.ops_safe_drop_threshold > 0 && amt < settings.ops_safe_drop_threshold) {
       if (!confirm(t('operations.confirm_safe_drop_below', 'Safe drop below threshold ({{amount}}). Continue?', { amount: fmtMoney(settings.ops_safe_drop_threshold) }))) return;
     }
-    const { error } = await sb.rpc("record_cash_event", {
-      _type: type, _amount: amt, _reason: reason || null, _reference: reference || null,
-    });
-    if (error) return toast.error(error.message);
+    try {
+      await recordCashEventOfflineAware({ type, amount: amt, reason: reason || null, reference: reference || null });
+    } catch (e: any) {
+      return toast.error(e?.message ?? t('operations.toast_record_failed', 'Could not record event'));
+    }
     toast.success(t('operations.toast_recorded', 'Recorded'));
     setAmount(""); setReason(""); setReference("");
     qc.invalidateQueries({ queryKey: ["cash-events"] });
@@ -576,31 +599,54 @@ function HeldBills() {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["held-bills"],
-    queryFn: async () => {
-      const { data, error } = await sb
-        .from("held_bills")
-        .select("*, customers(name)")
-        .eq("status", "held")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "held_bills",
+        cloud: async () => {
+          const { data, error } = await sb
+            .from("held_bills")
+            .select("*, customers(name)")
+            .eq("status", "held")
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          return data as any[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().held_bills.toArray()).filter(
+            (r: any) => r._deleted !== 1 && r.status === "held",
+          );
+          const enriched = await Promise.all(
+            rows.map(async (r: any) => {
+              const c = r.customer_id ? await offlineDb().customers.get(r.customer_id) : null;
+              return { ...r, customers: c ? { name: c.name } : null };
+            }),
+          );
+          return enriched.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+        },
+      }),
   });
 
   const discard = async (id: string) => {
     if (!confirm(t('operations.confirm_discard', 'Discard this held bill?'))) return;
-    const { error } = await sb.rpc("discard_held_bill", { _id: id, _reason: null });
-    if (error) return toast.error(error.message);
+    try {
+      await discardHeldBillOfflineAware(id);
+    } catch (e: any) {
+      return toast.error(e?.message ?? t('operations.toast_discard_failed', 'Could not discard bill'));
+    }
     toast.success(t('operations.toast_discarded', 'Discarded'));
     qc.invalidateQueries({ queryKey: ["held-bills"] });
   };
 
   const resume = async (id: string) => {
-    // Store payload in localStorage so POS can pick up
-    const { data, error } = await sb.rpc("resume_bill", { _id: id });
-    if (error) return toast.error(error.message);
+    let payload: any;
     try {
-      localStorage.setItem("pos:resume_payload", JSON.stringify(data));
+      const r = await resumeHeldBillOfflineAware(id);
+      payload = r.payload;
+    } catch (e: any) {
+      return toast.error(e?.message ?? t('operations.toast_could_not_load', 'Could not load bill'));
+    }
+    try {
+      localStorage.setItem("pos:resume_payload", JSON.stringify(payload));
       toast.success(t('operations.toast_resumed', 'Resumed — open POS to continue'));
       window.location.href = "/pos";
     } catch {
@@ -643,31 +689,34 @@ function TasksPanel() {
 
   const { data } = useQuery({
     queryKey: ["shift-tasks"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
-        .from("shift_tasks")
-        .select("*")
-        .order("status", { ascending: true })
-        .order("created_at", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "shift_tasks",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => sb
+            .from("shift_tasks")
+            .select("*")
+            .order("status", { ascending: true })
+            .order("created_at", { ascending: false })
+            .range(from, to) as any);
+          return data as any[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().shift_tasks.toArray()).filter((r: any) => r._deleted !== 1);
+          return rows.sort((a: any, b: any) =>
+            String(a.status).localeCompare(String(b.status)) || String(b.created_at).localeCompare(String(a.created_at)),
+          );
+        },
+      }),
   });
 
   const add = async () => {
     if (!title.trim()) return;
-    const { error } = await sb.from("shift_tasks").insert({
-      title, priority, created_by: user!.id, tenant_id: undefined,
-    } as any);
-    // tenant_id auto via trigger? — fetch via current_tenant_id: we need to pass explicitly
-    if (error && String(error.message).includes("tenant_id")) {
-      const { data: tid } = await sb.rpc("current_tenant_id" as any);
-      if (tid) {
-        await sb.from("shift_tasks").insert({ title, priority, created_by: user!.id, tenant_id: tid } as any);
-      }
-    } else if (error) {
-      return toast.error(error.message);
+    const tenant_id = (await getMeta<string>("tenant_id")) ?? undefined;
+    try {
+      await insertOfflineAware("shift_tasks" as any, { title, priority, created_by: user!.id, tenant_id });
+    } catch (e: any) {
+      return toast.error(e?.message ?? t('operations.toast_task_add_failed', 'Could not add task'));
     }
     setTitle("");
     qc.invalidateQueries({ queryKey: ["shift-tasks"] });
@@ -676,7 +725,11 @@ function TasksPanel() {
   const setStatus = async (id: string, status: string) => {
     const patch: any = { status };
     if (status === "done") { patch.completed_at = new Date().toISOString(); patch.completed_by = user!.id; }
-    await sb.from("shift_tasks").update(patch).eq("id", id);
+    try {
+      await updateOfflineAware("shift_tasks", id, patch);
+    } catch (e: any) {
+      toast.error(e?.message ?? t('operations.toast_task_update_failed', 'Could not update task'));
+    }
     qc.invalidateQueries({ queryKey: ["shift-tasks"] });
   };
 
@@ -723,24 +776,32 @@ function NotesPanel() {
 
   const { data } = useQuery({
     queryKey: ["shift-notes"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
-        .from("shift_notes")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "shift_notes",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => sb
+            .from("shift_notes")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .range(from, to) as any);
+          return data as any[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().shift_notes.toArray()).filter((r: any) => r._deleted !== 1);
+          return rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+        },
+      }),
   });
 
   const add = async () => {
     if (!note.trim()) return;
-    const { data: tid } = await sb.rpc("current_tenant_id" as any);
-    const { error } = await sb.from("shift_notes").insert({
-      note, category, user_id: user!.id, tenant_id: tid,
-    } as any);
-    if (error) return toast.error(error.message);
+    const tenant_id = (await getMeta<string>("tenant_id")) ?? undefined;
+    try {
+      await insertOfflineAware("shift_notes" as any, { note, category, user_id: user!.id, tenant_id });
+    } catch (e: any) {
+      return toast.error(e?.message ?? t('operations.toast_note_add_failed', 'Could not save note'));
+    }
     setNote("");
     qc.invalidateQueries({ queryKey: ["shift-notes"] });
   };
@@ -782,6 +843,7 @@ function NotesPanel() {
 function ChecklistPanel({ settings }: { settings: any }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { user } = useAuth();
   const items: string[] = settings?.ops_checklist_items || [
     t('operations.checklist_default_1', 'Cash counted'),
     t('operations.checklist_default_2', 'Safe drop done'),
@@ -790,12 +852,25 @@ function ChecklistPanel({ settings }: { settings: any }) {
   ];
 
   const { data: shift } = useQuery({
-    queryKey: ["current-shift"],
-    queryFn: async () => {
-      const { data, error } = await sb.rpc("current_shift" as any);
-      if (error) return null;
-      return data as any;
-    },
+    queryKey: ["current-shift", user?.id],
+    enabled: !!user?.id,
+    queryFn: () =>
+      readLocalFirst<any>({
+        table: "shift_sessions",
+        cloud: async () => {
+          const { data, error } = await sb.rpc("current_shift" as any);
+          if (error) return null;
+          return data;
+        },
+        local: async () => {
+          if (!user?.id) return null;
+          const rows = (await offlineDb().shift_sessions.where("[cashier_id+status]").equals([user.id, "open"]).toArray())
+            .filter((r: any) => r._deleted !== 1);
+          rows.sort((a: any, b: any) => String(b.opened_at).localeCompare(String(a.opened_at)));
+          return rows[0] ?? null;
+        },
+        isEmpty: (d) => d == null,
+      }),
   });
 
   const shiftId = shift?.id || shift?.[0]?.id;
@@ -803,19 +878,28 @@ function ChecklistPanel({ settings }: { settings: any }) {
   const { data: existing } = useQuery({
     queryKey: ["checklist", shiftId],
     enabled: !!shiftId,
-    queryFn: async () => {
-      const { data, error } = await sb.from("shift_checklist").select("*").eq("shift_id", shiftId);
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "shift_checklist",
+        cloud: async () => {
+          const { data, error } = await sb.from("shift_checklist").select("*").eq("shift_id", shiftId);
+          if (error) throw error;
+          return data as any[];
+        },
+        local: async () => {
+          const rows = await offlineDb().shift_checklist.where("shift_id").equals(shiftId).toArray();
+          return rows.filter((r: any) => r._deleted !== 1);
+        },
+      }),
   });
 
   const toggle = async (key: string, label: string, completed: boolean) => {
     if (!shiftId) return toast.error(t('operations.toast_open_shift_first', 'Open a shift first'));
-    const { error } = await sb.rpc("set_checklist_item", {
-      _shift_id: shiftId, _key: key, _label: label, _completed: completed, _note: null,
-    });
-    if (error) return toast.error(error.message);
+    try {
+      await setChecklistItemOfflineAware({ shift_id: shiftId, key, label, completed, note: null });
+    } catch (e: any) {
+      return toast.error(e?.message ?? t('operations.toast_checklist_failed', 'Could not update checklist'));
+    }
     qc.invalidateQueries({ queryKey: ["checklist", shiftId] });
   };
 
@@ -845,15 +929,28 @@ function ReprintsLog() {
   const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ["reprints"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
-        .from("receipt_reprints")
-        .select("*, sales(invoice_no,total)")
-        .order("created_at", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "receipt_reprints",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => sb
+            .from("receipt_reprints")
+            .select("*, sales(invoice_no,total)")
+            .order("created_at", { ascending: false })
+            .range(from, to) as any);
+          return data as any[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().receipt_reprints.toArray()).filter((r: any) => r._deleted !== 1);
+          const enriched = await Promise.all(
+            rows.map(async (r: any) => {
+              const s = await offlineDb().sales.get(r.sale_id);
+              return { ...r, sales: s ? { invoice_no: s.invoice_no, total: s.total } : null };
+            }),
+          );
+          return enriched.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+        },
+      }),
   });
   return (
     <Card className="p-4">
@@ -884,19 +981,29 @@ function VoidsLog() {
 
   const { data } = useQuery({
     queryKey: ["voids"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
-        .from("sale_voids")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "sale_voids",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => sb
+            .from("sale_voids")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .range(from, to) as any);
+          return data as any[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().sale_voids.toArray()).filter((r: any) => r._deleted !== 1);
+          return rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+        },
+      }),
   });
 
   const voidSale = async () => {
     if (!invoice.trim() || !reason.trim()) return toast.error(t('operations.toast_invoice_reason_required', 'Invoice and reason required'));
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return toast.error(t('operations.toast_void_needs_internet', 'Voiding a sale needs internet — it reverses stock, credit and expenses and must be applied immediately.'));
+    }
     const { data: s, error: e1 } = await sb.from("sales").select("id").eq("invoice_no", invoice.trim()).maybeSingle();
     if (e1 || !s) return toast.error(t('operations.toast_invoice_not_found', 'Invoice not found'));
     const { error } = await sb.rpc("void_sale", { _sale_id: s.id, _reason: reason });
@@ -968,24 +1075,44 @@ function HandoverPanel() {
   });
 
   const { data: currentShift } = useQuery({
-    queryKey: ["current-shift"],
-    queryFn: async () => {
-      const { data } = await sb.rpc("current_shift" as any);
-      return data as any;
-    },
+    queryKey: ["current-shift", user?.id],
+    enabled: !!user?.id,
+    queryFn: () =>
+      readLocalFirst<any>({
+        table: "shift_sessions",
+        cloud: async () => {
+          const { data } = await sb.rpc("current_shift" as any);
+          return data;
+        },
+        local: async () => {
+          if (!user?.id) return null;
+          const rows = (await offlineDb().shift_sessions.where("[cashier_id+status]").equals([user.id, "open"]).toArray())
+            .filter((r: any) => r._deleted !== 1);
+          rows.sort((a: any, b: any) => String(b.opened_at).localeCompare(String(a.opened_at)));
+          return rows[0] ?? null;
+        },
+        isEmpty: (d) => d == null,
+      }),
   });
 
   const { data: handovers = [], refetch } = useQuery({
     queryKey: ["manager-handovers"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => sb
-        .from("manager_handovers")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      readLocalFirst<any[]>({
+        table: "manager_handovers",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => sb
+            .from("manager_handovers")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .range(from, to) as any);
+          return data as any[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().manager_handovers.toArray()).filter((r: any) => r._deleted !== 1);
+          return rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+        },
+      }),
   });
 
   const submit = async () => {
@@ -993,29 +1120,33 @@ function HandoverPanel() {
     const amt = Number(cash || 0);
     if (isNaN(amt) || amt < 0) return toast.error(t('operations.toast_enter_valid_cash', 'Enter a valid cash amount'));
     setSaving(true);
-    const { data: tid } = await sb.rpc("current_tenant_id" as any);
+    const tenant_id = (await getMeta<string>("tenant_id")) ?? undefined;
     const shiftId = currentShift?.id || currentShift?.[0]?.id || null;
-    const { error } = await sb.from("manager_handovers").insert({
-      tenant_id: tid,
-      from_user: user.id,
-      to_user: toUser || null,
-      from_shift_id: shiftId,
-      cash_amount: amt,
-      notes: notes.trim() || null,
-    } as any);
+    try {
+      await insertOfflineAware("manager_handovers" as any, {
+        tenant_id,
+        from_user: user.id,
+        to_user: toUser || null,
+        from_shift_id: shiftId,
+        cash_amount: amt,
+        notes: notes.trim() || null,
+      });
+    } catch (e: any) {
+      setSaving(false);
+      return toast.error(e?.message ?? t('operations.toast_handover_failed', 'Could not record handover'));
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
     toast.success(t('operations.toast_handover_recorded', 'Handover recorded'));
     setCash(""); setNotes(""); setToUser("");
     qc.invalidateQueries({ queryKey: ["manager-handovers"] });
   };
 
   const acknowledge = async (id: string) => {
-    const { error } = await sb
-      .from("manager_handovers")
-      .update({ acknowledged_at: new Date().toISOString(), to_user: user?.id })
-      .eq("id", id);
-    if (error) return toast.error(error.message);
+    try {
+      await updateOfflineAware("manager_handovers", id, { acknowledged_at: new Date().toISOString(), to_user: user?.id });
+    } catch (e: any) {
+      return toast.error(e?.message ?? t('operations.toast_acknowledge_failed', 'Could not acknowledge'));
+    }
     toast.success(t('operations.toast_acknowledged', 'Acknowledged'));
     refetch();
   };
