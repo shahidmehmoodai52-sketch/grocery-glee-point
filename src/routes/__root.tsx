@@ -187,9 +187,11 @@ function RootComponent() {
         const { runSync, recoverInterruptedQueue, scheduleRetryPass } = await import("@/lib/offline/sync");
         const { registerAppShellSW } = await import("@/lib/offline/register-sw");
         const { debounceAsync, logPerf, nowMs, whenIdle } = await import("@/lib/offline/perf");
+        const { requestPersistentStorage } = await import("@/lib/offline/device");
         if (disposed) return;
         bootOfflineStatus();
         void registerAppShellSW();
+        void requestPersistentStorage();
         // Resume any upload interrupted by a crash / power failure, then arm
         // the backoff timer for items still waiting on a retry window.
         await recoverInterruptedQueue();
