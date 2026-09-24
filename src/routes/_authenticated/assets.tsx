@@ -19,6 +19,9 @@ import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
+import { insertOfflineAware, updateOfflineAware, deleteOfflineAware } from "@/lib/offline/pos";
 
 export const Route = createFileRoute("/_authenticated/assets")({
   component: Page,
@@ -90,33 +93,67 @@ function Page() {
 
   const catsQ = useQuery<Category[]>({
     queryKey: ["asset_categories"],
-    queryFn: async () => (await supabase.from("asset_categories").select("*").order("name")).data ?? [],
+    queryFn: () =>
+      readLocalFirst<Category[]>({
+        table: "asset_categories",
+        cloud: async () => (await supabase.from("asset_categories").select("*").order("name")).data ?? [],
+        local: async () => {
+          const rows = (await offlineDb().asset_categories.toArray()).filter((c: any) => c._deleted !== 1);
+          return rows.sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
+        },
+      }),
   });
 
   const assetsQ = useQuery<Asset[]>({
     queryKey: ["assets"],
-    queryFn: async () =>
-      (await supabase
-        .from("assets")
-        .select("*, asset_categories(name)")
-        .order("created_at", { ascending: false })).data as any ?? [],
+    queryFn: () =>
+      readLocalFirst<Asset[]>({
+        table: "assets",
+        cloud: async () =>
+          (await supabase
+            .from("assets")
+            .select("*, asset_categories(name)")
+            .order("created_at", { ascending: false })).data as any ?? [],
+        local: async () => {
+          const rows = (await offlineDb().assets.toArray()).filter((a: any) => a._deleted !== 1);
+          const enriched = await Promise.all(
+            rows.map(async (a: any) => {
+              const c = a.category_id ? await offlineDb().asset_categories.get(a.category_id) : null;
+              return { ...a, asset_categories: c ? { name: c.name } : null };
+            }),
+          );
+          return enriched.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+        },
+      }),
   });
 
   // Stock worth (from products) so shop's total worth can be shown at one click.
   const stockQ = useQuery<{ worth: number; count: number }>({
     queryKey: ["assets-stock-worth"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("products")
-        .select("stock,cost_price,sell_price,is_active")
-        .eq("is_active", true);
-      const rows = (data ?? []) as any[];
-      const worth = rows.reduce(
-        (s, r) => s + Number(r.stock ?? 0) * Number(r.cost_price ?? r.sell_price ?? 0),
-        0,
-      );
-      return { worth, count: rows.length };
-    },
+    queryFn: () =>
+      readLocalFirst<{ worth: number; count: number }>({
+        table: "products",
+        cloud: async () => {
+          const { data } = await supabase
+            .from("products")
+            .select("stock,cost_price,sell_price,is_active")
+            .eq("is_active", true);
+          const rows = (data ?? []) as any[];
+          const worth = rows.reduce(
+            (s, r) => s + Number(r.stock ?? 0) * Number(r.cost_price ?? r.sell_price ?? 0),
+            0,
+          );
+          return { worth, count: rows.length };
+        },
+        local: async () => {
+          const rows = (await offlineDb().products.toArray()).filter((p: any) => p.is_active && p._deleted !== 1);
+          const worth = rows.reduce(
+            (s, r: any) => s + Number(r.stock ?? 0) * Number(r.cost_price ?? r.sell_price ?? 0),
+            0,
+          );
+          return { worth, count: rows.length };
+        },
+      }),
   });
 
   const filtered = useMemo(() => {
@@ -183,15 +220,16 @@ function Page() {
       purchase_price: Number(form.purchase_price) || 0,
       current_value: Number(form.current_value) || Number(form.purchase_price) || 0,
     };
-    let err;
-    if (editingId) {
-      const { error } = await supabase.from("assets").update(payload).eq("id", editingId);
-      err = error;
-    } else {
-      const { error } = await supabase.from("assets").insert(payload);
-      err = error;
+    try {
+      if (editingId) {
+        await updateOfflineAware("assets", editingId, payload);
+      } else {
+        await insertOfflineAware("assets" as any, payload);
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? t('assets.toast_save_failed', 'Could not save asset'));
+      return;
     }
-    if (err) { toast.error(err.message); return; }
     toast.success(editingId ? t('assets.toast_asset_updated', 'Asset updated') : t('assets.toast_asset_added', 'Asset added'));
     setAssetOpen(false);
     qc.invalidateQueries({ queryKey: ["assets"] });
@@ -199,20 +237,28 @@ function Page() {
 
   const removeAsset = async (id: string) => {
     if (!confirm(t('assets.confirm_delete_asset', 'Delete this asset?'))) return;
-    const { error } = await supabase.from("assets").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    try {
+      await deleteOfflineAware("assets", id);
+    } catch (e: any) {
+      toast.error(e?.message ?? t('assets.toast_delete_failed', 'Could not delete asset'));
+      return;
+    }
     toast.success(t('cash_flow.toast_deleted', 'Deleted'));
     qc.invalidateQueries({ queryKey: ["assets"] });
   };
 
   const saveCategory = async () => {
     if (!cat.name.trim()) { toast.error(t('assets.toast_category_name_required', 'Category name required')); return; }
-    const { error } = await supabase.from("asset_categories").insert({
-      name: cat.name.trim(),
-      icon: cat.icon || null,
-      notes: cat.notes || null,
-    });
-    if (error) { toast.error(error.message); return; }
+    try {
+      await insertOfflineAware("asset_categories" as any, {
+        name: cat.name.trim(),
+        icon: cat.icon || null,
+        notes: cat.notes || null,
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? t('assets.toast_category_save_failed', 'Could not save category'));
+      return;
+    }
     toast.success(t('assets.toast_category_added', 'Category added'));
     setCat({ name: "", icon: "", notes: "" });
     setCatOpen(false);
@@ -221,8 +267,12 @@ function Page() {
 
   const removeCategory = async (id: string) => {
     if (!confirm(t('assets.confirm_delete_category', 'Delete this category? Assets will remain but become uncategorised.'))) return;
-    const { error } = await supabase.from("asset_categories").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    try {
+      await deleteOfflineAware("asset_categories", id);
+    } catch (e: any) {
+      toast.error(e?.message ?? t('assets.toast_category_delete_failed', 'Could not delete category'));
+      return;
+    }
     qc.invalidateQueries({ queryKey: ["asset_categories"] });
     qc.invalidateQueries({ queryKey: ["assets"] });
   };
