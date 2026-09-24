@@ -40,8 +40,10 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
-import { NeedsInternetBanner } from "@/components/needs-internet-banner";
 import { fetchAll } from "@/lib/supabase-page";
+import { readLocalFirst } from "@/lib/offline/data-access";
+import { db as offlineDb } from "@/lib/offline/db";
+import { offlineFirst, cacheSuppliers, updateOfflineAware } from "@/lib/offline/pos";
 
 export const Route = createFileRoute("/_authenticated/intelligence")({
   component: IntelligencePage,
@@ -114,15 +116,27 @@ function IntelligencePage() {
 
   const intelQ = useQuery({
     queryKey: ["product-intel"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => supabase
-        .from("product_intelligence" as any)
-        .select("*")
-        .order("revenue_90d", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return (data ?? []) as unknown as Intel[];
-    },
+    queryFn: () =>
+      readLocalFirst<Intel[]>({
+        table: "product_intelligence",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => supabase
+            .from("product_intelligence" as any)
+            .select("*")
+            .order("revenue_90d", { ascending: false })
+            .range(from, to) as any);
+          return (data ?? []) as unknown as Intel[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().product_intelligence.toArray()) as Intel[];
+          return rows.sort((a, b) => Number(b.revenue_90d) - Number(a.revenue_90d));
+        },
+        cache: async (data) => {
+          const t = offlineDb().product_intelligence;
+          await t.clear();
+          if (data.length) await t.bulkPut(data as any[]);
+        },
+      }),
   });
 
   const rows = intelQ.data ?? [];
@@ -153,10 +167,12 @@ function IntelligencePage() {
 
   return (
     <div className="p-6 space-y-4">
-      <NeedsInternetBanner section={t('intelligence.page_title', 'Inventory Intelligence')} />
       <PageHeader
         title={t('intelligence.page_title', 'Inventory Intelligence')}
-        description={t('intelligence.page_desc', 'ABC classification, velocity, reorder suggestions & smart alerts. Updates automatically from sales.')}
+        description={
+          t('intelligence.page_desc', 'ABC classification, velocity, reorder suggestions & smart alerts. Updates automatically from sales.')
+          + ' ' + t('intelligence.page_desc_offline_note', 'Works offline too, showing the numbers from your last visit while connected.')
+        }
         icon={<Brain className="h-5 w-5" />}
       />
 
@@ -373,25 +389,33 @@ function ReorderEditDialog({ product, onClose }: { product: Intel; onClose: () =
 
   const suppliersQ = useQuery({
     queryKey: ["suppliers-picker"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => supabase.from("suppliers").select("id,name").order("name").range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const data = await fetchAll<any>((from: number, to: number) => supabase.from("suppliers").select("id,name").order("name").range(from, to) as any);
+          return data ?? [];
+        },
+        async () => (await offlineDb().suppliers.orderBy("name").toArray()).map((s: any) => ({ id: s.id, name: s.name })),
+        cacheSuppliers,
+      ),
   });
 
   const save = async () => {
     setSaving(true);
-    const { error } = await supabase.from("products").update({
-      min_stock: minStock === "" ? null : roundToTillixQty(Number(minStock)),
-      max_stock: maxStock === "" ? null : roundToTillixQty(Number(maxStock)),
-      safety_stock: safety === "" ? 0 : roundToTillixQty(Number(safety)),
-      lead_time_days: lead === "" ? 7 : Number(lead),
-      reorder_qty: reorder === "" ? null : roundToTillixQty(Number(reorder)),
-      preferred_supplier_id: supplierId || null,
-    }).eq("id", product.product_id);
+    try {
+      await updateOfflineAware("products", product.product_id, {
+        min_stock: minStock === "" ? null : roundToTillixQty(Number(minStock)),
+        max_stock: maxStock === "" ? null : roundToTillixQty(Number(maxStock)),
+        safety_stock: safety === "" ? 0 : roundToTillixQty(Number(safety)),
+        lead_time_days: lead === "" ? 7 : Number(lead),
+        reorder_qty: reorder === "" ? null : roundToTillixQty(Number(reorder)),
+        preferred_supplier_id: supplierId || null,
+      });
+    } catch (e: any) {
+      setSaving(false);
+      return toast.error(e?.message ?? t('intelligence.toast_reorder_save_failed', 'Could not save reorder settings'));
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
     toast.success(t('intelligence.toast_reorder_saved', 'Reorder settings saved'));
     qc.invalidateQueries({ queryKey: ["product-intel"] });
     onClose();
@@ -579,15 +603,27 @@ function SuggestionsTab({ sym }: { sym: string }) {
   const { t } = useTranslation();
   const q = useQuery({
     queryKey: ["purchase-suggestions"],
-    queryFn: async () => {
-      const { data, error } = { data: await fetchAll<any>((from: number, to: number) => supabase
-        .from("smart_purchase_suggestions" as any)
-        .select("*")
-        .order("suggested_cost", { ascending: false })
-        .range(from, to) as any), error: null as any };
-      if (error) throw error;
-      return (data ?? []) as unknown as Suggestion[];
-    },
+    queryFn: () =>
+      readLocalFirst<Suggestion[]>({
+        table: "smart_purchase_suggestions",
+        cloud: async () => {
+          const data = await fetchAll<any>((from: number, to: number) => supabase
+            .from("smart_purchase_suggestions" as any)
+            .select("*")
+            .order("suggested_cost", { ascending: false })
+            .range(from, to) as any);
+          return (data ?? []) as unknown as Suggestion[];
+        },
+        local: async () => {
+          const rows = (await offlineDb().smart_purchase_suggestions.toArray()) as Suggestion[];
+          return rows.sort((a, b) => Number(b.suggested_cost) - Number(a.suggested_cost));
+        },
+        cache: async (data) => {
+          const t = offlineDb().smart_purchase_suggestions;
+          await t.clear();
+          if (data.length) await t.bulkPut(data as any[]);
+        },
+      }),
   });
 
   const grouped = useMemo(() => {

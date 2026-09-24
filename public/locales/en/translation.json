@@ -1987,6 +1987,7 @@
   "intelligence": {
     "page_title": "Inventory Intelligence",
     "page_desc": "ABC classification, velocity, reorder suggestions & smart alerts. Updates automatically from sales.",
+    "page_desc_offline_note": "Works offline too, showing the numbers from your last visit while connected.",
     "stat_inventory_health": "Inventory health",
     "stat_inventory_value": "Inventory value",
     "stat_dead_stock_value": "Dead stock value",
@@ -2035,6 +2036,7 @@
     "none_option": "None",
     "auto_suggestion_note": "Auto suggestion = (avg daily × lead time) + safety − current stock. Avg daily last 30d: {{avg}} {{unit}}/d.",
     "toast_reorder_saved": "Reorder settings saved",
+    "toast_reorder_save_failed": "Could not save reorder settings",
     "class_label": "Class {{letter}}",
     "products_count": "{{count}} products",
     "pct_of_revenue": "{{pct}}% of revenue",

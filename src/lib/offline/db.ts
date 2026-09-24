@@ -146,6 +146,10 @@ class PosOfflineDB extends Dexie {
   inventory_waste!: Table<any, string>;
   asset_categories!: Table<any, string>;
   assets!: Table<any, string>;
+  // v9 — cached snapshot of the product_intelligence / smart_purchase_suggestions
+  // views (see version(9) below for why these aren't in the periodic pull loop).
+  product_intelligence!: Table<any, string>;
+  smart_purchase_suggestions!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   // v3 master-data tables
@@ -267,6 +271,21 @@ class PosOfflineDB extends Dexie {
       asset_categories: "id, name, created_at, updated_at",
       assets: "id, category_id, created_at, updated_at",
     });
+    // v9 — product_intelligence / smart_purchase_suggestions snapshot cache.
+    // Both views have no created_at/updated_at column at all (every column is
+    // computed relative to now()/CURRENT_DATE — velocity, ABC class, days
+    // remaining, health score…), so there's no watermark for the periodic
+    // pull engine to use, and a full-table pull on every sync tick would be
+    // the exact DB-load regression this offline effort exists to avoid. So
+    // these are deliberately NOT in sync.ts's PULL_TABLES — intelligence.tsx's
+    // own readLocalFirst() read warms this cache on each successful online
+    // load (via its `cache` callback) and serves it, TTL-bound, when offline
+    // or between visits. That's a cached snapshot of the server's own
+    // precomputed numbers, not a client-side reimplementation of them.
+    this.version(9).stores({
+      product_intelligence: "product_id, tenant_id",
+      smart_purchase_suggestions: "product_id, tenant_id, supplier_id",
+    });
   }
 }
 
@@ -295,6 +314,7 @@ export const MIRRORED_TABLES = [
   "cash_accounts", "store_settings", "user_roles", "my_access",
   "party_payments", "cash_transactions",
   "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
+  "product_intelligence", "smart_purchase_suggestions",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];
