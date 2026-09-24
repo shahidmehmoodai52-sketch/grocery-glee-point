@@ -1401,6 +1401,7 @@
   "reports": {
     "title": "Reports",
     "subtitle": "Sales, profit, invoice & product breakdowns",
+    "subtitle_offline_note": "· Works offline too, using the data already synced to this device.",
     "loading": "Loading...",
     "stat_revenue": "Revenue",
     "stat_cost_of_goods": "Cost of goods",

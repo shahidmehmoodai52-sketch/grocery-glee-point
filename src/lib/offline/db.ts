@@ -179,6 +179,9 @@ class PosOfflineDB extends Dexie {
   sale_voids!: Table<any, string>;
   shift_checklist!: Table<any, string>;
   manager_handovers!: Table<any, string>;
+  // v12 — pharmacy_product_details, so reports.tsx's generic/company-wise
+  // pharmacy reports work offline too.
+  pharmacy_product_details!: Table<any, string>;
   store_settings!: Table<any, string>;
   user_roles!: Table<any, string>;
   // v3 master-data tables
@@ -342,6 +345,11 @@ class PosOfflineDB extends Dexie {
       shift_checklist: "id, shift_id, tenant_id, [shift_id+item_key]",
       manager_handovers: "id, tenant_id, from_user, to_user, created_at",
     });
+    // v12 — pharmacy_product_details, for reports.tsx's generic-name and
+    // manufacturer/company-wise pharmacy reports.
+    this.version(12).stores({
+      pharmacy_product_details: "id, product_id, tenant_id, updated_at",
+    });
   }
 }
 
@@ -373,6 +381,7 @@ export const MIRRORED_TABLES = [
   "product_intelligence", "smart_purchase_suggestions", "shift_sessions",
   "cash_drawer_events", "shift_notes", "shift_tasks", "receipt_reprints",
   "sale_voids", "shift_checklist", "manager_handovers",
+  "pharmacy_product_details",
   ...MASTER_TABLES,
 ] as const;
 export type MirroredTable = typeof MIRRORED_TABLES[number];

@@ -26,6 +26,7 @@ const PULL_TABLES: MirroredTable[] = [
   "shift_sessions",
   "cash_drawer_events", "shift_notes", "shift_tasks", "receipt_reprints",
   "sale_voids", "shift_checklist", "manager_handovers",
+  "pharmacy_product_details",
 ];
 
 const PAGE = 1000;
@@ -50,6 +51,7 @@ async function setWatermark(table: string, ts: string, id: string | null = null)
 const HAS_UPDATED_AT = new Set<string>([
   "products", "expenses", "store_settings", "cash_transactions",
   "product_batches", "asset_categories", "assets", "shift_sessions", "shift_tasks",
+  "pharmacy_product_details",
 ]);
 /** Tables with neither timestamp usable as a watermark → always full pull (small). */
 const FULL_PULL = new Set<string>([
