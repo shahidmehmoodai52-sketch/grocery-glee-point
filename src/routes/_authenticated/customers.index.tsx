@@ -51,7 +51,7 @@ function Page() {
   const [pay, setPay] = useState({ amount: 0, method: "Cash in hand", note: "", account_id: "" });
   const [search, setSearch] = useState("");
   const [editRow, setEditRow] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", address: "", opening_balance: 0 });
+  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", address: "" });
 
   const openEdit = (c: any) => {
     setEditRow(c);
@@ -60,7 +60,6 @@ function Page() {
       phone: c.phone ?? "",
       email: c.email ?? "",
       address: c.address ?? "",
-      opening_balance: Number(c.opening_balance ?? 0),
     });
   };
 
@@ -338,7 +337,7 @@ function Page() {
               <div><Label>{t('common.email', 'Email')}</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
             </div>
             <div><Label>{t('common.address', 'Address')}</Label><Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></div>
-            <div><Label>{t('customers.opening_balance_label', 'Opening balance (they owe)')}</Label><Input type="number" step="0.01" value={editForm.opening_balance || ""} onChange={(e) => setEditForm({ ...editForm, opening_balance: Number(e.target.value) })} /></div>
+            <p className="text-xs text-muted-foreground">{t('customers.opening_balance_edit_hint', 'To change the opening balance, open this customer\'s Ledger.')}</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditRow(null)}>{t('common.cancel', 'Cancel')}</Button>
