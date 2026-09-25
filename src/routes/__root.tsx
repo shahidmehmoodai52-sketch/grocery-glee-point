@@ -194,6 +194,7 @@ function RootComponent() {
         const { registerAppShellSW } = await import("@/lib/offline/register-sw");
         const { debounceAsync, logPerf, nowMs, whenIdle } = await import("@/lib/offline/perf");
         const { requestPersistentStorage } = await import("@/lib/offline/device");
+        const { refreshSessionDeduped } = await import("@/lib/offline/session");
         if (disposed) return;
         bootOfflineStatus();
         void registerAppShellSW();
@@ -267,8 +268,14 @@ function RootComponent() {
         // hit a real shop while saving an invoice). Force a refresh whenever
         // the app regains focus or the network comes back, so the token is
         // never stale by the time the cashier's next action fires.
+        //
+        // Uses the shared deduped helper (see session.ts) — onOnline and
+        // onVisible below can both fire within milliseconds of each other on
+        // a flapping connection, and racing two independent refreshSession()
+        // calls can tear down an otherwise-healthy session (see that file's
+        // comment for the full explanation).
         const refreshSessionIfNeeded = () => {
-          void supabase.auth.refreshSession().catch(() => {/* no session yet, or already fresh — ignore */});
+          void refreshSessionDeduped();
         };
 
         let offlineSince: number | null = null;
