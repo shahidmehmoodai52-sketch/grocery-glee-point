@@ -35,15 +35,40 @@ export function isOfflineNow(): boolean {
 // token — one succeeds, the other is rejected as already-used, and that
 // rejection can tear down the session the first call just established. A
 // spurious sign-out on reconnect, not an actually-expired session. Sharing
-// one in-flight call across every caller removes the race regardless of
-// which one fires first.
+// one in-flight call across every caller removes the race within a tab
+// regardless of which one fires first.
 let refreshInFlight: Promise<unknown> | null = null;
+
+// The in-flight guard above only spans one browser tab's own JS runtime —
+// a shop that keeps two tabs of the same device open (not two different
+// devices, which already get independent login sessions and can't race
+// each other) shares the same underlying refresh token via localStorage
+// (supabase-js's session store), so two tabs can still fire competing
+// refreshSession() calls against it. Stamp a shared timestamp before
+// calling so a second tab that checks within the same short window skips
+// its own network call and just re-reads the session supabase-js already
+// persisted to that shared storage — cheap, and avoids ever repeating the
+// original failure mode across tabs instead of just within one.
+const CROSS_TAB_LOCK_KEY = "tillix:last_refresh_attempt_at";
+const CROSS_TAB_LOCK_WINDOW_MS = 5000;
+
 export function refreshSessionDeduped(): Promise<unknown> {
-  if (!refreshInFlight) {
-    refreshInFlight = supabase.auth.refreshSession()
-      .catch(() => {/* no session yet, or already fresh — ignore */})
-      .finally(() => { refreshInFlight = null; });
+  if (refreshInFlight) return refreshInFlight;
+
+  let anotherTabRecentlyTried = false;
+  try {
+    const last = Number(window.localStorage.getItem(CROSS_TAB_LOCK_KEY) ?? 0);
+    anotherTabRecentlyTried = Date.now() - last < CROSS_TAB_LOCK_WINDOW_MS;
+    if (!anotherTabRecentlyTried) {
+      window.localStorage.setItem(CROSS_TAB_LOCK_KEY, String(Date.now()));
+    }
+  } catch {
+    /* localStorage unavailable — fall through to a normal refresh */
   }
+
+  refreshInFlight = (anotherTabRecentlyTried ? supabase.auth.getSession() : supabase.auth.refreshSession())
+    .catch(() => {/* no session yet, or already fresh — ignore */})
+    .finally(() => { refreshInFlight = null; });
   return refreshInFlight;
 }
 
