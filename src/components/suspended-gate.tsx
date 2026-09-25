@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { useOfflineStatus } from "@/lib/offline/status";
 import { clearOfflineDataOnLogout } from "@/lib/offline/device";
+import { refreshSessionDeduped } from "@/lib/offline/session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,8 +33,11 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
         // failure here (same class of bug already fixed for the sale-save path
         // in __root.tsx) — refresh once and retry before giving up, so a shop
         // owner with a perfectly real shop is never dropped into "Register
-        // your shop" just because their token needed a refresh.
-        await supabase.auth.refreshSession().catch(() => {});
+        // your shop" just because their token needed a refresh. Uses the
+        // shared deduped helper so this can't race __root.tsx's own
+        // reconnect/focus-triggered refresh and tear down a session that
+        // refresh just fixed (see session.ts for the full explanation).
+        await refreshSessionDeduped();
         ({ data, error } = await call());
         if (error) throw error;
       }

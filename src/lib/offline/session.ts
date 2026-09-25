@@ -26,6 +26,27 @@ export function isOfflineNow(): boolean {
   return isEffectivelyOffline();
 }
 
+// Several independent triggers (reconnect, tab focus, a failed tenant-status
+// check) each want to force-refresh the session so a stale/expired access
+// token never causes a genuine action to fail. Left uncoordinated, two of
+// them firing within milliseconds of each other (a flapping network
+// interface commonly brings a reconnect and a focus change at once) race
+// two refreshSession() calls against the same not-yet-rotated refresh
+// token — one succeeds, the other is rejected as already-used, and that
+// rejection can tear down the session the first call just established. A
+// spurious sign-out on reconnect, not an actually-expired session. Sharing
+// one in-flight call across every caller removes the race regardless of
+// which one fires first.
+let refreshInFlight: Promise<unknown> | null = null;
+export function refreshSessionDeduped(): Promise<unknown> {
+  if (!refreshInFlight) {
+    refreshInFlight = supabase.auth.refreshSession()
+      .catch(() => {/* no session yet, or already fresh — ignore */})
+      .finally(() => { refreshInFlight = null; });
+  }
+  return refreshInFlight;
+}
+
 export async function getUserAllowOffline(): Promise<User | null> {
   // 1. Prefer local session first — Supabase restores this from storage reliably
   //    and does not need a network round-trip. This prevents transient network
