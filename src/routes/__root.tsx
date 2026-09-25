@@ -285,7 +285,20 @@ function RootComponent() {
         window.addEventListener("online", onOnline);
         window.addEventListener("offline", onOffline);
 
-        const interval = window.setInterval(() => trigger("interval"), 5 * 60_000);
+        // A full pass here re-requests every one of the ~34 mirrored tables
+        // (pullTable() always issues at least one request per table, even
+        // when nothing changed) — while online, the realtime subscription
+        // in use-realtime-sync.ts already pushes changes the moment they
+        // happen, so this periodic pass is purely a safety-net catch-up for
+        // whatever realtime might have missed, not the primary freshness
+        // mechanism. At 5 minutes this was ~9,000 needless requests/day per
+        // open device even with zero cashier activity — a meaningful share
+        // of the whole shop's (and, since the Cloudflare Worker proxy's
+        // daily request quota is shared across every tenant, every OTHER
+        // shop's) daily budget too. 20 minutes keeps a reasonable catch-up
+        // cadence while cutting that idle cost ~4x; boot, reconnect, and a
+        // manual "Sync now" are unaffected and stay immediate.
+        const interval = window.setInterval(() => trigger("interval"), 20 * 60_000);
 
         // Returning to the tab (or app resume on desktop) is also a good moment
         // to drain the queue — some platforms never fire an `online` event.

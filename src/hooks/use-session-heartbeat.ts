@@ -17,7 +17,13 @@ function getDeviceId(): string {
 
 /**
  * Registers this device as an active session for the signed-in user and
- * heartbeats every 30s. Admin panel counts rows with recent last_seen.
+ * heartbeats every few minutes. Admin panel counts rows with recent
+ * last_seen — that feature only needs "online within the last few minutes"
+ * resolution, not second-level freshness, so this doesn't need to be
+ * anywhere near as frequent as an actual liveness/health check. At 30s this
+ * was ~2,880 needless requests/day per signed-in device that just stays
+ * open, against the shared Cloudflare Worker proxy's daily request quota
+ * every tenant draws from.
  */
 export function useSessionHeartbeat() {
   const { user } = useAuth();
@@ -36,7 +42,7 @@ export function useSessionHeartbeat() {
         );
     };
     beat();
-    const interval = setInterval(beat, 30_000);
+    const interval = setInterval(beat, 180_000);
 
     const cleanup = async () => {
       try {
