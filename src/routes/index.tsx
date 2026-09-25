@@ -7,7 +7,7 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  PlayCircle, Sparkles, Mail,
+  PlayCircle, Sparkles, Mail, Download,
 } from "lucide-react";
 
 /* ---------- IP-based currency localization ---------- */
@@ -456,7 +456,16 @@ function LandingPage() {
                 <Link to="/auth" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-tx-navy transition hover:bg-slate-50">
                   {t('landing.nav.login')}
                 </Link>
+                <a
+                  href="https://github.com/shahidmehmoodai52-sketch/grocery-glee-point/releases/latest"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-tx-navy transition hover:bg-slate-50"
+                >
+                  <Download className="h-4 w-4" /> {t('landing.hero.installDesktop', 'Install Desktop App')}
+                </a>
               </div>
+              <p className="mt-2 text-xs text-slate-500">{t('landing.hero.installDesktopHint', 'Windows app — works fully offline once installed')}</p>
 
               <ul className="mt-6 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-2 sm:max-w-md">
                 {[t('landing.why.b1'), t('landing.why.b2'), t('landing.why.b3'), t('landing.why.b4')].map(x => (
