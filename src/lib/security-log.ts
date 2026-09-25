@@ -25,15 +25,26 @@ export async function logSecurityEvent(
   }
 }
 
-/** Check if the current visitor (by IP) or a given email is on the blocklist. */
+/** Check if the current visitor (by IP) or a given email is on the blocklist.
+ *  This gates sign-in (see auth.tsx) — if the proxy/network hangs instead of
+ *  erroring outright (seen live: a degraded connection that neither
+ *  succeeds nor fails, just never resolves), an un-timed-out call here would
+ *  leave the login button spinning forever with no way in, even though the
+ *  actual sign-in request would have worked fine. Fail open (treat as "not
+ *  blocked") after a bounded wait rather than block every login on this
+ *  check being reachable. */
 export async function isBlocked(email?: string | null): Promise<boolean> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 6000);
   try {
-    const { data, error } = await supabase.rpc("is_blocked", {
-      _email: email ?? undefined,
-    });
+    const { data, error } = await supabase
+      .rpc("is_blocked", { _email: email ?? undefined })
+      .abortSignal(ctrl.signal);
     if (error) return false;
     return Boolean(data);
   } catch {
     return false;
+  } finally {
+    clearTimeout(t);
   }
 }
