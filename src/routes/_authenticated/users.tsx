@@ -32,12 +32,15 @@ function Page() {
 
   const { data: users = [], isLoading } = useQuery({ queryKey: ["staff"], queryFn: () => (list as any)() });
 
-  // Active devices per user (heartbeat within last 90s)
+  // Active devices per user. The heartbeat now writes every 180s (was 30s —
+  // see use-session-heartbeat.ts), so the window must comfortably span at
+  // least one interval plus room for a slow/missed beat, or every device
+  // would show "offline" for most of each cycle.
   const { data: activeSessions = {} } = useQuery({
     queryKey: ["active-sessions"],
     refetchInterval: 15_000,
     queryFn: async () => {
-      const since = new Date(Date.now() - 90_000).toISOString();
+      const since = new Date(Date.now() - 240_000).toISOString();
       const { data, error } = await supabase
         .from("user_sessions")
         .select("user_id")
