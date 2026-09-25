@@ -33,6 +33,22 @@ function checkStrongPassword(pw: string): string | null {
   return null;
 }
 
+/** signInWithPassword() resolves an `{ error }` (it doesn't throw) for a
+ *  connection failure just as it does for a genuine wrong password — a
+ *  flaky/unstable connection (real incident: a shop's login started
+ *  showing "Invalid email or password" during a spell of bad connectivity,
+ *  with the same password that worked minutes earlier) must never be
+ *  reported to the user as "your credentials are wrong". Same heuristic
+ *  used throughout src/lib/offline for the identical distinction. */
+function isAuthNetworkError(e: any): boolean {
+  if (String((e as any)?.name ?? "") === "AuthRetryableFetchError") return true;
+  const msg = String(e?.message ?? e ?? "").toLowerCase();
+  if (!msg) return false;
+  return /failed to fetch|network(error)?|networkerror|fetch failed|load failed|timeout|timed out|offline|dns|err_(internet|network|name_not_resolved|connection)|socket|aborted|econn|enotfound/.test(
+    msg,
+  );
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const { next } = Route.useSearch();
@@ -170,6 +186,10 @@ function AuthPage() {
       }
       const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (error) {
+        if (isAuthNetworkError(error)) {
+          showErr("Could not reach the server — check your internet connection and try again.");
+          return;
+        }
         void logSecurityEvent("failed_login", { severity: "warning", email: cleanEmail });
         setFieldErrors({ password: "Invalid email or password" });
         return;
@@ -224,11 +244,15 @@ function AuthPage() {
       }
       const { error } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password: staffPwd });
       if (error) {
+        if (isAuthNetworkError(error)) {
+          showErr("Could not reach the server — check your internet connection and try again.");
+          return;
+        }
         void logSecurityEvent("failed_login", { severity: "warning", email: syntheticEmail });
-        setFieldErrors({ 
-          shopCode: "Invalid credentials", 
-          staffUser: "Invalid credentials", 
-          staffPwd: "Invalid credentials" 
+        setFieldErrors({
+          shopCode: "Invalid credentials",
+          staffUser: "Invalid credentials",
+          staffPwd: "Invalid credentials"
         });
         return;
       }
