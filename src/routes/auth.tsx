@@ -49,6 +49,24 @@ function isAuthNetworkError(e: any): boolean {
   );
 }
 
+/** signInWithPassword() has no built-in timeout — a degraded connection that
+ *  neither succeeds nor fails outright (seen live: requests to the
+ *  Cloudflare Worker proxy just hanging instead of erroring) leaves it
+ *  awaiting forever, with the login button stuck spinning and no way for
+ *  the cashier to even see an error, let alone retry. Race it against a
+ *  bounded wait so a hung request surfaces as the same "could not reach the
+ *  server" message a genuine network error would (isAuthNetworkError's
+ *  regex already matches "timed out"). */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("Request timed out")), ms);
+    p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const { next } = Route.useSearch();
@@ -184,7 +202,10 @@ function AuthPage() {
         showErr("Access blocked. Contact support if this is a mistake.");
         return;
       }
-      const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: cleanEmail, password }),
+        15000,
+      );
       if (error) {
         if (isAuthNetworkError(error)) {
           showErr("Could not reach the server — check your internet connection and try again.");
@@ -197,7 +218,11 @@ function AuthPage() {
       void logSecurityEvent("successful_login", { severity: "info", email: cleanEmail });
       await goToApp();
     } catch (err: any) {
-      showErr(err?.message ?? "Unexpected error");
+      if (isAuthNetworkError(err)) {
+        showErr("Could not reach the server — check your internet connection and try again.");
+      } else {
+        showErr(err?.message ?? "Unexpected error");
+      }
     } finally {
       setBusy(false);
     }
@@ -242,7 +267,10 @@ function AuthPage() {
         showErr("Access blocked. Contact your owner."); 
         return; 
       }
-      const { error } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password: staffPwd });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: syntheticEmail, password: staffPwd }),
+        15000,
+      );
       if (error) {
         if (isAuthNetworkError(error)) {
           showErr("Could not reach the server — check your internet connection and try again.");
@@ -259,7 +287,11 @@ function AuthPage() {
       void logSecurityEvent("successful_login", { severity: "info", email: syntheticEmail });
       await goToApp();
     } catch (err: any) {
-      showErr(err?.message ?? "Unexpected error");
+      if (isAuthNetworkError(err)) {
+        showErr("Could not reach the server — check your internet connection and try again.");
+      } else {
+        showErr(err?.message ?? "Unexpected error");
+      }
     } finally {
       setBusy(false);
     }
