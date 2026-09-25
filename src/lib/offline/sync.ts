@@ -72,8 +72,20 @@ export function subscribeSyncedTables(l: ChangedListener) {
   return () => { changedListeners.delete(l); };
 }
 
-async function pullTable(table: MirroredTable): Promise<number> {
-  const { ts: since, id: sinceId } = await getWatermark(table);
+/** Exported only for the regression test covering the cursor-advance bug
+ *  below — not part of the sync engine's public API otherwise. */
+export async function pullTable(table: MirroredTable): Promise<number> {
+  // Mutable cursor — advanced after every page (see below). Using these as
+  // `const` was the bug: every page of a >PAGE-row backlog re-issued the
+  // exact same pre-loop cursor, so a table with more than 1000 rows to catch
+  // up on (a device back online after a while, or any tenant whose backlog
+  // simply exceeds one page) re-fetched page 1 forever until MAX_PAGES threw
+  // — then repeated the same MAX_PAGES-page refetch on every subsequent sync
+  // pass, since the persisted watermark was never advanced either. Seen live
+  // as a sustained flood of identical `sales`/`products`/`product_barcodes`
+  // requests burning through the shared Cloudflare Worker proxy's daily
+  // quota and starving genuine reads/writes on unrelated devices.
+  let { ts: since, id: sinceId } = await getWatermark(table);
   const full = FULL_PULL.has(table);
   if (full && since) {
     const age = Date.now() - new Date(since).getTime();
@@ -125,12 +137,21 @@ async function pullTable(table: MirroredTable): Promise<number> {
       if (ts) {
         maxTs = ts;
         maxId = lastRow.id;
+        // Advance the cursor so the next page (if any) starts after what
+        // was just fetched, instead of re-requesting this same page.
+        since = ts;
+        sinceId = lastRow.id;
+        // Persist after every page, not just once at the end — a large
+        // backlog can span many pages, and a tab close / crash mid-pull
+        // should resume from the last completed page, not redo the whole
+        // backlog from the original pre-pull watermark.
+        await setWatermark(table, ts, lastRow.id);
       }
     }
-    
+
     // If we finished the dataset, we're done.
     if (data.length < PAGE) break;
-    
+
     // If we hit the safety limit on the last iteration, it means there's more data.
     if (page === MAX_PAGES - 1) {
       throw new Error(`${table}: Sync safety limit reached (${MAX_PAGES * PAGE} rows). Please contact support for large dataset synchronization.`);

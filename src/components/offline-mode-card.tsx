@@ -22,7 +22,7 @@ import {
   setSyncIntervalMinutes,
   type SyncMode,
 } from "@/lib/offline/status";
-import { runSync, wipeLocalMirror } from "@/lib/offline/sync";
+import { runSync, wipeLocalMirror, getPendingQueueCount } from "@/lib/offline/sync";
 import { db } from "@/lib/offline/db";
 
 export function OfflineModeCard() {
@@ -56,10 +56,19 @@ export function OfflineModeCard() {
   };
 
   const clearLocal = async () => {
-    if (!confirm(t('settings.wipe_confirm', 'Wipe local offline cache? Pending un-synced writes will be lost.'))) return;
+    // Never wipe the pending write queue from this manual action — a sale
+    // still waiting to sync (e.g. queued during a connectivity hiccup) must
+    // never be silently discarded just because the cashier cleared the
+    // cache. Only the read mirror (products/sales/etc. snapshots, which a
+    // fresh sync rebuilds anyway) is cleared here.
+    const pending = await getPendingQueueCount();
+    const msg = pending > 0
+      ? t('settings.wipe_confirm_with_pending', 'Wipe local offline cache? Your {{count}} pending un-synced item(s) will be kept and still sync once online.', { count: pending })
+      : t('settings.wipe_confirm', 'Wipe local offline cache?');
+    if (!confirm(msg)) return;
     setBusy("wipe");
     try {
-      await wipeLocalMirror();
+      await wipeLocalMirror({ includeQueue: false });
       toast.success(t('settings.cache_cleared', 'Local cache cleared'));
     } catch (e: any) {
       toast.error(e?.message ?? t('settings.cache_clear_failed', 'Failed to clear cache'));
