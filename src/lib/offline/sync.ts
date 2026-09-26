@@ -57,6 +57,15 @@ const HAS_UPDATED_AT = new Set<string>([
   "products", "expenses", "store_settings", "cash_transactions",
   "product_batches", "asset_categories", "assets", "shift_sessions", "shift_tasks",
   "pharmacy_product_details", "stock_count_sessions",
+  // Added 2026-09-26: customers/suppliers previously fell back to created_at,
+  // which never changes on UPDATE — an edit to an existing row (opening
+  // balance, name, phone, anything) was invisible to this incremental pull
+  // forever, on any device whose local mirror already had that row. A
+  // device that never happened to revisit the full Customers/Suppliers list
+  // (whose own query re-fetches and re-caches everything) could show a
+  // stale row indefinitely. Both tables now have a real trigger-maintained
+  // updated_at column (migration: add_updated_at_to_customers_and_suppliers).
+  "customers", "suppliers",
 ]);
 /** Tables with neither timestamp usable as a watermark → always full pull (small). */
 const FULL_PULL = new Set<string>([
