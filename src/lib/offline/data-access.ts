@@ -31,10 +31,24 @@ const revalidating = new Set<string>();
 const FRESHNESS_KEY = (table: string) => `lf_fresh:${table}`;
 
 /** Default freshness window per table — how old a local snapshot may be and
- *  still be good enough for the first paint. Slow-changing data gets longer. */
+ *  still be good enough for the first paint. Slow-changing data gets longer.
+ *
+ *  products/product_barcodes must stay longer than __root.tsx's 20-minute
+ *  background sync interval. Both pos.tsx's own readLocalFirst call for
+ *  these tables AND sync.ts's periodic pullTable() share this same
+ *  freshness ledger (see isTableFresh/stampFresh) specifically so whichever
+ *  runs first keeps the other from re-fetching — but at 15 minutes, pos.tsx's
+ *  own check always went stale first (15 < 20), so its expensive full
+ *  fetchAll() (every active product/barcode, no watermark) ran on every
+ *  reload/mount instead of sync.ts's cheap incremental pull ever getting the
+ *  chance to. Seen live: a full 8-20-request products/product_barcodes
+ *  re-download on essentially every app reload. Longer than the sync
+ *  interval lets sync.ts's own pass win the race and keep this fresh, so
+ *  pos.tsx's own fetch now only fires on a genuinely empty/never-synced
+ *  local mirror. */
 const DEFAULT_TTL_MS: Partial<Record<MirroredTable, number>> = {
-  products: 15 * 60_000,
-  product_barcodes: 15 * 60_000,
+  products: 25 * 60_000,
+  product_barcodes: 25 * 60_000,
   categories: 30 * 60_000,
   customers: 10 * 60_000,
   suppliers: 10 * 60_000,

@@ -2358,9 +2358,16 @@ function POSPage() {
       void 0;
       patchProductStockAfterSale(qc, tab.items);
       qc.invalidateQueries({ queryKey: ["sales"] });
-      qc.invalidateQueries({ queryKey: ["customers"] });
-      qc.invalidateQueries({ queryKey: ["expenses"] });
-      qc.invalidateQueries({ queryKey: ["expense_persons"] });
+      // complete_sale() only touches the customers row (a credit-balance
+      // update) when a customer was actually attached to this sale, and
+      // only writes expenses/cash_transactions for a staff/"expense person"
+      // purchase — a walk-in cash sale with neither selected changes none
+      // of that, so skip refetching caches nothing there could have moved.
+      if (tab.customer_id) qc.invalidateQueries({ queryKey: ["customers"] });
+      if (tab.expense_person_id) {
+        qc.invalidateQueries({ queryKey: ["expenses"] });
+        qc.invalidateQueries({ queryKey: ["expense_persons"] });
+      }
 
       // Post-sale print behaviour, configurable in Settings.
       const localPrinter = await getLocalPrinterSettings();
@@ -2554,8 +2561,11 @@ function POSPage() {
       setUndoReasonNote("");
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
-      qc.invalidateQueries({ queryKey: ["customers"] });
-      qc.invalidateQueries({ queryKey: ["expenses"] });
+      // The undone sale's own customer/staff attribution — no "old vs new"
+      // ambiguity here (unlike editing), a whole sale was just reversed —
+      // so only refetch the ledgers undo_last_sale() actually touched.
+      if (payload.customer_id) qc.invalidateQueries({ queryKey: ["customers"] });
+      if (payload.expense_person_id) qc.invalidateQueries({ queryKey: ["expenses"] });
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to undo sale");
     } finally {
