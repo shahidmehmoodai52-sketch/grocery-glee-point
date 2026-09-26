@@ -23,7 +23,6 @@ import { getLocalPrinterSettings } from "@/lib/offline/printer-settings";
 import { printInvoiceDirect } from "@/components/receipt";
 
 import { db } from "@/lib/offline/db";
-import { readLocalFirst } from "@/lib/offline/data-access";
 import { fetchAll } from "@/lib/supabase-page";
 import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 import { PurchaseBillScannerButton, type ImportedPurchase } from "@/features/purchase-ai/BillScannerDialog";
@@ -510,9 +509,17 @@ function Page() {
       const startIso = start.toISOString();
       const endIso = end.toISOString();
 
-      return readLocalFirst<any[]>({
-        table: "purchases",
-        cloud: async () => {
+      // Cloud-first whenever online, NOT readLocalFirst: the local mirror
+      // only learns about purchases through sync.ts's created_at-watermark
+      // pull (purchases has no updated_at) and realtime never writes them
+      // to Dexie, so an EDITED purchase (e.g. paid 0 -> 3000) stayed stale
+      // in the mirror forever. The list then showed the old values, and
+      // re-opening Edit pre-filled the form from that stale row, so a save
+      // looked like it "didn't stick" (seen live at Hafiz Mart: P-023-1834
+      // re-saved 4 times) and could overwrite newer data with old values.
+      // The mirror is still used offline / on a network error.
+      return offlineFirst<any[]>(
+        async () => {
           const { data, error } = await supabase.from("purchases")
             .select("*, suppliers(name), purchase_items(*)")
             .gte("created_at", startIso)
@@ -522,7 +529,7 @@ function Page() {
           if (error) throw error;
           return data ?? [];
         },
-        local: async () => {
+        async () => {
           const rows = await db()
             .purchases.where("created_at")
             .between(startIso, endIso, true, true)
@@ -530,7 +537,7 @@ function Page() {
             .toArray();
           return Promise.all(rows.slice(0, PURCHASE_LIST_LIMIT).map(enrichLocalPurchaseRow));
         },
-      });
+      );
     },
   });
 
