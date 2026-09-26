@@ -595,7 +595,6 @@ function POSPage() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
-  const businessType = useBusinessType();
 
   // Billing in progress survives navigation to other sections (and refresh):
   // cart lines, customer, payment, discounts and the active tab are persisted.
@@ -1039,65 +1038,12 @@ function POSPage() {
     return m;
   }, [searchableProducts, extraBarcodes]);
 
-  // Only products with no SKU of their own can actually show a library
-  // item_code — one with its own sku always wins below, so looking up its
-  // barcode against the shared library would just fetch a value that gets
-  // thrown away. On a well-maintained catalog (every product has a sku)
-  // this shrinks the set to near-empty instead of the whole catalog.
-  const itemCodeLookupBarcodes = useMemo(() => {
-    const set = new Set<string>();
-    searchableProducts.forEach((p) => {
-      if (cleanItemCode(p.sku)) return;
-      if (p.barcode) set.add(String(p.barcode));
-      (barcodesByProduct[p.id] ?? []).forEach((bc) => set.add(String(bc)));
-    });
-    return Array.from(set).slice(0, 1000);
-  }, [searchableProducts, barcodesByProduct]);
-
-  const { data: libraryItemCodes = {} } = useQuery({
-    queryKey: ["global_products", "item-codes", businessType, itemCodeLookupBarcodes.join("|")],
-    enabled: itemCodeLookupBarcodes.length > 0,
-    queryFn: async () => {
-      const map: Record<string, string> = {};
-      try {
-        const chunks: string[][] = [];
-        for (let i = 0; i < itemCodeLookupBarcodes.length; i += 500) {
-          chunks.push(itemCodeLookupBarcodes.slice(i, i + 500));
-        }
-        // Chunks fire together instead of one-at-a-time — each is an
-        // independent query, so there's no reason to pay N sequential
-        // round-trips when N parallel ones return in roughly one round-trip.
-        // Scoped to this shop's own business_type — a grocery shop has no
-        // use for a pharmacy-contributed entry on the same barcode, and
-        // matching one would show a wrong/irrelevant item code anyway.
-        const results = await Promise.all(
-          chunks.map((slice) =>
-            supabase
-              .from("global_products")
-              .select("barcode,item_code")
-              .eq("business_type", businessType)
-              .in("barcode", slice)
-              .not("item_code", "is", null),
-          ),
-        );
-        for (const { data, error } of results) {
-          if (error) throw error;
-          (data ?? []).forEach((row: any) => {
-            const barcode = String(row.barcode ?? "").trim();
-            const itemCode = cleanItemCode(row.item_code);
-            if (barcode && itemCode && itemCode !== barcode) map[barcode] = itemCode;
-          });
-        }
-      } catch {
-        return {};
-      }
-      return map;
-    },
-    staleTime: 30 * 60 * 1000,
-  });
-
+  // Item codes come only from this shop's own saved products (their own
+  // sku) — POS search/checkout never reaches into global_products, the
+  // separate cross-tenant library shops browse/import from elsewhere. A
+  // product with no sku of its own just has no item code here.
   const itemCodeByBarcode = useMemo(() => {
-    const m: Record<string, string> = { ...libraryItemCodes };
+    const m: Record<string, string> = {};
     searchableProducts.forEach((p) => {
       const sku = cleanItemCode(p.sku);
       if (!sku) return;
@@ -1107,7 +1053,7 @@ function POSPage() {
       });
     });
     return m;
-  }, [searchableProducts, barcodesByProduct, libraryItemCodes]);
+  }, [searchableProducts, barcodesByProduct]);
 
   const itemCodeForProduct = (p: any) => {
     const sku = cleanItemCode(p?.sku);
