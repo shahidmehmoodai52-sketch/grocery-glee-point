@@ -38,7 +38,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { Receipt, printReceipt } from "@/components/receipt";
-import { searchProductsLocal } from "@/lib/offline/pos";
+import { offlineFirst, searchProductsLocal } from "@/lib/offline/pos";
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
 import { completeSaleReturnOfflineAware } from "@/lib/offline/returns";
@@ -131,12 +131,17 @@ function Page() {
   const [viewing, setViewing] = useState<any>(null);
 
   const today = new Date().toISOString().slice(0, 10);
+  // Cloud-first whenever online (offlineFirst, not readLocalFirst): sale_returns has
+  // no updated_at, so the local mirror only ever learns about NEW rows via
+  // sync.ts's created_at-watermark pull, and realtime never writes them to
+  // Dexie. An edited, reassigned or deleted row stayed stale in the mirror
+  // forever and was served as current. The mirror is still used offline /
+  // on a network error.
   const { data: returns = [] } = useQuery({
     queryKey: ["sale-returns"],
     queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "sale_returns",
-        cloud: async () =>
+      offlineFirst<any[]>(
+        async () =>
           await fetchAllRows<any>((from: number, to: number) =>
             supabase
               .from("sale_returns")
@@ -144,11 +149,11 @@ function Page() {
               .order("created_at", { ascending: false })
               .range(from, to),
           ),
-        local: async () => {
+        async () => {
           const rows = await offlineDb().sale_returns.orderBy("created_at").reverse().toArray();
           return await Promise.all(rows.map(enrichReturnRow));
         },
-        cache: async (rows) => {
+        async (rows) => {
           try {
             await offlineDb().sale_returns.bulkPut(rows as any[]);
             const items = (rows as any[]).flatMap((r) => r.sale_return_items ?? []);
@@ -157,7 +162,7 @@ function Page() {
             void error;
           }
         },
-      }),
+      ),
   });
   // Bounded on purpose: this shop can have tens of thousands of historical
   // sales (with even more line items). Loading the entire history — as this

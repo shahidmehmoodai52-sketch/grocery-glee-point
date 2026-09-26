@@ -21,7 +21,6 @@ import { completePurchaseReturnOfflineAware } from "@/lib/offline/purchase-retur
 import { fetchAll } from "@/lib/supabase-page";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { cn } from "@/lib/utils";
-import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
 import { offlineFirst, cacheSuppliers } from "@/lib/offline/pos";
 
@@ -106,16 +105,21 @@ function Page() {
   const setMethod = (v: string) => setDraft((d) => ({ ...d, method: v }));
   const setNote = (v: string) => setDraft((d) => ({ ...d, note: v }));
 
+  // Cloud-first whenever online (offlineFirst, not readLocalFirst): purchase_returns and purchases have
+  // no updated_at, so the local mirror only ever learns about NEW rows via
+  // sync.ts's created_at-watermark pull, and realtime never writes them to
+  // Dexie. An edited, reassigned or deleted row stayed stale in the mirror
+  // forever and was served as current. The mirror is still used offline /
+  // on a network error.
   const { data: returns = [] } = useQuery({
     queryKey: ["purchase-returns"],
     queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "purchase_returns",
-        cloud: () =>
+      offlineFirst<any[]>(
+        () =>
           fetchAll<any>((from, to) =>
             supabase.from("purchase_returns").select("*, suppliers(name), purchase_return_items(*)").order("created_at", { ascending: false }).range(from, to)
           ),
-        local: async () => {
+        async () => {
           const rows = await offlineDb().purchase_returns.orderBy("created_at").reverse().toArray();
           return Promise.all(
             rows.map(async (row: any) => {
@@ -129,7 +133,7 @@ function Page() {
             }),
           );
         },
-      }),
+      ),
   });
 
   const [debouncedPurchaseSearch, setDebouncedPurchaseSearch] = useState(purchaseSearch);
@@ -141,9 +145,8 @@ function Page() {
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases-for-return", debouncedPurchaseSearch],
     queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "purchases",
-        cloud: async () => {
+      offlineFirst<any[]>(
+        async () => {
           let q = supabase.from("purchases").select("id,invoice_no,supplier_id,total,created_at,purchase_items(*)").order("created_at", { ascending: false }).limit(50);
           if (debouncedPurchaseSearch) {
             q = q.ilike("invoice_no", `%${debouncedPurchaseSearch}%`);
@@ -151,7 +154,7 @@ function Page() {
           const { data } = await q;
           return data ?? [];
         },
-        local: async () => {
+        async () => {
           const rows = await offlineDb().purchases.orderBy("created_at").reverse().toArray();
           const term = debouncedPurchaseSearch.trim().toLowerCase();
           const filtered = term ? rows.filter((p: any) => (p.invoice_no ?? "").toLowerCase().includes(term)) : rows;
@@ -163,7 +166,7 @@ function Page() {
             })),
           );
         },
-      }),
+      ),
   });
 
   const { data: suppliers = [] } = useQuery({
