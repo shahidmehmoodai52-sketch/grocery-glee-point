@@ -66,6 +66,15 @@ const HAS_UPDATED_AT = new Set<string>([
   // stale row indefinitely. Both tables now have a real trigger-maintained
   // updated_at column (migration: add_updated_at_to_customers_and_suppliers).
   "customers", "suppliers",
+  // Added 2026-09-26 (migration updated_at_for_transaction_tables): same
+  // problem for transaction rows. An edited sale (total/paid, customer
+  // reassigned), an edited purchase (e.g. a supplier payment added via
+  // Edit), an edited return or ledger payment never reached a device that
+  // already had the row, and backdated purchases (created_at earlier than
+  // the device's watermark at insert time) were never pulled at all. These
+  // now have a trigger-maintained updated_at, backfilled to created_at so
+  // switching the watermark column is continuous for existing devices.
+  "sales", "purchases", "sale_returns", "purchase_returns", "party_payments",
 ]);
 /** Tables with neither timestamp usable as a watermark → always full pull (small). */
 const FULL_PULL = new Set<string>([
@@ -105,7 +114,16 @@ async function pullChildRows(parentIds: string[], child: { table: MirroredTable;
   for (const ids of chunk(parentIds, CHILD_FETCH_CHUNK)) {
     const { data, error } = await supabase.from(child.table as any).select("*").in(child.fk, ids);
     if (error) throw new Error(`${child.table}: ${error.message}`);
-    if (data && data.length) await (db() as any)[child.table].bulkPut(data);
+    // The server's rows are the complete, current set for these parents. Now
+    // that an EDITED parent is re-pulled (updated_at watermark), its lines may
+    // have been replaced server-side (edit_sale / purchase edit delete + re-
+    // insert them with new ids) — drop this chunk's old local lines first so
+    // the replaced ones don't linger alongside the new ones.
+    const table = (db() as any)[child.table];
+    await db().transaction("rw", table, async () => {
+      await table.where(child.fk).anyOf(ids).delete();
+      if (data && data.length) await table.bulkPut(data);
+    });
   }
 }
 
