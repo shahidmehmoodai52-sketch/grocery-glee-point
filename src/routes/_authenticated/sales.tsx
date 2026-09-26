@@ -15,8 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
-import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
+import { offlineFirst } from "@/lib/offline/pos";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtDate } from "@/lib/format";
 import { Receipt, printReceipt } from "@/components/receipt";
@@ -123,13 +123,18 @@ function Page() {
   };
 
 
+  // Cloud-first whenever online (offlineFirst, not readLocalFirst): sales and sale_returns have
+  // no updated_at, so the local mirror only ever learns about NEW rows via
+  // sync.ts's created_at-watermark pull, and realtime never writes them to
+  // Dexie. An edited, reassigned or deleted row stayed stale in the mirror
+  // forever and was served as current. The mirror is still used offline /
+  // on a network error.
   const { data: allSales = [] } = useQuery({
     queryKey: ["sales", window.startIso, window.endIso],
     queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "sales",
-        cloud: rangedQuery("sales", "*, customers(name), sale_items(*)"),
-        local: async () => {
+      offlineFirst<any[]>(
+        rangedQuery("sales", "*, customers(name), sale_items(*)"),
+        async () => {
           if (!window.startIso || !window.endIso) return [];
           const rows = await offlineDb()
             .sales.where("created_at")
@@ -138,17 +143,16 @@ function Page() {
             .toArray();
           return Promise.all(rows.slice(0, 1000).map(enrichLocalSaleRow));
         },
-      }),
+      ),
     staleTime: 30_000,
   });
 
   const { data: allReturns = [] } = useQuery({
     queryKey: ["sale-returns-on-sales", window.startIso, window.endIso],
     queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "sale_returns",
-        cloud: rangedQuery("sale_returns", "*, customers(name), sale_return_items(*), sales(invoice_no)"),
-        local: async () => {
+      offlineFirst<any[]>(
+        rangedQuery("sale_returns", "*, customers(name), sale_return_items(*), sales(invoice_no)"),
+        async () => {
           if (!window.startIso || !window.endIso) return [];
           const rows = await offlineDb()
             .sale_returns.where("created_at")
@@ -157,7 +161,7 @@ function Page() {
             .sortBy("created_at");
           return Promise.all(rows.slice(0, 1000).map(enrichLocalReturnRow));
         },
-      }),
+      ),
     staleTime: 30_000,
   });
 
