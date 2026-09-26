@@ -27,18 +27,18 @@ const mockRows = (n: number, startIndex: number) =>
 const page1 = mockRows(1000, 0);
 const page2 = mockRows(1, 1000);
 
-function makeQueryBuilder(calls: any[][]) {
-  const state: any = { filters: [] };
+function makeQueryBuilder(calls: any[][], dataForCall: (callNumber: number) => unknown[]) {
+  const state: any = {};
   const builder: any = {
     select: vi.fn(() => builder),
     order: vi.fn(() => builder),
     or: vi.fn((f: string) => { state.or = f; return builder; }),
     gt: vi.fn((col: string, v: string) => { state.gt = [col, v]; return builder; }),
+    in: vi.fn((col: string, v: string[]) => { state.in = [col, v]; return builder; }),
     limit: vi.fn(() => builder),
     then: (resolve: any) => {
       calls.push([{ ...state }]);
-      const data = calls.length === 1 ? page1 : calls.length === 2 ? page2 : [];
-      return Promise.resolve({ data, error: null }).then(resolve);
+      return Promise.resolve({ data: dataForCall(calls.length), error: null }).then(resolve);
     },
   };
   return builder;
@@ -46,10 +46,18 @@ function makeQueryBuilder(calls: any[][]) {
 
 vi.mock("@/integrations/supabase/client", () => {
   const calls: any[][] = [];
+  // sale_items is now fetched as "sales"'s child table (scoped by sale_id),
+  // riding sales' own watermark instead of a full-table pull of its own —
+  // give it a separate mock so it doesn't share sales' call-numbered pages.
+  const itemCalls: unknown[][] = [];
   return {
     __calls: calls,
+    __itemCalls: itemCalls,
     supabase: {
-      from: vi.fn(() => makeQueryBuilder(calls)),
+      from: vi.fn((table: string) => {
+        if (table === "sale_items") return makeQueryBuilder(itemCalls, () => []);
+        return makeQueryBuilder(calls, (n) => (n === 1 ? page1 : n === 2 ? page2 : []));
+      }),
     },
   };
 });
@@ -82,5 +90,15 @@ describe("pullTable cursor advance", () => {
     // The persisted watermark must reflect the very last row pulled.
     const watermark = await db()._sync_state.get("sales");
     expect(watermark?.last_pulled_id).toBe("id-001000");
+
+    // sale_items is fetched per sales page, scoped to that page's ids, not
+    // re-pulled in full — chunked at 200 ids/request (page 1's 1000 ids →
+    // 5 requests, page 2's single id → 1 more), filtered by sale_id.
+    expect(clientModule.__itemCalls.length).toBe(6);
+    expect(clientModule.__itemCalls.every((c: any) => c[0].in[0] === "sale_id")).toBe(true);
+    expect(
+      clientModule.__itemCalls.slice(0, 5).reduce((n: number, c: any) => n + c[0].in[1].length, 0),
+    ).toBe(1000);
+    expect(clientModule.__itemCalls[5][0].in[1]).toEqual(["id-001000"]);
   });
 });
