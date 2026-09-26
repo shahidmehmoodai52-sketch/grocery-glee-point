@@ -217,6 +217,40 @@ export async function pullTable(table: MirroredTable): Promise<number> {
   return total;
 }
 
+const PRUNE_PAGE = 5000;
+
+/** A hard DELETE is the one change an incremental (watermark-based) pull can
+ *  structurally never detect — a deleted row simply stops appearing in any
+ *  future SELECT, so pullTable() has nothing to notice. If that row's
+ *  realtime DELETE event is also missed (a dropped/reconnecting websocket —
+ *  see use-realtime-sync.ts), the local mirror keeps a ghost row forever:
+ *  its old price/stock/barcode never goes away, and deleting a product then
+ *  re-adding one with the same barcode/SKU (freed server-side, since the
+ *  delete is a real hard delete) shows both the ghost and the new row side
+ *  by side in POS. Fetches just the id column for every row the tenant
+ *  actually has and removes any local row that's no longer among them —
+ *  cheap enough to run on the same cadence as products/product_barcodes'
+ *  own throttled pull (see catalogTables in runSync). */
+export async function pruneDeleted(table: MirroredTable): Promise<number> {
+  const localIds = await (db() as any)[table].toCollection().primaryKeys();
+  if (!localIds.length) return 0;
+
+  const remoteIds = new Set<string>();
+  for (let from = 0; ; from += PRUNE_PAGE) {
+    const { data, error } = await supabase
+      .from(table as any)
+      .select("id")
+      .range(from, from + PRUNE_PAGE - 1);
+    if (error) throw new Error(`${table} prune: ${error.message}`);
+    if (!data || data.length === 0) break;
+    for (const row of data as any[]) remoteIds.add(row.id);
+    if (data.length < PRUNE_PAGE) break;
+  }
+
+  const staleIds = localIds.filter((id: unknown) => !remoteIds.has(id as string));
+  if (staleIds.length) await (db() as any)[table].bulkDelete(staleIds);
+  return staleIds.length;
+}
 
 /** Statuses that still need an upload attempt. "syncing"/"uploading" are
  *  included on purpose: a browser crash or power failure leaves an item in that
@@ -477,6 +511,16 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
             }
             const n = await timed(`sync:pull:${t}`, () => pullTable(t));
             if (n > 0) changed.push(t);
+            // Incremental pulls can add/update but can never notice a hard
+            // DELETE (see pruneDeleted's own comment) — reconcile just the
+            // two catalogue tables, on the same throttled cadence as their
+            // own pull, so a deleted product/barcode doesn't linger forever.
+            if (catalogTables.has(t)) {
+              try {
+                const removed = await timed(`sync:prune:${t}`, () => pruneDeleted(t));
+                if (removed > 0) changed.push(t);
+              } catch {/* best effort — corrected on the next successful prune */}
+            }
             // Mark the local snapshot fresh so the smart data-access layer can
             // serve it on the next cold start without an extra cloud round trip.
             try {

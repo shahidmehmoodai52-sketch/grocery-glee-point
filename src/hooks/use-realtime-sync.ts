@@ -235,15 +235,18 @@ function applyProductRealtimePatch(qc: QueryClient, payload: any) {
 // silently lost until the next periodic sync (products/product_barcodes are
 // throttled to roughly once per 20-25 minutes — see data-access.ts). On
 // every reconnect, force a fresh pull of just those two catalogue tables,
-// bypassing that throttle, to backfill whatever the gap missed.
+// bypassing that throttle, to backfill whatever the gap missed — plus a
+// delete reconciliation pass, since a missed DELETE event is the one change
+// that pull can never notice on its own (see pruneDeleted's own comment).
 async function refreshCatalogAfterReconnect() {
   try {
-    const { pullTable } = await import("@/lib/offline/sync");
+    const { pullTable, pruneDeleted } = await import("@/lib/offline/sync");
     const { stampFresh } = await import("@/lib/offline/data-access");
     for (const t of ["products", "product_barcodes"] as const) {
       const n = await pullTable(t);
+      const removed = await pruneDeleted(t);
       await stampFresh(t);
-      if (n > 0) dirty.add(t);
+      if (n > 0 || removed > 0) dirty.add(t);
     }
     scheduleFlush();
   } catch {
