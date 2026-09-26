@@ -16,6 +16,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
 import { readLocalFirst } from "@/lib/offline/data-access";
+import { offlineFirst } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
 
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
@@ -73,18 +74,28 @@ function Page() {
         isEmpty: (row) => !row,
       }),
   });
+  // Sales, payments and returns are read cloud-first whenever online, NOT
+  // via readLocalFirst: the local mirror only ever learns about rows through
+  // sync.ts's created_at-watermark pull (none of these three tables has an
+  // updated_at), and realtime never writes them into Dexie either. So any
+  // sale later reassigned to this customer, any edited/deleted payment, any
+  // edited or deleted sale, stayed wrong in the mirror forever — and a
+  // non-empty-but-stale local snapshot was served as the whole ledger.
+  // Seen live at Hafiz Mart: 97 sales had their customer_id changed after
+  // creation, plus 100+ payment edits/deletes, none of which ever reached any
+  // device's mirror, so those customers' older entries went missing from
+  // their ledger. The mirror is still used offline / on a network error.
   const { data: sales = [] } = useQuery({
     queryKey: ["customer-sales", id],
     queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "sales",
-        cloud: () =>
+      offlineFirst<any[]>(
+        () =>
           fetchAll<any>((f, t) =>
             supabase.from("sales")
               .select("id,invoice_no,subtotal,tax,discount,total,paid,change_due,payment_method,status,created_at,note,sale_items(id,name,qty,price,line_total)")
               .eq("customer_id", id).order("created_at", { ascending: true }).range(f, t)
           ),
-        local: async () => {
+        async () => {
           const rows = await offlineDb().sales.where("customer_id").equals(id).sortBy("created_at");
           return Promise.all(
             rows.map(async (row: any) => ({
@@ -93,19 +104,18 @@ function Page() {
             })),
           );
         },
-      }),
+      ),
   });
   const { data: payments = [] } = useQuery({
     queryKey: ["customer-payments", id],
     queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "party_payments",
-        cloud: () =>
+      offlineFirst<any[]>(
+        () =>
           fetchAll<any>((f, t) =>
             supabase.from("party_payments").select("id,amount,method,note,created_at,cash_transaction_id,cash_transactions(direction)")
               .eq("party_type", "customer").eq("party_id", id).order("created_at", { ascending: true }).range(f, t)
           ),
-        local: async () => {
+        async () => {
           const rows = await offlineDb()
             .party_payments.where("[party_type+party_id]")
             .equals(["customer", id])
@@ -118,20 +128,19 @@ function Page() {
             }),
           );
         },
-      }),
+      ),
   });
   const { data: returns = [] } = useQuery({
     queryKey: ["customer-returns", id],
     queryFn: () =>
-      readLocalFirst<any[]>({
-        table: "sale_returns",
-        cloud: () =>
+      offlineFirst<any[]>(
+        () =>
           fetchAll<any>((f, t) =>
             supabase.from("sale_returns").select("id,return_no,total,refund_amount,created_at,note")
               .eq("customer_id", id).order("created_at", { ascending: true }).range(f, t)
           ),
-        local: () => offlineDb().sale_returns.where("customer_id").equals(id).sortBy("created_at"),
-      }),
+        () => offlineDb().sale_returns.where("customer_id").equals(id).sortBy("created_at"),
+      ),
   });
 
   const entries: Entry[] = useMemo(() => {
