@@ -2358,9 +2358,16 @@ function POSPage() {
       void 0;
       patchProductStockAfterSale(qc, tab.items);
       qc.invalidateQueries({ queryKey: ["sales"] });
-      qc.invalidateQueries({ queryKey: ["customers"] });
-      qc.invalidateQueries({ queryKey: ["expenses"] });
-      qc.invalidateQueries({ queryKey: ["expense_persons"] });
+      // complete_sale() only touches the customers row (a credit-balance
+      // update) when a customer was actually attached to this sale, and
+      // only writes expenses/cash_transactions for a staff/"expense person"
+      // purchase — a walk-in cash sale with neither selected changes none
+      // of that, so skip refetching caches nothing there could have moved.
+      if (tab.customer_id) qc.invalidateQueries({ queryKey: ["customers"] });
+      if (tab.expense_person_id) {
+        qc.invalidateQueries({ queryKey: ["expenses"] });
+        qc.invalidateQueries({ queryKey: ["expense_persons"] });
+      }
 
       // Post-sale print behaviour, configurable in Settings.
       const localPrinter = await getLocalPrinterSettings();
