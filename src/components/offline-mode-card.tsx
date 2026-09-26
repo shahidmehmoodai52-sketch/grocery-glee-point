@@ -69,7 +69,22 @@ export function OfflineModeCard() {
     setBusy("wipe");
     try {
       await wipeLocalMirror({ includeQueue: false });
-      toast.success(t('settings.cache_cleared', 'Local cache cleared'));
+      // Wiping clears every table's watermark too, so until something
+      // repopulates it every page reading local-first (customer ledgers,
+      // sales history, ...) shows empty except whatever gets created fresh
+      // afterward — exactly like the shop's whole history vanished, even
+      // though the server never lost a thing. Immediately re-pull instead
+      // of leaving that gap for the next reconnect/focus/interval tick,
+      // which can be many minutes away.
+      if (s.online) {
+        toast.message(t('settings.cache_cleared_resyncing', 'Local cache cleared — re-syncing…'));
+        await runSync();
+        toast.success(t('settings.cache_cleared', 'Local cache cleared'));
+      } else {
+        toast.success(
+          t('settings.cache_cleared_offline', 'Local cache cleared — will re-sync once back online'),
+        );
+      }
     } catch (e: any) {
       toast.error(e?.message ?? t('settings.cache_clear_failed', 'Failed to clear cache'));
     } finally { setBusy(null); }

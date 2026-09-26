@@ -2116,17 +2116,21 @@ function POSPage() {
         } as any);
         if (error) throw error;
         // Also update lightweight header fields (customer / payment / note)
-        // that the RPC does not touch, so the cashier's edits stick.
+        // that the RPC does not touch, so the cashier's edits stick. Routed
+        // through reassign_sale_party() rather than a raw .update() — a
+        // direct customer_id change here used to leave customers.balance
+        // untouched, so reassigning a still-unpaid credit sale to a
+        // different customer silently overstated the old customer's balance
+        // and understated the new one's forever (confirmed live drift across
+        // multiple customers). The RPC moves the outstanding balance too.
         try {
-          await supabase
-            .from("sales")
-            .update({
-              customer_id: tab.customer_id,
-              expense_person_id: tab.expense_person_id,
-              payment_method: paymentMethodLabel,
-              note: tab.note,
-            })
-            .eq("id", tab.editing_sale_id);
+          await supabase.rpc("reassign_sale_party", {
+            _sale_id: tab.editing_sale_id,
+            _customer_id: tab.customer_id ?? null,
+            _expense_person_id: tab.expense_person_id ?? null,
+            _payment_method: paymentMethodLabel,
+            _note: tab.note,
+          });
         } catch {
           /* non-fatal */
         }
