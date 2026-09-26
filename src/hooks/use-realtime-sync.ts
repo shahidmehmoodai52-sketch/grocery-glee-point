@@ -238,7 +238,19 @@ function applyProductRealtimePatch(qc: QueryClient, payload: any) {
 // bypassing that throttle, to backfill whatever the gap missed — plus a
 // delete reconciliation pass, since a missed DELETE event is the one change
 // that pull can never notice on its own (see pruneDeleted's own comment).
+//
+// Cooldown: a handful of shops' devices reconnecting independently every
+// 1-3 minutes still adds up to a reconnect every few seconds in aggregate —
+// live traffic showed this firing every 10-40s across the platform with no
+// limit at all, hammering the same shared Cloudflare Worker proxy every
+// other sync request goes through. Once per REFRESH_COOLDOWN_MS is still
+// far more responsive than the 20-25 minute throttle it's backfilling.
+const REFRESH_COOLDOWN_MS = 3 * 60_000;
+let lastCatalogRefreshAt = 0;
 async function refreshCatalogAfterReconnect() {
+  const now = Date.now();
+  if (now - lastCatalogRefreshAt < REFRESH_COOLDOWN_MS) return;
+  lastCatalogRefreshAt = now;
   try {
     const { pullTable, pruneDeleted } = await import("@/lib/offline/sync");
     const { stampFresh } = await import("@/lib/offline/data-access");
