@@ -2561,8 +2561,11 @@ function POSPage() {
       setUndoReasonNote("");
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
-      qc.invalidateQueries({ queryKey: ["customers"] });
-      qc.invalidateQueries({ queryKey: ["expenses"] });
+      // The undone sale's own customer/staff attribution — no "old vs new"
+      // ambiguity here (unlike editing), a whole sale was just reversed —
+      // so only refetch the ledgers undo_last_sale() actually touched.
+      if (payload.customer_id) qc.invalidateQueries({ queryKey: ["customers"] });
+      if (payload.expense_person_id) qc.invalidateQueries({ queryKey: ["expenses"] });
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to undo sale");
     } finally {
