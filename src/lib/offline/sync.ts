@@ -24,8 +24,8 @@ import { toast } from "sonner";
 const PULL_TABLES: MirroredTable[] = [
   "products", "product_barcodes", "customers", "suppliers",
   "store_settings", "user_roles", "cash_accounts", "held_bills",
-  "sales", "sale_items", "sale_returns", "sale_return_items",
-  "purchases", "purchase_items", "purchase_returns", "purchase_return_items", "expenses",
+  "sales", "sale_returns",
+  "purchases", "purchase_returns", "expenses",
   "party_payments", "cash_transactions",
   "product_batches", "inventory_damages", "inventory_waste", "asset_categories", "assets",
   "shift_sessions",
@@ -61,8 +61,44 @@ const HAS_UPDATED_AT = new Set<string>([
 /** Tables with neither timestamp usable as a watermark → always full pull (small). */
 const FULL_PULL = new Set<string>([
   "store_settings", "user_roles", "cash_accounts",
-  "sale_items", "sale_return_items", "purchase_items", "purchase_return_items",
 ]);
+
+/** Line-item child tables have neither a usable timestamp column nor an
+ *  identity worth watermark-tracking of their own — each row is created once,
+ *  atomically with its parent (sale/purchase/return), and never changes
+ *  independently afterward. They used to be FULL_PULL tables, re-downloaded
+ *  in full on every sync pass; fine while small, but unbounded as a shop's
+ *  history grows — seen live costing ~3,600 extra requests/day once one
+ *  tenant's sale_items alone passed 50k rows, re-fetching the whole table
+ *  every ~20 minutes forever. Instead, fetch each parent page's own new
+ *  child rows by foreign key, riding the parent's incremental watermark
+ *  instead of having one of their own. */
+const CHILD_TABLES: Partial<Record<MirroredTable, { table: MirroredTable; fk: string }>> = {
+  sales: { table: "sale_items", fk: "sale_id" },
+  sale_returns: { table: "sale_return_items", fk: "return_id" },
+  purchases: { table: "purchase_items", fk: "purchase_id" },
+  purchase_returns: { table: "purchase_return_items", fk: "return_id" },
+};
+
+/** PostgREST's `.in()` filter puts every id in the URL — keep each request
+ *  well short of proxy/CDN URL-length limits even during a large first-time
+ *  backlog catch-up (a fresh device can see thousands of parent ids in one
+ *  page's worth of history). */
+const CHILD_FETCH_CHUNK = 200;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function pullChildRows(parentIds: string[], child: { table: MirroredTable; fk: string }) {
+  for (const ids of chunk(parentIds, CHILD_FETCH_CHUNK)) {
+    const { data, error } = await supabase.from(child.table as any).select("*").in(child.fk, ids);
+    if (error) throw new Error(`${child.table}: ${error.message}`);
+    if (data && data.length) await (db() as any)[child.table].bulkPut(data);
+  }
+}
 
 /** Notified with the set of tables whose local mirror actually changed. */
 type ChangedListener = (tables: string[]) => void;
@@ -130,7 +166,13 @@ export async function pullTable(table: MirroredTable): Promise<number> {
     
     await (db() as any)[table].bulkPut(data);
     total += data.length;
-    
+
+    const child = CHILD_TABLES[table];
+    if (child) {
+      const ids = (data as any[]).map((r) => r.id).filter(Boolean);
+      if (ids.length) await pullChildRows(ids, child);
+    }
+
     if (!full) {
       const lastRow = data[data.length - 1] as any;
       const ts = lastRow.updated_at ?? lastRow.created_at;
