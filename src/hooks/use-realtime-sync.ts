@@ -114,6 +114,10 @@ const MAP: Record<string, string[][]> = {
 // subscriptions, so every DB change fanned out N times.
 // ---------------------------------------------------------------------------
 let channel: ReturnType<typeof supabase.channel> | null = null;
+// Set once this channel has reached SUBSCRIBED for the first time. A later
+// SUBSCRIBED after that point means the socket dropped and reconnected —
+// see channelSubscribedOnce's use in the subscribe callback below.
+let channelSubscribedOnce = false;
 let subscribers = 0;
 const clients = new Set<QueryClient>();
 
@@ -223,6 +227,30 @@ function applyProductRealtimePatch(qc: QueryClient, payload: any) {
   })();
 }
 
+// The websocket this channel rides on (proxied through a Cloudflare Worker
+// in production) doesn't hold a stable long-lived connection — live traffic
+// showed it reconnecting every 1-3 minutes rather than staying up for a
+// whole shift. Postgres Changes never replays events missed while
+// disconnected, so a product added or repriced during one of those gaps was
+// silently lost until the next periodic sync (products/product_barcodes are
+// throttled to roughly once per 20-25 minutes — see data-access.ts). On
+// every reconnect, force a fresh pull of just those two catalogue tables,
+// bypassing that throttle, to backfill whatever the gap missed.
+async function refreshCatalogAfterReconnect() {
+  try {
+    const { pullTable } = await import("@/lib/offline/sync");
+    const { stampFresh } = await import("@/lib/offline/data-access");
+    for (const t of ["products", "product_barcodes"] as const) {
+      const n = await pullTable(t);
+      await stampFresh(t);
+      if (n > 0) dirty.add(t);
+    }
+    scheduleFlush();
+  } catch {
+    /* best effort — the next periodic sync still catches it eventually */
+  }
+}
+
 function scheduleFlush() {
   if (typeof window === "undefined") return;
   if (flushTimer !== null) return;
@@ -271,7 +299,13 @@ export function useRealtimeSync() {
           },
         );
       });
-      ch.subscribe();
+      ch.subscribe((status: string) => {
+        if (status !== "SUBSCRIBED") return;
+        if (channelSubscribedOnce) {
+          void refreshCatalogAfterReconnect();
+        }
+        channelSubscribedOnce = true;
+      });
       channel = ch;
     });
 
@@ -300,6 +334,7 @@ export function useRealtimeSync() {
         if (channel) {
           supabase.removeChannel(channel);
           channel = null;
+          channelSubscribedOnce = false;
         }
         cachedTenantId = undefined;
         tenantIdPromise = null;
