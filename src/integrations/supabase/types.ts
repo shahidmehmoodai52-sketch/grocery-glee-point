@@ -4871,6 +4871,16 @@ export type Database = {
       owner_alerts: { Args: never; Returns: Json }
       owner_recommendations: { Args: never; Returns: Json }
       prune_audit_logs: { Args: { _days?: number }; Returns: number }
+      reassign_sale_party: {
+        Args: {
+          _customer_id: string | null
+          _expense_person_id: string | null
+          _note: string
+          _payment_method: string
+          _sale_id: string
+        }
+        Returns: undefined
+      }
       recalc_supplier_balances: {
         Args: { p_tenant_id?: string }
         Returns: number
