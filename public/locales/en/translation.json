@@ -1302,6 +1302,8 @@
     "sync_complete": "Sync complete",
     "sync_failed": "Sync failed",
     "cache_cleared": "Local cache cleared",
+    "cache_cleared_resyncing": "Local cache cleared — re-syncing…",
+    "cache_cleared_offline": "Local cache cleared — will re-sync once back online",
     "cache_clear_failed": "Failed to clear cache",
     "cache_rows_title": "Local cache rows",
     "cache_not_init": "Cache not initialised",
