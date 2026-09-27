@@ -1068,6 +1068,11 @@ function POSPage() {
             .filter((p: any) => p.is_active !== false)
             .sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? "")),
         cache: (rows) => cacheProducts(rows),
+        // A fresh-enough local snapshot is served first and the cloud copy
+        // only fetched in the background — without this, that fresher copy
+        // only reached the Dexie mirror, and the open POS kept scanning
+        // against the snapshot (old prices/names) until its next refetch.
+        onRevalidated: (fresh) => qc.setQueryData(["products", "active"], fresh),
       }),
     staleTime: 5 * 60 * 1000,
   });
@@ -1104,6 +1109,7 @@ function POSPage() {
           ),
         local: () => offlineDb().product_barcodes.toArray(),
         cache: (rows) => cacheProductBarcodes(rows),
+        onRevalidated: (fresh) => qc.setQueryData(["product_barcodes"], fresh),
       }),
     // Feeds the same scan lookup maps as `products` above — same staleTime
     // for the same reason (a fresh mount still refetches; it just doesn't
