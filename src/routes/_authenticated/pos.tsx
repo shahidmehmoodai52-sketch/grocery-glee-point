@@ -798,6 +798,29 @@ function POSPage() {
     setQuickAddLookup("");
   };
 
+  // Last resort before the "new product" popup for a scanned code: ask the
+  // server whether this shop already has it. The scan lookup above is purely
+  // in-memory, so a barcode this till hasn't loaded yet (added on the
+  // Products page / another till moments ago, catalogue still loading, or a
+  // stale mirror) used to open the popup even though the barcode existed —
+  // reported by a shop. If found, add it to the bill and refresh the
+  // catalogue so the next scan resolves locally.
+  const openQuickAddOrResolve = async (raw: string) => {
+    if (/^\d{4,}$/.test(raw)) {
+      const existing = await findExistingProductByBarcode(raw);
+      if (existing) {
+        addProduct(existing);
+        setSearch("");
+        triggerScanFlash();
+        searchRef.current?.focus();
+        qc.invalidateQueries({ queryKey: ["products", "active"] });
+        qc.invalidateQueries({ queryKey: ["product_barcodes"] });
+        return;
+      }
+    }
+    openQuickAdd(raw);
+  };
+
   const { data: quickAddMatches = [], isFetching: quickAddMatchesLoading } = useQuery({
     queryKey: ["pos-quickadd-search", quickAddLookup],
     enabled: quickAddLookup.trim().length >= 2,
@@ -2765,8 +2788,9 @@ function POSPage() {
           return;
         }
         
-        // 4. Quick add (only if search is not just numbers or common scan length)
-        openQuickAdd(raw);
+        // 4. Quick add — after checking the server for a code this till
+        // hasn't loaded yet (see openQuickAddOrResolve).
+        void openQuickAddOrResolve(raw);
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -2992,7 +3016,7 @@ function POSPage() {
                     setSearch("");
                     return;
                   }
-                  openQuickAdd(raw);
+                  void openQuickAddOrResolve(raw);
                 }}
                 className={`pl-12 h-14 text-base rounded-xl border-2 shadow-sm transition-all duration-300 ${
                   scanFlash

@@ -227,6 +227,37 @@ function applyProductRealtimePatch(qc: QueryClient, payload: any) {
   })();
 }
 
+// Same idea for extra barcodes. Invalidating ["product_barcodes"] alone was
+// not enough: that query reads through readLocalFirst, whose Dexie mirror
+// only learns about new barcode rows on the next periodic sync pull — so a
+// barcode added (or re-saved) on the Products page or another till stayed
+// unknown to every open POS for up to ~20 minutes, and scanning it opened
+// the "new product" popup even though the barcode already existed (reported
+// by a shop). Patch the in-memory list and the mirror directly instead.
+// product_barcodes has REPLICA IDENTITY FULL, so a DELETE carries the row.
+function applyProductBarcodeRealtimePatch(qc: QueryClient, payload: any) {
+  const isDelete = payload?.eventType === "DELETE";
+  const row = isDelete ? payload?.old : payload?.new;
+  const id = row?.id;
+  if (!id) return;
+
+  qc.setQueryData(["product_barcodes"], (old: any[] | undefined) => {
+    if (!Array.isArray(old)) return old;
+    const rest = old.filter((b: any) => b.id !== id);
+    if (isDelete) return rest;
+    return [...rest, { id, product_id: row.product_id, barcode: row.barcode }];
+  });
+
+  void (async () => {
+    try {
+      if (isDelete) await db().product_barcodes.delete(id);
+      else await db().product_barcodes.put(row);
+    } catch {
+      /* best effort — the next sync pull corrects any miss */
+    }
+  })();
+}
+
 // The websocket this channel rides on (proxied through a Cloudflare Worker
 // in production) doesn't hold a stable long-lived connection — live traffic
 // showed it reconnecting every 1-3 minutes rather than staying up for a
@@ -308,6 +339,8 @@ export function useRealtimeSync() {
           (payload: any) => {
             if (table === "products") {
               for (const c of clients) applyProductRealtimePatch(c, payload);
+            } else if (table === "product_barcodes") {
+              for (const c of clients) applyProductBarcodeRealtimePatch(c, payload);
             }
             dirty.add(table);
             scheduleFlush();
