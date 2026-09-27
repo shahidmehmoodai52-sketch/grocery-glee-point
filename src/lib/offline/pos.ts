@@ -68,26 +68,42 @@ export async function offlineFirst<T>(
 
 }
 
+/** Upsert rows into the local mirror by MERGING each one into the row
+ *  already stored there, never replacing it wholesale. Pages cache whatever
+ *  column subset they happened to select — POS reads customers as only
+ *  id,name,balance,phone, Sale Returns as only id,name, POS products as 9
+ *  columns — and a plain bulkPut() of those replaced the full mirror row,
+ *  silently dropping every other column (opening_balance, is_active,
+ *  updated_at, tenant_id …). Seen live as a customer ledger's opening
+ *  balance vanishing after POS / Sale Returns was opened and coming back
+ *  after the Customers list (which selects *) re-cached it — and a ledger
+ *  "Save opening" in that window would have written the 0 back to the
+ *  server. Columns a page did select still overwrite (including nulls). */
+export async function mergeIntoMirror(table: string, rows: any[]) {
+  if (!rows?.length) return;
+  const t = (db() as any)[table];
+  const ids = rows.map((r) => r?.id).filter(Boolean);
+  const existing: any[] = ids.length ? await t.bulkGet(ids) : [];
+  const byId = new Map<string, any>();
+  existing.forEach((row) => { if (row?.id) byId.set(row.id, row); });
+  await t.bulkPut(rows.map((r) => (r?.id && byId.has(r.id) ? { ...byId.get(r.id), ...r } : r)));
+}
+
 /** Warm helpers used by both queryFns and the sync engine. */
 export async function cacheProducts(rows: any[]) {
-  if (!rows?.length) return;
-  await db().products.bulkPut(rows);
+  await mergeIntoMirror("products", rows);
 }
 export async function cacheCustomers(rows: any[]) {
-  if (!rows?.length) return;
-  await db().customers.bulkPut(rows);
+  await mergeIntoMirror("customers", rows);
 }
 export async function cacheSuppliers(rows: any[]) {
-  if (!rows?.length) return;
-  await db().suppliers.bulkPut(rows);
+  await mergeIntoMirror("suppliers", rows);
 }
 export async function cachePurchases(rows: any[]) {
-  if (!rows?.length) return;
-  await db().purchases.bulkPut(rows);
+  await mergeIntoMirror("purchases", rows);
 }
 export async function cacheExpenses(rows: any[]) {
-  if (!rows?.length) return;
-  await db().expenses.bulkPut(rows);
+  await mergeIntoMirror("expenses", rows);
 }
 
 /** Insert a row online, or queue it for sync when offline.

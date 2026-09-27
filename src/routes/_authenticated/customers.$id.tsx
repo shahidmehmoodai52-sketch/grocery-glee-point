@@ -15,7 +15,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { fetchAll } from "@/lib/supabase-page";
-import { readLocalFirst } from "@/lib/offline/data-access";
 import { offlineFirst } from "@/lib/offline/pos";
 import { db as offlineDb } from "@/lib/offline/db";
 
@@ -66,13 +65,15 @@ function Page() {
 
   const { data: customer } = useQuery({
     queryKey: ["customer", id],
+    // Cloud-first when online: this row pre-fills the "Opening balance"
+    // input, and a stale/partial local copy (see mergeIntoMirror) showed 0
+    // there — saving in that state wrote 0 back to the server. The mirror
+    // is still used offline / on a network error.
     queryFn: () =>
-      readLocalFirst<any>({
-        table: "customers",
-        cloud: async () => (await supabase.from("customers").select("*").eq("id", id).maybeSingle()).data,
-        local: async () => (await offlineDb().customers.get(id)) ?? null,
-        isEmpty: (row) => !row,
-      }),
+      offlineFirst<any>(
+        async () => (await supabase.from("customers").select("*").eq("id", id).maybeSingle()).data,
+        async () => (await offlineDb().customers.get(id)) ?? null,
+      ),
   });
   // Sales, payments and returns are read cloud-first whenever online, NOT
   // via readLocalFirst: the local mirror only ever learns about rows through

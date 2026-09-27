@@ -38,7 +38,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { Receipt, printReceipt } from "@/components/receipt";
-import { offlineFirst, searchProductsLocal } from "@/lib/offline/pos";
+import { offlineFirst, searchProductsLocal, cacheCustomers } from "@/lib/offline/pos";
 import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
 import { completeSaleReturnOfflineAware } from "@/lib/offline/returns";
@@ -215,9 +215,12 @@ function Page() {
         cloud: async () =>
           (await supabase.from("customers").select("id,name").order("name")).data ?? [],
         local: async () => (await offlineDb().customers.orderBy("name").toArray()) as any[],
+        // Merge, don't replace: this reads only id,name, and a plain
+        // bulkPut wiped every customer's balance/opening_balance/phone
+        // from the local mirror (see mergeIntoMirror).
         cache: async (rows) => {
           try {
-            await offlineDb().customers.bulkPut(rows as any[]);
+            await cacheCustomers(rows as any[]);
           } catch {}
         },
       }),
