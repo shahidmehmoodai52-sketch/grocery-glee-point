@@ -198,6 +198,45 @@ async function fetchExpensePersons(): Promise<any[]> {
   );
 }
 
+/** An existing active product in this shop that already owns `barcode`
+ *  (as its primary barcode or one of its extra barcodes), straight from the
+ *  server — RLS scopes both reads to the current tenant. Quick-add used to
+ *  create a brand-new product whenever the scanned code wasn't in THIS
+ *  device's in-memory catalogue (stale mirror, catalogue still loading),
+ *  even though the code already belonged to a product server-side — seen
+ *  live as "bun" created on top of a months-old "Dawn Bun" with the same
+ *  barcode. Returns null offline or on any error (caller then proceeds as
+ *  before). */
+async function findExistingProductByBarcode(barcode: string): Promise<any | null> {
+  if (isOfflineNow()) return null;
+  try {
+    const { data: direct } = await supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .eq("barcode", barcode)
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    if (direct && direct.length) return direct[0];
+    const { data: extra } = await supabase
+      .from("product_barcodes")
+      .select("product_id")
+      .eq("barcode", barcode)
+      .limit(1);
+    const pid = extra?.[0]?.product_id;
+    if (!pid) return null;
+    const { data: viaExtra } = await supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .eq("id", pid)
+      .eq("is_active", true)
+      .maybeSingle();
+    return viaExtra ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function insertProductOfflineAware(payload: {
   name: string;
   barcode: string | null;
@@ -862,7 +901,21 @@ function POSPage() {
       ),
   });
 
+  // Quick-add had no in-flight guard: a scanner's trailing Enter, a second
+  // Enter or a double-click while the first insert was still awaiting each
+  // started another insert, creating several identical products within a
+  // second (seen live: 4 × "puffs rs 10" with one barcode in <1s).
+  const quickAddSavingRef = useRef(false);
   const saveQuickAdd = async () => {
+    if (quickAddSavingRef.current) return;
+    quickAddSavingRef.current = true;
+    try {
+      await saveQuickAddOnce();
+    } finally {
+      quickAddSavingRef.current = false;
+    }
+  };
+  const saveQuickAddOnce = async () => {
     const name = quickAdd.name.trim();
     if (!name) return toast.error(t('pos.toast_item_name_required', 'Item name is required'));
     const sell = Number(quickAdd.sell_price || 0);
@@ -888,6 +941,17 @@ function POSPage() {
       rack_location: quickAdd.rack_location.trim() || null,
       allow_negative_stock: quickAdd.allow_negative_stock,
     };
+    // The scanned code may already belong to a product this device just
+    // didn't have loaded — use that product instead of creating a duplicate.
+    if (bc) {
+      const existing = await findExistingProductByBarcode(bc);
+      if (existing) {
+        toast.info(
+          t('pos.toast_barcode_exists_added', 'This barcode already belongs to "{{name}}" — added it to the bill instead of creating a duplicate.', { name: existing.name }),
+        );
+        return selectQuickAddMatch(existing);
+      }
+    }
     let data: any;
     try {
       data = await insertProductOfflineAware(payload);

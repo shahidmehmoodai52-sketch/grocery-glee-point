@@ -271,6 +271,32 @@ function ProductsPage() {
       pack_size, units_per_pack,
       ...rest
     } = form;
+    // Refuse a barcode another product in this shop already owns (as its
+    // primary or an extra barcode). The product row used to be inserted
+    // first and the barcode insert only failed afterwards on
+    // product_barcodes' (tenant_id, barcode) unique index — leaving a new
+    // product carrying a duplicate primary barcode, which makes a POS scan
+    // pick one of the two arbitrarily. RLS scopes both reads to this shop.
+    const codes = Array.from(new Set([...(primary ? [primary] : []), ...allBarcodes]));
+    if (codes.length) {
+      const [{ data: byPrimary }, { data: byExtra }] = await Promise.all([
+        supabase.from("products").select("id,name,barcode").in("barcode", codes),
+        supabase.from("product_barcodes").select("product_id,barcode").in("barcode", codes),
+      ]);
+      const clashPrimary = (byPrimary ?? []).find((r: any) => r.id !== form.id);
+      const clashExtra = (byExtra ?? []).find((r: any) => r.product_id !== form.id);
+      if (clashPrimary || clashExtra) {
+        let owner = clashPrimary?.name as string | undefined;
+        if (!owner && clashExtra) {
+          const { data: o } = await supabase.from("products").select("name").eq("id", clashExtra.product_id).maybeSingle();
+          owner = o?.name;
+        }
+        const code = clashPrimary?.barcode ?? clashExtra?.barcode;
+        return toast.error(
+          t('products.barcode_in_use', 'Barcode {{code}} is already used by "{{name}}". Edit that product instead, or use a different barcode.', { code, name: owner ?? "another product" }),
+        );
+      }
+    }
     const newStock = roundToTillixQty(Number(rawStock));
     const payload = { ...rest, sku: form.sku || null, barcode: primary || null, category: form.category || null, preferred_supplier_id: form.preferred_supplier_id || null, batch_no: form.batch_no || null, expiry_date: form.expiry_date || null, rack_location: form.rack_location || null, allow_negative_stock: form.allow_negative_stock, track_batches: form.track_batches };
     let productId = form.id;
