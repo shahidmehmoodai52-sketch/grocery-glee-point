@@ -16,7 +16,7 @@ import {
   setSyncProgress,
   getSyncMode,
 } from "./status";
-import { getDeviceId, getMeta } from "./device";
+import { getDeviceId, getMeta, setMeta } from "./device";
 import { logPerf, nowMs, timed, whenIdle, yieldToUI } from "./perf";
 import { toast } from "sonner";
 
@@ -268,6 +268,30 @@ export async function pruneDeleted(table: MirroredTable): Promise<number> {
   const staleIds = localIds.filter((id: unknown) => !remoteIds.has(id as string));
   if (staleIds.length) await (db() as any)[table].bulkDelete(staleIds);
   return staleIds.length;
+}
+
+/** One-time full re-download of the catalogue. products.updated_at used to
+ *  be bumped only by the stock-changing RPCs — a price/name/barcode/category
+ *  edit on the Products page left it unchanged (fixed server-side by
+ *  migration products_updated_at_trigger), so devices never re-pulled those
+ *  rows. The 2026-09-27 duplicate-barcode cleanup also moved some
+ *  product_barcodes rows to another product in place (same id, same
+ *  created_at), which the created_at watermark can't see either. Clearing
+ *  both watermarks once makes the next pull re-fetch every row and overwrite
+ *  the stale copies; after that the normal incremental pull takes over. */
+const CATALOG_RESYNC_KEY = "catalog_resync_2026_09_27";
+async function resyncCatalogOnce(): Promise<boolean> {
+  try {
+    if (await getMeta(CATALOG_RESYNC_KEY)) return false;
+    await db()._sync_state.bulkDelete(["products", "product_barcodes"]);
+    const { markLocalStale } = await import("./data-access");
+    await markLocalStale("products");
+    await markLocalStale("product_barcodes");
+    await setMeta(CATALOG_RESYNC_KEY, Date.now());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Tables whose server-side hard DELETEs are recorded in `sync_tombstones`
@@ -578,6 +602,9 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
     const catalogTables = new Set<string>(["products", "product_barcodes"]);
     const bypassCatalogThrottle = !opts.reason || opts.reason === "boot";
     if (!skipPull) {
+      // Must run before the catalogue freshness check below, so the one-time
+      // resync isn't skipped as "still fresh".
+      await resyncCatalogOnce();
       for (let i = 0; i < PULL_TABLES.length; i += PULL_BATCH) {
         await whenIdle(400);
         const batch = PULL_TABLES.slice(i, i + PULL_BATCH);
