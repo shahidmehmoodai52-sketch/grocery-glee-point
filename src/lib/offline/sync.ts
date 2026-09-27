@@ -270,6 +270,69 @@ export async function pruneDeleted(table: MirroredTable): Promise<number> {
   return staleIds.length;
 }
 
+/** Tables whose server-side hard DELETEs are recorded in `sync_tombstones`
+ *  (migration sync_tombstones) — see pullTombstones(). */
+const TOMBSTONE_TABLES = new Set<string>([
+  "sales", "purchases", "sale_returns", "purchase_returns",
+  "party_payments", "cash_transactions", "expenses",
+  "customers", "suppliers", "held_bills",
+  "inventory_damages", "inventory_waste", "product_batches", "assets",
+]);
+const TOMBSTONE_STATE_KEY = "__sync_tombstones";
+
+/** The incremental pull can add and update rows but never notice a deleted
+ *  one, and pruneDeleted()'s full id-list diff is only affordable for the
+ *  catalogue — so a deleted sale, purchase, return, ledger payment, cash
+ *  entry, expense, customer or held bill used to stay in every device's
+ *  offline copy forever (offline views, ledgers and totals kept showing it).
+ *  The server now writes a tombstone per deleted row; this pulls the ones
+ *  newer than the last seen id and deletes those rows — plus their line
+ *  items — locally. Returns the tables that changed. */
+export async function pullTombstones(): Promise<string[]> {
+  const changed = new Set<string>();
+  const state = await db()._sync_state.get(TOMBSTONE_STATE_KEY);
+  let lastId = Number(state?.last_pulled_id ?? 0) || 0;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { data, error } = await supabase
+      .from("sync_tombstones" as any)
+      .select("id,table_name,row_id")
+      .gt("id", lastId)
+      .order("id", { ascending: true })
+      .limit(PAGE);
+    if (error) throw new Error(`sync_tombstones: ${error.message}`);
+    if (!data || data.length === 0) break;
+
+    const byTable = new Map<string, string[]>();
+    for (const r of data as any[]) {
+      if (!TOMBSTONE_TABLES.has(r.table_name)) continue;
+      const list = byTable.get(r.table_name) ?? [];
+      list.push(r.row_id);
+      byTable.set(r.table_name, list);
+    }
+    for (const [table, ids] of byTable) {
+      const parent = (db() as any)[table];
+      if (!parent) continue;
+      await parent.bulkDelete(ids);
+      const child = CHILD_TABLES[table as MirroredTable];
+      if (child) await (db() as any)[child.table].where(child.fk).anyOf(ids).delete();
+      changed.add(table);
+    }
+
+    lastId = Number((data as any[])[data.length - 1].id);
+    // Persist per page so a crash mid-catch-up resumes instead of redoing it.
+    await db()._sync_state.put({
+      table: TOMBSTONE_STATE_KEY,
+      last_pulled_at: new Date().toISOString(),
+      last_pulled_id: String(lastId),
+      last_error: null,
+    });
+    if (data.length < PAGE) break;
+    await yieldToUI();
+  }
+  return [...changed];
+}
+
 /** Statuses that still need an upload attempt. "syncing"/"uploading" are
  *  included on purpose: a browser crash or power failure leaves an item in that
  *  state and it must resume, never be lost. */
@@ -556,6 +619,19 @@ export async function runSync(opts: { silent?: boolean; reason?: string } = {}):
           }
           await yieldToUI();
         }
+      }
+      // Deletions (see pullTombstones) — after the table pulls, so a row
+      // that was pulled and deleted within the same window still ends up gone.
+      try {
+        const removed = await timed("sync:pull:tombstones", () => pullTombstones());
+        for (const t of removed) if (!changed.includes(t)) changed.push(t);
+      } catch (e: any) {
+        await db()._sync_state.put({
+          table: TOMBSTONE_STATE_KEY,
+          last_pulled_at: null,
+          last_pulled_id: (await db()._sync_state.get(TOMBSTONE_STATE_KEY))?.last_pulled_id ?? null,
+          last_error: String(e?.message ?? e),
+        });
       }
       lastPullAt = nowMs();
     }
