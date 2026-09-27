@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAll } from "@/lib/supabase-page";
 import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 import { QuickAddProductDialog, type QuickAddedProduct } from "@/components/quick-add-product-dialog";
 import { extractPurchaseBill } from "./scan.functions";
@@ -209,12 +210,19 @@ export function PurchaseBillScannerButton({
       const bill = await extract({ data: { images, extractBatchExpiry: !!isPharmacy } });
       setExtracted(bill);
 
-      const [prodRes, bcRes] = await Promise.all([
-        supabase.from("products").select("id,name,sku,barcode,cost_price,sell_price,stock").eq("is_active", true).limit(5000),
-        supabase.from("product_barcodes").select("product_id,barcode").limit(5000),
+      // Paged: PostgREST caps each response at 1000 rows, so the old
+      // .limit(5000) silently matched bill lines against only the first
+      // 1000 products/barcodes of a 4-7k-product shop.
+      const [prodRows, bcRows] = await Promise.all([
+        fetchAll<MatchedProductOption>((from, to) =>
+          supabase.from("products").select("id,name,sku,barcode,cost_price,sell_price,stock").eq("is_active", true).order("id").range(from, to),
+        ),
+        fetchAll<{ product_id: string; barcode: string }>((from, to) =>
+          supabase.from("product_barcodes").select("product_id,barcode").order("id").range(from, to),
+        ),
       ]);
-      const prods = (prodRes.data ?? []) as MatchedProductOption[];
-      const extraBc = (bcRes.data ?? []) as { product_id: string; barcode: string }[];
+      const prods = prodRows;
+      const extraBc = bcRows;
       setProducts(prods);
       setExtraBarcodes(extraBc);
 

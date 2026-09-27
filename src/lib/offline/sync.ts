@@ -235,7 +235,7 @@ export async function pullTable(table: MirroredTable): Promise<number> {
   return total;
 }
 
-const PRUNE_PAGE = 5000;
+const PRUNE_PAGE = PAGE; // PostgREST caps each response at 1000 rows
 
 /** A hard DELETE is the one change an incremental (watermark-based) pull can
  *  structurally never detect — a deleted row simply stops appearing in any
@@ -253,19 +253,41 @@ export async function pruneDeleted(table: MirroredTable): Promise<number> {
   const localIds = await (db() as any)[table].toCollection().primaryKeys();
   if (!localIds.length) return 0;
 
+  // Keyset pages of PRUNE_PAGE ordered by id, and "done" only when a page
+  // comes back EMPTY. This used to request 5000-row pages and stop at the
+  // first short page — but PostgREST caps every response at 1000 rows
+  // (see supabase-page.ts), so the first page always looked like the last
+  // one: only ~1000 (unordered, arbitrary) ids counted as "still on the
+  // server" and every other local product / barcode was deleted from the
+  // mirror, on every sync pass and every realtime reconnect. Seen live as
+  // products missing from POS, stock showing 0 and existing barcodes
+  // opening the new-product popup — fixed by clearing the cache, then
+  // broken again at the next prune.
   const remoteIds = new Set<string>();
-  for (let from = 0; ; from += PRUNE_PAGE) {
-    const { data, error } = await supabase
-      .from(table as any)
-      .select("id")
-      .range(from, from + PRUNE_PAGE - 1);
+  let lastId: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let q = supabase.from(table as any).select("id").order("id", { ascending: true }).limit(PRUNE_PAGE);
+    if (lastId) q = q.gt("id", lastId);
+    const { data, error } = await q;
     if (error) throw new Error(`${table} prune: ${error.message}`);
     if (!data || data.length === 0) break;
     for (const row of data as any[]) remoteIds.add(row.id);
-    if (data.length < PRUNE_PAGE) break;
+    lastId = (data as any[])[data.length - 1].id;
+    if (page === MAX_PAGES - 1) return 0; // couldn't list everything — never guess
   }
+  // An empty answer is far more likely a transient/auth problem than "every
+  // product was deleted" — never wipe the whole catalogue on it.
+  if (remoteIds.size === 0) return 0;
 
-  const staleIds = localIds.filter((id: unknown) => !remoteIds.has(id as string));
+  // Rows created on this device and not yet uploaded aren't on the server yet.
+  const pending = new Set<string>(
+    ((await (db() as any)[table].toArray()) as any[])
+      .filter((r) => r?._offline_pending || r?._sync === "pending")
+      .map((r) => r.id),
+  );
+  const staleIds = localIds.filter(
+    (id: unknown) => !remoteIds.has(id as string) && !pending.has(id as string),
+  );
   if (staleIds.length) await (db() as any)[table].bulkDelete(staleIds);
   return staleIds.length;
 }
@@ -279,7 +301,10 @@ export async function pruneDeleted(table: MirroredTable): Promise<number> {
  *  created_at), which the created_at watermark can't see either. Clearing
  *  both watermarks once makes the next pull re-fetch every row and overwrite
  *  the stale copies; after that the normal incremental pull takes over. */
-const CATALOG_RESYNC_KEY = "catalog_resync_2026_09_27";
+// Bumped (…_b) together with the pruneDeleted() fix: devices that already
+// ran the first resync had most of the catalogue deleted again by the old
+// prune right after, so they need one more full re-download.
+const CATALOG_RESYNC_KEY = "catalog_resync_2026_09_27_b";
 async function resyncCatalogOnce(): Promise<boolean> {
   try {
     if (await getMeta(CATALOG_RESYNC_KEY)) return false;
