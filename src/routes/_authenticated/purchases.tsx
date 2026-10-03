@@ -33,8 +33,12 @@ export const Route = createFileRoute("/_authenticated/purchases")({
   // Lets other pages (the supplier ledger) deep-link straight into editing
   // one purchase — e.g. /purchases?edit=<id> — instead of duplicating this
   // page's full item-editing form elsewhere.
-  validateSearch: (s: Record<string, unknown>): { edit?: string } => ({
+  // `from_supplier`: the supplier ledger that opened this edit — once the
+  // editor closes (saved, cancelled or discarded) the user is taken straight
+  // back to that ledger instead of being left on the Purchases page.
+  validateSearch: (s: Record<string, unknown>): { edit?: string; from_supplier?: string } => ({
     edit: typeof s.edit === "string" ? s.edit : undefined,
+    from_supplier: typeof s.from_supplier === "string" ? s.from_supplier : undefined,
   }),
   component: Page,
 });
@@ -276,23 +280,51 @@ function Page() {
   // editParamId, React runs that cleanup before the fetch returns, and the
   // load was thrown away — the ledger's Edit just landed on an unopened
   // Purchases page.
-  const editParamId = Route.useSearch().edit;
+  const { edit: editParamId, from_supplier: fromSupplierParam } = Route.useSearch();
   const navigate = useNavigate();
   const handledEditParamRef = useRef<string | null>(null);
+  // Supplier ledger to return to when the editor it opened closes. Kept in a
+  // ref because the URL params are cleared as soon as the purchase loads.
+  const returnToSupplierRef = useRef<string | null>(null);
+  const editorWasOpenRef = useRef(false);
   useEffect(() => {
     if (!editParamId || handledEditParamRef.current === editParamId) return;
     handledEditParamRef.current = editParamId;
     void (async () => {
+      let opened = false;
       try {
         const { data, error } = await supabase.from("purchases").select("*").eq("id", editParamId).maybeSingle();
         if (error || !data) { toast.error(t('purchases.could_not_load_for_edit', 'Could not load that purchase.')); return; }
         await openEdit(data);
+        opened = true;
       } finally {
-        void navigate({ to: "/purchases", search: {}, replace: true });
+        if (opened && fromSupplierParam) {
+          returnToSupplierRef.current = fromSupplierParam;
+          void navigate({ to: "/purchases", search: {}, replace: true });
+        } else if (fromSupplierParam) {
+          // Couldn't open it — don't strand the user here.
+          void navigate({ to: "/suppliers/$id", params: { id: fromSupplierParam }, replace: true });
+        } else {
+          void navigate({ to: "/purchases", search: {}, replace: true });
+        }
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editParamId]);
+
+  // Back to the supplier ledger once the editor it opened is closed —
+  // saved (submit clears the draft), discarded, or dismissed.
+  useEffect(() => {
+    const isOpen = !!draft.open;
+    if (isOpen) { editorWasOpenRef.current = true; return; }
+    if (!editorWasOpenRef.current) return;
+    editorWasOpenRef.current = false;
+    const supplierId = returnToSupplierRef.current;
+    if (!supplierId) return;
+    returnToSupplierRef.current = null;
+    void navigate({ to: "/suppliers/$id", params: { id: supplierId } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.open]);
 
   const handleDeletePurchase = async () => {
     if (!deleteTarget) return;
@@ -891,7 +923,10 @@ function Page() {
 
   /** Hide the entry form: park it as a draft. */
   const hideKeepDraft = () => {
-    if (draftHasContent(draft)) {
+    // Closing an edit opened from a supplier ledger means "cancel", not
+    // "park it" — otherwise an unsaved copy of that purchase lingers in the
+    // drafts list after the user has already been sent back to the ledger.
+    if (draftHasContent(draft) && !(editingId && returnToSupplierRef.current)) {
       setSavedDrafts((prev) => [...prev, { ...draft, open: false }]);
     }
     clearDraft();
