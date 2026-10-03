@@ -308,6 +308,8 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["purchase-returns"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
+    qc.invalidateQueries({ queryKey: ["supplier-ledger"] });
+    qc.invalidateQueries({ queryKey: ["suppliers-with-balances"] });
     setProcessing(false);
   };
 

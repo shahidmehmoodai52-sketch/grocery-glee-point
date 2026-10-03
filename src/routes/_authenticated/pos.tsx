@@ -2290,6 +2290,11 @@ function POSPage() {
         qc.invalidateQueries({ queryKey: ["products"] });
         qc.invalidateQueries({ queryKey: ["sales"] });
         qc.invalidateQueries({ queryKey: ["customers"] });
+        // The customer ledger caches the invoice under its own keys — refresh
+        // them so going back to it after an edit shows the new amounts.
+        qc.invalidateQueries({ queryKey: ["customer-sales"] });
+        qc.invalidateQueries({ queryKey: ["customer-payments"] });
+        qc.invalidateQueries({ queryKey: ["customer-balances"] });
         qc.invalidateQueries({ queryKey: ["expenses"] });
         qc.invalidateQueries({ queryKey: ["expense_persons"] });
         refetchHeld?.();

@@ -56,24 +56,36 @@ const MAP: Record<string, string[][]> = {
     ["daily-timeline"],
     ["product-intel"],
     ["purchase-suggestions"],
+    // Customer ledger / Customers-list balances read sales directly; without
+    // these an edited invoice kept showing its old amount there until the
+    // 15s staleTime lapsed and something happened to refetch.
+    ["customer-sales"],
+    ["customer-balances"],
   ],
-  sale_items: [["sales"], ["dash-top-items"], ["product-intel"], ["purchase-suggestions"]],
+  sale_items: [["sales"], ["dash-top-items"], ["product-intel"], ["purchase-suggestions"], ["customer-sales"]],
   purchases: [
     ["purchases"],
     ["dash-purchases"],
     ["report-purchases"],
     ["product-intel"],
     ["purchase-suggestions"],
+    // Supplier ledger / Suppliers-list balances: same reason as sales above —
+    // an edited purchase kept its old amount in an open/cached ledger.
+    ["supplier-ledger"],
+    ["suppliers-with-balances"],
   ],
   purchase_items: [["purchases"], ["product-intel"], ["purchase-suggestions"]],
-  sale_returns: [["sale-returns"], ["dash-sale-returns"]],
+  sale_returns: [["sale-returns"], ["dash-sale-returns"], ["customer-returns"], ["customer-balances"]],
   sale_return_items: [["sale-returns"]],
-  purchase_returns: [["purchase-returns"], ["report-purchases"]],
+  purchase_returns: [["purchase-returns"], ["report-purchases"], ["supplier-ledger"], ["suppliers-with-balances"]],
   purchase_return_items: [["purchase-returns"]],
   customers: [["customers"]],
   suppliers: [["suppliers"], ["suppliers-picker"]],
   expenses: [["expenses"], ["report-expenses"], ["daily-summary"]],
-  party_payments: [["party_payments"], ["customers"], ["suppliers"], ["report-party-payments"]],
+  party_payments: [
+    ["party_payments"], ["customers"], ["suppliers"], ["report-party-payments"],
+    ["customer-payments"], ["customer-balances"], ["supplier-ledger"], ["suppliers-with-balances"],
+  ],
   inventory_movements: [
     ["product-movements"],
     ["product-health"],

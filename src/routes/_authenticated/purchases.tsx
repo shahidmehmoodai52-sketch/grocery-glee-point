@@ -344,6 +344,8 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
+    qc.invalidateQueries({ queryKey: ["supplier-ledger"] });
+    qc.invalidateQueries({ queryKey: ["suppliers-with-balances"] });
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
   };
   const searchRef = useRef<HTMLInputElement>(null);
@@ -885,6 +887,8 @@ function Page() {
         qc.invalidateQueries({ queryKey: ["purchases"] });
         qc.invalidateQueries({ queryKey: ["products"] });
         qc.invalidateQueries({ queryKey: ["suppliers"] });
+        qc.invalidateQueries({ queryKey: ["supplier-ledger"] });
+        qc.invalidateQueries({ queryKey: ["suppliers-with-balances"] });
       }
     } catch (err: any) {
       setSaving(false);
@@ -910,6 +914,8 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["purchases"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["suppliers"] });
+    qc.invalidateQueries({ queryKey: ["supplier-ledger"] });
+    qc.invalidateQueries({ queryKey: ["suppliers-with-balances"] });
     qc.invalidateQueries({ queryKey: ["cf-purchases"] });
     qc.invalidateQueries({ queryKey: ["cash-accounts"] });
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
