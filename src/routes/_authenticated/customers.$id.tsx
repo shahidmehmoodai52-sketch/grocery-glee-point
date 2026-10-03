@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +44,15 @@ function Page() {
   const { t } = useTranslation();
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  // A sale is edited in full (items, rates, discount, payment) in the POS
+  // edit tab — the same flow as POS → Reprint → Edit, which runs edit_sale
+  // and fixes stock and this customer's balance. Voided sales can't be edited.
+  const editSaleInPos = (sale: any) => {
+    if (!sale?.id) return;
+    if (sale.status === "voided") return toast.error(t('customers.voided_cannot_edit', 'This invoice is voided and can no longer be edited.'));
+    void navigate({ to: "/pos", search: { edit: sale.id } });
+  };
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
   const [from, setFrom] = useState("");
@@ -363,7 +372,8 @@ function Page() {
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest("button")) return;
                   if (["payment", "discount", "cash_out"].includes(x.type) && x.id) return openEditPayment(x);
-                  if (x.type && !["payment", "discount", "cash_out"].includes(x.type) && x.id) return setEditEntry({ entity: x.type === "sale" ? "sale" : "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
+                  if (x.type === "sale" && x.data) return editSaleInPos(x.data);
+                  if (x.type && !["payment", "discount", "cash_out"].includes(x.type) && x.id) return setEditEntry({ entity: "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } });
                 }}
               >
 
@@ -413,8 +423,13 @@ function Page() {
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    {x.type && !["payment", "discount", "cash_out"].includes(x.type) && x.id && (
-                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: (x.type === "sale" ? "sale" : "sale_return") as any, entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
+                    {x.type === "sale" && x.data && x.data.status !== "voided" && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" title={t('customers.edit_invoice_in_pos', 'Edit invoice (items & rates) in POS')} onClick={() => editSaleInPos(x.data)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {x.type === "return" && x.id && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditEntry({ entity: "sale_return", entry: { id: x.id!, ref: x.ref, note: x.note, created_at: x.date } })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}

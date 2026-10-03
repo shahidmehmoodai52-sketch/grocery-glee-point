@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
@@ -109,6 +109,12 @@ const PharmacyPOSPage = lazy(() =>
 );
 
 export const Route = createFileRoute("/_authenticated/pos")({
+  // Lets other pages (the customer ledger) deep-link straight into editing
+  // one invoice — /pos?edit=<sale id> — in the same "✎ Edit" tab the
+  // Reprint dialog's Edit button opens, instead of duplicating the cart.
+  validateSearch: (s: Record<string, unknown>): { edit?: string } => ({
+    edit: typeof s.edit === "string" ? s.edit : undefined,
+  }),
   component: POSRouteEntry,
 });
 
@@ -1731,6 +1737,58 @@ function POSPage() {
     setActive(editTab.id);
     toast.success(`Editing invoice ${sale.invoice_no}`);
   };
+
+  // /pos?edit=<sale id> (from the customer ledger): load that invoice with
+  // its items into an edit tab. The param is cleared only AFTER the load,
+  // and a ref (not an effect-cleanup flag) guards against running twice —
+  // clearing it first re-runs the effect's cleanup and would cancel the
+  // load before it ever finished.
+  const editSaleParam = Route.useSearch().edit;
+  const navigateToPos = useNavigate();
+  const handledEditParamRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!editSaleParam || handledEditParamRef.current === editSaleParam) return;
+    handledEditParamRef.current = editSaleParam;
+    void (async () => {
+      try {
+        const sale = await offlineFirst<any>(
+          async () => {
+            const { data, error } = await supabase
+              .from("sales")
+              .select("*, customers(name), expense_persons(name), sale_items(*)")
+              .eq("id", editSaleParam)
+              .maybeSingle();
+            if (error) throw error;
+            return data;
+          },
+          async () => {
+            const row = await offlineDb().sales.get(editSaleParam);
+            if (!row) return null;
+            return {
+              ...row,
+              sale_items:
+                (row as any).sale_items ??
+                (await offlineDb().sale_items.where("sale_id").equals(editSaleParam).toArray()),
+            };
+          },
+        );
+        if (!sale) {
+          toast.error(t('pos.edit_invoice_not_found', 'Could not load that invoice for editing.'));
+        } else if (sale.status === "voided") {
+          toast.error(t('pos.edit_invoice_voided', 'This invoice is voided and can no longer be edited.'));
+        } else {
+          const existing = tabs.find((tb) => tb.editing_sale_id === sale.id);
+          if (existing) setActive(existing.id);
+          else loadInvoiceForEdit(sale);
+        }
+      } catch (e: any) {
+        toast.error(e?.message ?? t('pos.edit_invoice_not_found', 'Could not load that invoice for editing.'));
+      } finally {
+        void navigateToPos({ to: "/pos", search: {}, replace: true });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editSaleParam]);
 
   const openRestoredTab = (payload: any, fallbackInvoiceNo: string) => {
     const parsedPayments = parsePaymentMethod(payload?.payment_method, Number(payload?.paid ?? 0));
