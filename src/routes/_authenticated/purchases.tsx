@@ -269,19 +269,28 @@ function Page() {
   // Fetches fresh rather than looking the id up in the (date-filtered,
   // possibly-not-yet-loaded) purchases list below, then clears the param so
   // a later refresh/back-navigation doesn't reopen the same editor.
+  //
+  // The param is cleared only AFTER the purchase has loaded, and a ref (not
+  // an effect-cleanup flag) stops a double run. This used to clear it right
+  // away and set `cancelled` in the cleanup: clearing the param changes
+  // editParamId, React runs that cleanup before the fetch returns, and the
+  // load was thrown away — the ledger's Edit just landed on an unopened
+  // Purchases page.
   const editParamId = Route.useSearch().edit;
   const navigate = useNavigate();
+  const handledEditParamRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!editParamId) return;
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase.from("purchases").select("*").eq("id", editParamId).maybeSingle();
-      if (cancelled) return;
-      if (error || !data) { toast.error(t('purchases.could_not_load_for_edit', 'Could not load that purchase.')); return; }
-      await openEdit(data);
+    if (!editParamId || handledEditParamRef.current === editParamId) return;
+    handledEditParamRef.current = editParamId;
+    void (async () => {
+      try {
+        const { data, error } = await supabase.from("purchases").select("*").eq("id", editParamId).maybeSingle();
+        if (error || !data) { toast.error(t('purchases.could_not_load_for_edit', 'Could not load that purchase.')); return; }
+        await openEdit(data);
+      } finally {
+        void navigate({ to: "/purchases", search: {}, replace: true });
+      }
     })();
-    void navigate({ to: "/purchases", search: {}, replace: true });
-    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editParamId]);
 
