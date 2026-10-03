@@ -48,7 +48,7 @@ function Page() {
   // into it rather than duplicating that form here. Covers the purchase row
   // itself, its incentive split, and its on-invoice "paid" split, since all
   // three are really just fields on the one purchases row.
-  const editPurchase = (purchaseId: string) => navigate({ to: "/purchases", search: { edit: purchaseId } });
+  const editPurchase = (purchaseId: string) => navigate({ to: "/purchases", search: { edit: purchaseId, from_supplier: id } });
 
   const openEditPayment = (x: Entry) => {
     if (!x.id) return;
