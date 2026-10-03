@@ -799,8 +799,10 @@ function Page() {
           .eq("purchase_id", editingId);
         if (fetchErr) throw fetchErr;
 
-        // 2. Update purchase header
-        const { error: hErr } = await supabase
+        // 2. Update purchase header. RLS turns a disallowed UPDATE/DELETE into
+        // "0 rows, no error" — check the row counts, or the items below get
+        // replaced under a header that still carries the old total (P-023-1469).
+        const { data: hRows, error: hErr } = await supabase
           .from("purchases")
           .update({
             supplier_id: payload.supplier_id,
@@ -814,8 +816,12 @@ function Page() {
             account_id: payload.account_id,
             created_at: payload.created_at,
           })
-          .eq("id", editingId);
+          .eq("id", editingId)
+          .select("id");
         if (hErr) throw hErr;
+        if (!hRows?.length) {
+          throw new Error(t('purchases.edit_not_saved', 'Purchase could not be updated (no permission or it no longer exists). Nothing was changed.'));
+        }
 
         // 3. Stock adjustments: reverse old, apply new
         // We set a flag to avoid redundant trigger movements if possible,
@@ -837,8 +843,11 @@ function Page() {
           .single();
         if (tErr) throw tErr;
 
-        const { error: delErr } = await supabase.from("purchase_items").delete().eq("purchase_id", editingId);
+        const { data: delRows, error: delErr } = await supabase.from("purchase_items").delete().eq("purchase_id", editingId).select("id");
         if (delErr) throw delErr;
+        if ((delRows?.length ?? 0) < (origItems?.length ?? 0)) {
+          throw new Error(t('purchases.edit_items_not_replaced', 'Old purchase items could not be removed — edit not saved. Please reload and try again.'));
+        }
 
         const newItems = payload.items.map((it: any) => ({
           purchase_id: editingId,
