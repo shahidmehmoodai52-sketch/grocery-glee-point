@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Eye, Printer, Undo2, Search } from "lucide-react";
+import { Plus, Trash2, Eye, Printer, Undo2, Search, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
+import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { Receipt, printReceipt } from "@/components/receipt";
@@ -129,6 +130,19 @@ function Page() {
   const [method, setMethod] = useState("cash");
   const [note, setNote] = useState("");
   const [viewing, setViewing] = useState<any>(null);
+  const { isAdmin } = usePermissions();
+  // The return being edited (null = new return). Its invoice link and party
+  // type are fixed; items, tax, refund, method, note and (for ad-hoc
+  // returns) the customer can change.
+  const [editing, setEditing] = useState<any>(null);
+  // In-flight guard: "Process return" stayed clickable while the RPC was
+  // running, so a second click on a slow connection recorded the same
+  // return twice (SR-023-1077 / SR-023-1078, same item 13s apart).
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  // Total of the return just loaded for editing: the auto-refund effect
+  // must not overwrite its saved refund with the full total.
+  const editLoadTotalRef = useRef<number | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
   // Cloud-first whenever online (offlineFirst, not readLocalFirst): sale_returns has
@@ -356,6 +370,11 @@ function Page() {
   );
   const total = subtotal + Number(tax || 0);
   useEffect(() => {
+    const loaded = editLoadTotalRef.current;
+    if (loaded != null) {
+      editLoadTotalRef.current = null;
+      if (Math.abs(loaded - total) < 0.005) return;
+    }
     setRefund(+total.toFixed(2));
   }, [total]);
 
@@ -410,6 +429,8 @@ function Page() {
 
   const reset = () => {
     setOpen(false);
+    setEditing(null);
+    editLoadTotalRef.current = null;
     setItems([]);
     setSaleId("none");
     setInvoiceSearch("");
@@ -423,7 +444,86 @@ function Page() {
     setProductSearch("");
   };
 
+  const startEdit = (r: any) => {
+    const its: ItemRow[] = (r.sale_return_items ?? []).map((it: any) => ({
+      product_id: it.product_id ?? null,
+      name: it.name ?? "",
+      qty: Number(it.qty),
+      price: Number(it.price),
+      selected: true,
+    }));
+    const loadedTotal = +(its.reduce((a, l) => a + l.qty * l.price, 0) + Number(r.tax || 0)).toFixed(2);
+    editLoadTotalRef.current = loadedTotal;
+    setEditing(r);
+    setPartyType(r.party_type === "staff" ? "staff" : "customer");
+    setSaleId("none");
+    setCustomer(r.customer_id ?? "none");
+    setItems(its);
+    setTax(Number(r.tax || 0));
+    setRefund(Number(r.refund_amount || 0));
+    setMethod(r.refund_method && r.refund_method !== "staff" ? r.refund_method : "cash");
+    setNote(r.note ?? "");
+    setProductSearch("");
+    setOpen(true);
+  };
+
+  const invalidateAfterChange = () => {
+    qc.invalidateQueries({ queryKey: ["sale-returns"] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["customers"] });
+    qc.invalidateQueries({ queryKey: ["customer-returns"] });
+    qc.invalidateQueries({ queryKey: ["customer-balances"] });
+    qc.invalidateQueries({ queryKey: ["customer-ledger"] });
+    qc.invalidateQueries({ queryKey: ["report-sales-full"] });
+    qc.invalidateQueries({ queryKey: ["report-sale-returns"] });
+    qc.invalidateQueries({ queryKey: ["dash-sale-returns"] });
+  };
+
+  const saveEdit = async (picked: ItemRow[]) => {
+    if (!navigator.onLine) {
+      return toast.error(t('sale_returns.edit_needs_internet', 'Editing a return needs an internet connection.'));
+    }
+    const { error } = await supabase.rpc("edit_sale_return" as any, {
+      _id: editing.id,
+      payload: {
+        items: picked.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
+        tax,
+        refund_amount: partyType === "staff" ? 0 : refund,
+        refund_method: partyType === "staff" ? "staff" : method,
+        note,
+        customer_id: partyType === "customer" && customer !== "none" ? customer : null,
+      } as any,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(t('sale_returns.return_updated', 'Return {{no}} updated', { no: editing.return_no }));
+    reset();
+    invalidateAfterChange();
+  };
+
+  const deleteReturn = async (r: any) => {
+    if (!confirm(t('sale_returns.confirm_delete', 'Delete return {{no}}? Stock and balances will be reversed.', { no: r.return_no }))) return;
+    if (!navigator.onLine) {
+      return toast.error(t('sale_returns.delete_needs_internet', 'Deleting a return needs an internet connection.'));
+    }
+    const { error } = await supabase.rpc("delete_sale_return" as any, { _id: r.id });
+    if (error) return toast.error(error.message);
+    toast.success(t('sale_returns.return_deleted', 'Return {{no}} deleted', { no: r.return_no }));
+    invalidateAfterChange();
+  };
+
   const submit = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await submitInner();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  const submitInner = async () => {
     const picked = items.filter((l) => l.selected && l.name && l.qty > 0);
     if (!picked.length) return toast.error(t('sale_returns.select_at_least_one_item', 'Select at least one item to return'));
     for (const l of picked) {
@@ -431,6 +531,7 @@ function Page() {
         return toast.error(t('sale_returns.qty_exceeds_sold', '{{name}}: return qty {{qty}} exceeds sold qty {{max}}', { name: l.name, qty: l.qty, max: l.max }));
       }
     }
+    if (editing) return saveEdit(picked);
     if (partyType === "staff" && !selectedSale?.expense_person_id) {
       return toast.error(t('sale_returns.pick_staff_invoice', "Pick the staff member's purchase invoice to return"));
     }
@@ -477,12 +578,7 @@ function Page() {
     // cashier can still print the return receipt.
     if (offline && localRet) setViewing(localRet);
 
-    qc.invalidateQueries({ queryKey: ["sale-returns"] });
-    qc.invalidateQueries({ queryKey: ["products"] });
-    qc.invalidateQueries({ queryKey: ["customers"] });
-    qc.invalidateQueries({ queryKey: ["report-sales-full"] });
-    qc.invalidateQueries({ queryKey: ["report-sale-returns"] });
-    qc.invalidateQueries({ queryKey: ["dash-sale-returns"] });
+    invalidateAfterChange();
   };
 
   const selectedSale = saleId !== "none" ? (sales as any[]).find((s) => s.id === saleId) : null;
@@ -512,11 +608,27 @@ function Page() {
           </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{t('sale_returns.dialog_title', 'New sale return')}</DialogTitle>
+              <DialogTitle>
+                {editing
+                  ? t('sale_returns.edit_dialog_title', 'Edit return {{no}}', { no: editing.return_no })
+                  : t('sale_returns.dialog_title', 'New sale return')}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
+              {editing && (
+                <div className="text-xs bg-muted/40 rounded p-2">
+                  {editing.party_type === "staff"
+                    ? `${t('expenses.role_staff', 'Staff')}: ${editing.expense_persons?.name ?? "—"}`
+                    : editing.sale_id
+                      ? `${t('sales.th_customer', 'Customer')}: ${editing.customers?.name ?? t('common.walk_in', 'Walk-in')}`
+                      : t('sale_returns.adhoc_no_invoice', '— Ad-hoc return (no invoice) —')}
+                  {" · "}
+                  {new Date(editing.created_at).toLocaleString()}
+                </div>
+              )}
               {/* Step 1: pick invoice */}
               <div className="grid grid-cols-1 gap-3">
+                {!editing && (<>
                 <div>
                   <Label>{t('sale_returns.return_for_label', 'Return for')}</Label>
                   <div className="flex gap-2 mt-1">
@@ -595,7 +707,9 @@ function Page() {
                   </div>
                 </div>
 
-                {selectedSale && (
+                </>)}
+
+                {selectedSale && !editing && (
                   <div className="text-xs bg-muted/40 rounded p-2">
                     {t('sales.th_invoice', 'Invoice')} <span className="font-mono">{selectedSale.invoice_no}</span> ·{" "}
                     {new Date(selectedSale.created_at).toLocaleString()} · {t('sales.th_total', 'Total')}{" "}
@@ -612,7 +726,7 @@ function Page() {
                   </div>
                 )}
 
-                {partyType === "customer" && saleId === "none" && (
+                {partyType === "customer" && saleId === "none" && !(editing && editing.sale_id) && (
                   <div>
                     <Label>{t('pos.customer', 'Customer')}</Label>
                     <Select value={customer} onValueChange={setCustomer}>
@@ -838,9 +952,13 @@ function Page() {
               <Button variant="outline" onClick={reset}>
                 {t('common.cancel', 'Cancel')}
               </Button>
-              <Button onClick={submit}>
+              <Button onClick={submit} disabled={saving}>
                 <Undo2 className="h-4 w-4 mr-2" />
-                {t('sale_returns.process_return', 'Process return')}
+                {saving
+                  ? t('common.saving', 'Saving…')
+                  : editing
+                    ? t('common.save_changes', 'Save changes')
+                    : t('sale_returns.process_return', 'Process return')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -893,6 +1011,16 @@ function Page() {
                   <Button variant="ghost" size="icon" onClick={() => setViewing(r)}>
                     <Eye className="h-4 w-4" />
                   </Button>
+                  {isAdmin && !r._offline_pending && r._sync !== "pending" && (
+                    <>
+                      <Button variant="ghost" size="icon" title={t('common.edit', 'Edit')} onClick={() => startEdit(r)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title={t('common.delete', 'Delete')} onClick={() => deleteReturn(r)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
