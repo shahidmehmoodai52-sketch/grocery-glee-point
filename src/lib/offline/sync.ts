@@ -398,7 +398,7 @@ function isPermanentSyncError(e: any): boolean {
   const code = String((e as any)?.code ?? "").toUpperCase();
   const msg = String((e as any)?.message ?? e ?? "").toLowerCase();
   if (["22P02", "23502", "23503", "42P01", "42703", "42883", "PGRST202"].includes(code)) return true;
-  return /invalid input syntax|null value|foreign key|does not exist|function .* does not exist|unknown|not authenticated|forbidden|permission denied|does not belong to current tenant|no active tenant|party does not belong/.test(msg);
+  return /invalid input syntax|null value|foreign key|does not exist|function .* does not exist|unknown|not authenticated|forbidden|permission denied|does not belong to current tenant|no active tenant|party does not belong|affected no rows/.test(msg);
 }
 
 /** After an offline sale's queued `complete_sale` RPC finally uploads, the
@@ -533,11 +533,18 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
         if (error) throw error;
       } else if (item.op === "update") {
         const { id, ...rest } = item.payload;
-        const { error } = await supabase.from(item.table as any).update(rest).eq("id", id);
+        // RLS turns a disallowed UPDATE into "0 rows, no error" — a queued
+        // edit the server silently dropped must not be marked "uploaded"
+        // (see 083c9de and pos.ts's updateOfflineAware for the same risk
+        // on the online path). Classified as permanent below so it surfaces
+        // to the user instead of retrying the same no-op forever.
+        const { data, error } = await supabase.from(item.table as any).update(rest).eq("id", id).select("id");
         if (error) throw error;
+        if (!data?.length) throw new Error(`update to ${item.table} affected no rows (no permission or the record no longer exists)`);
       } else if (item.op === "delete") {
-        const { error } = await supabase.from(item.table as any).delete().eq("id", item.payload.id);
+        const { data, error } = await supabase.from(item.table as any).delete().eq("id", item.payload.id).select("id");
         if (error) throw error;
+        if (!data?.length) throw new Error(`delete from ${item.table} affected no rows (no permission or the record no longer exists)`);
       }
       await db()._queue.update(item.id!, {
         status: "uploaded",

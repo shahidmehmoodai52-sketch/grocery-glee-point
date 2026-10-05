@@ -170,8 +170,12 @@ export async function updateOfflineAware<T extends Record<string, any>>(
 
   if (!offline) {
     try {
-      const { error } = await supabase.from(table as any).update(patch as any).eq("id", id);
+      // RLS turns a disallowed UPDATE into "0 rows, no error" — check the
+      // row count, or the caller (and this table's local mirror) believes a
+      // write succeeded that the server silently dropped (see 083c9de).
+      const { data, error } = await supabase.from(table as any).update(patch as any).eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error(`Update to ${table} had no effect (no permission or the record no longer exists). Nothing was changed.`);
       if (enabled) {
         try {
           const existing = await (db() as any)[table]?.get(id);
@@ -200,8 +204,10 @@ export async function deleteOfflineAware(table: string, id: string): Promise<voi
 
   if (!offline) {
     try {
-      const { error } = await supabase.from(table as any).delete().eq("id", id);
+      // Same RLS silent-no-op risk as the update path above.
+      const { data, error } = await supabase.from(table as any).delete().eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error(`Delete from ${table} had no effect (no permission or the record no longer exists). Nothing was removed.`);
       if (enabled) { try { await (db() as any)[table]?.delete(id); } catch {} }
       return;
     } catch (e: any) {
