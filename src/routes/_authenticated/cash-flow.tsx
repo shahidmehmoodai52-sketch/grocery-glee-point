@@ -608,7 +608,8 @@ function Page() {
         p_method: from.name,
         p_note: spForm.note || "",
         p_account_id: from.id,
-      });
+        p_direction: null, // disambiguates record_payment's two overloads
+      } as any);
       if (error) { toast.error(error.message); return; }
       toast.success(t('cash_flow.toast_supplier_paid', 'Supplier paid'));
       setSpOpen(false);

@@ -205,7 +205,10 @@ export function AddPaymentDialog({
         const account = await resolveAccount();
         const res = await supabase.rpc("record_payment", {
           p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: account.name, p_note: note || "", p_account_id: account.id ?? undefined,
-          p_direction: effectiveDirection,
+          // Always sent (null for suppliers): record_payment has a 6-arg and
+          // a 7-arg overload, and a call without p_direction matches both,
+          // so PostgREST refused it ("could not choose the best candidate").
+          p_direction: effectiveDirection ?? null,
         } as any);
         error = res.error;
         if (!error && when && res.data) {
@@ -367,7 +370,10 @@ export function AddDiscountDialog({
       } else {
         const res = await supabase.rpc("record_payment", {
           p_party_type: party, p_party_id: partyId, p_amount: amount, p_method: "discount", p_note: note || "",
-        });
+          // See AddPaymentDialog: without p_direction the call is ambiguous
+          // between record_payment's two overloads and never saved.
+          p_direction: null,
+        } as any);
         error = res.error;
         if (!error && when && res.data) {
           const chosen = new Date(when);
