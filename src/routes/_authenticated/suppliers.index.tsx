@@ -135,7 +135,8 @@ function Page() {
     }
     const { error } = await supabase.rpc("record_payment", {
       p_party_type: "supplier", p_party_id: payOpen.id, p_amount: pay.amount, p_method: account.name, p_note: pay.note, p_account_id: account.id,
-    });
+      p_direction: null, // disambiguates record_payment's two overloads
+    } as any);
     if (error) return toast.error(error.message);
     toast.success(t('suppliers.payment_sent', 'Payment sent'));
 
