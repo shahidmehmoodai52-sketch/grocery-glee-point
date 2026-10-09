@@ -211,6 +211,14 @@ function AuthPage() {
           showErr("Could not reach the server — check your internet connection and try again.");
           return;
         }
+        // An unconfirmed signup is not a wrong password: showing "Invalid
+        // email or password" left new shops (e.g. Kids World) stuck with no
+        // hint to open the confirmation link. Show the confirm/resend screen.
+        if ((error as any).code === "email_not_confirmed" || /email not confirmed/i.test(error.message ?? "")) {
+          setPendingConfirmEmail(cleanEmail);
+          showErr("Email not confirmed yet — open the confirmation link we emailed you, or tap Resend email.");
+          return;
+        }
         void logSecurityEvent("failed_login", { severity: "warning", email: cleanEmail });
         setFieldErrors({ password: "Invalid email or password" });
         return;
