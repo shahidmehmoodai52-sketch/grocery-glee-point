@@ -13,8 +13,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Trash2, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { useSettings } from "@/hooks/use-settings";
-import { fmtMoney } from "@/lib/format";
 
 export type Party = "customer" | "supplier" | "expense_person";
 export type LedgerEntity = "sale" | "purchase" | "sale_return" | "purchase_return" | "payment";
@@ -94,32 +92,10 @@ function useCashAccounts() {
     queryFn: async () =>
       (await supabase
         .from("cash_accounts")
-        .select("id,name,type,is_active,opening_balance")
+        .select("id,name,type,is_active")
         .eq("is_active", true)
         .order("sort_order")
         .order("name")).data ?? [],
-  });
-}
-
-/** Current balance per account, so the picker shows "Cash in hand — Rs 12,500"
- *  instead of a bare name — the cashier can see how much is already in each
- *  account (cash on hand vs. what's landed in the bank/EasyPaisa/etc.) right
- *  where they choose where this payment is going. Reuses the same
- *  get_cash_flow_account_totals RPC the Cash Flow page's own per-account
- *  balance is built from (opening_balance + all-time in - all-time out),
- *  rather than recomputing the running balance a second way here. */
-function useAccountBalances() {
-  return useQuery({
-    queryKey: ["cash-accounts", "all-time-totals"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_cash_flow_account_totals", {
-        p_from_date: "2000-01-01T00:00:00",
-        p_to_date: "2099-12-31T23:59:59",
-      } as any);
-      if (error) throw error;
-      return (data ?? []) as { account_id: string | null; total_in: number; total_out: number }[];
-    },
-    staleTime: 60_000,
   });
 }
 
@@ -162,16 +138,6 @@ export function AddPaymentDialog({
   const [direction, setDirection] = useState<"in" | "out">("in");
   const cashAccountsQ = useCashAccounts();
   const cashAccounts = cashAccountsQ.data ?? [];
-  const { data: settings } = useSettings();
-  const sym = settings?.currency_symbol ?? "Rs";
-  const accountTotals = useAccountBalances().data ?? [];
-  const balanceByAccount = new Map(
-    cashAccounts.map((a: any) => {
-      const t = accountTotals.find((x) => x.account_id === a.id);
-      const balance = Number(a.opening_balance ?? 0) + Number(t?.total_in ?? 0) - Number(t?.total_out ?? 0);
-      return [a.id as string, balance];
-    }),
-  );
   const sourceOptions = [
     ...cashAccounts.map((a: any) => ({ id: a.id as string, name: a.name as string, preset: false })),
     ...PAYMENT_SOURCE_PRESETS
@@ -330,18 +296,7 @@ export function AddPaymentDialog({
             >
               <SelectTrigger><SelectValue placeholder={isEditing && !accountId ? method : t('ledger.choose_source_placeholder', 'Choose Cash, Bank, EasyPaisa…')} /></SelectTrigger>
               <SelectContent>
-                {sourceOptions.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    <span className="flex items-center justify-between gap-4 w-full">
-                      <span>{a.name}</span>
-                      {!a.preset && balanceByAccount.has(a.id) && (
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          {fmtMoney(balanceByAccount.get(a.id), sym)}
-                        </span>
-                      )}
-                    </span>
-                  </SelectItem>
-                ))}
+                {sourceOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground mt-1">
