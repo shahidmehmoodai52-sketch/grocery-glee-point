@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
@@ -66,7 +67,7 @@ function AdminLogin() {
           </div>
           <div>
             <Label>Password</Label>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
