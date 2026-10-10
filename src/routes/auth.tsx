@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, ArrowLeft, ShoppingCart, Pill, Store, Shirt, MailCheck } from "lucide-react";
+import { Loader2, ArrowLeft, ShoppingCart, Pill, Store, Shirt, MailCheck, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +79,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
+  const [staffForgotOpen, setStaffForgotOpen] = useState(false);
 
   // Staff sign-in
   const [shopCode, setShopCode] = useState("");
@@ -494,7 +495,7 @@ function AuthPage() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                       <Label htmlFor="password">Password</Label>
-                      <button type="button" onClick={() => { setForgotEmail(email); setForgotOpen(true); }} className="text-xs text-primary hover:underline">
+                      <button type="button" onClick={() => { setForgotEmail(email); setForgotOpen(true); }} className="text-sm font-medium text-primary hover:underline">
                         Forgot password?
                       </button>
                     </div>
@@ -517,6 +518,14 @@ function AuthPage() {
                   {formError && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
                   <Button type="submit" className="w-full" disabled={busy}>
                     {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Sign in
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-primary"
+                    onClick={() => { setForgotEmail(email); setForgotOpen(true); setFormError(null); }}
+                  >
+                    <KeyRound className="mr-2 h-4 w-4" />Forgot password?
                   </Button>
                   <Button
                     type="button"
@@ -607,6 +616,22 @@ function AuthPage() {
                 <Button type="submit" className="w-full" disabled={busy}>
                   {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Sign in
                 </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full text-primary"
+                  onClick={() => setStaffForgotOpen((v) => !v)}
+                >
+                  <KeyRound className="mr-2 h-4 w-4" />Forgot password?
+                </Button>
+                {staffForgotOpen && (
+                  // Staff accounts sign in with a username, not a real
+                  // mailbox, so there is nowhere to email a reset link —
+                  // the shop owner sets a new one from the Users page.
+                  <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+                    Staff passwords are reset by the shop owner: <strong className="text-foreground">Users</strong> → your name → <strong className="text-foreground">Password</strong>. Ask your owner to set a new one.
+                  </div>
+                )}
               </form>
             )}
           </TabsContent>
