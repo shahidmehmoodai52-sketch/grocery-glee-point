@@ -6,12 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
 const SITE_URL = "https://tillix.co";
-// The installer is published to this repo's GitHub Releases by
-// electron-builder (see electron-builder.yml). The browser downloads the
-// asset file straight from GitHub's file host, so the shop never lands on a
+// Installers are published by electron-builder to the public
+// tillix-releases repo (see electron-builder.yml). Until its first release
+// exists, fall back to the source repo's old releases. The browser downloads
+// the asset straight from GitHub's file host, so the shop never lands on a
 // GitHub page.
-const LATEST_RELEASE_API =
-  "https://api.github.com/repos/shahidmehmoodai52-sketch/grocery-glee-point/releases/latest";
+const RELEASE_APIS = [
+  "https://api.github.com/repos/shahidmehmoodai52-sketch/tillix-releases/releases/latest",
+  "https://api.github.com/repos/shahidmehmoodai52-sketch/grocery-glee-point/releases/latest",
+];
 
 export const Route = createFileRoute("/download")({
   ssr: false,
@@ -37,12 +40,21 @@ type State =
   | { kind: "error"; message: string };
 
 async function latestInstaller(): Promise<{ url: string; name: string; version: string }> {
-  const res = await fetch(LATEST_RELEASE_API, { headers: { Accept: "application/vnd.github+json" } });
-  if (!res.ok) throw new Error(`Could not look up the latest version (${res.status}).`);
-  const rel = await res.json();
-  const exe = (rel.assets ?? []).find((a: any) => /\.exe$/i.test(a.name ?? ""));
-  if (!exe?.browser_download_url) throw new Error("No Windows installer found in the latest release.");
-  return { url: exe.browser_download_url, name: exe.name, version: rel.tag_name ?? "" };
+  let lastError = "No Windows installer found.";
+  for (const api of RELEASE_APIS) {
+    try {
+      const res = await fetch(api, { headers: { Accept: "application/vnd.github+json" } });
+      if (!res.ok) { lastError = `Could not look up the latest version (${res.status}).`; continue; }
+      const rel = await res.json();
+      const exe = (rel.assets ?? []).find((a: any) => /\.exe$/i.test(a.name ?? ""));
+      if (exe?.browser_download_url) {
+        return { url: exe.browser_download_url, name: exe.name, version: rel.tag_name ?? "" };
+      }
+    } catch (e: any) {
+      lastError = e?.message ?? lastError;
+    }
+  }
+  throw new Error(lastError);
 }
 
 function DownloadPage() {

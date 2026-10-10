@@ -52,6 +52,33 @@ New terminal open karo taake env variable load ho.
 
 ---
 
+## Moving releases to `tillix-releases` (one time, then make the code repo private)
+
+Releases ab alag **public** repo `shahidmehmoodai52-sketch/tillix-releases` me jaati hain (sirf installers, code nahi). `electron-builder.yml` aur website ka `/download` page usi ko dekhte hain. Code repo `grocery-glee-point` baad me private ho sakta hai.
+
+**Masla:** jo shops v0.1.0 install kar chuki hain, unki app abhi bhi `grocery-glee-point` se update dhoondti hai (ye address exe ke andar likha hota hai). Agar code repo pehle private kar diya to unhe update kabhi nahi milega. Isliye ye order follow karo:
+
+1. GitHub pe naya **public** repo banao: `tillix-releases` (README ke saath, khali chhod do).
+2. Token (`GH_TOKEN`) me `tillix-releases` ka access ho (classic token `public_repo` scope kaafi hai).
+3. Is repo ka latest code lo (version ab `0.1.1` hai) aur Windows PC pe chalao:
+   ```powershell
+   bun install
+   bun run electron:release
+   ```
+   Ye `tillix-releases` me **v0.1.1** ka draft banayega. GitHub pe ja kar **Publish** karo.
+4. **Bridge step (zaroori):** `grocery-glee-point` repo me bhi release `v0.1.1` banao aur `electron-release/` folder se yehi 3 files upload karo:
+   - `Tillix-Setup-0.1.1.exe`
+   - `Tillix-Setup-0.1.1.exe.blockmap`
+   - `latest.yml`
+
+   Isse purani installed apps (v0.1.0) ko v0.1.1 milega — aur v0.1.1 ke andar naya address (`tillix-releases`) hai.
+5. Kuch din intezar karo taake sab shops app ek dafa restart karke v0.1.1 le len.
+6. Ab `grocery-glee-point` ko **private** kar do. Updates aur website download dono `tillix-releases` se chalte rahenge.
+
+Aage se har release sirf step 3 (version bump + `electron:release` + Publish) — bridge ki zaroorat nahi.
+
+---
+
 ## Local test build (without publishing)
 
 ```powershell
