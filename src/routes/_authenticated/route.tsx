@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useRouter, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouter, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { LanguageSelect } from "@/components/language-select/language-select";
@@ -28,7 +28,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { setDefaultCurrencySymbol } from "@/lib/format";
 import { PendingBanner } from "@/components/pending-banner";
 import { ExpiryCountdown } from "@/components/expiry-countdown";
-import { getUserAllowOffline } from "@/lib/offline/session";
+import { getUserAllowOffline, signOutCompletely } from "@/lib/offline/session";
 import { OfflineStatusBadge } from "@/components/offline-status";
 import { clearOfflineDataOnLogout, guardTenantScope } from "@/lib/offline/device";
 import { SuspendedGate } from "@/components/suspended-gate";
@@ -59,7 +59,6 @@ export const Route = createFileRoute("/_authenticated")({
 
 function Layout() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -84,9 +83,12 @@ function Layout() {
     // If force is true, we wipe everything including the queue.
     // If there is NO pending data, we wipe everything safely.
     // If the user cancelled the dialog (force=false), we don't even reach here.
+    await signOutCompletely();
     await clearOfflineDataOnLogout({ includeQueue: force || !hasPending });
-    await supabase.auth.signOut();
-    navigate({ to: "/auth", search: { next: "/dashboard" }, replace: true });
+    // Full page load, not a client-side navigate: drops every cached query
+    // and in-memory user so nothing from the old session can bounce the
+    // login page back into the app.
+    window.location.replace("/auth?next=%2Fdashboard");
   };
 
   const { data: settings } = useSettings();
