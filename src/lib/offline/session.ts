@@ -97,7 +97,48 @@ export async function getUserAllowOffline(): Promise<User | null> {
     // Network or server error — fall through to cached fallback.
   }
 
-  // 3. Last resort: use the cached user even if we are not strictly offline,
-  //    so a transient network glitch does not force a logout.
+  // 3. No stored session at all. Offline, the cached user keeps the POS
+  //    usable. Online, there is nothing to revalidate — the user signed out
+  //    (or the session was revoked). Returning the cached user here is what
+  //    sent a just-logged-out owner from /auth straight back into the app
+  //    with no token, where my_tenant_status came back null and the
+  //    "Register your shop" form appeared instead of the login page.
+  if (!isEffectivelyOffline()) {
+    clearCachedUser();
+    return null;
+  }
   return readCachedUser();
+}
+
+function clearCachedUser() {
+  try {
+    window.localStorage.removeItem(OFFLINE_USER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Sign out of this device, completely and quickly.
+ *  - the cached offline user is dropped first, so nothing can resurrect the
+ *    session while sign-out is in flight;
+ *  - the server-side revoke gets a few seconds at most (on a slow
+ *    connection supabase-js's signOut() could hang, which is why logout
+ *    "didn't happen right away"); the local session is then removed no
+ *    matter what. */
+export async function signOutCompletely(): Promise<void> {
+  clearCachedUser();
+  try {
+    await Promise.race([
+      supabase.auth.signOut(),
+      new Promise((resolve) => setTimeout(resolve, 4000)),
+    ]);
+  } catch {
+    /* fall through to the local sign-out */
+  }
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    /* already signed out */
+  }
+  clearCachedUser();
 }

@@ -1,4 +1,4 @@
-import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck, ClipboardList, Receipt,
@@ -10,7 +10,6 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarHeader, SidebarFooter, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
 } from "@/components/ui/sidebar";
-import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
@@ -83,7 +82,6 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
-  const navigate = useNavigate();
   const { data: settings } = useSettings();
   const { isAdmin, can } = usePermissions();
   const { isSuperAdmin } = useSuperAdmin();
@@ -110,9 +108,10 @@ export function AppSidebar() {
       }
     } catch {}
 
+    const { signOutCompletely } = await import("@/lib/offline/session");
+    await signOutCompletely();
     await clearOfflineDataOnLogout({ includeQueue: hasPending });
-    await supabase.auth.signOut();
-    navigate({ to: "/auth", search: { next: "/dashboard" }, replace: true });
+    window.location.replace("/auth?next=%2Fdashboard");
   };
 
 

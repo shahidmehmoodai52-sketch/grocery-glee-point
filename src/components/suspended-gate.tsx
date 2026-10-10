@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSuperAdmin } from "@/hooks/use-super-admin";
 import { useOfflineStatus } from "@/lib/offline/status";
 import { clearOfflineDataOnLogout } from "@/lib/offline/device";
-import { refreshSessionDeduped } from "@/lib/offline/session";
+import { refreshSessionDeduped, signOutCompletely } from "@/lib/offline/session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -104,7 +104,7 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
             variant="outline"
             onClick={async () => {
               await clearOfflineDataOnLogout();
-              await supabase.auth.signOut();
+              await signOutCompletely();
               window.location.href = "/auth";
             }}
           >
@@ -143,7 +143,7 @@ function StaffAccountBlocked() {
           variant="outline"
           onClick={async () => {
             await clearOfflineDataOnLogout();
-            await supabase.auth.signOut();
+            await signOutCompletely();
             window.location.href = "/auth";
           }}
         >
@@ -264,7 +264,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
             className="w-full"
             onClick={async () => {
               await clearOfflineDataOnLogout();
-              await supabase.auth.signOut();
+              await signOutCompletely();
               window.location.href = "/auth";
             }}
           >
