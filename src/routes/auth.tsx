@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, ArrowLeft, ShoppingCart, Pill, Store, Shirt, MailCheck, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -499,9 +500,8 @@ function AuthPage() {
                         Forgot password?
                       </button>
                     </div>
-                    <Input 
+                    <PasswordInput 
                       id="password" 
-                      type="password" 
                       value={password} 
                       onChange={(e) => {
                         setPassword(e.target.value);
@@ -596,9 +596,8 @@ function AuthPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="staff_pwd">Password</Label>
-                  <Input 
+                  <PasswordInput 
                     id="staff_pwd" 
-                    type="password" 
                     value={staffPwd} 
                     onChange={(e) => {
                       setStaffPwd(e.target.value);
@@ -676,9 +675,8 @@ function AuthPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="reg_pwd">Password</Label>
-                <Input 
+                <PasswordInput 
                   id="reg_pwd" 
-                  type="password" 
                   value={regPwd} 
                   onChange={(e) => {
                     setRegPwd(e.target.value);
