@@ -37,12 +37,17 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Tillix POS
 publish:
-  # NOTE: `repo` below must exactly match the live GitHub repo name, or
-  # electron-updater will look in the wrong place and the shop that already
-  # has this app installed will silently stop receiving updates. If/when the
-  # GitHub repo is renamed, update this in the same commit as that rename —
-  # do not change it speculatively ahead of the actual rename.
+  # Releases live in a separate PUBLIC repo that holds only installers, so
+  # the source repo (grocery-glee-point) can be made private. electron-updater
+  # reads this at build time: every build from here on checks
+  # tillix-releases for updates.
+  #
+  # Apps installed from v0.1.0 still check grocery-glee-point. The first
+  # build with this config (v0.1.1, the "bridge" release) must therefore be
+  # uploaded to BOTH repos — see desktop-docs/RELEASE.md, "Moving releases
+  # to tillix-releases". Don't make grocery-glee-point private until the
+  # installed shops have taken that update.
   - provider: github
     owner: shahidmehmoodai52-sketch
-    repo: grocery-glee-point
+    repo: tillix-releases
     releaseType: release
