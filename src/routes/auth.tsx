@@ -139,7 +139,7 @@ function AuthPage() {
               _business_type: (meta?.pending_shop_business_type as string) ?? "grocery",
             } as any);
             if (!rpcErr) {
-              toast.success("Email confirmed — your shop is ready! Your 7-day free trial has started.");
+              toast.success("Email confirmed — your shop is registered and waiting for approval. Your 7-day free trial starts when it is approved.");
               // Best effort: clear the stashed details now that they're applied.
               void supabase.auth.updateUser({
                 data: {
@@ -384,7 +384,7 @@ function AuthPage() {
         return; 
       }
 
-      toast.success("Shop registered! Your 7-day free trial has started — full access, no approval needed.");
+      toast.success("Shop registered! It is waiting for approval — your 7-day free trial starts when it is approved.");
       await goToApp();
     } catch (err: any) {
       showErr(err?.message ?? "Registration failed");
@@ -423,7 +423,7 @@ function AuthPage() {
               <h1 className="text-xl font-semibold">Check your email</h1>
               <p className="text-sm text-muted-foreground">
                 We've sent a confirmation link to <strong className="text-foreground">{pendingConfirmEmail}</strong>.
-                Click the link to activate your account — your shop and 7-day free trial will be ready as soon as you do.
+                Click the link to activate your account. Your shop will then be reviewed, and your 7-day free trial starts as soon as it is approved.
               </p>
             </div>
             <div className="w-full space-y-2 pt-2">

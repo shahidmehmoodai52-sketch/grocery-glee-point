@@ -7,7 +7,7 @@ import {
   ShoppingCart, Barcode, Boxes, Users, TrendingUp, Store, Cloud, Shield,
   Smartphone, Zap, Globe2, ReceiptText, PackageSearch, Landmark, Truck,
   Pill, UtensilsCrossed, ShoppingBasket, Building2, Check, ChevronDown, Menu, X,
-  PlayCircle, Sparkles, Mail,
+  PlayCircle, Sparkles, Mail, MonitorDown,
 } from "lucide-react";
 
 /* ---------- IP-based currency localization ---------- */
@@ -455,6 +455,10 @@ function LandingPage() {
                 </Link>
                 <Link to="/auth" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-tx-navy transition hover:bg-slate-50">
                   {t('landing.nav.login')}
+                </Link>
+                {/* Approved shops only: /download checks the shop's status before handing out the installer. */}
+                <Link to="/download" className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-tx-green-dark transition hover:bg-emerald-100">
+                  <MonitorDown className="h-4 w-4" /> {t('landing.hero.download_windows', 'Download for Windows')}
                 </Link>
               </div>
 
