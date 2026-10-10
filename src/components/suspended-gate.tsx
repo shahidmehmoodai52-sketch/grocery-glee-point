@@ -81,6 +81,12 @@ export function SuspendedGate({ children }: { children: React.ReactNode }) {
     return <ShopSetup onDone={() => refetch()} />;
   }
 
+  // New shops wait for platform approval before anything opens — the 7-day
+  // trial only starts when an admin approves them (admin_set_tenant_status).
+  if (status === "pending") {
+    return <AwaitingApproval onRefresh={() => refetch()} />;
+  }
+
   if (status === "suspended" || status === "archived" || status === "expired") {
     const isExpired = status === "expired";
     return (
@@ -179,7 +185,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
     } as any);
     setBusy(false);
     if (error) { toast.error(error.message ?? t('suspended_gate.toast_could_not_register', 'Could not register shop.')); return; }
-    toast.success(t('suspended_gate.toast_shop_registered', 'Shop registered! Your 7-day free trial has started.'));
+    toast.success(t('suspended_gate.toast_shop_submitted', 'Shop registered! It is now waiting for approval — your 7-day free trial starts when it is approved.'));
     onDone();
   };
 
@@ -192,7 +198,7 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
           </div>
           <h1 className="text-xl font-semibold">{t('suspended_gate.register_shop_title', 'Register your shop')}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {t('suspended_gate.register_shop_intro', "Please enter shop details to continue. You'll get full access right away with a 7-day free trial.")}
+            {t('suspended_gate.register_shop_intro_approval', "Please enter shop details to continue. After approval you get full access with a 7-day free trial.")}
           </p>
         </div>
         <form className="space-y-4" onSubmit={submit}>
@@ -271,6 +277,43 @@ function ShopSetup({ onDone }: { onDone: () => void }) {
             <LogOut className="mr-2 h-4 w-4" /> {t('suspended_gate.sign_out', 'Sign out')}
           </Button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function AwaitingApproval({ onRefresh }: { onRefresh: () => void }) {
+  const { t } = useTranslation();
+  const [checking, setChecking] = useState(false);
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md rounded-lg border border-amber-500/40 bg-amber-500/5 p-8 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+          <Clock className="h-6 w-6" />
+        </div>
+        <h1 className="mt-4 text-xl font-semibold">{t('suspended_gate.awaiting_approval_title', 'Waiting for approval')}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t('suspended_gate.awaiting_approval_body', 'Your shop is registered and is being reviewed. Your 7-day free trial starts as soon as it is approved. For a faster approval contact Tillix support (info@tillix.co · +923096431377).')}
+        </p>
+        <div className="mt-6 flex flex-col gap-2">
+          <Button
+            disabled={checking}
+            onClick={async () => { setChecking(true); try { await onRefresh(); } finally { setChecking(false); } }}
+          >
+            {checking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {t('suspended_gate.check_again', 'Check again')}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              await clearOfflineDataOnLogout();
+              await signOutCompletely();
+              window.location.href = "/auth";
+            }}
+          >
+            <LogOut className="mr-2 h-4 w-4" /> {t('suspended_gate.sign_out', 'Sign out')}
+          </Button>
+        </div>
       </div>
     </div>
   );
