@@ -18,7 +18,7 @@ import { fmtMoney } from "@/lib/format";
 import { roundToTillixQty } from "@/lib/quantity-rounding";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { offlineFirst, cacheSuppliers } from "@/lib/offline/pos";
-import { completePurchaseOfflineAware, updateSellPriceOfflineAware, isOffline as isOfflineNow } from "@/lib/offline/purchases";
+import { completePurchaseOfflineAware, updateSellPriceOfflineAware, refreshProductsInMirror, isOffline as isOfflineNow } from "@/lib/offline/purchases";
 import { getLocalPrinterSettings } from "@/lib/offline/printer-settings";
 import { printInvoiceDirect } from "@/components/receipt";
 
@@ -912,9 +912,23 @@ function Page() {
     const priceUpdates = items.filter(
       (l) => l.product_id && Number(l.sale_price || 0) > 0 && Number(l.sale_price) !== Number(l.old_sale ?? -1),
     );
+    let rateErrors = 0;
     for (const l of priceUpdates) {
-      await updateSellPriceOfflineAware(l.product_id as string, Number(l.sale_price));
+      try {
+        await updateSellPriceOfflineAware(l.product_id as string, Number(l.sale_price));
+      } catch (e) {
+        rateErrors++;
+        console.error("sale rate update failed", l.name, e);
+      }
     }
+    if (rateErrors) {
+      toast.error(t('purchases.rate_update_failed', '{{n}} sale rate(s) could not be updated — please set them on the Products page.', { n: rateErrors }));
+    }
+    // Pull the purchased products (new stock, cost and sale rate) into this
+    // device's offline mirror so the POS shows them right away.
+    try {
+      await refreshProductsInMirror(items.map((l) => l.product_id as string));
+    } catch { /* best effort — the regular sync catches up */ }
 
     toast.success(priceUpdates.length ? t('purchases.recorded_with_rates', 'Purchase recorded — stock & sale rates updated') : t('purchases.recorded_stock_updated', 'Purchase recorded, stock updated'));
     setConfirmOpen(false);
