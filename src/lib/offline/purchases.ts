@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { db } from "./db";
 import { getOfflineStatus, isEffectivelyOffline } from "./status";
 import { enqueueWrite } from "./sync";
+import { mergeIntoMirror } from "./pos";
 import { getDeviceId, getMeta } from "./device";
 
 export interface PurchaseItemPayload {
@@ -259,11 +260,18 @@ export async function updateSellPriceOfflineAware(
   const enabled = getOfflineStatus().enabled;
   if (!(isOffline() && enabled)) {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("products")
         .update({ sell_price: sellPrice })
-        .eq("id", productId);
+        .eq("id", productId)
+        .select("*");
       if (error) throw error;
+      if (!data?.length) throw new Error("Sale rate was not saved (product not found or no permission).");
+      // Also write it into this device's offline mirror: POS serves products
+      // from the mirror first and only re-reads the cloud every few minutes,
+      // so without this the till kept selling at the OLD rate right after a
+      // purchase changed it.
+      try { await mergeIntoMirror("products", data); } catch { /* best effort */ }
       return;
     } catch (e: any) {
       if (!enabled || !isNetworkError(e)) throw e;
@@ -284,4 +292,17 @@ export async function updateSellPriceOfflineAware(
     table: "products",
     payload: { id: productId, sell_price: sellPrice },
   });
+}
+
+/** Re-read products from the cloud into this device's offline mirror — used
+ *  after a purchase so POS sees the new stock / cost / sale rate at once
+ *  instead of a mirror snapshot that is refreshed only every few minutes. */
+export async function refreshProductsInMirror(productIds: string[]): Promise<void> {
+  const ids = [...new Set(productIds.filter(Boolean))];
+  if (!ids.length || isOffline()) return;
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase.from("products").select("*").in("id", ids.slice(i, i + 200));
+    if (error) throw error;
+    await mergeIntoMirror("products", data ?? []);
+  }
 }
