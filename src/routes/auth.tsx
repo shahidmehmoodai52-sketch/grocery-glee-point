@@ -362,6 +362,19 @@ function AuthPage() {
         return;
       }
 
+      // Supabase doesn't error for an email that is already registered: it
+      // returns a user with no identities and sends nothing. The form then
+      // showed "Check your email" and no shop was ever created (Kids World
+      // re-registering an existing account). Send them to Sign in instead —
+      // signing in finishes the shop registration from the details saved at
+      // their first signup.
+      if (signUpData.user && (signUpData.user.identities?.length ?? 0) === 0) {
+        setMode("signin");
+        setEmail(cleanEmail);
+        showErr("This email is already registered. Please sign in with your password — your shop will be set up automatically. Forgot it? Use Forgot password.");
+        return;
+      }
+
       if (!signUpData.session) {
         // Confirmation required: signing in now would just fail with a raw
         // "Email not confirmed" error, and register_shop needs a real
