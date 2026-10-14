@@ -20,6 +20,17 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+/** Auth emails (confirm/reset) must land somewhere a visitor can actually open.
+ *  Vercel's SSO wall protects every domain except tillix.co, so a link built
+ *  from window.location.origin breaks when someone registers from the raw
+ *  *.vercel.app URL instead of the custom domain. Force tillix.co except on
+ *  localhost, where that would break local dev testing of these flows. Read
+ *  lazily (not at module scope) since this route also renders during SSR,
+ *  where `window` doesn't exist. */
+function authLinkOrigin(): string {
+  return window.location.hostname === "localhost" ? window.location.origin : "https://tillix.co";
+}
+
 function cleanCode(s: string) {
   return s.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
 }
@@ -243,7 +254,7 @@ function AuthPage() {
     if (!cleanEmail) { toast.error("Enter your email first."); return; }
     setBusy(true);
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: `${window.location.origin}/reset-password?next=${encodeURIComponent(target)}`,
+      redirectTo: `${authLinkOrigin()}/reset-password?next=${encodeURIComponent(target)}`,
     });
     setBusy(false);
     if (error) toast.error("Could not send reset link. Please try again.");
@@ -341,7 +352,7 @@ function AuthPage() {
         email: cleanEmail,
         password: regPwd,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
+          emailRedirectTo: `${authLinkOrigin()}/auth`,
           data: {
             full_name: fullName.trim() || undefined,
             // Stashed here (not localStorage) so it survives the round trip
