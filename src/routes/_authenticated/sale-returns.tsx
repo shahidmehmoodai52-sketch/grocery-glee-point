@@ -44,6 +44,7 @@ import { readLocalFirst } from "@/lib/offline/data-access";
 import { db as offlineDb } from "@/lib/offline/db";
 import { completeSaleReturnOfflineAware } from "@/lib/offline/returns";
 import { fetchAll as fetchAllRows } from "@/lib/supabase-page";
+import { localDateStr } from "@/lib/date-presets";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -144,7 +145,7 @@ function Page() {
   // must not overwrite its saved refund with the full total.
   const editLoadTotalRef = useRef<number | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   // Cloud-first whenever online (offlineFirst, not readLocalFirst): sale_returns has
   // no updated_at, so the local mirror only ever learns about NEW rows via
   // sync.ts's created_at-watermark pull, and realtime never writes them to

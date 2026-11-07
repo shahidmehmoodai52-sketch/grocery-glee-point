@@ -90,6 +90,7 @@ import {
   searchProductsLocal,
 } from "@/lib/offline/pos";
 import { readLocalFirst } from "@/lib/offline/data-access";
+import { localDateStr } from "@/lib/date-presets";
 import { db as offlineDb } from "@/lib/offline/db";
 import { computeSoldQtyByProduct, applyStockDeltas, type SoldLine } from "@/lib/pos-stock-patch";
 import { enqueueWrite } from "@/lib/offline/sync";
@@ -4698,7 +4699,7 @@ function CashOutDialog({
             category: "adjustment",
             reference: "Cash Out",
             notes: `${selectedCustomer?.name}: ${note}`,
-            occurred_on: now.slice(0, 10),
+            occurred_on: localDateStr(now),
             created_at: now,
           },
         });
@@ -4733,7 +4734,7 @@ function CashOutDialog({
             category: "adjustment",
             reference: "Cash Out",
             notes: `${selectedCustomer?.name}: ${note}`,
-            occurred_on: new Date().toISOString().slice(0, 10),
+            occurred_on: localDateStr(),
           })
           .select()
           .single();

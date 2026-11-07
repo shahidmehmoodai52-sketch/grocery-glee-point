@@ -24,7 +24,7 @@ import { fmtMoney } from "@/lib/format";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
-import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { PRESETS, rangeFor, localDateStr, localDayStartIso, localDayEndIso, type DatePreset } from "@/lib/date-presets";
 import { cn } from "@/lib/utils";
 import { fetchAll } from "@/lib/supabase-page";
 
@@ -134,7 +134,13 @@ const iconFor = (t: string) => ACC_TYPES.find((x) => x.v === t)?.Icon ?? Wallet;
 const labelFor = (t: string) => ACC_TYPES.find((x) => x.v === t)?.label ?? t;
 
 const emptyAcc = { name: "", type: "cash", opening_balance: 0, notes: "", is_active: true };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateStr();
+/** Sales, sale returns and purchases have no stored cash date: the ledger RPC
+ *  derives it as created_at::date in the server's UTC, which put a sale made
+ *  between 12 am and 5 am (Pakistan) on the PREVIOUS day. Re-derive it from
+ *  the timestamp in the shop's local time. Stored entries keep their date. */
+const ledgerDay = (row: any): string =>
+  /^(sale|sret|pur):/.test(String(row.id ?? "")) && row.created_at ? localDateStr(row.created_at) : row.occurred_on;
 const emptyTx = { account_id: "", direction: "in" as "in" | "out", amount: 0, occurred_on: today(), category: "other", reference: "", notes: "", payment_method: "cash" };
 const emptyTransfer = { from_id: "", to_id: "", amount: 0, occurred_on: today(), notes: "" };
 const emptySupplierPay = { supplier_id: "", from_id: "", amount: 0, occurred_on: today(), note: "" };
@@ -213,7 +219,7 @@ function Page() {
         .order("created_at", { ascending: true })
         .limit(1);
       const v = (data?.[0] as any)?.created_at;
-      return v ? v.slice(0, 10) : null;
+      return v ? localDateStr(v) : null;
     },
   });
 
@@ -276,8 +282,8 @@ function Page() {
     queryKey: ["cf-summary", dateFrom, dateTo, filterAcc],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_summary", {
-        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
-        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
+        p_from_date: dateFrom ? localDayStartIso(dateFrom) : "2000-01-01T00:00:00Z",
+        p_to_date: dateTo ? localDayEndIso(dateTo) : "2099-12-31T23:59:59Z",
         p_account_id: filterAcc === "all" ? undefined : filterAcc
       });
       if (error) throw error;
@@ -290,8 +296,8 @@ function Page() {
     queryKey: ["cf-ledger-paged", dateFrom, dateTo, filterAcc, filterMethod, search, page],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
-        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
-        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
+        p_from_date: dateFrom ? localDayStartIso(dateFrom) : "2000-01-01T00:00:00Z",
+        p_to_date: dateTo ? localDayEndIso(dateTo) : "2099-12-31T23:59:59Z",
         p_account_id: filterAcc === "all" ? undefined : filterAcc,
         p_payment_method: filterMethod === "all" ? undefined : filterMethod,
         p_search: search || undefined,
@@ -304,6 +310,7 @@ function Page() {
       // map RPC response to Tx type, adding required fields if missing
       const mapped = rows.map((row: any) => ({
         ...row,
+        occurred_on: ledgerDay(row),
         transfer_group_id: row.transfer_group_id || null,
         payment_method: row.payment_method || null
       })) as Tx[];
@@ -340,8 +347,8 @@ function Page() {
     queryKey: ["cf-account-totals", dateFrom, dateTo],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_account_totals", {
-        p_from_date: dateFrom ? `${dateFrom}T00:00:00` : "2000-01-01T00:00:00",
-        p_to_date: dateTo ? `${dateTo}T23:59:59` : "2099-12-31T23:59:59",
+        p_from_date: dateFrom ? localDayStartIso(dateFrom) : "2000-01-01T00:00:00Z",
+        p_to_date: dateTo ? localDayEndIso(dateTo) : "2099-12-31T23:59:59Z",
       });
       if (error) throw error;
       return (data ?? []) as { account_id: string | null; total_in: number; total_out: number; entry_count: number; prior_in: number; prior_out: number }[];
@@ -376,6 +383,7 @@ function Page() {
       }
       return rows.map((row: any) => ({
         ...row,
+        occurred_on: ledgerDay(row),
         transfer_group_id: row.transfer_group_id || null,
         payment_method: row.payment_method || null,
       })) as Tx[];

@@ -20,7 +20,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
 import { printDocument } from "@/components/receipt";
 import { cn } from "@/lib/utils";
-import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { PRESETS, rangeFor, type DatePreset, localDateStr } from "@/lib/date-presets";
 import { useEarliestDataDate } from "@/lib/earliest-date";
 import { fetchAll } from "@/lib/supabase-page";
 import { useBusinessType } from "@/hooks/use-tenant";
@@ -739,7 +739,7 @@ const displayPaymentMethod = (methodValue: string | null | undefined) => {
   return rows.map((r) => r.method).join(" + ");
 };
 
-function today() { return new Date().toISOString().slice(0, 10); }
+function today() { return localDateStr(); }
 
 function useDebounced<T>(value: T, ms: number) {
   const [v, setV] = useState(value);
@@ -1165,7 +1165,7 @@ function Page() {
   const dailySales = useMemo(() => {
     const map = new Map<string, { date: string; invoices: number; qty: number; revenue: number; tax: number; total: number; profit: number }>();
     for (const s of allSales as any[]) {
-      const d = new Date(s.created_at).toISOString().slice(0, 10);
+      const d = localDateStr(s.created_at);
       const rev = Number(s.subtotal) - Number(s.discount);
       const profit = rev - Number(s.cost_total);
       const qty = (s.sale_items ?? []).reduce((a: number, i: any) => a + Number(i.qty), 0);
@@ -1407,7 +1407,7 @@ function Page() {
                   <TableRow
                     key={d.date}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openInvoices(t('reports.drill_sales_on', 'Sales on {{date}}', { date: d.date }), (allSales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                    onClick={() => openInvoices(t('reports.drill_sales_on', 'Sales on {{date}}', { date: d.date }), (allSales as any[]).filter((s) => localDateStr(s.created_at) === d.date))}
                   >
                     <TableCell>{d.date}</TableCell>
                     <TableCell className="text-right">{d.invoices}</TableCell>
@@ -1449,7 +1449,7 @@ function Page() {
                     <TableRow
                       key={d.date}
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => openInvoices(t('reports.drill_sales_profit_on', 'Sales & profit on {{date}}', { date: d.date }), (allSales as any[]).filter((s) => new Date(s.created_at).toISOString().slice(0, 10) === d.date))}
+                      onClick={() => openInvoices(t('reports.drill_sales_profit_on', 'Sales & profit on {{date}}', { date: d.date }), (allSales as any[]).filter((s) => localDateStr(s.created_at) === d.date))}
                     >
                       <TableCell>{d.date}</TableCell>
                       <TableCell className="text-right">{d.invoices}</TableCell>
