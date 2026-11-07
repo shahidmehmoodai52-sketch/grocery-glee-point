@@ -43,6 +43,7 @@ import {
   computeLocalDailyTimeline,
 } from "@/lib/offline/analytics";
 import {
+import { localDateStr } from "@/lib/date-presets";
   resumeHeldBillOfflineAware,
   discardHeldBillOfflineAware,
   recordCashEventOfflineAware,
@@ -129,7 +130,7 @@ function QuickActionsBar() {
 /* ---------------- OWNER CONTROL CENTER ---------------- */
 function OwnerControlCenter({ settings }: { settings: any }) {
   const { t } = useTranslation();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
 
   const { data: morning, refetch: refetchMorning } = useQuery({
     queryKey: ["morning-dashboard"],
@@ -416,7 +417,7 @@ function BusinessCalendar() {
   const [month, setMonth] = useState(() => {
     const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1);
   });
-  const [selected, setSelected] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [selected, setSelected] = useState<string>(() => localDateStr());
 
   const days = useMemo(() => {
     const first = new Date(month);
@@ -425,7 +426,7 @@ function BusinessCalendar() {
     const arr: (string | null)[] = Array(pad).fill(null);
     for (let i = 1; i <= last.getDate(); i++) {
       const d = new Date(month.getFullYear(), month.getMonth(), i);
-      arr.push(d.toISOString().slice(0, 10));
+      arr.push(localDateStr(d));
     }
     return arr;
   }, [month]);
@@ -457,7 +458,7 @@ function BusinessCalendar() {
 
   const s = summary || {};
   const monthLabel = month.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
 
   return (
     <div className="space-y-4">

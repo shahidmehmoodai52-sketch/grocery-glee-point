@@ -19,11 +19,12 @@ import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney } from "@/lib/format";
 import { offlineFirst, cacheExpenses, insertOfflineAware } from "@/lib/offline/pos";
 import { db } from "@/lib/offline/db";
+import { localDateStr } from "@/lib/date-presets";
 
 export const Route = createFileRoute("/_authenticated/expenses")({ component: Page });
 
-function today() { return new Date().toISOString().slice(0, 10); }
-function startOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); }
+function today() { return localDateStr(); }
+function startOfMonth() { const d = new Date(); d.setDate(1); return localDateStr(d); }
 
 // Presets offered when the shop hasn't created these heads in Cash Flow yet.
 // Selecting one creates the matching cash account so expenses always land on

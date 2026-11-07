@@ -7,6 +7,24 @@ const fmt = (d: Date) => {
   return `${y}-${m}-${da}`;
 };
 
+/** Calendar date (YYYY-MM-DD) in the device's own timezone. Use this, never
+ *  `toISOString().slice(0, 10)`: that is the UTC date, which in Pakistan
+ *  (UTC+5) is still YESTERDAY from midnight until 5 am — so a sale made
+ *  after 12 am showed under today while its cash landed on the previous day. */
+export function localDateStr(d: Date | string | number = new Date()): string {
+  return fmt(d instanceof Date ? d : new Date(d));
+}
+
+/** Start / end of a local calendar day as a UTC instant, for timestamp
+ *  range filters. A bare "2026-11-07T00:00:00" sent to Postgres is read as
+ *  UTC midnight (5 am in Pakistan), which shifted every day's range. */
+export function localDayStartIso(ymd: string): string {
+  return new Date(`${ymd}T00:00:00`).toISOString();
+}
+export function localDayEndIso(ymd: string): string {
+  return new Date(`${ymd}T23:59:59.999`).toISOString();
+}
+
 export function rangeFor(preset: DatePreset): { from: string; to: string } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

@@ -28,6 +28,7 @@ import { calculatePurchaseTotals } from "@/lib/purchase-totals";
 import { PurchaseBillScannerButton, type ImportedPurchase } from "@/features/purchase-ai/BillScannerDialog";
 import { QuickAddProductDialog } from "@/components/quick-add-product-dialog";
 import { useBusinessType } from "@/hooks/use-tenant";
+import { localDateStr } from "@/lib/date-presets";
 
 export const Route = createFileRoute("/_authenticated/purchases")({
   // Lets other pages (the supplier ledger) deep-link straight into editing
@@ -62,7 +63,7 @@ type Draft = {
   /** Supplier bonus for hitting a target — reporting only, never part of the bill. */
   incentive?: number;
 };
-const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", date: new Date().toISOString().slice(0,10), paySource: "", incentive: 0 };
+const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", date: localDateStr(), paySource: "", incentive: 0 };
 
 // Presets offered when the shop hasn't created these heads in Cash Flow yet.
 // Selecting one creates the matching cash account so purchase payments always
@@ -163,7 +164,7 @@ function Page() {
   const qc = useQueryClient();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr();
   const isPharmacy = useBusinessType() === "pharmacy";
 
   const [draft, setDraft, clearDraft] = usePersistentState<Draft>("purchase-entry", emptyDraft);
@@ -255,7 +256,7 @@ function Page() {
       open: true,
       editingId: p.id,
       supplier: p.supplier_id ?? "none",
-      date: p.created_at ? new Date(p.created_at).toISOString().slice(0, 10) : today,
+      date: p.created_at ? localDateStr(p.created_at) : today,
       lines: formattedLines,
       tax: Number(p.tax || 0),
       taxMode: "amt",
