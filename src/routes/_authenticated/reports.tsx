@@ -13,6 +13,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { RangeCalendar } from "@/components/range-calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -1306,17 +1307,15 @@ function Page() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="range"
-              selected={{ from: fromDate, to: toDate }}
-              onSelect={(r) => {
+            <RangeCalendar
+              from={fromDate}
+              to={toDate}
+              onChange={(f, t) => {
                 setUserPicked(true);
                 setPreset("custom");
-                setFromDate(r?.from);
-                setToDate(r?.to);
+                setFromDate(f);
+                setToDate(t);
               }}
-              numberOfMonths={2}
-              className={cn("p-3 pointer-events-auto")}
             />
           </PopoverContent>
         </Popover>

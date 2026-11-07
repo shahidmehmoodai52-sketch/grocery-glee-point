@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { RangeCalendar } from "@/components/range-calendar";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -476,19 +477,15 @@ function Page() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="range"
-              selected={{ from, to }}
-              onSelect={(r: any) => {
-                if (r?.from) setFrom(startOfDay(r.from));
-                if (r?.to) setTo(startOfDay(r.to));
-                else if (r?.from) setTo(startOfDay(r.from));
+            <RangeCalendar
+              from={from}
+              to={to}
+              onChange={(f, t) => {
+                setFrom(f);
+                setTo(t);
                 setUserPicked(true);
                 setPreset("custom");
               }}
-              numberOfMonths={2}
-              initialFocus
-              className={cn("p-3 pointer-events-auto")}
             />
           </PopoverContent>
         </Popover>
