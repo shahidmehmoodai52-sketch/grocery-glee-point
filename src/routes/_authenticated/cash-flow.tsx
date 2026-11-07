@@ -23,46 +23,56 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { fmtMoney } from "@/lib/format";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { RangeCalendar } from "@/components/range-calendar";
 import { CalendarIcon } from "lucide-react";
 import { PRESETS, rangeFor, localDateStr, localDayStartIso, localDayEndIso, type DatePreset } from "@/lib/date-presets";
 import { cn } from "@/lib/utils";
 import { fetchAll } from "@/lib/supabase-page";
 
+/** "custom" = dates picked by hand (not one of the presets). */
+type BarPreset = DatePreset | "custom";
+
 function DateRangeBar({
   preset, from, to, onPreset, onFrom, onTo,
 }: {
-  preset: DatePreset; from: string; to: string;
-  onPreset: (p: DatePreset) => void; onFrom: (v: string) => void; onTo: (v: string) => void;
+  preset: BarPreset; from: string; to: string;
+  onPreset: (p: BarPreset) => void; onFrom: (v: string) => void; onTo: (v: string) => void;
 }) {
   const { t } = useTranslation();
-  const pick = (val: string, set: (v: string) => void, label: string) => (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 justify-start font-normal">
-          <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
-          {val || label}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={val ? new Date(`${val}T00:00:00`) : undefined}
-          onSelect={(d) => { onPreset("all"); set(d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : ""); }}
-          className={cn("p-3 pointer-events-auto")}
-        />
-      </PopoverContent>
-    </Popover>
-  );
+  const asDate = (v: string) => (v ? new Date(`${v}T00:00:00`) : undefined);
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select value={preset} onValueChange={(v) => { const p = v as DatePreset; onPreset(p); const r = rangeFor(p); onFrom(r.from); onTo(r.to); }}>
         <SelectTrigger className="h-8 w-[150px]"><SelectValue /></SelectTrigger>
         <SelectContent>
           {PRESETS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+          {preset === "custom" && <SelectItem value="custom">{t('dashboard.custom_range', 'Custom range')}</SelectItem>}
         </SelectContent>
       </Select>
-      {pick(from, onFrom, t('cash_flow.from_placeholder', 'From'))}
-      {pick(to, onTo, t('cash_flow.to_placeholder', 'To'))}
+      {/* One range picker instead of separate From / To calendars: picking a
+          date used to go through onPreset("all"), which reset BOTH dates (From
+          to the first entry, To to tomorrow), so a custom range never stuck. */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 justify-start font-normal">
+            <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+            {from || to
+              ? `${from || "…"} – ${to || "…"}`
+              : `${t('cash_flow.from_placeholder', 'From')} – ${t('cash_flow.to_placeholder', 'To')}`}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <RangeCalendar
+            from={asDate(from)}
+            to={asDate(to)}
+            onChange={(f, tt) => {
+              onPreset("custom");
+              onFrom(localDateStr(f));
+              onTo(localDateStr(tt));
+            }}
+          />
+        </PopoverContent>
+      </Popover>
       {(from || to) && (
         <Button variant="ghost" size="sm" className="h-8" onClick={() => { onPreset("all"); onFrom(""); onTo(""); }}>{t('cash_flow.clear', 'Clear')}</Button>
       )}
@@ -205,7 +215,7 @@ function Page() {
   const [spForm, setSpForm] = useState<any>({ ...emptySupplierPay });
 
   const [search, setSearch] = useState("");
-  const [mainPreset, setMainPreset] = useState<DatePreset>("all");
+  const [mainPreset, setMainPreset] = useState<BarPreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [userPicked, setUserPicked] = useState(false);
@@ -245,7 +255,7 @@ function Page() {
   const [dFilterAcc, setDFilterAcc] = useState<string>("all");
   const [dFilterMethod, setDFilterMethod] = useState<string>("all");
 
-  const [dPreset, setDPreset] = useState<DatePreset>("all");
+  const [dPreset, setDPreset] = useState<BarPreset>("all");
   const [dFrom, setDFrom] = useState("");
   const [dTo, setDTo] = useState("");
   const setDetails = (d: typeof details) => {
