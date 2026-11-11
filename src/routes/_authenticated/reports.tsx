@@ -1229,9 +1229,9 @@ function Page() {
 
   // Combined method cash-flow: money IN (sales + customer party-payments) vs money OUT (supplier party-payments)
   const methodFlow = useMemo(() => {
-    const map = new Map<string, { method: string; in_sales: number; in_customer: number; out_supplier: number; net: number }>();
+    const map = new Map<string, { method: string; in_sales: number; in_customer: number; cash_out_customer: number; out_supplier: number; net: number }>();
     const get = (m: string) => {
-      const cur = map.get(m) ?? { method: m, in_sales: 0, in_customer: 0, out_supplier: 0, net: 0 };
+      const cur = map.get(m) ?? { method: m, in_sales: 0, in_customer: 0, cash_out_customer: 0, out_supplier: 0, net: 0 };
       map.set(m, cur); return cur;
     };
     for (const s of allSales as any[]) {
@@ -1243,8 +1243,17 @@ function Page() {
     }
     for (const p of partyPayments as any[]) {
       const cur = get((p.method || "unknown").toLowerCase());
-      if (p.dir === "in") cur.in_customer += Number(p.amount);
-      else cur.out_supplier += Number(p.amount);
+      // Customer recovery is NET of Cash Out: money handed back to a customer
+      // comes out of the same channel the recovery went into, so it reduces
+      // that channel's recovery rather than being lumped with supplier
+      // payments. Suppliers: out is a payment, in (a refund) offsets it.
+      const amt = Number(p.amount);
+      if (p.party_type === "customer") {
+        if (p.dir === "in") cur.in_customer += amt;
+        else { cur.in_customer -= amt; cur.cash_out_customer += amt; }
+      } else {
+        cur.out_supplier += p.dir === "out" ? amt : -amt;
+      }
     }
     for (const v of map.values()) v.net = v.in_sales + v.in_customer - v.out_supplier;
     return Array.from(map.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
@@ -1659,14 +1668,14 @@ function Page() {
           <Card className="p-3 mt-4">
             <div className="mb-2">
               <div className="text-sm font-semibold">{t('reports.money_flow_heading', 'Money flow by payment channel')}</div>
-              <div className="text-xs text-muted-foreground">{t('reports.money_flow_desc_v2', 'Tracks each channel (cash, card, JazzCash, EasyPaisa…) — money received via sales & party payments vs money paid out (supplier payments, customer Cash Out).')}</div>
+              <div className="text-xs text-muted-foreground">{t('reports.money_flow_desc_v3', 'Tracks each channel (cash, card, JazzCash, EasyPaisa…) — money received via sales & customer recovery (less any Cash Out given to customers) vs money paid to suppliers.')}</div>
             </div>
             <Table>
               <TableHeader><TableRow>
                 <TableHead>{t('reports.th_channel', 'Channel')}</TableHead>
                 <TableHead className="text-right">{t('reports.th_in_sales', 'In · Sales')}</TableHead>
-                <TableHead className="text-right">{t('reports.th_in_party', 'In · Party payments')}</TableHead>
-                <TableHead className="text-right">{t('reports.th_out_party', 'Out · Party payments')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_recovery_net', 'Customer recovery (net of Cash Out)')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_out_supplier', 'Out · Supplier payments')}</TableHead>
                 <TableHead className="text-right">{t('reports.th_net', 'Net (In − Out)')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
@@ -1703,7 +1712,12 @@ function Page() {
                   >
                     <TableCell className="capitalize font-medium">{m.method}</TableCell>
                     <TableCell className="text-right text-success">{m.in_sales ? fmtMoney(m.in_sales, sym) : "—"}</TableCell>
-                    <TableCell className="text-right text-success">{m.in_customer ? fmtMoney(m.in_customer, sym) : "—"}</TableCell>
+                    <TableCell className={`text-right ${m.in_customer < 0 ? "text-destructive" : "text-success"}`}>
+                      {m.in_customer || m.cash_out_customer ? fmtMoney(m.in_customer, sym) : "—"}
+                      {m.cash_out_customer > 0 && (
+                        <div className="text-[11px] text-muted-foreground">{t('reports.incl_cash_out', 'after − {{amount}} Cash Out', { amount: fmtMoney(m.cash_out_customer, sym) })}</div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right text-destructive">{m.out_supplier ? fmtMoney(m.out_supplier, sym) : "—"}</TableCell>
                     <TableCell className={`text-right font-semibold ${m.net > 0 ? "text-success" : m.net < 0 ? "text-destructive" : ""}`}>{fmtMoney(m.net, sym)}</TableCell>
                   </TableRow>
@@ -1712,7 +1726,12 @@ function Page() {
                   <TableRow className="bg-muted/50 font-semibold">
                     <TableCell>{t('reports.total_label', 'Total')}</TableCell>
                     <TableCell className="text-right text-success">{fmtMoney(methodFlow.reduce((a, b) => a + b.in_sales, 0), sym)}</TableCell>
-                    <TableCell className="text-right text-success">{fmtMoney(methodFlow.reduce((a, b) => a + b.in_customer, 0), sym)}</TableCell>
+                    <TableCell className="text-right text-success">
+                      {fmtMoney(methodFlow.reduce((a, b) => a + b.in_customer, 0), sym)}
+                      {methodFlow.some((b) => b.cash_out_customer > 0) && (
+                        <div className="text-[11px] font-normal text-muted-foreground">{t('reports.incl_cash_out', 'after − {{amount}} Cash Out', { amount: fmtMoney(methodFlow.reduce((a, b) => a + b.cash_out_customer, 0), sym) })}</div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right text-destructive">{fmtMoney(methodFlow.reduce((a, b) => a + b.out_supplier, 0), sym)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(methodFlow.reduce((a, b) => a + b.net, 0), sym)}</TableCell>
                   </TableRow>
