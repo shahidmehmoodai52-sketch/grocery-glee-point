@@ -20,6 +20,7 @@ import { db as offlineDb } from "@/lib/offline/db";
 
 import { buildLedgerPdf, type LedgerItem } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { beforeLocalDay, inLocalRange, previousMonthSummary } from "@/lib/ledger-period";
 import { Receipt, printReceipt, printDocument } from "@/components/receipt";
 import { AddPaymentDialog, AddDiscountDialog, EditEntryDialog, type LedgerEntity, type EditingPayment } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger, buildLedgerEntries } from "@/lib/customer-ledger";
@@ -166,15 +167,16 @@ function Page() {
   const initialOB = Number(customer?.opening_balance ?? 0);
   useEffect(() => { if (customer) setObValue(String(Number(customer.opening_balance ?? 0))); }, [customer?.id, customer?.opening_balance]);
 
-  const filteredEntries = entries.filter((x) => {
-    if (from && x.date < from) return false;
-    if (to && x.date > to + "T23:59:59") return false;
-    return true;
-  });
+  // Range bounds are shop-local days; entry dates are UTC timestamps, so a
+  // sale at 12:30 am on the 1st belongs to the 1st, not the previous month.
+  const filteredEntries = entries.filter((x) => inLocalRange(x.date, from, to));
 
   const opening = initialOB + entries
-    .filter((x) => from && x.date < from)
+    .filter((x) => beforeLocalDay(x.date, from))
     .reduce((s, x) => s + x.debit - x.credit, 0);
+  // When the range starts on the 1st: last month's opening, in/out and
+  // closing (its closing is this range's opening).
+  const prevMonth = useMemo(() => previousMonthSummary(entries, initialOB, from), [entries, initialOB, from]);
 
   const saveOpeningBalance = async () => {
     const v = Number(obValue);
@@ -199,8 +201,7 @@ function Page() {
   const items: LedgerItem[] = useMemo(() => {
     const out: LedgerItem[] = [];
     for (const s of sales as any[]) {
-      if (from && s.created_at < from) continue;
-      if (to && s.created_at > to + "T23:59:59") continue;
+      if (!inLocalRange(s.created_at, from, to)) continue;
       for (const it of s.sale_items ?? []) {
         out.push({
           date: s.created_at, invoice: s.invoice_no, name: it.name,
@@ -335,8 +336,18 @@ function Page() {
         </div>
       </Card>
 
+      {prevMonth && (
+        <Card className="p-3 text-sm flex flex-wrap items-center gap-x-6 gap-y-1">
+          <span className="font-medium">{t('ledger.last_month', 'Last month')}: {prevMonth.label}</span>
+          <span className="text-muted-foreground">{t('ledger.opening', 'Opening')}: <span className={`font-semibold ${prevMonth.opening > 0 ? "text-destructive" : prevMonth.opening < 0 ? "text-success" : "text-foreground"}`}>{fmtMoney(prevMonth.opening, sym)}</span></span>
+          <span className="text-muted-foreground">{t('customers.stat_total_in', 'Total In (+)')}: <span className="font-semibold text-primary">{fmtMoney(prevMonth.totalIn, sym)}</span></span>
+          <span className="text-muted-foreground">{t('customers.stat_total_out', 'Total Out (−)')}: <span className="font-semibold text-success">{fmtMoney(prevMonth.totalOut, sym)}</span></span>
+          <span className="text-muted-foreground">{t('ledger.closing', 'Closing')}: <span className={`font-semibold ${prevMonth.closing > 0 ? "text-destructive" : prevMonth.closing < 0 ? "text-success" : "text-foreground"}`}>{fmtMoney(prevMonth.closing, sym)}</span></span>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat icon={TrendingUp} label={from ? t('customers.stat_opening_before', 'Opening (before {{date}})', { date: from }) : t('customers.stat_opening_balance', 'Opening balance')} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
+        <Stat icon={TrendingUp} label={prevMonth ? t('ledger.last_month_closing', 'Last month closing ({{date}})', { date: prevMonth.closingDay }) : from ? t('customers.stat_opening_before', 'Opening (before {{date}})', { date: from }) : t('customers.stat_opening_balance', 'Opening balance')} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
         <Stat icon={ReceiptIcon} label={t('customers.stat_total_in', 'Total In (+)')} value={fmtMoney(totalIn, sym)} tone="primary" />
         <Stat icon={TrendingDown} label={t('customers.stat_total_out', 'Total Out (−)')} value={fmtMoney(totalOut, sym)} tone="success" />
         <Stat icon={Wallet} label={closingLabel === "Settled" ? t('customers.closing_settled', 'Settled') : closingLabel === "Outstanding (they owe)" ? t('customers.closing_outstanding', 'Outstanding (they owe)') : closingLabel === "Advance (credit)" ? t('customers.closing_advance', 'Advance (credit)') : closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />

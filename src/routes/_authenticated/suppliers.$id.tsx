@@ -17,6 +17,7 @@ import { printDocument } from "@/components/receipt";
 
 import { buildLedgerPdf } from "@/lib/pdf-ledger";
 import { PRESETS, rangeFor, type DatePreset } from "@/lib/date-presets";
+import { beforeLocalDay, inLocalRange, previousMonthSummary } from "@/lib/ledger-period";
 import { AddPaymentDialog, AddDiscountDialog, EditEntryDialog, type LedgerEntity, type EditingPayment } from "@/components/ledger-dialogs";
 import { summarizeCustomerLedger } from "@/lib/customer-ledger";
 import type { LedgerEntry as Entry } from "@/lib/supplier-ledger";
@@ -106,19 +107,20 @@ function Page() {
     },
   });
 
-  const filteredEntries = entries.filter((x) => {
-    if (from && x.date < from) return false;
-    if (to && x.date > to + "T23:59:59") return false;
-    return true;
-  });
+  // Range bounds are shop-local days; entry dates are UTC timestamps, so a
+  // sale at 12:30 am on the 1st belongs to the 1st, not the previous month.
+  const filteredEntries = entries.filter((x) => inLocalRange(x.date, from, to));
 
   // Single source of truth: ledger + a manually-entered opening balance drive every number.
   const initialOB = Number(supplier?.opening_balance ?? 0);
   useEffect(() => { if (supplier) setObValue(String(Number(supplier.opening_balance ?? 0))); }, [supplier?.id, supplier?.opening_balance]);
 
   const opening = initialOB + entries
-    .filter((x) => from && x.date < from)
+    .filter((x) => beforeLocalDay(x.date, from))
     .reduce((s, x) => s + x.debit - x.credit, 0);
+  // When the range starts on the 1st: last month's opening, in/out and
+  // closing (its closing is this range's opening).
+  const prevMonth = useMemo(() => previousMonthSummary(entries, initialOB, from), [entries, initialOB, from]);
 
   const saveOpeningBalance = async () => {
     const v = Number(obValue);
@@ -229,8 +231,18 @@ function Page() {
       </Card>
 
 
+      {prevMonth && (
+        <Card className="p-3 text-sm flex flex-wrap items-center gap-x-6 gap-y-1">
+          <span className="font-medium">{t('ledger.last_month', 'Last month')}: {prevMonth.label}</span>
+          <span className="text-muted-foreground">{t('ledger.opening', 'Opening')}: <span className={`font-semibold ${prevMonth.opening > 0 ? "text-destructive" : prevMonth.opening < 0 ? "text-success" : "text-foreground"}`}>{fmtMoney(prevMonth.opening, sym)}</span></span>
+          <span className="text-muted-foreground">{t('customers.stat_total_in', 'Total In (+)')}: <span className="font-semibold text-primary">{fmtMoney(prevMonth.totalIn, sym)}</span></span>
+          <span className="text-muted-foreground">{t('customers.stat_total_out', 'Total Out (−)')}: <span className="font-semibold text-success">{fmtMoney(prevMonth.totalOut, sym)}</span></span>
+          <span className="text-muted-foreground">{t('ledger.closing', 'Closing')}: <span className={`font-semibold ${prevMonth.closing > 0 ? "text-destructive" : prevMonth.closing < 0 ? "text-success" : "text-foreground"}`}>{fmtMoney(prevMonth.closing, sym)}</span></span>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Stat icon={TrendingUp} label={from ? t('customers.stat_opening_before', 'Opening (before {{date}})', { date: from }) : t('customers.stat_opening_balance', 'Opening balance')} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
+        <Stat icon={TrendingUp} label={prevMonth ? t('ledger.last_month_closing', 'Last month closing ({{date}})', { date: prevMonth.closingDay }) : from ? t('customers.stat_opening_before', 'Opening (before {{date}})', { date: from }) : t('customers.stat_opening_balance', 'Opening balance')} value={fmtMoney(opening, sym)} tone={opening > 0 ? "destructive" : opening < 0 ? "success" : "primary"} />
         <Stat icon={Receipt} label={t('customers.stat_total_in', 'Total In (+)')} value={fmtMoney(totalIn, sym)} tone="primary" />
         <Stat icon={TrendingDown} label={t('customers.stat_total_out', 'Total Out (−)')} value={fmtMoney(totalOut, sym)} tone="success" />
         <Stat icon={Wallet} label={closingLabel === "Settled" ? t('customers.closing_settled', 'Settled') : closingLabel === "Outstanding (they owe)" ? t('customers.closing_outstanding', 'Outstanding (they owe)') : closingLabel === "Advance (credit)" ? t('customers.closing_advance', 'Advance (credit)') : closingLabel} value={fmtMoney(Math.abs(closing), sym)} tone={closingTone} />
