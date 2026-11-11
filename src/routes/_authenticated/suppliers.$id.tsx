@@ -134,10 +134,30 @@ function Page() {
   };
 
 
+  // Narration: a purchase's note (e.g. "Cametti 4000+10000 Shahid") is about
+  // how it was paid, so it is shown on its on-invoice payment row; the
+  // purchase row shows what was bought (first two items, "+N more").
+  const purchaseNoteById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const x of entries) if (x.type === "purchase" && x.id) m.set(x.id, x.note);
+    return m;
+  }, [entries]);
+  const shownNote = (x: Entry): string => {
+    if (x.type === "purchase" && x.id) {
+      const its = itemsByPurchase.get(x.id) ?? [];
+      if (!its.length) return x.note;
+      const names = its.slice(0, 2).map((it: any) => it.name).filter(Boolean).join(", ");
+      return its.length > 2 ? `${names} +${its.length - 2} more` : names;
+    }
+    const pid = (x.data as any)?.purchase_id;
+    if (x.type === "payment" && pid && !x.id) return purchaseNoteById.get(pid) || x.note;
+    return x.note;
+  };
+
   let running = opening;
   const rows = filteredEntries.map((x) => {
     running += x.debit - x.credit;
-    return { ...x, balance: running };
+    return { ...x, note: shownNote(x), balance: running };
   });
 
   const summary = useMemo(() => summarizeCustomerLedger({ openingBalance: opening, entries: filteredEntries }), [opening, filteredEntries]);
