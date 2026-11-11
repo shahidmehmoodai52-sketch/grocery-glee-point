@@ -30,8 +30,10 @@ function Page() {
   const { id } = Route.useParams();
   const { data: settings } = useSettings();
   const sym = settings?.currency_symbol ?? "Rs";
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  // Ledgers open on This month; everything before it is shown as the
+  // opening balance. Pick another preset or dates to widen the range.
+  const [from, setFrom] = useState(() => rangeFor("this_month").from);
+  const [to, setTo] = useState(() => rangeFor("this_month").to);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [addPayOpen, setAddPayOpen] = useState(false);
   const [addDiscountOpen, setAddDiscountOpen] = useState(false);
