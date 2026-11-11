@@ -1335,8 +1335,14 @@ function Page() {
               if (dFilterMethod !== "all" && methodOf(t) !== dFilterMethod) return false;
               return true;
             });
+            // No second date filter here: detailTxs is already limited to the
+            // window on the server, by when each entry was recorded — the same
+            // rule the account cards and their opening (prior) totals use.
+            // Re-filtering by the entry's own date dropped back-dated entries
+            // (e.g. one entered on 1 Nov dated 31 Oct): they were in the card's
+            // period but in neither this list nor its opening, so "This month"
+            // showed a different closing than the card / "All".
             const list = scope
-              .filter((t) => (!dFrom || t.occurred_on >= dFrom) && (!dTo || t.occurred_on <= dTo))
               .sort((a, b) =>
                 String(b.occurred_on).localeCompare(String(a.occurred_on)) ||
                 String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")) ||
