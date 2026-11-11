@@ -1032,6 +1032,9 @@ function POSPage() {
   // which character it was, and the field's value just before it — so a
   // barcode scanned into Paid can be told apart from typed digits, recovered
   // character-for-character, and the Paid amount restored to what it was.
+  // Set right after a scan is caught in Paid: an Enter arriving in this
+  // window is the scanner's own trailing key, never "complete the sale".
+  const scanGuardUntilRef = useRef(0);
   const paidBurstRef = useRef<{ keys: { t: number; ch: string; before: string }[] }>({ keys: [] });
 
   useEffect(() => {
@@ -3779,22 +3782,42 @@ function POSPage() {
                       // then scanned an item with the cursor still in Paid.
                       // Judging every keystroke since focus let those earlier
                       // human-speed keys hide the scan, and Enter checked out.
-                      // Every gap in the run must be scanner-fast; a human
-                      // can't sustain <60ms between 4+ keystrokes.
+                      //
+                      // The trailing run is split off at the first pause of
+                      // 150ms+ (the gap between typing an amount and picking
+                      // up the scanner is far longer). It is a scan when:
+                      //  - every gap in it is under 80ms with 4+ keys (scanner
+                      //    speed; a person can't sustain that), or
+                      //  - it is 8+ digits (EAN-8/UPC/EAN-13 — no one is paid
+                      //    1 crore at a till), which also catches slow wireless
+                      //    scanners whose keys arrive further apart, or
+                      //  - it contains letters (an amount never does).
                       const keys = paidBurstRef.current.keys;
                       const now = Date.now();
                       let start = keys.length;
-                      if (keys.length && now - keys[keys.length - 1].t < 120) {
+                      if (keys.length && now - keys[keys.length - 1].t < 300) {
                         start = keys.length - 1;
-                        while (start > 0 && keys[start].t - keys[start - 1].t < 60) start--;
+                        while (start > 0 && keys[start].t - keys[start - 1].t < 150) start--;
                       }
-                      const isBurst = keys.length - start >= 4;
+                      const run = keys.slice(start);
+                      const runText = run.map((k) => k.ch).join("").trim();
+                      let allFast = run.length >= 4;
+                      for (let r = 1; allFast && r < run.length; r++) {
+                        if (run[r].t - run[r - 1].t >= 80) allFast = false;
+                      }
+                      const isBurst =
+                        allFast ||
+                        /^\d{8,}$/.test(runText) ||
+                        (runText.length >= 3 && /[a-z]/i.test(runText));
                       if (isBurst) {
                         // Characters from the keys themselves: a number input
                         // drops letters from its value, so the value can't be
                         // trusted to hold an alphanumeric barcode.
-                        const raw = keys.slice(start).map((k) => k.ch).join("").trim();
+                        const raw = runText;
                         const prevPaid = keys[start].before;
+                        // Any further key the scanner sends (some add a second
+                        // Enter/line feed) must not reach Paid's Enter.
+                        scanGuardUntilRef.current = Date.now() + 500;
                         const nextRows = [...paymentRows];
                         if (nextRows[0]) {
                           nextRows[0] = { ...nextRows[0], amount: Number(prevPaid || 0) };
@@ -3810,6 +3833,9 @@ function POSPage() {
                         if (product) {
                           addProduct(product);
                           triggerScanFlash();
+                          // Leave Paid, so the next scan goes to search too.
+                          setSearch("");
+                          searchRef.current?.focus();
                           toast.warning(
                             t('pos.scan_in_paid_field_added', 'Cursor was in the Paid field — scanned item added to cart instead of checking out.'),
                           );
@@ -3823,6 +3849,7 @@ function POSPage() {
                         return;
                       }
                       paidBurstRef.current = { keys: [] };
+                      if (Date.now() < scanGuardUntilRef.current) return;
                       if (submitting) return;
                       handleSale();
                     }
