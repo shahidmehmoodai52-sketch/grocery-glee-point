@@ -92,7 +92,7 @@ function nextLocalPurchaseNo(): string {
 export async function completePurchaseOfflineAware(
   payload: PurchasePayload,
   corrections: StockCorrection[] = [],
-): Promise<{ offline: boolean }> {
+): Promise<{ offline: boolean; dateNotApplied?: boolean }> {
   const enabled = getOfflineStatus().enabled;
   const offline = isOffline() && enabled;
 
@@ -106,8 +106,22 @@ export async function completePurchaseOfflineAware(
         });
         if (error) throw error;
       }
-      const { error } = await supabase.rpc("complete_purchase", { payload: payload as any });
+      const { data: purchaseId, error } = await supabase.rpc("complete_purchase", { payload: payload as any });
       if (error) throw error;
+      // complete_purchase stamps the purchase with now() and ignores
+      // payload.created_at, so a back-dated purchase landed on today. Apply
+      // the chosen date afterwards (the ledgers and Cash Flow read it from
+      // purchases.created_at).
+      if (payload.created_at && purchaseId) {
+        const { error: dErr } = await supabase
+          .from("purchases")
+          .update({ created_at: payload.created_at })
+          .eq("id", purchaseId as unknown as string);
+        if (dErr) {
+          console.error("purchase date not applied", dErr);
+          return { offline: false, dateNotApplied: true };
+        }
+      }
       return { offline: false };
     } catch (e: any) {
       if (!enabled || !isNetworkError(e)) throw e;
