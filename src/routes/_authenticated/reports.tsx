@@ -1017,7 +1017,7 @@ function Page() {
           // settle the customer ledger, but no cash actually moves — they don't
           // belong in a page about payment channels/cash flow.
           const base = supabase.from("party_payments")
-            .select("id,party_type,party_id,amount,method,note,created_at")
+            .select("id,party_type,party_id,amount,method,note,created_at,cash_transactions(direction)")
             .neq("method", "discount")
             .gte("created_at", fromTime)
             .lte("created_at", toTime)
@@ -1034,6 +1034,7 @@ function Page() {
           const sMap = new Map((supRes.data ?? []).map((s: any) => [s.id, s.name]));
           return rows.map((r) => ({
             ...r,
+            dir: partyPaymentDirection(r),
             customers: r.party_type === "customer" ? { name: cMap.get(r.party_id) ?? null } : null,
             suppliers: r.party_type !== "customer" ? { name: sMap.get(r.party_id) ?? null } : null,
           }));
@@ -1045,11 +1046,13 @@ function Page() {
           return Promise.all(
             rows.map(async (r: any) => {
               const isCustomer = r.party_type === "customer";
+              const tx = r.cash_transaction_id ? await offlineDb().cash_transactions.get(r.cash_transaction_id) : null;
               const name = r.party_id
                 ? (isCustomer ? (await offlineDb().customers.get(r.party_id))?.name : (await offlineDb().suppliers.get(r.party_id))?.name)
                 : null;
               return {
                 id: r.id, party_type: r.party_type, party_id: r.party_id, amount: r.amount, method: r.method, note: r.note, created_at: r.created_at,
+                dir: partyPaymentDirection({ ...r, cash_transactions: tx ? { direction: tx.direction } : null }),
                 customers: isCustomer ? { name: name ?? null } : null,
                 suppliers: !isCustomer ? { name: name ?? null } : null,
               };
@@ -1240,7 +1243,7 @@ function Page() {
     }
     for (const p of partyPayments as any[]) {
       const cur = get((p.method || "unknown").toLowerCase());
-      if (p.party_type === "customer") cur.in_customer += Number(p.amount);
+      if (p.dir === "in") cur.in_customer += Number(p.amount);
       else cur.out_supplier += Number(p.amount);
     }
     for (const v of map.values()) v.net = v.in_sales + v.in_customer - v.out_supplier;
@@ -1656,14 +1659,14 @@ function Page() {
           <Card className="p-3 mt-4">
             <div className="mb-2">
               <div className="text-sm font-semibold">{t('reports.money_flow_heading', 'Money flow by payment channel')}</div>
-              <div className="text-xs text-muted-foreground">{t('reports.money_flow_desc', 'Tracks each channel (cash, card, JazzCash, EasyPaisa…) — money received via sales & customer payments vs money paid out to suppliers.')}</div>
+              <div className="text-xs text-muted-foreground">{t('reports.money_flow_desc_v2', 'Tracks each channel (cash, card, JazzCash, EasyPaisa…) — money received via sales & party payments vs money paid out (supplier payments, customer Cash Out).')}</div>
             </div>
             <Table>
               <TableHeader><TableRow>
                 <TableHead>{t('reports.th_channel', 'Channel')}</TableHead>
                 <TableHead className="text-right">{t('reports.th_in_sales', 'In · Sales')}</TableHead>
-                <TableHead className="text-right">{t('reports.th_in_customer', 'In · Customer payments')}</TableHead>
-                <TableHead className="text-right">{t('reports.th_out_supplier', 'Out · Supplier payments')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_in_party', 'In · Party payments')}</TableHead>
+                <TableHead className="text-right">{t('reports.th_out_party', 'Out · Party payments')}</TableHead>
                 <TableHead className="text-right">{t('reports.th_net', 'Net (In − Out)')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
@@ -1684,10 +1687,10 @@ function Page() {
                         if ((p.method || "unknown").toLowerCase() !== m.method) continue;
                         rows.push([
                           new Date(p.created_at).toLocaleString(),
-                          p.party_type === "customer" ? t('reports.in_customer_payment_type', 'In · Customer payment') : t('reports.out_supplier_payment_type', 'Out · Supplier payment'),
+                          partyPaymentLabel(p, t),
                           p.note || "—",
                           p.customers?.name ?? p.suppliers?.name ?? "—",
-                          `${p.party_type === "customer" ? "+" : "−"}${fmtMoney(Number(p.amount), sym)}`,
+                          `${p.dir === "in" ? "+" : "−"}${fmtMoney(Number(p.amount), sym)}`,
                         ]);
                       }
                       setDrill({
@@ -1740,7 +1743,7 @@ function Page() {
                       note: new Date(p.created_at).toLocaleString(),
                       cols: [t('reports.field_col', 'Field'), t('reports.value_col', 'Value')],
                       rows: [
-                        [t('reports.th_direction', 'Direction'), p.party_type === "customer" ? t('reports.direction_in', 'In · from customer') : t('reports.direction_out', 'Out · to supplier')],
+                        [t('reports.th_direction', 'Direction'), partyPaymentLabel(p, t)],
                         [t('reports.th_channel', 'Channel'), p.method || "—"],
                         [t('reports.th_note', 'Note'), p.note || "—"],
                         [t('common.amount', 'Amount'), fmtMoney(Number(p.amount), sym)],
@@ -1749,15 +1752,13 @@ function Page() {
                   >
                     <TableCell className="whitespace-nowrap text-xs">{new Date(p.created_at).toLocaleString()}</TableCell>
                     <TableCell>
-                      {p.party_type === "customer"
-                        ? <span className="text-success font-medium">{t('reports.direction_in', 'In · from customer')}</span>
-                        : <span className="text-destructive font-medium">{t('reports.direction_out', 'Out · to supplier')}</span>}
+                      <span className={`font-medium ${p.dir === "in" ? "text-success" : "text-destructive"}`}>{partyPaymentLabel(p, t)}</span>
                     </TableCell>
                     <TableCell>{p.customers?.name ?? p.suppliers?.name ?? "—"}</TableCell>
                     <TableCell className="capitalize">{p.method || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{p.note || "—"}</TableCell>
-                    <TableCell className={`text-right font-medium ${p.party_type === "customer" ? "text-success" : "text-destructive"}`}>
-                      {p.party_type === "customer" ? "+" : "−"}{fmtMoney(Number(p.amount), sym)}
+                    <TableCell className={`text-right font-medium ${p.dir === "in" ? "text-success" : "text-destructive"}`}>
+                      {p.dir === "in" ? "+" : "−"}{fmtMoney(Number(p.amount), sym)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1870,4 +1871,22 @@ function Row({ label, value, bold, muted, accent, onClick }: any) {
       <TableCell className={`text-right ${bold ? "font-semibold" : ""} ${accent ? "text-primary text-lg" : ""}`}>{value}</TableCell>
     </TableRow>
   );
+}
+
+/** Which way a party payment moved money. The linked cash_transactions row's
+ *  `direction` is authoritative (it drives Cash Flow and the ledgers): a
+ *  Cash Out to a customer is "out" even though party_type is "customer".
+ *  Rows with no linked transaction fall back to the party type (customer →
+ *  in, supplier → out), with the customer ledger's note check for Cash Out. */
+function partyPaymentDirection(p: any): "in" | "out" {
+  const d = p?.cash_transactions?.direction;
+  if (d === "in" || d === "out") return d;
+  if (p?.party_type === "customer") return /^\s*cash\s*out\b/i.test(String(p?.note ?? "")) ? "out" : "in";
+  return "out";
+}
+
+function partyPaymentLabel(p: any, t: (k: string, d: string) => string): string {
+  const customer = p.party_type === "customer";
+  if (p.dir === "in") return customer ? t('reports.direction_in', 'In · from customer') : t('reports.direction_in_supplier', 'In · from supplier');
+  return customer ? t('reports.direction_out_customer', 'Out · Cash Out to customer') : t('reports.direction_out', 'Out · to supplier');
 }
