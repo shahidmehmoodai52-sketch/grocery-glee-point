@@ -258,7 +258,9 @@ function Page() {
   const [dPreset, setDPreset] = useState<BarPreset>("all");
   const [dFrom, setDFrom] = useState("");
   const [dTo, setDTo] = useState("");
+  const [detailShown, setDetailShown] = useState(300);
   const setDetails = (d: typeof details) => {
+    setDetailShown(300);
     if (d) {
       setDPreset("all");
       setDFrom("");
@@ -370,27 +372,59 @@ function Page() {
    *  PostgREST caps a single response (~1000 rows), so page through the ledger and
    *  scope the fetch to the selected account when the dialog is account-specific. */
   const detailAccountId = details?.kind === "account" ? details.accountId : null;
-  const { data: detailTxs = [] } = useQuery({
+  // Opening / Cash-on-hand dialogs only need per-account totals, which the
+  // server aggregates in well under a second. They used to download the
+  // shop's ENTIRE ledger first (Hafiz: ~39k rows, 39 sequential calls of
+  // ~2 s each), so the card took over a minute to open.
+  const wantsTotalsOnly = details?.kind === "opening" || details?.kind === "balance";
+  const { data: detailTotals = [], isLoading: detailTotalsLoading } = useQuery({
+    queryKey: ["cf-detail-totals", dFrom, dTo],
+    enabled: !!details && wantsTotalsOnly,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_cash_flow_account_totals", {
+        p_from_date: dFrom ? localDayStartIso(dFrom) : "2000-01-01T00:00:00Z",
+        p_to_date: dTo ? localDayEndIso(dTo) : "2099-12-31T23:59:59Z",
+      });
+      if (error) throw error;
+      return (data ?? []) as { account_id: string | null; total_in: number; total_out: number; prior_in: number; prior_out: number }[];
+    },
+  });
+  const { data: detailTxs = [], isLoading: detailTxsLoading } = useQuery({
     queryKey: ["cf-ledger-full", detailAccountId ?? "all"],
-    enabled: !!details,
+    enabled: !!details && !wantsTotalsOnly,
     staleTime: 60_000,
     queryFn: async () => {
       const CHUNK = 1000;
-      const rows: any[] = [];
-      for (let offset = 0; ; offset += CHUNK) {
+      const fetchChunk = async (offset: number) => {
         const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
-          p_from_date: "2000-01-01T00:00:00",
-          p_to_date: "2099-12-31T23:59:59",
+          p_from_date: "2000-01-01T00:00:00Z",
+          p_to_date: "2099-12-31T23:59:59Z",
           p_limit: CHUNK,
           p_offset: offset,
           ...(detailAccountId ? { p_account_id: detailAccountId } : {}),
         });
         if (error) throw error;
-        const batch = data ?? [];
-        rows.push(...batch);
-        const total = Number((batch[0] as any)?.total_count ?? 0);
-        if (batch.length < CHUNK || (total && rows.length >= total) || offset > 200000) break;
-      }
+        return (data ?? []) as any[];
+      };
+      // The first chunk tells us the total; the rest are fetched a few at a
+      // time in parallel instead of one after another.
+      const first = await fetchChunk(0);
+      const total = Math.min(Number((first[0] as any)?.total_count ?? first.length), 200000);
+      const offsets: number[] = [];
+      for (let o = CHUNK; o < total; o += CHUNK) offsets.push(o);
+      const chunks: any[][] = new Array(offsets.length);
+      const CONCURRENCY = 4;
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, offsets.length) }, async () => {
+          while (next < offsets.length) {
+            const i = next++;
+            chunks[i] = await fetchChunk(offsets[i]);
+          }
+        }),
+      );
+      const rows = [...first, ...chunks.flat()];
       return rows.map((row: any) => ({
         ...row,
         occurred_on: ledgerDay(row),
@@ -1239,18 +1273,18 @@ function Page() {
               const title = details.kind === "opening" ? t('cash_flow.title_opening_per_account', 'Opening balance — per account') : t('cash_flow.title_balance_per_account', 'Cash on hand — per account');
               const perAcc = new Map<string, { prior: number; inSum: number; outSum: number }>();
               for (const a of allAccounts) perAcc.set(a.id, { prior: 0, inSum: 0, outSum: 0 });
-              for (const t of detailTxs) {
-                const r = perAcc.get(t.account_id);
+              for (const row of detailTotals) {
+                const r = row.account_id ? perAcc.get(row.account_id) : undefined;
                 if (!r) continue;
-                const amt = Number(t.amount);
-                if (dFrom && t.occurred_on < dFrom) { r.prior += t.direction === "in" ? amt : -amt; continue; }
-                if (dTo && t.occurred_on > dTo) continue;
-                if (t.direction === "in") r.inSum += amt; else r.outSum += amt;
+                r.prior = Number(row.prior_in || 0) - Number(row.prior_out || 0);
+                r.inSum = Number(row.total_in || 0);
+                r.outSum = Number(row.total_out || 0);
               }
               return (
                 <>
                   <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
                   <DateRangeBar preset={dPreset} from={dFrom} to={dTo} onPreset={setDPreset} onFrom={setDFrom} onTo={setDTo} />
+                  {detailTotalsLoading && <p className="mt-3 text-xs text-muted-foreground">{t('common.loading', 'Loading…')}</p>}
                   <div className="flex-1 overflow-auto min-h-0 mt-4">
                     <Table className="w-full">
                       <TableHeader>
@@ -1382,9 +1416,11 @@ function Page() {
                     </TableHeader>
                     <TableBody>
                       {list.length === 0 && (
-                        <TableRow><TableCell colSpan={accId ? 7 : 8} className="text-center text-muted-foreground py-8">{t('cash_flow.no_entries', 'No entries')}</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={accId ? 7 : 8} className="text-center text-muted-foreground py-8">{detailTxsLoading ? t('common.loading', 'Loading…') : t('cash_flow.no_entries', 'No entries')}</TableCell></TableRow>
                       )}
-                      {list.map((tx) => {
+                      {/* Rendering tens of thousands of rows at once froze the dialog;
+                          totals and running balances still use the full list. */}
+                      {list.slice(0, detailShown).map((tx) => {
                         const acc = accById(tx.account_id);
                         return (
                           <TableRow key={tx.id}>
@@ -1406,6 +1442,13 @@ function Page() {
                       })}
                     </TableBody>
                   </Table>
+                  {list.length > detailShown && (
+                    <div className="p-2 text-center">
+                      <Button variant="outline" size="sm" onClick={() => setDetailShown((n) => n + 500)}>
+                        {t('cash_flow.show_more', 'Show more')} ({detailShown} / {list.length})
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </>
             );
