@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtMoney, fmtQty } from "@/lib/format";
+import { makeAccountResolver, type CashAccountLite } from "@/lib/cash-account-resolve";
 import { printDocument } from "@/components/receipt";
 import { cn } from "@/lib/utils";
 import { PRESETS, rangeFor, type DatePreset, localDateStr } from "@/lib/date-presets";
@@ -1017,7 +1018,7 @@ function Page() {
           // settle the customer ledger, but no cash actually moves — they don't
           // belong in a page about payment channels/cash flow.
           const base = supabase.from("party_payments")
-            .select("id,party_type,party_id,amount,method,note,created_at,cash_transactions(direction)")
+            .select("id,party_type,party_id,amount,method,note,created_at,cash_transactions(direction,account_id)")
             .neq("method", "discount")
             .gte("created_at", fromTime)
             .lte("created_at", toTime)
@@ -1035,6 +1036,7 @@ function Page() {
           return rows.map((r) => ({
             ...r,
             dir: partyPaymentDirection(r),
+            account_id: (r as any).cash_transactions?.account_id ?? null,
             customers: r.party_type === "customer" ? { name: cMap.get(r.party_id) ?? null } : null,
             suppliers: r.party_type !== "customer" ? { name: sMap.get(r.party_id) ?? null } : null,
           }));
@@ -1053,6 +1055,7 @@ function Page() {
               return {
                 id: r.id, party_type: r.party_type, party_id: r.party_id, amount: r.amount, method: r.method, note: r.note, created_at: r.created_at,
                 dir: partyPaymentDirection({ ...r, cash_transactions: tx ? { direction: tx.direction } : null }),
+                account_id: tx?.account_id ?? null,
                 customers: isCustomer ? { name: name ?? null } : null,
                 suppliers: !isCustomer ? { name: name ?? null } : null,
               };
@@ -1227,7 +1230,27 @@ function Page() {
     return Array.from(map.values()).sort((a, b) => b.paid - a.paid);
   }, [allSales]);
 
-  // Combined method cash-flow: money IN (sales + customer party-payments) vs money OUT (supplier party-payments)
+  // Cash accounts, to group the money-flow table by the account money
+  // actually landed in (as Cash Flow does) rather than by the free-text
+  // method, which split one account across "cash" / "Cash in Hand" rows.
+  const { data: cashAccounts = [] } = useQuery({
+    queryKey: ["report-cash-accounts"],
+    queryFn: () =>
+      offlineFirst<any[]>(
+        async () => {
+          const { data, error } = await supabase.from("cash_accounts").select("id,name,type,is_active,created_at");
+          if (error) throw error;
+          return data ?? [];
+        },
+        async () => (await offlineDb().cash_accounts.toArray()).filter((a: any) => a._deleted !== 1),
+      ),
+    staleTime: 5 * 60 * 1000,
+  });
+  const accountResolver = useMemo(() => makeAccountResolver(cashAccounts as CashAccountLite[]), [cashAccounts]);
+  const saleChannel = (method: string | null | undefined) => accountResolver.byMethod(method);
+  const partyChannel = (p: any) => accountResolver.byId(p.account_id) ?? accountResolver.byMethod(p.method);
+
+  // Combined channel cash-flow: money IN (sales + customer party-payments) vs money OUT (supplier party-payments)
   const methodFlow = useMemo(() => {
     const map = new Map<string, { method: string; in_sales: number; in_customer: number; cash_out_customer: number; out_supplier: number; net: number }>();
     const get = (m: string) => {
@@ -1237,12 +1260,12 @@ function Page() {
     for (const s of allSales as any[]) {
       const splits = parsePaymentSplit(s.payment_method, Number(s.paid));
       for (const split of splits) {
-        const cur = get((split.method || "unknown").toLowerCase());
+        const cur = get(saleChannel(split.method));
         cur.in_sales += Number(split.amount || 0);
       }
     }
     for (const p of partyPayments as any[]) {
-      const cur = get((p.method || "unknown").toLowerCase());
+      const cur = get(partyChannel(p));
       // Customer recovery is NET of Cash Out: money handed back to a customer
       // comes out of the same channel the recovery went into, so it reduces
       // that channel's recovery rather than being lumped with supplier
@@ -1257,7 +1280,7 @@ function Page() {
     }
     for (const v of map.values()) v.net = v.in_sales + v.in_customer - v.out_supplier;
     return Array.from(map.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
-  }, [allSales, partyPayments]);
+  }, [allSales, partyPayments, accountResolver]);
 
   const debouncedSearch = useDebounced(search, 200);
   const q = debouncedSearch.trim().toLowerCase();
@@ -1688,12 +1711,12 @@ function Page() {
                       const rows: (string | number)[][] = [];
                       for (const s of allSales as any[]) {
                         for (const split of parsePaymentSplit(s.payment_method, Number(s.paid))) {
-                          if ((split.method || "unknown").toLowerCase() !== m.method) continue;
+                          if (saleChannel(split.method) !== m.method) continue;
                           rows.push([new Date(s.created_at).toLocaleString(), t('reports.in_sale_type', 'In · Sale'), s.invoice_no, s.customers?.name ?? t('common.walk_in', 'Walk-in'), fmtMoney(Number(split.amount), sym)]);
                         }
                       }
                       for (const p of partyPayments as any[]) {
-                        if ((p.method || "unknown").toLowerCase() !== m.method) continue;
+                        if (partyChannel(p) !== m.method) continue;
                         rows.push([
                           new Date(p.created_at).toLocaleString(),
                           partyPaymentLabel(p, t),
@@ -1763,7 +1786,7 @@ function Page() {
                       cols: [t('reports.field_col', 'Field'), t('reports.value_col', 'Value')],
                       rows: [
                         [t('reports.th_direction', 'Direction'), partyPaymentLabel(p, t)],
-                        [t('reports.th_channel', 'Channel'), p.method || "—"],
+                        [t('reports.th_channel', 'Channel'), partyChannel(p)],
                         [t('reports.th_note', 'Note'), p.note || "—"],
                         [t('common.amount', 'Amount'), fmtMoney(Number(p.amount), sym)],
                       ],
@@ -1774,7 +1797,7 @@ function Page() {
                       <span className={`font-medium ${p.dir === "in" ? "text-success" : "text-destructive"}`}>{partyPaymentLabel(p, t)}</span>
                     </TableCell>
                     <TableCell>{p.customers?.name ?? p.suppliers?.name ?? "—"}</TableCell>
-                    <TableCell className="capitalize">{p.method || "—"}</TableCell>
+                    <TableCell>{partyChannel(p)}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{p.note || "—"}</TableCell>
                     <TableCell className={`text-right font-medium ${p.dir === "in" ? "text-success" : "text-destructive"}`}>
                       {p.dir === "in" ? "+" : "−"}{fmtMoney(Number(p.amount), sym)}
