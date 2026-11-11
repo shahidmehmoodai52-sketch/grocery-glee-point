@@ -214,6 +214,10 @@ function Page() {
   const [entrySearch, setEntrySearch] = useState("");
   const [entryActive, setEntryActive] = useState(false);
   const [entryIndex, setEntryIndex] = useState(0);
+  // True once the user picks a row in the dropdown (arrow keys or hover):
+  // Enter must then add THAT row, not an exact name/code match — typing
+  // "egg" and arrowing to "Egg 1 Dozon" used to add the single "Egg".
+  const entryPickedRef = useRef(false);
   const [newProdOpen, setNewProdOpen] = useState(false);
   const [newProdPrefill, setNewProdPrefill] = useState<{ name?: string; sku?: string; barcode?: string }>({});
   const openNewProduct = (term: string) => {
@@ -409,6 +413,11 @@ function Page() {
   const addFromSearch = async () => {
     const term = entrySearch.trim();
     if (!term) return;
+    if (entryPickedRef.current) {
+      const picked = entryMatches[Math.min(entryIndex, Math.max(entryMatches.length - 1, 0))];
+      entryPickedRef.current = false;
+      if (picked) { addProductLine(picked); return; }
+    }
     const t = term.toLowerCase();
     const normalizedItemCode = normalizeItemCode(term);
     // Candidates from the debounced server search. When the user (or a barcode
@@ -1058,10 +1067,10 @@ function Page() {
                     value={entrySearch}
                     onFocus={() => setEntryActive(true)}
                     onBlur={() => setTimeout(() => setEntryActive(false), 120)}
-                    onChange={(e) => { setEntrySearch(e.target.value); setEntryActive(true); setEntryIndex(0); }}
+                    onChange={(e) => { setEntrySearch(e.target.value); setEntryActive(true); setEntryIndex(0); entryPickedRef.current = false; }}
                     onKeyDown={(e) => {
-                      if (e.key === "ArrowDown") { e.preventDefault(); setEntryIndex((n) => Math.min(n + 1, Math.max(entryMatches.length - 1, 0))); }
-                      if (e.key === "ArrowUp") { e.preventDefault(); setEntryIndex((n) => Math.max(n - 1, 0)); }
+                      if (e.key === "ArrowDown") { e.preventDefault(); entryPickedRef.current = true; setEntryIndex((n) => Math.min(n + 1, Math.max(entryMatches.length - 1, 0))); }
+                      if (e.key === "ArrowUp") { e.preventDefault(); entryPickedRef.current = true; setEntryIndex((n) => Math.max(n - 1, 0)); }
                       if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); addFromSearch(); }
                     }}
                     placeholder={t('purchases.search_placeholder', '🔍  Type 4-digit item code first, scan barcode, or type name…')}
@@ -1085,7 +1094,7 @@ function Page() {
                           ref={(el) => { if (el && idx === entryIndex) el.scrollIntoView({ block: "nearest" }); }}
                           type="button"
                           onMouseDown={(e) => { e.preventDefault(); addProductLine(p); }}
-                          onMouseEnter={() => setEntryIndex(idx)}
+                          onMouseEnter={() => { setEntryIndex(idx); entryPickedRef.current = true; }}
                           className={`flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm ${idx === entryIndex ? "bg-accent text-accent-foreground ring-1 ring-primary/40" : "hover:bg-accent hover:text-accent-foreground"}`}
                         >
                           <span className="min-w-0">
