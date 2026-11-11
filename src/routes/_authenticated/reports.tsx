@@ -1282,6 +1282,14 @@ function Page() {
     return Array.from(map.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   }, [allSales, partyPayments, accountResolver]);
 
+  // The party payment log lists recovery and supplier payments only. A Cash
+  // Out handed to a customer isn't a party payment in that sense: it only
+  // reduces the channel's cash (see methodFlow), so it's left out here.
+  const partyLog = useMemo(
+    () => (partyPayments as any[]).filter((p) => !(p.party_type === "customer" && p.dir === "out")),
+    [partyPayments],
+  );
+
   const debouncedSearch = useDebounced(search, 200);
   const q = debouncedSearch.trim().toLowerCase();
   const filteredInvoices = useMemo(() => {
@@ -1775,8 +1783,8 @@ function Page() {
                 <TableHead className="text-right">{t('common.amount', 'Amount')}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {(partyPayments as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('reports.no_party_payments', 'No party payments')}</TableCell></TableRow>}
-                {(partyPayments as any[]).map((p) => (
+                {partyLog.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">{t('reports.no_party_payments', 'No party payments')}</TableCell></TableRow>}
+                {partyLog.map((p) => (
                   <TableRow
                     key={p.id}
                     className="cursor-pointer hover:bg-muted/50"
