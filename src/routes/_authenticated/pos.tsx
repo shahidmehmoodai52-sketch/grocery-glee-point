@@ -1028,7 +1028,11 @@ function POSPage() {
   // with the scanned code standing in as the paid amount. Recorded keystroke
   // timestamps let Enter tell a machine-speed burst apart from a cashier
   // actually typing an amount (see the Enter handler below).
-  const paidBurstRef = useRef<{ times: number[]; prevPaid: string }>({ times: [], prevPaid: "" });
+  // Keystrokes typed into the Paid field since it was focused: when each came,
+  // which character it was, and the field's value just before it — so a
+  // barcode scanned into Paid can be told apart from typed digits, recovered
+  // character-for-character, and the Paid amount restored to what it was.
+  const paidBurstRef = useRef<{ keys: { t: number; ch: string; before: string }[] }>({ keys: [] });
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -3740,7 +3744,7 @@ function POSPage() {
                   step="0.01"
                   value={tab.paid}
                   onFocus={() => {
-                    paidBurstRef.current = { times: [], prevPaid: tab.paid };
+                    paidBurstRef.current = { keys: [] };
                   }}
                   onChange={(e) => {
                     const nextValue = e.target.value;
@@ -3756,9 +3760,9 @@ function POSPage() {
                   }}
                   onKeyDown={(e) => {
                     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                      const times = paidBurstRef.current.times;
-                      times.push(Date.now());
-                      if (times.length > 20) times.shift();
+                      const keys = paidBurstRef.current.keys;
+                      keys.push({ t: Date.now(), ch: e.key, before: e.currentTarget.value });
+                      if (keys.length > 64) keys.shift();
                       return;
                     }
                     if (e.key === "Enter") {
@@ -3770,27 +3774,37 @@ function POSPage() {
                       // not a "complete the sale" command — recover the scan
                       // instead of checking out with the barcode as the paid
                       // amount.
-                      const times = paidBurstRef.current.times;
-                      // Every consecutive gap (not just the average) must be
-                      // scanner-fast — a human can type a few keys quickly,
-                      // but can't sustain <45ms between every keystroke for
-                      // 4+ characters the way a scanner does.
-                      let isBurst = times.length >= 4;
-                      for (let i = 1; isBurst && i < times.length; i++) {
-                        if (times[i] - times[i - 1] >= 45) isBurst = false;
+                      // Only the TRAILING run of keystrokes counts: a cashier
+                      // may have typed an amount here earlier (slow keys) and
+                      // then scanned an item with the cursor still in Paid.
+                      // Judging every keystroke since focus let those earlier
+                      // human-speed keys hide the scan, and Enter checked out.
+                      // Every gap in the run must be scanner-fast; a human
+                      // can't sustain <60ms between 4+ keystrokes.
+                      const keys = paidBurstRef.current.keys;
+                      const now = Date.now();
+                      let start = keys.length;
+                      if (keys.length && now - keys[keys.length - 1].t < 120) {
+                        start = keys.length - 1;
+                        while (start > 0 && keys[start].t - keys[start - 1].t < 60) start--;
                       }
+                      const isBurst = keys.length - start >= 4;
                       if (isBurst) {
-                        const raw = e.currentTarget.value.trim();
+                        // Characters from the keys themselves: a number input
+                        // drops letters from its value, so the value can't be
+                        // trusted to hold an alphanumeric barcode.
+                        const raw = keys.slice(start).map((k) => k.ch).join("").trim();
+                        const prevPaid = keys[start].before;
                         const nextRows = [...paymentRows];
                         if (nextRows[0]) {
-                          nextRows[0] = { ...nextRows[0], amount: Number(paidBurstRef.current.prevPaid || 0) };
+                          nextRows[0] = { ...nextRows[0], amount: Number(prevPaid || 0) };
                         }
                         setTab({
-                          paid: paidBurstRef.current.prevPaid,
+                          paid: prevPaid,
                           payments: nextRows,
                           payment_method: nextRows[0]?.method || tab.payment_method || "cash",
                         });
-                        paidBurstRef.current = { times: [], prevPaid: "" };
+                        paidBurstRef.current = { keys: [] };
                         const product =
                           productByBarcode[raw] ?? productByCodeLower[raw.toLowerCase()] ?? null;
                         if (product) {
@@ -3808,7 +3822,7 @@ function POSPage() {
                         }
                         return;
                       }
-                      paidBurstRef.current = { times: [], prevPaid: "" };
+                      paidBurstRef.current = { keys: [] };
                       if (submitting) return;
                       handleSale();
                     }
