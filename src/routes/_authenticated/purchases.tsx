@@ -63,6 +63,23 @@ type Draft = {
   /** Supplier bonus for hitting a target — reporting only, never part of the bill. */
   incentive?: number;
 };
+/** Timestamp for a purchase dated `ymd` (YYYY-MM-DD, shop-local).
+ *  - Same day as `keep` (the purchase's existing timestamp, when editing) →
+ *    `keep` unchanged, so re-saving doesn't reset the time of day.
+ *  - New purchase dated today → undefined (the server stamps "now").
+ *  - Any other day → that day at the time of day of `keep` (or now), so a
+ *    back-dated purchase lands on that day and keeps a sensible order. */
+function purchaseTimestamp(ymd: string, keep?: string | null): string | undefined {
+  if (!ymd) return keep ?? undefined;
+  const base = keep ? new Date(keep) : new Date();
+  if (localDateStr(base) === ymd) return keep ?? undefined;
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return keep ?? undefined;
+  const dt = new Date(base);
+  dt.setFullYear(y, m - 1, d);
+  return dt.toISOString();
+}
+
 const emptyDraft: Draft = { open: false, supplier: "none", lines: [], tax: 0, taxMode: "amt", discount: 0, discountMode: "amt", paid: 0, note: "", date: localDateStr(), paySource: "", incentive: 0 };
 
 // Presets offered when the shop hasn't created these heads in Cash Flow yet.
@@ -259,6 +276,7 @@ function Page() {
     setDraft({
       open: true,
       editingId: p.id,
+      editingCreatedAt: p.created_at ?? null,
       supplier: p.supplier_id ?? "none",
       date: p.created_at ? localDateStr(p.created_at) : today,
       lines: formattedLines,
@@ -745,7 +763,7 @@ function Page() {
       note,
       payment_method: account.name,
       account_id: account.id ?? undefined,
-      created_at: date || undefined,
+      created_at: purchaseTimestamp(date, editingId ? ((draft as any).editingCreatedAt ?? null) : null),
       items: (() => {
         // Distribute bill discount across lines proportionally
         let remainingDiscount = billDiscountAmt;
@@ -824,7 +842,7 @@ function Page() {
             note: payload.note,
             payment_method: payload.payment_method,
             account_id: payload.account_id,
-            created_at: payload.created_at,
+            ...(payload.created_at ? { created_at: payload.created_at } : {}),
           })
           .eq("id", editingId)
           .select("id");
@@ -883,6 +901,28 @@ function Page() {
           await supabase.from("products").update({ stock: currentStock + Number(it.qty) + Number((it as any).bonus_qty ?? 0) }).eq("id", it.product_id);
         }
 
+        // Manual stock corrections. While editing, the Stock box shows the
+        // product's stock as loaded — already including this purchase's
+        // original qty — so a typed value means "the stock is really this,
+        // as things stand". Any qty change made in this edit is applied on
+        // top of it. Recorded as an audited 'adjustment', like a new
+        // purchase's correction; it used to be silently ignored on edit.
+        const qtyOf = (rows: any[], pid: string) =>
+          rows.filter((r) => r.product_id === pid).reduce((sum, r) => sum + Number(r.qty || 0) + Number(r.bonus_qty ?? 0), 0);
+        const editCorrections = items.filter(
+          (l) => l.product_id && l.stock_override != null && Number(l.stock_override) !== Number(l.old_stock ?? 0),
+        );
+        for (const l of editCorrections) {
+          const pid = l.product_id as string;
+          const target = Number(l.stock_override) + qtyOf(payload.items as any[], pid) - qtyOf((origItems ?? []) as any[], pid);
+          const { error: adjErr } = await supabase.rpc("adjust_product_stock", {
+            _product_id: pid,
+            _new_stock: +target.toFixed(4),
+            _reason: "Stock correction while editing purchase",
+          });
+          if (adjErr) throw adjErr;
+        }
+
       } else {
         // --- New Purchase Flow ---
         // Manual stock corrections (e.g. a physical count done while
@@ -900,7 +940,10 @@ function Page() {
             reason: "Stock correction during purchase entry",
           }));
 
-        await completePurchaseOfflineAware(payload, corrections);
+        const res = await completePurchaseOfflineAware(payload, corrections);
+        if (res.dateNotApplied) {
+          toast.warning(t('purchases.date_not_applied', 'Purchase saved, but its date could not be set — edit the purchase to change the date.'));
+        }
 
         // Invalidate queries early to ensure next fetches get fresh data
         qc.invalidateQueries({ queryKey: ["purchases"] });
