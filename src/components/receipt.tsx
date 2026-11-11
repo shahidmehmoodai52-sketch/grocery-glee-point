@@ -71,7 +71,7 @@ type Props = {
   invoice: ReceiptInvoice;
   settings?: ReceiptSettings | null;
   paper?: boolean;
-  kind?: "sale" | "sale-return" | "purchase-return";
+  kind?: "sale" | "purchase" | "sale-return" | "purchase-return";
 };
 
 function setReceiptPrintPageSize(
@@ -348,21 +348,25 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
   const marginMm = settings?.receipt_margin_mm ?? 2.5;
   const fontScale = settings?.font_scale ?? 100;
   const date = invoice.created_at ? new Date(invoice.created_at) : new Date();
-  const isReturn = kind !== "sale";
+  // Only the two return kinds are returns. This used to be `kind !== "sale"`,
+  // so a purchase bill (kind "purchase") printed with "Refund Due" and a
+  // "✦ RETURN ✦" stamp.
+  const isReturn = kind === "sale-return" || kind === "purchase-return";
+  const isPurchaseDoc = kind === "purchase" || kind === "purchase-return" || !!invoice.isPurchase;
   const docNo = invoice.return_no ?? invoice.invoice_no ?? "—";
   const docTitle =
     kind === "sale-return"
       ? t('receipt.doc_sales_return', 'SALES RETURN')
       : kind === "purchase-return"
       ? t('receipt.doc_purchase_return', 'PURCHASE RETURN')
-      : invoice.isPurchase
+      : isPurchaseDoc
       ? t('receipt.doc_purchase_invoice', 'PURCHASE INVOICE')
       : t('receipt.doc_sales_invoice', 'SALES INVOICE');
 
   const staffName = invoice.expense_persons?.name ?? invoice.expense_person_name ?? null;
   const party = invoice.customers?.name ?? invoice.suppliers?.name ?? staffName ?? undefined;
   const partyLabel =
-    kind === "purchase-return"
+    isPurchaseDoc
       ? t('receipt.party_supplier', 'Supplier')
       : !invoice.customers?.name && !invoice.suppliers?.name && staffName
         ? t('receipt.party_staff', 'Staff')
@@ -579,7 +583,7 @@ export function Receipt({ invoice, settings, paper = true, kind = "sale" }: Prop
 
 
 
-      {savings > 0 && !isReturn && (
+      {savings > 0 && !isReturn && !isPurchaseDoc && (
         <div className="mt-2 text-center text-[10px] border border-dashed border-black py-1 font-semibold">
           {t('receipt.you_saved', '★ You saved {{amount}} today! ★', { amount: fmtMoney(savings, sym) })}
         </div>

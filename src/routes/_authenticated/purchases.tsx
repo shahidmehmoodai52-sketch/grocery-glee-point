@@ -727,7 +727,46 @@ function Page() {
     return { id: data.id as string, name: data.name as string };
   };
 
-  const submit = async () => {
+  /** Fresh copy of one purchase (with items and supplier) for printing. */
+  const loadPurchaseForPrint = async (id: string): Promise<any | null> => {
+    try {
+      const { data, error } = await supabase.from("purchases")
+        .select("*, suppliers(name), purchase_items(*)").eq("id", id).maybeSingle();
+      if (!error && data) return data;
+    } catch { /* offline — fall back to the local mirror */ }
+    const local = await db().purchases.get(id);
+    return local ? enrichLocalPurchaseRow(local) : null;
+  };
+
+  const printPurchase = async (p: any) => {
+    const localPrinter = await getLocalPrinterSettings();
+    printInvoiceDirect({
+      invoice_no: p.invoice_no,
+      created_at: p.created_at,
+      suppliers: p.suppliers,
+      subtotal: p.subtotal,
+      tax: p.tax,
+      total: p.total,
+      paid: p.paid,
+      discount: Number(p.subtotal || 0) > 0 ? Number(p.subtotal || 0) - (Number(p.total || 0) - Number(p.tax || 0)) : 0,
+      note: p.note,
+      payment_method: p.payment_method,
+      isPurchase: true,
+      sale_items: p.purchase_items?.map((it: any) => ({
+        name: it.name,
+        qty: it.qty,
+        price: it.cost,
+        line_total: it.line_total,
+      })),
+    }, {
+      ...settings,
+      printer_name: localPrinter.printer_name,
+      paper_width: localPrinter.paper_width,
+      direct_print_enabled: localPrinter.direct_print_enabled,
+    }, "purchase");
+  };
+
+  const submit = async (): Promise<string | false> => {
     if (savingRef.current) return false;
     if (!supplier || supplier === "none") { toast.error(t('purchases.supplier_required', 'Supplier is required')); return false; }
     const items = lines.filter((l) => l.name && l.qty > 0);
@@ -809,6 +848,10 @@ function Page() {
       })(),
     };
 
+    // Id of the purchase this save wrote, so "Save/Update & Print" prints
+    // exactly that one (it used to print whichever purchase was first in
+    // the list — never the one just edited).
+    let savedId: string | null = editingId ?? null;
     try {
       if (editingId) {
         // --- Edit Flow ---
@@ -941,6 +984,7 @@ function Page() {
           }));
 
         const res = await completePurchaseOfflineAware(payload, corrections);
+        savedId = res.id ?? null;
         if (res.dateNotApplied) {
           toast.warning(t('purchases.date_not_applied', 'Purchase saved, but its date could not be set — edit the purchase to change the date.'));
         }
@@ -995,7 +1039,7 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["cf-purchases"] });
     qc.invalidateQueries({ queryKey: ["cash-accounts"] });
     qc.invalidateQueries({ queryKey: ["cash-transactions"] });
-    return true;
+    return savedId ?? "saved";
   };
 
 
@@ -1655,37 +1699,16 @@ function Page() {
                   const success = await submit();
                   if (!success) return;
                   
-                  // Invalidate immediately to ensure we have the latest purchase for printing
-                  await qc.invalidateQueries({ queryKey: ["purchases"] });
-                  
-                  setTimeout(() => {
-                    // Try to find the latest purchase from the query cache
-                    const allPurchases = qc.getQueryData<any[]>(["purchases"]) || purchases;
-                    const latest = allPurchases[0];
-                    if (latest) {
-                      printInvoiceDirect({
-                        invoice_no: latest.invoice_no,
-                        created_at: latest.created_at,
-                        suppliers: latest.suppliers,
-                        subtotal: latest.subtotal,
-                        tax: latest.tax,
-                        total: latest.total,
-                        paid: latest.paid,
-                        discount: Number(latest.subtotal || 0) > 0 ? Number(latest.subtotal || 0) - (Number(latest.total || 0) - Number(latest.tax || 0)) : 0,
-                        note: latest.note,
-                        payment_method: latest.payment_method,
-                        isPurchase: true,
-                        sale_items: latest.purchase_items?.map((it: any) => ({
-                          name: it.name,
-                          qty: it.qty,
-                          price: it.cost,
-                          line_total: it.line_total
-                        }))
-                      }, settings, "purchase" as any);
-                    } else {
-                      toast.error(t('purchases.print_not_found', 'Could not find the purchase record for printing. Please try reprinting from the history.'));
-                    }
-                  }, 500);
+                  if (success === "saved") {
+                    toast.error(t('purchases.print_not_found', 'Could not find the purchase record for printing. Please try reprinting from the history.'));
+                    return;
+                  }
+                  const p = await loadPurchaseForPrint(success);
+                  if (!p) {
+                    toast.error(t('purchases.print_not_found', 'Could not find the purchase record for printing. Please try reprinting from the history.'));
+                    return;
+                  }
+                  await printPurchase(p);
                 }}
                 disabled={saving}
               >
@@ -1805,33 +1828,7 @@ function Page() {
                     variant="ghost" 
                     size="icon" 
                     data-print-id={p.id}
-                    onClick={async () => {
-                      const localPrinter = await getLocalPrinterSettings();
-                      printInvoiceDirect({
-                        invoice_no: p.invoice_no,
-                        created_at: p.created_at,
-                        suppliers: p.suppliers,
-                        subtotal: p.subtotal,
-                        tax: p.tax,
-                        total: p.total,
-                        paid: p.paid,
-                        discount: Number(p.subtotal || 0) > 0 ? Number(p.subtotal || 0) - (Number(p.total || 0) - Number(p.tax || 0)) : 0,
-                        note: p.note,
-                        payment_method: p.payment_method,
-                        isPurchase: true,
-                        sale_items: p.purchase_items?.map((it: any) => ({
-                          name: it.name,
-                          qty: it.qty,
-                          price: it.cost,
-                          line_total: it.line_total
-                        }))
-                      }, {
-                        ...settings,
-                        printer_name: localPrinter.printer_name,
-                        paper_width: localPrinter.paper_width,
-                        direct_print_enabled: localPrinter.direct_print_enabled
-                      }, "purchase" as any);
-                    }} 
+                    onClick={() => { void printPurchase(p); }}
                     title={t('purchases.print_receipt_tooltip', 'Print receipt')}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-printer"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>

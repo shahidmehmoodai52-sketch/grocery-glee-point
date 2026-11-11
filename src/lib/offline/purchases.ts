@@ -92,7 +92,7 @@ function nextLocalPurchaseNo(): string {
 export async function completePurchaseOfflineAware(
   payload: PurchasePayload,
   corrections: StockCorrection[] = [],
-): Promise<{ offline: boolean; dateNotApplied?: boolean }> {
+): Promise<{ offline: boolean; id?: string; dateNotApplied?: boolean }> {
   const enabled = getOfflineStatus().enabled;
   const offline = isOffline() && enabled;
 
@@ -119,10 +119,10 @@ export async function completePurchaseOfflineAware(
           .eq("id", purchaseId as unknown as string);
         if (dErr) {
           console.error("purchase date not applied", dErr);
-          return { offline: false, dateNotApplied: true };
+          return { offline: false, id: purchaseId as unknown as string, dateNotApplied: true };
         }
       }
-      return { offline: false };
+      return { offline: false, id: (purchaseId as unknown as string) ?? undefined };
     } catch (e: any) {
       if (!enabled || !isNetworkError(e)) throw e;
     }
@@ -261,7 +261,7 @@ export async function completePurchaseOfflineAware(
     },
   });
 
-  return { offline: true };
+  return { offline: true, id: localId };
 }
 
 /** Applies a sell_price change to the local product mirror and queues it for
