@@ -262,9 +262,13 @@ function Page() {
   const setDetails = (d: typeof details) => {
     setDetailShown(300);
     if (d) {
-      setDPreset("all");
-      setDFrom("");
-      setDTo("");
+      // Open on this month: only its entries are fetched, older history is
+      // folded into the opening balance by the server. "All" or any wider
+      // range can still be picked in the dialog.
+      const m = rangeFor("this_month");
+      setDPreset("this_month");
+      setDFrom(m.from);
+      setDTo(m.to);
       setDFilterAcc(d.kind === "account" ? d.accountId : "all");
       setDFilterMethod("all");
     }
@@ -379,7 +383,9 @@ function Page() {
   const wantsTotalsOnly = details?.kind === "opening" || details?.kind === "balance";
   const { data: detailTotals = [], isLoading: detailTotalsLoading } = useQuery({
     queryKey: ["cf-detail-totals", dFrom, dTo],
-    enabled: !!details && wantsTotalsOnly,
+    // Also gives the list dialogs their opening balance (prior_in/prior_out),
+    // so they no longer need every entry before the range.
+    enabled: !!details,
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cash_flow_account_totals", {
@@ -391,15 +397,15 @@ function Page() {
     },
   });
   const { data: detailTxs = [], isLoading: detailTxsLoading } = useQuery({
-    queryKey: ["cf-ledger-full", detailAccountId ?? "all"],
+    queryKey: ["cf-ledger-full", detailAccountId ?? "all", dFrom, dTo],
     enabled: !!details && !wantsTotalsOnly,
     staleTime: 60_000,
     queryFn: async () => {
       const CHUNK = 1000;
       const fetchChunk = async (offset: number) => {
         const { data, error } = await supabase.rpc("get_cash_flow_ledger", {
-          p_from_date: "2000-01-01T00:00:00Z",
-          p_to_date: "2099-12-31T23:59:59Z",
+          p_from_date: dFrom ? localDayStartIso(dFrom) : "2000-01-01T00:00:00Z",
+          p_to_date: dTo ? localDayEndIso(dTo) : "2099-12-31T23:59:59Z",
           p_limit: CHUNK,
           p_offset: offset,
           ...(detailAccountId ? { p_account_id: detailAccountId } : {}),
@@ -1339,15 +1345,18 @@ function Page() {
 
             const inTot = list.filter((t) => t.direction === "in").reduce((s, t) => s + Number(t.amount), 0);
             const outTot = list.filter((t) => t.direction === "out").reduce((s, t) => s + Number(t.amount), 0);
-            const baseOpening = accId
-              ? Number(accById(accId)?.opening_balance ?? 0)
+            // Everything before the selected window rolls into the opening
+            // balance — from the server's per-account totals, since only the
+            // window's own entries are loaded.
+            const priorAcc = accId ?? (dFilterAcc !== "all" ? dFilterAcc : null);
+            const baseOpening = priorAcc
+              ? Number(accById(priorAcc)?.opening_balance ?? 0)
               : allAccounts.reduce((s, a) => s + Number(a.opening_balance ?? 0), 0);
-            // Everything before the selected window rolls into the opening balance
             let prior = 0;
             if (dFrom) {
-              for (const t of scope) {
-                if (t.occurred_on >= dFrom) continue;
-                prior += t.direction === "in" ? Number(t.amount) : -Number(t.amount);
+              for (const row of detailTotals) {
+                if (priorAcc && row.account_id !== priorAcc) continue;
+                prior += Number(row.prior_in || 0) - Number(row.prior_out || 0);
               }
             }
             const openingBal = baseOpening + prior;
