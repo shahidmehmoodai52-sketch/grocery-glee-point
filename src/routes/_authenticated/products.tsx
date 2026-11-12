@@ -69,6 +69,17 @@ function useDebounced<T>(value: T, ms: number) {
   return v;
 }
 
+/** Barcode spellings worth an exact lookup for a scanned/typed code: the
+ *  code itself plus its UPC-A (12) / EAN-13 twin. Empty for non-codes
+ *  (names with spaces, very short input). */
+function barcodeVariants(term: string): string[] {
+  if (!/^[0-9A-Za-z-]{4,}$/.test(term)) return [];
+  const out = new Set([term]);
+  if (/^\d{12}$/.test(term)) out.add(`0${term}`);
+  if (/^0\d{12}$/.test(term)) out.add(term.slice(1));
+  return [...out];
+}
+
 // Escape PostgREST `or()` filter separators inside a user-supplied term.
 function safeTerm(q: string) {
   return q.replace(/[(),]/g, " ").trim();
@@ -153,7 +164,25 @@ function ProductsPage() {
 
       const term = safeTerm(debouncedSearch);
       if (term) {
-        q = q.or(`name.ilike.%${term}%,sku.ilike.${term}%,barcode.ilike.${term}%`);
+        // Scanned codes: also look in product_barcodes (a product's extra
+        // barcodes — Hafiz has ~3,400 that exist only there, so scanning
+        // those found nothing here though the POS sells them fine), and try
+        // the UPC-A / EAN-13 twin of a numeric code (same code with/without
+        // a leading 0, as scanners and suppliers write it either way).
+        const variants = barcodeVariants(term);
+        const extraIds = new Set<string>();
+        if (variants.length) {
+          const { data: bcs } = await supabase
+            .from("product_barcodes")
+            .select("product_id,barcode")
+            .or([`barcode.ilike.${term}%`, ...variants.map((v) => `barcode.eq.${v}`)].join(","))
+            .limit(50);
+          for (const b of (bcs ?? []) as any[]) if (b.product_id) extraIds.add(b.product_id);
+        }
+        const clauses = [`name.ilike.%${term}%`, `sku.ilike.${term}%`, `barcode.ilike.${term}%`];
+        for (const v of variants) if (v !== term) clauses.push(`barcode.eq.${v}`);
+        if (extraIds.size) clauses.push(`id.in.(${[...extraIds].join(",")})`);
+        q = q.or(clauses.join(","));
       }
       if (category !== "all") q = q.eq("category", category);
       if (rackFilter !== "all") q = rackFilter === "__none__" ? q.is("rack_location", null) : q.eq("rack_location", rackFilter);
