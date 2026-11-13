@@ -10,7 +10,12 @@ const fs = require('fs');
 const { setupAutoUpdater, checkForUpdatesNow } = require('./updater.cjs');
 
 const IS_DEV = !!process.env.POS_DEV;
-const NITRO_ENTRY = path.join(__dirname, '..', '.output', 'server', 'index.mjs');
+// In the packaged app these live in app.asar.unpacked (electron-builder
+// asarUnpack). Point at the real files: the server is loaded with an ESM
+// import(), and Node's ESM loader can't read paths inside app.asar.
+const unpacked = (p) => p.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1');
+const NITRO_ENTRY = unpacked(path.join(__dirname, '..', '.output', 'server', 'index.mjs'));
+const NITRO_HOST = unpacked(path.join(__dirname, 'nitro-host.mjs'));
 const DEV_URL = process.env.POS_DEV_URL || 'http://localhost:8080';
 
 let mainWindow = null;
@@ -46,8 +51,10 @@ function waitForServer(url, timeoutMs = 15000) {
 
 async function startNitroServer() {
   nitroPort = pickPort();
-  nitroChild = fork(NITRO_ENTRY, [], {
-    env: { ...process.env, PORT: String(nitroPort), HOST: '127.0.0.1', NITRO_PORT: String(nitroPort), NITRO_HOST: '127.0.0.1' },
+  // Forked through nitro-host.mjs, which exits as soon as this process is
+  // gone (see that file) — so the server never outlives the app.
+  nitroChild = fork(NITRO_HOST, [], {
+    env: { ...process.env, TILLIX_NITRO_ENTRY: NITRO_ENTRY, PORT: String(nitroPort), HOST: '127.0.0.1', NITRO_PORT: String(nitroPort), NITRO_HOST: '127.0.0.1' },
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
   });
   nitroChild.on('exit', (code) => {
@@ -82,7 +89,32 @@ function createWindow(startUrl) {
   });
 }
 
+function stopNitro() {
+  if (nitroChild) { try { nitroChild.kill(); } catch {} nitroChild = null; }
+}
+// Every way out, not only "last window closed" (an update's quitAndInstall,
+// Ctrl+C / SIGTERM, an uncaught error path).
+app.on('will-quit', stopNitro);
+process.on('exit', stopNitro);
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => { stopNitro(); app.quit(); });
+}
+
+// One running copy only: a second launch (double-clicked shortcut) focuses
+// the open window instead of starting a second server on the same port.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 app.whenReady().then(async () => {
+  if (!app.hasSingleInstanceLock()) return;
   try {
     let startUrl;
     if (IS_DEV) {
