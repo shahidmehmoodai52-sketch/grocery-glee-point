@@ -6,6 +6,7 @@ const path = require('path');
 const os = require('os');
 const http = require('http');
 const { fork } = require('child_process');
+const fs = require('fs');
 const { setupAutoUpdater, checkForUpdatesNow } = require('./updater.cjs');
 
 const IS_DEV = !!process.env.POS_DEV;
@@ -124,6 +125,54 @@ ipcMain.handle('pos:print', async (_event, options = {}) => {
     }, (success) => resolve(Boolean(success)));
   });
 });
+// ---- Offline journal ------------------------------------------------------
+// Every write the app queues while offline is also appended, as one JSON
+// line, to Documents\Tillix\offline-journal\<YYYY-MM>.jsonl, followed by an
+// "uploaded"/"cancelled" line once it syncs. The browser storage that holds
+// the sync queue can be wiped (clear site data, profile reset); this plain
+// file on disk can't be, so unsynced work can be found and queued again.
+function journalDir() {
+  return path.join(app.getPath('documents'), 'Tillix', 'offline-journal');
+}
+const MAX_JOURNAL_LINE = 2 * 1024 * 1024; // one queued write, generously
+ipcMain.handle('pos:journal-append', async (_event, entries) => {
+  if (!Array.isArray(entries) || entries.length === 0 || entries.length > 200) return false;
+  const lines = [];
+  for (const e of entries) {
+    if (!e || typeof e !== 'object' || typeof e.kind !== 'string' || typeof e.client_uuid !== 'string') continue;
+    const line = JSON.stringify(e);
+    if (line.length > MAX_JOURNAL_LINE) continue;
+    lines.push(line);
+  }
+  if (!lines.length) return false;
+  const dir = journalDir();
+  await fs.promises.mkdir(dir, { recursive: true });
+  const month = new Date().toISOString().slice(0, 7);
+  await fs.promises.appendFile(path.join(dir, `${month}.jsonl`), lines.join('\n') + '\n', 'utf8');
+  return true;
+});
+ipcMain.handle('pos:journal-read', async (_event, monthsBack) => {
+  const dir = journalDir();
+  const keep = Math.min(Math.max(Number(monthsBack) || 3, 1), 24);
+  let files = [];
+  try { files = (await fs.promises.readdir(dir)).filter((n) => /^\d{4}-\d{2}\.jsonl$/.test(n)).sort().slice(-keep); }
+  catch { return { dir, entries: [] }; }
+  const entries = [];
+  for (const name of files) {
+    const text = await fs.promises.readFile(path.join(dir, name), 'utf8');
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      try { entries.push(JSON.parse(line)); } catch { /* a torn last line after a power cut */ }
+    }
+  }
+  return { dir, entries };
+});
+ipcMain.handle('pos:journal-open-folder', async () => {
+  const dir = journalDir();
+  await fs.promises.mkdir(dir, { recursive: true });
+  return shell.openPath(dir);
+});
+
 ipcMain.handle('pos:quit-and-install', () => {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.quitAndInstall();

@@ -17,6 +17,7 @@ import {
   setAutoEnabled, setBackupTime, isSupported, type BackupStatus,
   setEncryptionEnabled, getRecoveryKeyBase64, decryptBackupFile,
 } from "@/lib/backup";
+import { OfflineJournalCard } from "@/components/offline-journal-card";
 
 export const Route = createFileRoute("/_authenticated/backup")({
   component: BackupPage,
@@ -304,6 +305,8 @@ function BackupPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <OfflineJournalCard />
 
       <Card>
         <CardHeader>
