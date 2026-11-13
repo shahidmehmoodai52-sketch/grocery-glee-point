@@ -79,6 +79,45 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/** A shop owner who signed up before confirming their email has their shop
+ *  details stashed in user_metadata (register_shop needs a session, which
+ *  signUp didn't have yet). Register that shop once, on the first session
+ *  after confirmation — whether they arrive from the email link or sign in
+ *  with the form (the form path used to skip this, leaving them on an empty
+ *  "Register your shop" form asking for the same details again). */
+async function finishPendingShop(user: { user_metadata?: Record<string, unknown> | null } | null | undefined): Promise<void> {
+  if (!user) return;
+  try {
+    const meta = user.user_metadata as Record<string, unknown> | undefined;
+    const pendingName = typeof meta?.pending_shop_name === "string" ? meta.pending_shop_name : "";
+    if (pendingName) {
+      const { data: tenantId } = await supabase.rpc("current_tenant_id");
+      if (!tenantId) {
+        const { error: rpcErr } = await supabase.rpc("register_shop" as any, {
+          _name: pendingName,
+          _phone: (meta?.pending_shop_phone as string) ?? "",
+          _address: (meta?.pending_shop_address as string) ?? "",
+          _city: (meta?.pending_shop_city as string) ?? "",
+          _business_type: (meta?.pending_shop_business_type as string) ?? "grocery",
+        } as any);
+        if (!rpcErr) {
+          toast.success("Email confirmed — your shop is registered and waiting for approval. Your 7-day free trial starts when it is approved.");
+          // Best effort: clear the stashed details now that they're applied.
+          void supabase.auth.updateUser({
+            data: {
+              pending_shop_name: null, pending_shop_phone: null,
+              pending_shop_address: null, pending_shop_city: null, pending_shop_business_type: null,
+            },
+          });
+        }
+      }
+    }
+  } catch {
+    // Never block sign-in on this — worst case the user lands in the
+    // app without a shop and can retry registration.
+  }
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const { next } = Route.useSearch();
@@ -136,36 +175,7 @@ function AuthPage() {
       // handleFinishRegister) and this user still has no shop, finish it
       // now, transparently, instead of dropping them into an app with no
       // tenant at all.
-      try {
-        const meta = user.user_metadata as Record<string, unknown> | undefined;
-        const pendingName = typeof meta?.pending_shop_name === "string" ? meta.pending_shop_name : "";
-        if (pendingName) {
-          const { data: tenantId } = await supabase.rpc("current_tenant_id");
-          if (!tenantId) {
-            const { error: rpcErr } = await supabase.rpc("register_shop" as any, {
-              _name: pendingName,
-              _phone: (meta?.pending_shop_phone as string) ?? "",
-              _address: (meta?.pending_shop_address as string) ?? "",
-              _city: (meta?.pending_shop_city as string) ?? "",
-              _business_type: (meta?.pending_shop_business_type as string) ?? "grocery",
-            } as any);
-            if (!rpcErr) {
-              toast.success("Email confirmed — your shop is registered and waiting for approval. Your 7-day free trial starts when it is approved.");
-              // Best effort: clear the stashed details now that they're applied.
-              void supabase.auth.updateUser({
-                data: {
-                  pending_shop_name: null, pending_shop_phone: null,
-                  pending_shop_address: null, pending_shop_city: null, pending_shop_business_type: null,
-                },
-              });
-            }
-          }
-        }
-      } catch {
-        // Never block sign-in on this — worst case the user lands in the
-        // app without a shop and can retry registration.
-      }
-
+      await finishPendingShop(user);
       void goToApp();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,6 +247,8 @@ function AuthPage() {
         return;
       }
       void logSecurityEvent("successful_login", { severity: "info", email: cleanEmail });
+      const { data: signedIn } = await supabase.auth.getUser();
+      await finishPendingShop(signedIn?.user as any);
       await goToApp();
     } catch (err: any) {
       if (isAuthNetworkError(err)) {

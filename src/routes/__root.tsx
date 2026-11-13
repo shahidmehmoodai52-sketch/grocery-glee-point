@@ -292,6 +292,17 @@ function RootComponent() {
         window.addEventListener("online", onOnline);
         window.addEventListener("offline", onOffline);
 
+        // The `online` event fires before the connectivity probe has marked
+        // this device online again, so the reconnect sync above (2.5s later)
+        // often found status.online still false and silently did nothing —
+        // queued offline sales then waited for the 20-minute interval or a
+        // window refocus. Sync as soon as the probe confirms we're back.
+        let wasOnline = getOfflineStatus().online;
+        const unsubscribeReconnect = subscribeOfflineStatus((st) => {
+          if (st.online && !wasOnline) trigger("reconnect");
+          wasOnline = st.online;
+        });
+
         // A full pass here re-requests every one of the ~34 mirrored tables
         // (pullTable() always issues at least one request per table, even
         // when nothing changed) — while online, the realtime subscription
@@ -317,6 +328,7 @@ function RootComponent() {
         document.addEventListener("visibilitychange", onVisible);
 
         cleanup = () => {
+          unsubscribeReconnect();
           window.removeEventListener("online", onOnline);
           window.removeEventListener("offline", onOffline);
           document.removeEventListener("visibilitychange", onVisible);

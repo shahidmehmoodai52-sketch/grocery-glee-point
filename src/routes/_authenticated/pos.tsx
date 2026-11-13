@@ -1992,10 +1992,24 @@ function POSPage() {
     try {
       const ids = Array.from(new Set(tab.items.map((i) => i.product_id).filter(Boolean)));
       if (ids.length) {
-        const { data: stockRows } = await supabase
-          .from("products")
-          .select("id,name,stock,allow_negative_stock" as any)
-          .in("id", ids as string[]);
+        // Offline (or a server that doesn't answer within 3s) → check against
+        // this device's product mirror instead. The server query used to be
+        // retried by the fetch layer while offline, so every offline sale
+        // waited ~8s on F4 before falling through to the queue.
+        const localRows = async () =>
+          ((await offlineDb().products.bulkGet(ids as string[])) as any[]).filter(Boolean);
+        let stockRows: any[] | null = null;
+        if (isOfflineNow()) {
+          stockRows = await localRows();
+        } else {
+          const remote = supabase
+            .from("products")
+            .select("id,name,stock,allow_negative_stock" as any)
+            .in("id", ids as string[])
+            .then((r) => (r.error ? null : ((r.data ?? []) as any[])));
+          const timeout = new Promise<null>((res) => setTimeout(() => res(null), 3000));
+          stockRows = (await Promise.race([remote, timeout])) ?? (await localRows());
+        }
         const byId = new Map((stockRows ?? []).map((r: any) => [r.id, r]));
         const totals = new Map<string, number>();
         for (const it of tab.items) {
@@ -3862,7 +3876,23 @@ function POSPage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setTab({ paid: total.toFixed(2) });
+                    // Set the tender line too, as typing in Paid does. Setting
+                    // only `paid` left payments[0] at the last typed amount, and
+                    // Due / the saved sale are computed from the payment lines —
+                    // so after typing 100 and pressing Exact on a 300 bill, Paid
+                    // showed 300 but Due stayed 200 and the sale was blocked or
+                    // saved short. With split tender, the first line takes
+                    // whatever the other lines leave.
+                    const nextRows = [...paymentRows];
+                    if (nextRows[0]) {
+                      const others = nextRows.slice(1).reduce((sum, r) => sum + Number(r.amount || 0), 0);
+                      nextRows[0] = { ...nextRows[0], amount: +Math.max(total - others, 0).toFixed(2) };
+                    }
+                    setTab({
+                      paid: total.toFixed(2),
+                      payments: nextRows,
+                      payment_method: nextRows[0]?.method || tab.payment_method || "cash",
+                    });
                     setTimeout(() => searchRef.current?.focus(), 0);
                   }}
                   className="text-xs text-primary hover:underline shrink-0 font-medium"
