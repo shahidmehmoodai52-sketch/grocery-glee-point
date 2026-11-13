@@ -5,6 +5,7 @@
 // Push  : IndexedDB queue → cloud, in strict chronological order, with
 //         idempotency keys, bounded retries and progress reporting.
 
+import { journalAppend } from "./journal";
 import { supabase } from "@/integrations/supabase/client";
 import { db, MIRRORED_TABLES, queuePriority, type MirroredTable } from "./db";
 import {
@@ -450,7 +451,7 @@ const TABLE_QUEUE_LABELS: Record<string, string> = {
 };
 
 /** Human-readable "what's uploading right now" text for the sync status badge. */
-function describeQueueItem(item: { op: string; table: string; payload: any }): string {
+export function describeQueueItem(item: { op: string; table: string; payload: any }): string {
   if (item.op === "rpc") {
     const base = RPC_QUEUE_LABELS[item.table] ?? item.table;
     if (item.table === "complete_sale") {
@@ -551,6 +552,7 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
         last_error: null,
         next_attempt_at: null,
       });
+      if (item.client_uuid) journalAppend({ kind: "uploaded", client_uuid: item.client_uuid, at: new Date().toISOString() });
       ok++;
     } catch (e: any) {
       failed++;
@@ -567,6 +569,9 @@ async function flushQueue(opts: { silent?: boolean } = {}): Promise<{ ok: number
         last_error: `${permanent ? "PERMANENT ERROR: " : "SYNC ERROR: "}${String(e?.message ?? e)}`,
         next_attempt_at: shouldCancel ? null : new Date(Date.now() + backoffMs(attempts)).toISOString(),
       });
+      if (shouldCancel && item.client_uuid) {
+        journalAppend({ kind: "cancelled", client_uuid: item.client_uuid, at: new Date().toISOString(), error: String(e?.message ?? e).slice(0, 300) });
+      }
       // Preserve chronological application for this entity only.
       blocked.add(item.table);
     }
@@ -765,6 +770,10 @@ export async function enqueueWrite(item: {
     status: "pending",
     next_attempt_at: null,
     priority: queuePriority(item.table),
+  });
+  journalAppend({
+    kind: "queued", client_uuid, at: new Date().toISOString(), op: item.op, table: item.table,
+    payload: item.payload, tenant_id: tenant_id ?? null, device_id: getDeviceId(),
   });
   await refreshPendingCount();
   // A write created while online should leave immediately — but only in

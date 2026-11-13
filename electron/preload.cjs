@@ -6,6 +6,11 @@ contextBridge.exposeInMainWorld('pos', {
   checkForUpdates: () => ipcRenderer.invoke('pos:check-updates'),
   print: (options) => ipcRenderer.invoke('pos:print', options),
   quitAndInstall: () => ipcRenderer.invoke('pos:quit-and-install'),
+  journal: {
+    append: (entries) => ipcRenderer.invoke('pos:journal-append', entries),
+    read: (monthsBack) => ipcRenderer.invoke('pos:journal-read', monthsBack),
+    openFolder: () => ipcRenderer.invoke('pos:journal-open-folder'),
+  },
   onUpdateStatus: (cb) => {
     const listener = (_e, payload) => cb(payload);
     ipcRenderer.on('pos:update-status', listener);
