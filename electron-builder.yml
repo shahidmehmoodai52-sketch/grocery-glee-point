@@ -29,6 +29,9 @@ win:
     - target: nsis
       arch: [x64]
   artifactName: "Tillix-Setup-${version}.exe"
+  # The green "T" from the landing page / favicon (public/favicon.png),
+  # squared onto white: exe, taskbar, desktop & Start-menu shortcuts.
+  icon: electron/build-resources/icon.ico
 nsis:
   oneClick: false
   perMachine: false
@@ -36,6 +39,8 @@ nsis:
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: Tillix POS
+  installerIcon: electron/build-resources/icon.ico
+  uninstallerIcon: electron/build-resources/icon.ico
 publish:
   # Releases live in a separate PUBLIC repo that holds only installers, so
   # the source repo (grocery-glee-point) can be made private. electron-updater
