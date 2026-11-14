@@ -77,6 +77,8 @@ async function startLocalBackend({ dataDir, migrationsDir, log = console.log }) 
   return {
     url: `http://127.0.0.1:${PORTS.gateway}`,
     anonKey: OFFLINE_ANON_KEY,
+    /** Superuser query on the local DB (license sync, local shop setup). */
+    query: async (sql, params) => (await pool.query(sql, params)).rows,
     async stop() {
       try { await gateway.close(); } catch {}
       try { rest.kill(); } catch {}
