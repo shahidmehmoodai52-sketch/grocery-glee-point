@@ -38,3 +38,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Offline desktop edition: its own deps and downloaded binaries
+desktop-offline/node_modules
+desktop-offline/bin

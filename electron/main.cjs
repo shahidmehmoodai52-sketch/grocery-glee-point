@@ -18,6 +18,15 @@ const NITRO_ENTRY = unpacked(path.join(__dirname, '..', '.output', 'server', 'in
 const NITRO_HOST = unpacked(path.join(__dirname, 'nitro-host.mjs'));
 const DEV_URL = process.env.POS_DEV_URL || 'http://localhost:8080';
 
+// Offline edition (desktop-offline/): the database runs on this PC instead
+// of the cloud. Set by the offline build's package.json (extraMetadata
+// tillixEdition) or TILLIX_EDITION=offline when testing.
+const EDITION = process.env.TILLIX_EDITION || (() => {
+  try { return require(path.join(__dirname, '..', 'package.json')).tillixEdition || 'online'; } catch { return 'online'; }
+})();
+const IS_OFFLINE_EDITION = EDITION === 'offline';
+let localBackend = null;
+
 let mainWindow = null;
 let nitroChild = null;
 let nitroPort = 0;
@@ -49,12 +58,12 @@ function waitForServer(url, timeoutMs = 15000) {
   });
 }
 
-async function startNitroServer() {
+async function startNitroServer(extraEnv = {}) {
   nitroPort = pickPort();
   // Forked through nitro-host.mjs, which exits as soon as this process is
   // gone (see that file) — so the server never outlives the app.
   nitroChild = fork(NITRO_HOST, [], {
-    env: { ...process.env, TILLIX_NITRO_ENTRY: NITRO_ENTRY, PORT: String(nitroPort), HOST: '127.0.0.1', NITRO_PORT: String(nitroPort), NITRO_HOST: '127.0.0.1' },
+    env: { ...process.env, ...extraEnv, TILLIX_NITRO_ENTRY: NITRO_ENTRY, PORT: String(nitroPort), HOST: '127.0.0.1', NITRO_PORT: String(nitroPort), NITRO_HOST: '127.0.0.1' },
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
   });
   nitroChild.on('exit', (code) => {
@@ -117,22 +126,49 @@ app.whenReady().then(async () => {
   if (!app.hasSingleInstanceLock()) return;
   try {
     let startUrl;
-    if (IS_DEV) {
+    if (IS_OFFLINE_EDITION) {
+      // First launch builds the database (a minute or two): show progress
+      // instead of a blank window.
+      createWindow('data:text/html;charset=utf-8,' + encodeURIComponent(
+        '<body style="background:#0f172a;color:#e2e8f0;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">' +
+        '<div style="text-align:center"><h2>Tillix POS</h2><p>Preparing database on this PC…</p><p style="opacity:.6;font-size:13px">First start can take a minute or two.</p></div></body>'));
+      const { startLocalBackend } = require(path.join(__dirname, '..', 'desktop-offline', 'runtime', 'local-backend.cjs'));
+      localBackend = await startLocalBackend({
+        dataDir: path.join(app.getPath('userData'), 'offline-db'),
+        migrationsDir: path.join(__dirname, '..', 'supabase', 'migrations'),
+        log: (...a) => console.log('[offline]', ...a),
+      });
+      await startNitroServer({ SUPABASE_URL: localBackend.url, SUPABASE_PUBLISHABLE_KEY: localBackend.anonKey });
+      startUrl = `http://127.0.0.1:${nitroPort}/dashboard`;
+      mainWindow.loadURL(startUrl);
+    } else if (IS_DEV) {
       startUrl = `${DEV_URL.replace(/\/$/, '')}/dashboard`;
     } else {
       await startNitroServer();
       startUrl = `http://127.0.0.1:${nitroPort}/dashboard`;
     }
-    createWindow(startUrl);
-    if (!IS_DEV) setupAutoUpdater(mainWindow);
+    if (!mainWindow) createWindow(startUrl);
+    // The offline edition is updated by installing a new version (USB);
+    // it never checks the internet for updates.
+    if (!IS_DEV && !IS_OFFLINE_EDITION) setupAutoUpdater(mainWindow);
   } catch (err) {
     dialog.showErrorBox('Failed to start Tillix POS', String(err?.message || err));
     app.quit();
   }
 });
 
+// The local Postgres must shut down cleanly (a killed server recovers on the
+// next start, but a clean stop avoids that): hold the quit until it's done.
+app.on('will-quit', (e) => {
+  if (!localBackend) return;
+  e.preventDefault();
+  const b = localBackend; localBackend = null;
+  b.stop().catch(() => {}).finally(() => app.quit());
+});
+
 app.on('window-all-closed', () => {
   if (nitroChild) { try { nitroChild.kill(); } catch {} nitroChild = null; }
+  if (localBackend) { const b = localBackend; localBackend = null; b.stop().catch(() => {}); }
   if (process.platform !== 'darwin') app.quit();
 });
 

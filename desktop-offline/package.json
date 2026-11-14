@@ -1,0 +1,13 @@
+{
+  "name": "tillix-desktop-offline-runtime",
+  "private": true,
+  "description": "Local backend for the offline desktop edition (Postgres + PostgREST + auth gateway). Installed separately so the web app's dependencies are untouched.",
+  "dependencies": {
+    "embedded-postgres": "17.6.0-beta.15",
+    "pg": "8.16.3"
+  },
+  "optionalDependencies": {
+    "@embedded-postgres/windows-x64": "17.6.0-beta.15",
+    "@embedded-postgres/linux-x64": "17.6.0-beta.15"
+  }
+}
