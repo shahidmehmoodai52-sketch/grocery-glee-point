@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:">
+<title>Tillix POS Offline — License</title>
+<style>
+  :root { --bg:#0f172a; --card:#ffffff; --text:#0f172a; --muted:#64748b; --green:#16a34a; --green-d:#15803d; --red:#dc2626; --line:#e2e8f0; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); font-family: system-ui, "Segoe UI", sans-serif; color:var(--text); }
+  .card { background:var(--card); width:min(460px, 92vw); border-radius:14px; padding:28px; box-shadow:0 20px 50px rgba(0,0,0,.35); }
+  h1 { margin:0 0 4px; font-size:22px; }
+  p.sub { margin:0 0 18px; color:var(--muted); font-size:14px; line-height:1.45; }
+  label { display:block; font-size:13px; font-weight:600; margin:12px 0 6px; }
+  input, textarea { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; }
+  textarea { height:96px; font-family: ui-monospace, Consolas, monospace; font-size:12px; resize:none; }
+  button { margin-top:18px; width:100%; padding:11px; border:0; border-radius:8px; background:var(--green); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+  button:hover { background:var(--green-d); } button:disabled { opacity:.6; cursor:default; }
+  .info { background:#f1f5f9; border-radius:8px; padding:10px 12px; font-size:13px; line-height:1.7; }
+  .info b { font-family: ui-monospace, Consolas, monospace; font-size:14px; }
+  .err { color:var(--red); font-size:13px; margin-top:12px; min-height:18px; white-space:pre-line; }
+  .ok { color:var(--green-d); font-size:13px; margin-top:12px; }
+  .link { background:none; color:var(--green-d); width:auto; padding:0; margin-top:14px; font-size:13px; font-weight:500; }
+  .link:hover { background:none; text-decoration:underline; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="title">Tillix POS Offline</h1>
+  <p class="sub" id="sub">Loading…</p>
+
+  <!-- First start: activate with the Tillix account (internet needed once). -->
+  <form id="activate" hidden>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <button id="activateBtn" type="submit">Activate this PC</button>
+  </form>
+
+  <!-- Expired / renewal: paste the code from Tillix support. -->
+  <div id="renew" hidden>
+    <div class="info" id="pcinfo"></div>
+    <label for="code">Renewal code</label>
+    <textarea id="code" placeholder="TLX1.…" spellcheck="false"></textarea>
+    <button id="renewBtn" type="button">Apply code</button>
+  </div>
+
+  <div class="err" id="err"></div>
+  <div class="ok" id="ok"></div>
+  <button class="link" id="toActivate" type="button" hidden>Activate again with my Tillix account (needs internet)</button>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const api = window.pos && window.pos.license;
+  const fmt = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+  function pcInfo(info) {
+    $('pcinfo').innerHTML =
+      'Machine ID: <b>' + info.machineId + '</b><br>' +
+      (info.shop ? 'Shop: ' + escapeHtml(info.shop) + (info.shopCode ? ' (code <b>' + escapeHtml(info.shopCode) + '</b>)' : '') + '<br>' : '') +
+      (info.expiresAt ? 'Valid until: ' + fmt(info.expiresAt) : '');
+  }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  async function render() {
+    const info = await api.info();
+    $('err').textContent = ''; $('ok').textContent = '';
+    $('activate').hidden = true; $('renew').hidden = true; $('toActivate').hidden = true;
+    if (info.state === 'missing' || info.state === 'invalid' || info.state === 'wrong_machine') {
+      $('title').textContent = 'Activate Tillix POS Offline';
+      $('sub').textContent = 'Sign in once with your Tillix account (the one you registered your shop with). This needs internet only this one time — after that the app works without internet.';
+      if (info.message) $('err').textContent = info.message;
+      $('activate').hidden = false;
+    } else if (info.state === 'clock') {
+      $('title').textContent = 'Check the date and time';
+      $('sub').textContent = info.message;
+    } else {
+      $('title').textContent = info.state === 'expired' ? 'License expired' : 'Renew license';
+      $('sub').textContent = 'Send the Machine ID below to Tillix support (WhatsApp). They will send you a renewal code — paste it here.';
+      pcInfo(info);
+      $('renew').hidden = false;
+      $('toActivate').hidden = false;
+    }
+  }
+
+  $('activate').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('err').textContent = ''; $('activateBtn').disabled = true; $('activateBtn').textContent = 'Activating…';
+    try {
+      const r = await api.activate($('email').value, $('password').value);
+      $('ok').textContent = 'Activated until ' + fmt(r.expiresAt) + '. Opening Tillix…';
+      setTimeout(() => api.continue(), 900);
+    } catch (err) {
+      $('err').textContent = String(err && err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+      $('activateBtn').disabled = false; $('activateBtn').textContent = 'Activate this PC';
+    }
+  });
+
+  $('renewBtn').addEventListener('click', async () => {
+    $('err').textContent = ''; $('renewBtn').disabled = true;
+    try {
+      const r = await api.renew($('code').value);
+      $('ok').textContent = 'Renewed until ' + fmt(r.expiresAt) + '. Opening Tillix…';
+      setTimeout(() => api.continue(), 900);
+    } catch (err) {
+      $('err').textContent = String(err && err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+      $('renewBtn').disabled = false;
+    }
+  });
+
+  $('toActivate').addEventListener('click', () => {
+    $('renew').hidden = true; $('toActivate').hidden = true; $('activate').hidden = false;
+    $('title').textContent = 'Activate Tillix POS Offline';
+    $('sub').textContent = 'Sign in with your Tillix account. Needs internet. Your shop must have an active subscription on tillix.co.';
+  });
+
+  if (!api) { $('sub').textContent = 'License screen is only available in the Tillix POS Offline app.'; } else { render(); }
+</script>
+</body>
+</html>

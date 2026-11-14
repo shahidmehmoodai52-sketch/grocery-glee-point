@@ -15,6 +15,7 @@ files:
   - supabase/migrations/**/*
   - desktop-offline/runtime/**/*
   - desktop-offline/sql/**/*.sql
+  - desktop-offline/ui/**/*
   - desktop-offline/node_modules/**/*
   - desktop-offline/bin/win32-x64/**/*
   - "!**/*.map"
