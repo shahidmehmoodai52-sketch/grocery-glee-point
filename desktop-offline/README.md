@@ -36,6 +36,35 @@ Output: `electron-release-offline/Tillix-Offline-Setup-<version>.exe` — copy t
 USB and install on any Windows x64 PC. App id/name differ from the online exe,
 so both can be installed side by side. Uninstalling keeps the database.
 
+## License (phase 2)
+
+- **First start** shows the activation screen: the shop owner signs in with
+  their Tillix account (internet needed once). `POST /api/offline-license/activate`
+  on tillix.co checks the shop is active and that the caller is its owner,
+  then returns a license code for this PC (valid until the shop's current
+  subscription/trial ends) and the shop details. The exe installs the code,
+  creates the same owner account (same email/password) and shop locally —
+  with the same shop code, so invoices read `S-044-1001` as online.
+- **Code format** `TLX1.<payload>.<sig>`: Ed25519, signed only on the server
+  (`TILLIX_LICENSE_PRIVATE_KEY`), verified on the PC with
+  `runtime/license-public.pem`. Bound to the PC's Machine ID (Windows
+  MachineGuid) and the shop; a code for another PC or shop is refused.
+- **Expiry**: the license expiry is copied into the local
+  `tenant_subscriptions`, so the app's own "N days left" popup counts down to
+  it. When it passes (checked at start and hourly) the app switches to the
+  renewal screen, which shows the Machine ID and shop code.
+- **Renewal**: Admin panel → *Offline licenses* (super admin) → pick shop,
+  enter Machine ID and date → code (copy / WhatsApp). The shop pastes it.
+- **Clock check**: the furthest time the app has seen is stored; a clock wound
+  back more than 36 h shows "check the date and time" until it's corrected.
+
+### Server setup (once)
+Set `TILLIX_LICENSE_PRIVATE_KEY` in Vercel (Production) to the private key
+(PEM or its base64) whose public half is `runtime/license-public.pem`, then
+redeploy. Without it the activate/renew endpoints answer "not configured".
+Never commit the private key. If it leaks, generate a new pair, replace
+`license-public.pem`, rebuild the exe, and re-issue codes.
+
 ## Status (phase 1 proof of concept)
 
 Verified on Linux (Electron 43 under Xvfb), internet fully blocked:
@@ -43,8 +72,11 @@ first start builds the DB in ~5 s; register shop → add product → POS scan �
 sale saved (stock 50→49) → Reports P&L correct; restart keeps login and data.
 
 Not done yet:
-- Phase 2: first-run activation online + license with expiry and renewal code
-  (the 7-day trial banner from `register_shop` still shows).
+- Phase 2 is done (see License above), verified in the exe: activation against
+  the real Supabase via a local copy of the API, wrong login refused,
+  local shop created, expiry → renewal screen, bad code refused, valid code
+  unlocks, clock rollback detected. Admin "issue code" UI not exercised with
+  a real super-admin login.
 - Phase 3: automatic daily backup + restore; DB upgrade on new versions.
 - Parity items in `sql/PARITY_TODO.md` (returns/payments functions, RLS audit).
 - Shop staff accounts (uses a cloud server function), email/password reset,

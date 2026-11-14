@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link, Outlet, redirect } from "@tanstack/react-router";
+import { OfflineLicensesPanel } from "@/components/admin/offline-licenses-panel";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -257,6 +258,9 @@ function AdminPanelPage() {
           <TabsTrigger value="database"><Database className="h-4 w-4 mr-1" />Database</TabsTrigger>
           <TabsTrigger value="billing"><Wallet className="h-4 w-4 mr-1" />Billing</TabsTrigger>
           <TabsTrigger value="flags"><Flag className="h-4 w-4 mr-1" />Feature Flags</TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="offline-licenses"><KeyRound className="h-4 w-4 mr-1" />Offline licenses</TabsTrigger>
+          )}
         </TabsList>
          <TabsContent value="dashboard" className="mt-3"><DashboardTab setActiveTab={setActiveTab} /></TabsContent>
         <TabsContent value="tenants" className="mt-3"><TenantsTab /></TabsContent>
@@ -274,6 +278,9 @@ function AdminPanelPage() {
         <TabsContent value="database" className="mt-3"><DatabaseTab /></TabsContent>
         <TabsContent value="billing" className="mt-3"><BillingTab /></TabsContent>
         <TabsContent value="flags" className="mt-3"><FeatureFlagsTab /></TabsContent>
+        {isSuperAdmin && (
+          <TabsContent value="offline-licenses" className="mt-3"><OfflineLicensesPanel /></TabsContent>
+        )}
       </Tabs>
     </div>
   );

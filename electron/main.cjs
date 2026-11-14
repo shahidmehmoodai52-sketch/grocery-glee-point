@@ -122,6 +122,75 @@ if (!app.requestSingleInstanceLock()) {
   });
 }
 
+// ---- Offline edition license ---------------------------------------------
+const OFFLINE_RUNTIME = path.join(__dirname, '..', 'desktop-offline', 'runtime');
+const offlineDataDir = () => path.join(app.getPath('userData'), 'offline-db');
+let offlineAppUrl = null;
+let licenseWaiter = null;
+
+function licenseInfo() {
+  const lic = require(path.join(OFFLINE_RUNTIME, 'license.cjs'));
+  const st = lic.check(offlineDataDir());
+  const p = st.payload || {};
+  return {
+    machineId: lic.machineId(), state: st.state, message: st.message || null, daysLeft: st.daysLeft ?? null,
+    shop: p.shop || null, shopCode: p.sc || null, expiresAt: p.exp ? new Date(p.exp * 1000).toISOString() : null,
+  };
+}
+
+/** Resolves with the license payload once this PC has a valid license,
+ *  showing the activation / renewal screen until then. */
+function ensureLicensed() {
+  const lic = require(path.join(OFFLINE_RUNTIME, 'license.cjs'));
+  const st = lic.check(offlineDataDir());
+  if (st.state === 'ok') return Promise.resolve(st.payload);
+  mainWindow.loadFile(path.join(__dirname, '..', 'desktop-offline', 'ui', 'license.html'));
+  return new Promise((resolve) => { licenseWaiter = resolve; });
+}
+
+async function recheckLicense() {
+  if (!localBackend || !mainWindow || mainWindow.isDestroyed()) return;
+  const lic = require(path.join(OFFLINE_RUNTIME, 'license.cjs'));
+  if (lic.check(offlineDataDir()).state === 'ok') return;
+  const payload = await ensureLicensed();
+  await require(path.join(OFFLINE_RUNTIME, 'license-flow.cjs')).applyLicenseToDb(localBackend, payload);
+  mainWindow.loadURL(offlineAppUrl);
+}
+
+function warnIfExpiringSoon() {
+  const info = licenseInfo();
+  const lic = require(path.join(OFFLINE_RUNTIME, 'license.cjs'));
+  if (info.state !== 'ok' || info.daysLeft == null || info.daysLeft > lic.WARN_DAYS) return;
+  dialog.showMessageBox(mainWindow, {
+    type: 'warning', title: 'Tillix license',
+    message: `Your Tillix license ends in ${info.daysLeft} day${info.daysLeft === 1 ? '' : 's'}.`,
+    detail: `Send this Machine ID to Tillix support for a renewal code: ${info.machineId}`,
+  }).catch(() => {});
+}
+
+if (IS_OFFLINE_EDITION) {
+  ipcMain.handle('pos:license-info', () => licenseInfo());
+  ipcMain.handle('pos:license-activate', async (_e, email, password) => {
+    if (!localBackend) throw new Error('Database is still starting, try again in a moment.');
+    const { activateOnline } = require(path.join(OFFLINE_RUNTIME, 'license-flow.cjs'));
+    const p = await activateOnline({ backend: localBackend, dataDir: offlineDataDir(), email: String(email || ''), password: String(password || '') });
+    return { expiresAt: new Date(p.exp * 1000).toISOString() };
+  });
+  ipcMain.handle('pos:license-renew', async (_e, code) => {
+    const lic = require(path.join(OFFLINE_RUNTIME, 'license.cjs'));
+    const p = lic.install(offlineDataDir(), String(code || ''));
+    if (localBackend) await require(path.join(OFFLINE_RUNTIME, 'license-flow.cjs')).applyLicenseToDb(localBackend, p);
+    return { expiresAt: new Date(p.exp * 1000).toISOString() };
+  });
+  ipcMain.handle('pos:license-continue', () => {
+    const lic = require(path.join(OFFLINE_RUNTIME, 'license.cjs'));
+    const st = lic.check(offlineDataDir());
+    if (st.state !== 'ok') return false;
+    if (licenseWaiter) { const w = licenseWaiter; licenseWaiter = null; w(st.payload); }
+    return true;
+  });
+}
+
 app.whenReady().then(async () => {
   if (!app.hasSingleInstanceLock()) return;
   try {
@@ -140,7 +209,14 @@ app.whenReady().then(async () => {
       });
       await startNitroServer({ SUPABASE_URL: localBackend.url, SUPABASE_PUBLISHABLE_KEY: localBackend.anonKey });
       startUrl = `http://127.0.0.1:${nitroPort}/dashboard`;
+      offlineAppUrl = startUrl;
+      const payload = await ensureLicensed();
+      await require(path.join(OFFLINE_RUNTIME, 'license-flow.cjs')).applyLicenseToDb(localBackend, payload);
       mainWindow.loadURL(startUrl);
+      warnIfExpiringSoon();
+      // Re-check hourly: an expiry while the app is open sends it back to
+      // the license screen.
+      setInterval(() => { void recheckLicense(); }, 60 * 60 * 1000);
     } else if (IS_DEV) {
       startUrl = `${DEV_URL.replace(/\/$/, '')}/dashboard`;
     } else {

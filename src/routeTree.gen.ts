@@ -55,6 +55,8 @@ import { Route as AuthenticatedSuppliersIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers.$id'
 import { Route as AdminShopsIdRouteImport } from './routes/admin_.shops.$id'
 import { Route as AdminSupportSessionIdRouteImport } from './routes/admin_.support.$sessionId'
+import { Route as ApiOfflineLicenseActivateRouteImport } from './routes/api.offline-license.activate'
+import { Route as ApiOfflineLicenseRenewRouteImport } from './routes/api.offline-license.renew'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -299,6 +301,17 @@ const AdminSupportSessionIdRoute = AdminSupportSessionIdRouteImport.update({
   path: '/admin/support/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOfflineLicenseActivateRoute =
+  ApiOfflineLicenseActivateRouteImport.update({
+    id: '/api/offline-license/activate',
+    path: '/api/offline-license/activate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOfflineLicenseRenewRoute = ApiOfflineLicenseRenewRouteImport.update({
+  id: '/api/offline-license/renew',
+  path: '/api/offline-license/renew',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -343,6 +356,8 @@ export interface FileRoutesByFullPath {
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/admin/shops/$id': typeof AdminShopsIdRoute
   '/admin/support/$sessionId': typeof AdminSupportSessionIdRoute
+  '/api/offline-license/activate': typeof ApiOfflineLicenseActivateRoute
+  '/api/offline-license/renew': typeof ApiOfflineLicenseRenewRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/suppliers/': typeof AuthenticatedSuppliersIndexRoute
@@ -390,6 +405,8 @@ export interface FileRoutesByTo {
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/admin/shops/$id': typeof AdminShopsIdRoute
   '/admin/support/$sessionId': typeof AdminSupportSessionIdRoute
+  '/api/offline-license/activate': typeof ApiOfflineLicenseActivateRoute
+  '/api/offline-license/renew': typeof ApiOfflineLicenseRenewRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/stock-count': typeof AuthenticatedStockCountIndexRoute
   '/suppliers': typeof AuthenticatedSuppliersIndexRoute
@@ -439,6 +456,8 @@ export interface FileRoutesById {
   '/_authenticated/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/admin_/shops/$id': typeof AdminShopsIdRoute
   '/admin_/support/$sessionId': typeof AdminSupportSessionIdRoute
+  '/api/offline-license/activate': typeof ApiOfflineLicenseActivateRoute
+  '/api/offline-license/renew': typeof ApiOfflineLicenseRenewRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/stock-count/': typeof AuthenticatedStockCountIndexRoute
   '/_authenticated/suppliers/': typeof AuthenticatedSuppliersIndexRoute
@@ -488,6 +507,8 @@ export interface FileRouteTypes {
     | '/suppliers/$id'
     | '/admin/shops/$id'
     | '/admin/support/$sessionId'
+    | '/api/offline-license/activate'
+    | '/api/offline-license/renew'
     | '/customers/'
     | '/stock-count/'
     | '/suppliers/'
@@ -535,6 +556,8 @@ export interface FileRouteTypes {
     | '/suppliers/$id'
     | '/admin/shops/$id'
     | '/admin/support/$sessionId'
+    | '/api/offline-license/activate'
+    | '/api/offline-license/renew'
     | '/customers'
     | '/stock-count'
     | '/suppliers'
@@ -583,6 +606,8 @@ export interface FileRouteTypes {
     | '/_authenticated/suppliers/$id'
     | '/admin_/shops/$id'
     | '/admin_/support/$sessionId'
+    | '/api/offline-license/activate'
+    | '/api/offline-license/renew'
     | '/_authenticated/customers/'
     | '/_authenticated/stock-count/'
     | '/_authenticated/suppliers/'
@@ -605,6 +630,8 @@ export interface RootRouteChildren {
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   AdminShopsIdRoute: typeof AdminShopsIdRoute
   AdminSupportSessionIdRoute: typeof AdminSupportSessionIdRoute
+  ApiOfflineLicenseActivateRoute: typeof ApiOfflineLicenseActivateRoute
+  ApiOfflineLicenseRenewRoute: typeof ApiOfflineLicenseRenewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -931,6 +958,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSupportSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/offline-license/activate': {
+      id: '/api/offline-license/activate'
+      path: '/api/offline-license/activate'
+      fullPath: '/api/offline-license/activate'
+      preLoaderRoute: typeof ApiOfflineLicenseActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/offline-license/renew': {
+      id: '/api/offline-license/renew'
+      path: '/api/offline-license/renew'
+      fullPath: '/api/offline-license/renew'
+      preLoaderRoute: typeof ApiOfflineLicenseRenewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1032,6 +1073,8 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   AdminShopsIdRoute: AdminShopsIdRoute,
   AdminSupportSessionIdRoute: AdminSupportSessionIdRoute,
+  ApiOfflineLicenseActivateRoute: ApiOfflineLicenseActivateRoute,
+  ApiOfflineLicenseRenewRoute: ApiOfflineLicenseRenewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
