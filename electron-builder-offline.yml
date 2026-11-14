@@ -1,0 +1,49 @@
+# electron-builder config for the OFFLINE desktop edition (data stays on the PC).
+# Build: see desktop-offline/README.md. Distributed by USB, never auto-updates.
+#
+# Different appId and productName from the online edition on purpose: the two
+# install side by side, and installing one never upgrades over the other.
+appId: com.tillix.pos.offline
+productName: Tillix POS Offline
+directories:
+  output: electron-release-offline
+  buildResources: electron/build-resources
+files:
+  - .output/**/*
+  - electron/**/*
+  - "!electron/build-resources/**"
+  - supabase/migrations/**/*
+  - desktop-offline/runtime/**/*
+  - desktop-offline/sql/**/*.sql
+  - desktop-offline/node_modules/**/*
+  - desktop-offline/bin/win32-x64/**/*
+  - "!**/*.map"
+asar: true
+# Native/child-process pieces must be real files: the Nitro server, our main
+# scripts, Postgres binaries (spawned) and PostgREST (spawned).
+asarUnpack:
+  - ".output/**/*"
+  - "electron/**/*"
+  - "desktop-offline/**/*"
+  - "supabase/migrations/**/*"
+extraMetadata:
+  main: electron/main.cjs
+  tillixEdition: offline
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: "Tillix-Offline-Setup-${version}.exe"
+  icon: electron/build-resources/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Tillix POS Offline
+  installerIcon: electron/build-resources/icon.ico
+  uninstallerIcon: electron/build-resources/icon.ico
+  # Keep the shop's database when the app is uninstalled or reinstalled.
+  deleteAppDataOnUninstall: false
+publish: null

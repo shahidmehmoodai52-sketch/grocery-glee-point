@@ -23,7 +23,10 @@
     "electron:build": "cross-env NITRO_PRESET=node-server vite build",
     "electron:pack": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish never",
     "electron:release": "bun run electron:build && electron-builder --config electron-builder.yml --win nsis --publish always",
-    "test": "vitest run"
+    "test": "vitest run",
+    "electron:offline:prepare": "npm --prefix desktop-offline install && node desktop-offline/scripts/fetch-postgrest.cjs win32",
+    "electron:offline:build": "node desktop-offline/scripts/build-frontend.cjs",
+    "electron:offline:pack": "npm run electron:offline:build && electron-builder --config electron-builder-offline.yml --win nsis --publish never"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
