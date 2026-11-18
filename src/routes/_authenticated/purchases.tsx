@@ -612,6 +612,49 @@ function Page() {
     },
   });
 
+  // Payments made from a supplier's ledger ("Add payment") live in
+  // party_payments, not on any purchase row, so the day's purchase view never
+  // showed them. Load them for the same date range so "what did we pay
+  // suppliers today" includes balances cleared from the ledger. Discounts are
+  // party_payments too but move no money, so they're left out.
+  const { data: supplierLedgerPayments = [] } = useQuery({
+    queryKey: ["purchases-supplier-ledger-payments", dateFilter, filterFrom, filterTo],
+    staleTime: 30_000,
+    queryFn: () => {
+      const { from, to } = dateFilter === "custom" ? { from: filterFrom, to: filterTo } : getPresetRange(dateFilter);
+      const start = from ? new Date(from) : new Date(); start.setHours(0,0,0,0);
+      const end = to ? new Date(to) : new Date(); end.setHours(23,59,59,999);
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
+      const direction = (p: any): "in" | "out" => {
+        const d = p?.cash_transactions?.direction;
+        return d === "in" ? "in" : "out";
+      };
+      return offlineFirst<any[]>(
+        async () => {
+          const base = supabase.from("party_payments")
+            .select("id,party_id,amount,method,note,created_at,cash_transactions(direction)")
+            .eq("party_type", "supplier")
+            .neq("method", "discount")
+            .gte("created_at", startIso)
+            .lte("created_at", endIso)
+            .order("created_at", { ascending: false });
+          const rows = await fetchAll<any>((fIdx: number, tIdx: number) => base.range(fIdx, tIdx), 1000);
+          return rows.map((r) => ({ ...r, dir: direction(r) }));
+        },
+        async () => {
+          const rows = (await db().party_payments.where("created_at").between(startIso, endIso, true, true).toArray())
+            .filter((r: any) => r._deleted !== 1 && r.party_type === "supplier" && r.method !== "discount");
+          rows.sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)));
+          return Promise.all(rows.map(async (r: any) => {
+            const tx = r.cash_transaction_id ? await db().cash_transactions.get(r.cash_transaction_id) : null;
+            return { ...r, dir: direction({ cash_transactions: tx ? { direction: tx.direction } : null }) };
+          }));
+        },
+      );
+    },
+  });
+
   const formatLocalDate = (value: Date) => {
     const y = value.getFullYear();
     const m = String(value.getMonth() + 1).padStart(2, "0");
@@ -666,16 +709,42 @@ function Page() {
       });
   }, [purchases, search, filterFrom, filterTo]);
 
+  const supplierNameById = useMemo(
+    () => new Map((suppliers as any[]).map((s) => [s.id, s.name])),
+    [suppliers],
+  );
+
+  const filteredLedgerPayments = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (supplierLedgerPayments as any[])
+      .map((p) => ({ ...p, supplierName: supplierNameById.get(p.party_id) ?? "—" }))
+      .filter((p) => {
+        const day = formatLocalDate(new Date(p.created_at));
+        if (day < filterFrom || day > filterTo) return false;
+        if (!query) return true;
+        return p.supplierName.toLowerCase().includes(query) || String(p.note ?? "").toLowerCase().includes(query);
+      });
+  }, [supplierLedgerPayments, supplierNameById, search, filterFrom, filterTo]);
+
   const filteredTotals = useMemo(() => {
     const todayKey = formatLocalDate(new Date());
+    const paidOnInvoices = filteredPurchases.reduce((sum, p) => sum + Number(p.paid || 0), 0);
+    // A refund from a supplier (direction "in") reduces what was paid out.
+    const paidFromLedger = filteredLedgerPayments.reduce(
+      (sum, p) => sum + (p.dir === "in" ? -1 : 1) * Number(p.amount || 0),
+      0,
+    );
     return {
       totalAmount: filteredPurchases.reduce((sum, p) => sum + Number(p.total || 0), 0),
       todayAmount: filteredPurchases.reduce(
         (sum, p) => sum + (formatLocalDate(new Date(p.created_at)) === todayKey ? Number(p.total || 0) : 0),
         0,
       ),
+      paidOnInvoices,
+      paidFromLedger,
+      paidTotal: paidOnInvoices + paidFromLedger,
     };
-  }, [filteredPurchases]);
+  }, [filteredPurchases, filteredLedgerPayments]);
 
   const { lineDiscountTotal, subtotal, discountedSubtotal, billDiscountAmt, taxAmt, total } = useMemo(
     () =>
@@ -1749,7 +1818,7 @@ function Page() {
       </div>
 
       <div className="grid gap-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('purchases.stat_total_purchases', 'Total purchases')}</div>
             <div className="mt-2 text-2xl font-semibold">{filteredPurchases.length}</div>
@@ -1761,6 +1830,16 @@ function Page() {
           <Card className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('purchases.stat_today_amount', "Today's purchase amount")}</div>
             <div className="mt-2 text-2xl font-semibold">{fmtMoney(filteredTotals.todayAmount, sym)}</div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('purchases.stat_paid_to_suppliers', 'Paid to suppliers')}</div>
+            <div className="mt-2 text-2xl font-semibold">{fmtMoney(filteredTotals.paidTotal, sym)}</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {t('purchases.paid_breakdown', 'On bills {{bills}} · Ledger {{ledger}}', {
+                bills: fmtMoney(filteredTotals.paidOnInvoices, sym),
+                ledger: fmtMoney(filteredTotals.paidFromLedger, sym),
+              })}
+            </div>
           </Card>
         </div>
         <Card className="p-4">
@@ -1865,6 +1944,44 @@ function Page() {
           <div><span className="text-muted-foreground">{t('purchases.filtered_total_label', 'Filtered total:')} </span><span className="font-semibold text-primary">{fmtMoney(filteredTotals.totalAmount, sym)}</span></div>
           <div><span className="text-muted-foreground">{t('purchases.today_filtered_total_label', "Today's filtered total:")} </span><span className="font-semibold">{fmtMoney(filteredTotals.todayAmount, sym)}</span></div>
         </div>
+      </Card>
+
+      <Card className="p-3 space-y-3">
+        <div>
+          <h2 className="font-semibold">{t('purchases.ledger_payments_heading', 'Supplier payments from ledger')}</h2>
+          <p className="text-xs text-muted-foreground">{t('purchases.ledger_payments_hint', 'Payments added from a supplier ledger (Add payment) in this period. Not part of any bill above.')}</p>
+        </div>
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead>{t('sales.th_date', 'Date')}</TableHead>
+            <TableHead>{t('purchase_returns.th_supplier', 'Supplier')}</TableHead>
+            <TableHead>{t('purchases.th_method', 'Method')}</TableHead>
+            <TableHead>{t('purchases.th_note', 'Note')}</TableHead>
+            <TableHead className="text-right">{t('common.amount', 'Amount')}</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {filteredLedgerPayments.length === 0 && (
+              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-4">{t('purchases.no_ledger_payments', 'No supplier ledger payments in this period')}</TableCell></TableRow>
+            )}
+            {filteredLedgerPayments.map((p: any) => (
+              <TableRow key={p.id}>
+                <TableCell className="text-sm">{new Date(p.created_at).toLocaleString('en-US', { timeZone: 'Asia/Karachi' })}</TableCell>
+                <TableCell>{p.supplierName}</TableCell>
+                <TableCell className="text-xs capitalize">{p.method ?? "—"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{p.note || "—"}</TableCell>
+                <TableCell className={`text-right font-medium ${p.dir === "in" ? "text-success" : ""}`}>
+                  {p.dir === "in" ? `+${fmtMoney(p.amount, sym)} ${t('purchases.refund_tag', '(refund)')}` : fmtMoney(p.amount, sym)}
+                </TableCell>
+              </TableRow>
+            ))}
+            {filteredLedgerPayments.length > 0 && (
+              <TableRow className="bg-muted/40 font-semibold border-t-2">
+                <TableCell colSpan={4} className="text-right">{t('purchases.ledger_payments_total', 'Total paid from ledger')}</TableCell>
+                <TableCell className="text-right">{fmtMoney(filteredTotals.paidFromLedger, sym)}</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </Card>
     </div>
   );
