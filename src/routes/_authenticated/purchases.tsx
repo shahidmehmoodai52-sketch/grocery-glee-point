@@ -935,7 +935,7 @@ function Page() {
         // 1. Get original items to calculate stock deltas
         const { data: origItems, error: fetchErr } = await supabase
           .from("purchase_items")
-          .select("product_id,qty,bonus_qty")
+          .select("product_id,qty,bonus_qty,cost")
           .eq("purchase_id", editingId);
         if (fetchErr) throw fetchErr;
 
@@ -1011,6 +1011,28 @@ function Page() {
           const { data: p } = await supabase.from("products").select("stock").eq("id", it.product_id).single();
           const currentStock = Number(p?.stock ?? 0);
           await supabase.from("products").update({ stock: currentStock + Number(it.qty) + Number((it as any).bonus_qty ?? 0) }).eq("id", it.product_id);
+        }
+
+        // Purchase rate. A new purchase sets products.cost_price to the rate
+        // entered (complete_purchase); the edit flow never did, so a rate
+        // corrected while editing stayed on the bill only (P-023-2993: bill
+        // 375, product still 339). Only rates actually changed in this edit
+        // are pushed, so re-saving an old purchase never overwrites a newer
+        // purchase's rate with this bill's untouched one.
+        const origCost = new Map<string, number>();
+        for (const it of ((origItems ?? []) as any[])) {
+          if (it.product_id && !origCost.has(it.product_id)) origCost.set(it.product_id, Number(it.cost));
+        }
+        const newCost = new Map<string, number>();
+        for (const it of payload.items as any[]) {
+          if (it.product_id) newCost.set(it.product_id, Number(it.cost));
+        }
+        for (const [pid, cost] of newCost) {
+          if (!Number.isFinite(cost) || cost < 0) continue;
+          const before = origCost.get(pid);
+          if (before !== undefined && Math.abs(before - cost) < 0.0001) continue;
+          const { error: costErr } = await supabase.from("products").update({ cost_price: +cost.toFixed(4) }).eq("id", pid);
+          if (costErr) throw costErr;
         }
 
         // Manual stock corrections. While editing, the Stock box shows the
