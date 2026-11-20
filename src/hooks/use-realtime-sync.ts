@@ -239,6 +239,35 @@ function applyProductRealtimePatch(qc: QueryClient, payload: any) {
   })();
 }
 
+// Rows that reach the Dexie mirror WITHOUT a realtime event (the reconnect
+// backfill below, or a periodic sync pull) were only stale-marked on the
+// POS catalogue — and ["products", "active"] is passive (never refetched
+// while mounted), so an open till kept scanning at the old price until the
+// page was reloaded, even though the mirror already had the new rate
+// (reported at Hafiz Mart: price changed on Products, POS kept the old one).
+// Re-read the mirror into the in-memory catalogue instead. Cheap: a local
+// IndexedDB read, and it only runs after a pull that actually changed rows.
+async function reloadPosCatalogFromMirror() {
+  try {
+    const hasCatalogue = Array.from(clients).some((qc) => Array.isArray(qc.getQueryData(["products", "active"])));
+    if (!hasCatalogue) return;
+    const rows = (await db().products.toArray())
+      .filter((p: any) => p.is_active !== false && p._deleted !== 1)
+      .sort((a: any, b: any) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+    if (!rows.length) return;
+    for (const qc of clients) {
+      const old = qc.getQueryData(["products", "active"]);
+      if (!Array.isArray(old)) continue;
+      // Never swap a full catalogue for a partial mirror (offline mode off,
+      // or a first sync still downloading) — that would hide products.
+      if (rows.length < old.length * 0.9) continue;
+      qc.setQueryData(["products", "active"], rows);
+    }
+  } catch {
+    /* best effort — a page reload or the next refetch still corrects it */
+  }
+}
+
 // Same idea for extra barcodes. Invalidating ["product_barcodes"] alone was
 // not enough: that query reads through readLocalFirst, whose Dexie mirror
 // only learns about new barcode rows on the next periodic sync pull — so a
@@ -301,7 +330,10 @@ async function refreshCatalogAfterReconnect() {
       const n = await pullTable(t);
       const removed = await pruneDeleted(t);
       await stampFresh(t);
-      if (n > 0 || removed > 0) dirty.add(t);
+      if (n > 0 || removed > 0) {
+        dirty.add(t);
+        if (t === "products") await reloadPosCatalogFromMirror();
+      }
     }
     scheduleFlush();
   } catch {
@@ -375,6 +407,7 @@ export function useRealtimeSync() {
     void import("@/lib/offline/sync").then(({ subscribeSyncedTables }) => {
       unsubSync = subscribeSyncedTables((tables) => {
         for (const t of tables) dirty.add(t);
+        if (tables.includes("products")) void reloadPosCatalogFromMirror();
         scheduleFlush();
       });
     });
